@@ -106,7 +106,9 @@ export function Component({ isSignUp = false }: { isSignUp?: boolean }) {
           password,
           options: {
             data: { full_name: name },
-            emailRedirectTo: typeof window !== 'undefined' ? window.location.origin : undefined,
+            emailRedirectTo: process.env.NEXT_PUBLIC_APP_URL
+              ? `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback`
+              : (typeof window !== 'undefined' ? `${window.location.origin}/auth/callback` : undefined),
           },
         });
 

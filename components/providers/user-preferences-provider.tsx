@@ -85,7 +85,12 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
         }
     };
 
+    const fetchedRef = React.useRef(false);
+
     useEffect(() => {
+        if (fetchedRef.current) return;
+        fetchedRef.current = true;
+
         refreshPreferences();
 
         // Subscribe to realtime changes for instant updates across tabs/components
