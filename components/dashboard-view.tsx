@@ -88,17 +88,23 @@ export function DashboardView() {
     const [userId, setUserId] = useState<string | null>(null);
 
     const [loading, setLoading] = useState(true);
-    const { formatCurrency, currency, convertAmount, monthlyBudget } = useUserPreferences();
+    const { formatCurrency, currency, convertAmount, monthlyBudget, userId: providerUserId } = useUserPreferences();
     const { balances } = useGroups();
 
     const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
     const [isEditOpen, setIsEditOpen] = useState(false);
 
-    const loadTransactions = async () => {
-        try {
-            const { data: { session } } = await supabase.auth.getSession();
-            if (!session?.user) return;
+    // Sync provider userId to local state if needed, or just use it directly
+    // We kept the local state 'userId' for now to minimize refactor impact, 
+    // but we'll sync it.
+    useEffect(() => {
+        if (providerUserId) {
+            setUserId(providerUserId);
+        }
+    }, [providerUserId]);
 
+    const loadTransactions = async (currentUserId: string) => {
+        try {
             const { data: txs } = await supabase
                 .from('transactions')
                 .select('*, splits(*)')
@@ -115,25 +121,23 @@ export function DashboardView() {
 
     useEffect(() => {
         async function fetchData() {
-            try {
-                const { data: { session } } = await supabase.auth.getSession();
-                const user = session?.user;
-                if (!user) return;
-                setUserId(user.id);
+            if (!providerUserId) return; // Wait for provider to have user
 
-                // Fetch Profile
+            try {
+                // Fetch Profile - we can probably optimize this too if provider has it, 
+                // but provider only has preferences. Let's keep profile fetch for now.
                 const { data: profile } = await supabase
                     .from('profiles')
                     .select('full_name, avatar_url')
-                    .eq('id', user.id)
+                    .eq('id', providerUserId)
                     .single();
 
                 if (profile) {
-                    setUserName(profile.full_name || user.email?.split('@')[0] || 'User');
+                    setUserName(profile.full_name || 'User');
                     setAvatarUrl(profile.avatar_url);
                 }
 
-                await loadTransactions();
+                await loadTransactions(providerUserId);
             } catch (error) {
                 console.error("Error fetching data:", error);
             } finally {
@@ -141,7 +145,7 @@ export function DashboardView() {
             }
         }
         fetchData();
-    }, []);
+    }, [providerUserId]);
 
     const handleDeleteTransaction = async (txId: string) => {
         try {
@@ -152,7 +156,7 @@ export function DashboardView() {
 
             if (error) throw error;
             toast.success('Transaction deleted');
-            loadTransactions();
+            if (userId) loadTransactions(userId);
         } catch (error: any) {
             toast.error('Failed to delete: ' + error.message);
         }
@@ -176,7 +180,7 @@ export function DashboardView() {
             toast.success('Transaction updated');
             setIsEditOpen(false);
             setEditingTransaction(null);
-            loadTransactions();
+            if (userId) loadTransactions(userId);
         } catch (error: any) {
             toast.error('Failed to update: ' + error.message);
         }

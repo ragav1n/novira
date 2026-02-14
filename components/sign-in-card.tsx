@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation';
 import { cn } from "@/lib/utils"
 import { FallingPattern } from './ui/falling-pattern';
 import { supabase } from '@/lib/supabase';
+import { authRateLimiter } from '@/utils/auth-rate-limiter';
 
 function Input({ className, type, ...props }: React.ComponentProps<"input">) {
   return (
@@ -56,8 +57,28 @@ export function Component({ isSignUp = false }: { isSignUp?: boolean }) {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
+  // Submission Lock to prevent double-firing
+  const isSubmittingRef = React.useRef(false);
+
+  // Rate Limiter Import (Dynamic import not needed if standard, but good to know context)
+  // We'll use the imported utility
+
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
+
+    // 1. Check Submission Lock
+    if (isSubmittingRef.current || isLoading) {
+      return;
+    }
+
+    // 2. Check Rate Limit
+    const remainingTime = authRateLimiter.check();
+    if (remainingTime > 0) {
+      const seconds = Math.ceil(remainingTime / 1000);
+      setError(`Please wait ${seconds}s before trying again.`);
+      return;
+    }
+
     setError(null);
     setSuccess(null);
 
@@ -72,7 +93,10 @@ export function Component({ isSignUp = false }: { isSignUp?: boolean }) {
       return;
     }
 
+    // 3. Set Lock & Loading
+    isSubmittingRef.current = true;
     setIsLoading(true);
+    authRateLimiter.recordOK(); // Record attempt
 
     try {
       if (isSignUp) {
@@ -107,8 +131,14 @@ export function Component({ isSignUp = false }: { isSignUp?: boolean }) {
       }
     } catch (error: any) {
       setError(error.message || 'Authentication failed');
+      // Release lock on error only (on success we navigate away)
+      isSubmittingRef.current = false;
     } finally {
       setIsLoading(false);
+      // Ensure lock is released if we didn't navigate (e.g. error or signup success message)
+      if (isSignUp || error) {
+        isSubmittingRef.current = false;
+      }
     }
   };
 
