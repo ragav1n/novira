@@ -17,6 +17,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select"
+import { useUserPreferences } from '@/components/providers/user-preferences-provider';
 
 // Constants for consistent coloring
 const CATEGORY_COLORS: Record<string, string> = {
@@ -40,7 +41,19 @@ const chartConfig: ChartConfig = {
 };
 
 // Custom Tooltip Component
+// Custom Tooltip Component needs access to context, but it's outside component. passing formatter?
+// Or better, define CustomTooltip inside, or pass it as prop?
+// Recharts tooltip content can be a function. 
+// Let's refactor CustomTooltip to be defined inside AnalyticsView or accept formatter.
+// Actually, for simplicity I will just update the CustomTooltip definition to use a context consumer or passing props is hard with Recharts sometimes.
+// I'll move CustomTooltip into the component or use a wrapper.
+// Moving CustomTooltip inside AnalyticsView might be performance heavy if it re-renders.
+// I'll update the component to accept a formatter prop if I can, but Recharts cloning might block it.
+// Easiest is to just use the raw symbol if I can't easily pass the function.
+// Wait, I can just use the hook if I make CustomTooltip a component that uses the hook?
+// Yes, CustomTooltip is a component.
 const CustomTooltip = ({ active, payload, label }: any) => {
+    const { formatCurrency } = useUserPreferences();
     if (active && payload && payload.length) {
         return (
             <div className="bg-card/90 backdrop-blur-md border border-white/10 p-3 rounded-xl shadow-xl">
@@ -53,7 +66,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
                                 style={{ backgroundColor: entry.stroke || entry.color || entry.fill }}
                             />
                             <span className="text-muted-foreground capitalize">{entry.name}:</span>
-                            <span className="font-mono font-medium">${Number(entry.value).toFixed(2)}</span>
+                            <span className="font-mono font-medium">{formatCurrency(Number(entry.value))}</span>
                         </div>
                     ))}
                 </div>
@@ -72,6 +85,7 @@ export function AnalyticsView() {
     const [categoryBreakdown, setCategoryBreakdown] = useState<any[]>([]);
     const [totalSpentInRange, setTotalSpentInRange] = useState(0);
     const [dateRange, setDateRange] = useState<DateRange>('6M');
+    const { formatCurrency } = useUserPreferences();
 
     useEffect(() => {
         fetchData();
@@ -267,7 +281,7 @@ export function AnalyticsView() {
                     <div className="flex items-center justify-between">
                         <div className="flex flex-col">
                             <span className="text-[10px] text-muted-foreground">Total in Period</span>
-                            <span className="text-lg font-bold">${totalSpentInRange.toFixed(2)}</span>
+                            <span className="text-lg font-bold">{formatCurrency(totalSpentInRange)}</span>
                         </div>
                     </div>
                 </CardContent>
@@ -316,7 +330,7 @@ export function AnalyticsView() {
                                     <div className="w-2 h-2 rounded-full" style={{ backgroundColor: cat.fill }} />
                                     {cat.name}
                                 </span>
-                                <span className="font-semibold">${cat.amount.toFixed(2)}</span>
+                                <span className="font-semibold">{formatCurrency(cat.amount)}</span>
                             </div>
 
                             {/* Simple Progress Bar */}

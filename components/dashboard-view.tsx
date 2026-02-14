@@ -1,5 +1,6 @@
 'use client';
 
+import { useUserPreferences } from '@/components/providers/user-preferences-provider';
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Plus, LogOut, Utensils, Car, Zap, ShoppingBag, HeartPulse, Clapperboard, CircleDollarSign } from 'lucide-react';
@@ -63,7 +64,9 @@ export function DashboardView() {
     const [userName, setUserName] = useState<string>('User');
     const [budget, setBudget] = useState<number>(3000);
     const [transactions, setTransactions] = useState<Transaction[]>([]);
+
     const [loading, setLoading] = useState(true);
+    const { formatCurrency, currency } = useUserPreferences();
 
     useEffect(() => {
         async function fetchData() {
@@ -189,24 +192,24 @@ export function DashboardView() {
             {/* Total Spent Card */}
             <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#8A2BE2] to-[#4B0082] p-6 shadow-xl shadow-primary/20">
                 <div className="absolute top-0 right-0 p-6 opacity-10">
-                    <span className="text-9xl font-bold text-white">$</span>
+                    <span className="text-9xl font-bold text-white">{currency === 'EUR' ? '€' : '$'}</span>
                 </div>
 
                 <div className="relative z-10 space-y-6">
                     <div className="flex justify-between items-start">
                         <div>
                             <p className="text-white/80 text-sm font-medium">Total Spent This Month</p>
-                            <h2 className="text-4xl font-bold text-white mt-1">${totalSpent.toFixed(2)}</h2>
+                            <h2 className="text-4xl font-bold text-white mt-1">{formatCurrency(totalSpent)}</h2>
                         </div>
                         <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center backdrop-blur-sm">
-                            <span className="text-xl font-bold text-white">$</span>
+                            <span className="text-xl font-bold text-white">{currency === 'EUR' ? '€' : '$'}</span>
                         </div>
                     </div>
 
                     <div className="space-y-2">
                         <div className="flex justify-between text-xs font-medium text-white/80">
-                            <span>Budget: ${budget.toLocaleString()}</span>
-                            <span>Remaining: ${remaining.toFixed(2)}</span>
+                            <span>Budget: {formatCurrency(budget)}</span>
+                            <span>Remaining: {formatCurrency(remaining)}</span>
                         </div>
                         <Progress value={progress} className="h-2 bg-black/30" indicatorClassName="bg-white" />
                         <div className="flex justify-between text-[10px] text-white/60">
@@ -263,7 +266,7 @@ export function DashboardView() {
                                                 <span className="text-foreground/80">{item.name}</span>
                                             </div>
                                             <div className="flex flex-col items-end">
-                                                <span className="font-semibold">${item.value.toFixed(2)}</span>
+                                                <span className="font-semibold">{formatCurrency(item.value)}</span>
                                             </div>
                                         </div>
                                     ))}
@@ -310,7 +313,7 @@ export function DashboardView() {
                                                     </div>
                                                 </div>
                                             </div>
-                                            <span className="font-bold text-sm">-${Number(tx.amount).toFixed(2)}</span>
+                                            <span className="font-bold text-sm">-{formatCurrency(Number(tx.amount))}</span>
                                         </div>
                                     ))}
                                     {transactions.length === 0 && (
@@ -339,7 +342,7 @@ export function DashboardView() {
                                     </div>
                                 </div>
                             </div>
-                            <span className="font-semibold text-sm">-${Number(tx.amount).toFixed(2)}</span>
+                            <span className="font-semibold text-sm">-{formatCurrency(Number(tx.amount))}</span>
                         </div>
                     ))}
                     {transactions.length === 0 && (

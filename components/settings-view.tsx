@@ -1,9 +1,11 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { ChevronLeft, User, Download, AlertTriangle, Shield, Lock, ChevronRight, SlidersHorizontal, LogOut } from 'lucide-react';
+import { ChevronLeft, User, Download, AlertTriangle, Shield, Lock, ChevronRight, SlidersHorizontal, LogOut, Banknote } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Switch } from '@/components/ui/switch';
+import { cn } from '@/lib/utils';
+import { useUserPreferences } from '@/components/providers/user-preferences-provider';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/lib/supabase';
@@ -22,6 +24,7 @@ export function SettingsView() {
     const [userEmail, setUserEmail] = useState('');
     const [budgetAlertsEnabled, setBudgetAlertsEnabled] = useState(false);
     const [showAlert, setShowAlert] = useState(false);
+    const { currency, setCurrency } = useUserPreferences();
 
     useEffect(() => {
         getProfile();
@@ -182,6 +185,36 @@ export function SettingsView() {
                 </div>
 
                 <div className="bg-secondary/5 rounded-xl border border-white/5 divide-y divide-white/5">
+                    <div className="flex items-center justify-between p-3">
+                        <div className="flex items-center gap-3">
+                            <Banknote className="w-4 h-4 text-muted-foreground" />
+                            <div>
+                                <p className="text-sm font-medium">Currency</p>
+                                <p className="text-[10px] text-muted-foreground">Select your preferred currency</p>
+                            </div>
+                        </div>
+                        <div className="flex items-center bg-secondary/20 rounded-lg p-0.5">
+                            <button
+                                onClick={() => setCurrency('USD')}
+                                className={cn(
+                                    "px-3 py-1 text-xs font-medium rounded-md transition-all",
+                                    currency === 'USD' ? "bg-primary text-white shadow-sm" : "text-muted-foreground hover:text-foreground"
+                                )}
+                            >
+                                USD
+                            </button>
+                            <button
+                                onClick={() => setCurrency('EUR')}
+                                className={cn(
+                                    "px-3 py-1 text-xs font-medium rounded-md transition-all",
+                                    currency === 'EUR' ? "bg-primary text-white shadow-sm" : "text-muted-foreground hover:text-foreground"
+                                )}
+                            >
+                                EUR
+                            </button>
+                        </div>
+                    </div>
+
                     <div className="flex items-center justify-between p-3">
                         <div className="flex items-center gap-3">
                             <AlertTriangle className="w-4 h-4 text-muted-foreground" />

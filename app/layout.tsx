@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import './globals.css'
 import { MobileLayout } from '@/components/mobile-layout'
+import { UserPreferencesProvider } from '@/components/providers/user-preferences-provider'
 
 const geist = Geist({
   subsets: ["latin"],
@@ -36,7 +37,9 @@ export default function RootLayout({
     <html lang="en">
       <body className={`${geist.variable} ${geistMono.variable} font-sans antialiased`}>
         <MobileLayout>
-          {children}
+          <UserPreferencesProvider>
+            {children}
+          </UserPreferencesProvider>
         </MobileLayout>
         <Analytics />
       </body>

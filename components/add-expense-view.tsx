@@ -16,6 +16,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { TimePicker } from "@/components/ui/datetime-picker";
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
+import { useUserPreferences } from '@/components/providers/user-preferences-provider';
 
 const dropdownCategories: Category[] = [
     { id: 'food', label: 'Food & Dining', icon: Utensils, color: '#FF6B6B' },
@@ -35,6 +36,7 @@ export function AddExpenseView() {
     const [date, setDate] = useState<Date | undefined>(new Date());
     const [paymentMethod, setPaymentMethod] = useState<'Cash' | 'Debit Card' | 'Credit Card'>('Cash');
     const [loading, setLoading] = useState(false);
+    const { currency } = useUserPreferences();
 
     const handleSubmit = async () => {
         if (!amount || !description || !date) {
@@ -101,7 +103,7 @@ export function AddExpenseView() {
                         onChange={(e) => setAmount(e.target.value)}
                         className="h-16 text-3xl font-bold pl-12 bg-secondary/10 border-primary/50 focus-visible:ring-primary/50"
                     />
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-bold text-primary">$</span>
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-bold text-primary">{currency === 'EUR' ? '€' : '$'}</span>
                 </div>
             </div>
 

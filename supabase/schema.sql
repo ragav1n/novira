@@ -4,7 +4,8 @@ create table profiles (
   updated_at timestamptz,
   full_name text,
   avatar_url text,
-  monthly_budget numeric default 3000
+  monthly_budget numeric default 3000,
+  currency text default 'USD'
 );
 
 -- Access policies for profiles
