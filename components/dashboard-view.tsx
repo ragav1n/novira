@@ -5,16 +5,25 @@ import { Plus, ChevronRight, MoreHorizontal } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
+import { Pie, PieChart } from 'recharts';
+import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/pie-chart";
 
 // Mock Data
 const spendingData = [
-    { name: 'Food', value: 1150, color: '#FF6B6B' },      // Red/Coral
-    { name: 'Transport', value: 680, color: '#4ECDC4' },   // Teal
-    { name: 'Bills', value: 520, color: '#45B7D1' },       // Light Blue
-    { name: 'Shopping', value: 350, color: '#FFA07A' },    // Orange
-    { name: 'Others', value: 147, color: '#C7F464' },      // Lime
+    { name: 'Food', value: 1150, color: '#8A2BE2', fill: '#8A2BE2' },      // Electric Purple
+    { name: 'Transport', value: 680, color: '#FF6B6B', fill: '#FF6B6B' },   // Coral
+    { name: 'Bills', value: 520, color: '#4ECDC4', fill: '#4ECDC4' },       // Teal
+    { name: 'Shopping', value: 350, color: '#F9C74F', fill: '#F9C74F' },    // Yellow
+    { name: 'Others', value: 147, color: '#C7F464', fill: '#C7F464' },      // Lime
 ];
+
+const chartConfig = {
+    food: { label: "Food", color: "#8A2BE2" },
+    transport: { label: "Transport", color: "#FF6B6B" },
+    bills: { label: "Bills", color: "#4ECDC4" },
+    shopping: { label: "Shopping", color: "#F9C74F" },
+    others: { label: "Others", color: "#C7F464" },
+} satisfies ChartConfig;
 
 const transactions = [
     { id: 1, name: 'Starbucks Coffee', category: 'Food', date: 'Today', amount: -8.75, icon: '☕' },
@@ -81,24 +90,27 @@ export function DashboardView() {
                     <CardContent className="p-4 flex items-center justify-between gap-4">
                         {/* Chart Circle */}
                         <div className="w-32 h-32 relative flex-shrink-0">
-                            <ResponsiveContainer width="100%" height="100%">
+                            <ChartContainer
+                                config={chartConfig}
+                                className="mx-auto aspect-square max-h-[250px]"
+                            >
                                 <PieChart>
+                                    <ChartTooltip
+                                        cursor={false}
+                                        content={<ChartTooltipContent hideLabel />}
+                                    />
                                     <Pie
                                         data={spendingData}
-                                        cx="50%"
-                                        cy="50%"
+                                        dataKey="value"
+                                        nameKey="name"
                                         innerRadius={40}
                                         outerRadius={60}
                                         paddingAngle={5}
-                                        dataKey="value"
-                                        stroke="none"
-                                    >
-                                        {spendingData.map((entry, index) => (
-                                            <Cell key={`cell-${index}`} fill={entry.color} />
-                                        ))}
-                                    </Pie>
+                                        cornerRadius={5}
+                                        strokeWidth={0}
+                                    />
                                 </PieChart>
-                            </ResponsiveContainer>
+                            </ChartContainer>
                             {/* Center text could go here */}
                         </div>
 

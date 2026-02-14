@@ -6,7 +6,8 @@ import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { LineChart, Line, XAxis, Tooltip, ResponsiveContainer } from 'recharts';
+import { LineChart, Line, XAxis, Tooltip, ResponsiveContainer, Pie, PieChart } from 'recharts';
+import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/pie-chart";
 
 // Mock Data
 const trendData = [
@@ -20,11 +21,18 @@ const trendData = [
 ];
 
 const categoryBreakdown = [
-    { name: 'Food', amount: 1150, color: 'bg-red-500', value: 75, lastMonth: 'bg-red-500/20' },
-    { name: 'Transport', amount: 680, color: 'bg-blue-500', value: 45, lastMonth: 'bg-blue-500/20' },
-    { name: 'Bills', amount: 520, color: 'bg-green-500', value: 35, lastMonth: 'bg-green-500/20' },
-    { name: 'Shopping', amount: 350, color: 'bg-yellow-500', value: 25, lastMonth: 'bg-yellow-500/20' },
+    { name: 'Food', amount: 1150, color: 'bg-[#8A2BE2]', value: 75, lastMonth: 'bg-[#8A2BE2]/20', fill: "#8A2BE2" }, // Electric Purple
+    { name: 'Transport', amount: 680, color: 'bg-[#FF6B6B]', value: 45, lastMonth: 'bg-[#FF6B6B]/20', fill: "#FF6B6B" }, // Coral
+    { name: 'Bills', amount: 520, color: 'bg-[#4ECDC4]', value: 35, lastMonth: 'bg-[#4ECDC4]/20', fill: "#4ECDC4" }, // Teal
+    { name: 'Shopping', amount: 350, color: 'bg-[#F9C74F]', value: 25, lastMonth: 'bg-[#F9C74F]/20', fill: "#F9C74F" }, // Yellow
 ];
+
+const chartConfig = {
+    food: { label: "Food", color: "#8A2BE2" },
+    transport: { label: "Transport", color: "#FF6B6B" },
+    bills: { label: "Bills", color: "#4ECDC4" },
+    shopping: { label: "Shopping", color: "#F9C74F" },
+} satisfies ChartConfig;
 
 export function AnalyticsView() {
     const router = useRouter();
@@ -88,9 +96,35 @@ export function AnalyticsView() {
                 </CardContent>
             </Card>
 
-            {/* Category Breakdown */}
+            {/* Category Breakdown including Pie Chart */}
             <div className="space-y-4">
                 <h3 className="font-semibold text-sm">Category Breakdown</h3>
+
+                {/* Pie Chart Integration */}
+                <div className="h-[250px] w-full">
+                    <ChartContainer
+                        config={chartConfig}
+                        className="mx-auto aspect-square max-h-[250px]"
+                    >
+                        <PieChart>
+                            <ChartTooltip
+                                cursor={false}
+                                content={<ChartTooltipContent hideLabel />}
+                            />
+                            <Pie
+                                data={categoryBreakdown}
+                                dataKey="amount"
+                                nameKey="name"
+                                innerRadius={60}
+                                strokeWidth={0}
+                                paddingAngle={5}
+                                cornerRadius={5}
+                            >
+                            </Pie>
+                        </PieChart>
+                    </ChartContainer>
+                </div>
+
                 <div className="space-y-4">
                     {categoryBreakdown.map((cat) => (
                         <div key={cat.name} className="space-y-2">

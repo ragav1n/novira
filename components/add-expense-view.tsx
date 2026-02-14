@@ -9,6 +9,11 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { FloatingLabelInput } from '@/components/ui/floating-label';
 import { FluidDropdown, type Category } from '@/components/ui/fluid-dropdown';
+import { format } from "date-fns";
+import { Calendar as CalendarIcon } from "lucide-react";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { TimePicker } from "@/components/ui/datetime-picker";
 
 const dropdownCategories: Category[] = [
     { id: 'food', label: 'Food & Dining', icon: Utensils, color: '#FF6B6B' },
@@ -23,6 +28,7 @@ export function AddExpenseView() {
     const router = useRouter();
     const [selectedCategory, setSelectedCategory] = useState('food');
     const [amount, setAmount] = useState('45.80');
+    const [date, setDate] = useState<Date | undefined>(new Date());
 
     return (
         <div className="p-5 space-y-6 max-w-md mx-auto pt-4 relative">
@@ -90,17 +96,39 @@ export function AddExpenseView() {
             </div>
 
             {/* Date & Payment */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-4">
                 <div className="space-y-2">
                     <label className="text-sm font-medium">Date</label>
-                    <div className="flex items-center gap-2 p-3 rounded-xl bg-secondary/10 border border-white/10">
-                        <Calendar className="w-4 h-4 text-muted-foreground" />
-                        <span className="text-sm">Jan 30, 2025</span>
-                    </div>
+                    <Popover>
+                        <PopoverTrigger asChild>
+                            <Button
+                                variant={"outline"}
+                                className={cn(
+                                    "w-full justify-start text-left font-normal h-12 rounded-xl bg-secondary/10 border-white/10 hover:bg-secondary/20",
+                                    !date && "text-muted-foreground"
+                                )}
+                            >
+                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                {date ? format(date, "PPP p") : <span>Pick a date</span>}
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0 bg-card border-white/10 text-foreground" align="center">
+                            <CalendarComponent
+                                mode="single"
+                                selected={date}
+                                onSelect={setDate}
+                                initialFocus
+                                className="p-3"
+                            />
+                            <div className="p-3 border-t border-white/10">
+                                <TimePicker setDate={setDate} date={date} />
+                            </div>
+                        </PopoverContent>
+                    </Popover>
                 </div>
                 <div className="space-y-2">
                     <label className="text-sm font-medium">Payment</label>
-                    <div className="flex items-center gap-2 p-3 rounded-xl bg-secondary/10 border border-white/10">
+                    <div className="flex items-center gap-2 p-3 rounded-xl bg-secondary/10 border border-white/10 h-12">
                         <CreditCard className="w-4 h-4 text-muted-foreground" />
                         <span className="text-sm">Credit Card</span>
                     </div>
