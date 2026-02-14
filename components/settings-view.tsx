@@ -16,7 +16,8 @@ import { AnimatePresence } from 'framer-motion';
 import { generateCSV, generatePDF } from '@/utils/export-utils';
 import { ChangePasswordDialog } from '@/components/change-password-dialog';
 import { FileTriggerButton } from '@/components/ui/file-trigger';
-import { Camera } from 'lucide-react';
+import { Camera, Trash2 } from 'lucide-react';
+import { DeleteAccountDialog } from '@/components/delete-account-dialog';
 
 export function SettingsView() {
     const router = useRouter();
@@ -434,11 +435,33 @@ export function SettingsView() {
             <div className="pt-2">
                 <button
                     onClick={handleSignOut}
-                    className="w-full flex items-center justify-center gap-2 p-3 rounded-xl bg-destructive/10 hover:bg-destructive/20 text-destructive transition-colors duration-200 border border-destructive/20"
+                    className="w-full flex items-center justify-center gap-2 p-3 rounded-xl bg-secondary/10 hover:bg-secondary/20 text-muted-foreground hover:text-foreground transition-colors duration-200 border border-white/5"
                 >
                     <LogOut className="w-4 h-4" />
                     <span className="font-medium text-sm">Log Out</span>
                 </button>
+            </div>
+
+            {/* Danger Zone - Refined */}
+            <div className="space-y-3 pt-2">
+                {/* No header, just part of the flow or separate section */}
+
+                <div className="bg-secondary/5 rounded-xl border border-white/5 overflow-hidden">
+                    <DeleteAccountDialog
+                        trigger={
+                            <button className="w-full flex items-center justify-between p-3 hover:bg-destructive/5 transition-colors text-left outline-none group">
+                                <div className="flex items-center gap-3">
+                                    <Trash2 className="w-4 h-4 text-muted-foreground group-hover:text-destructive transition-colors" />
+                                    <span className="text-sm font-medium text-muted-foreground group-hover:text-destructive transition-colors">Delete Account</span>
+                                </div>
+                                <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-destructive/50 transition-colors" />
+                            </button>
+                        }
+                    />
+                </div>
+                <p className="text-[10px] text-muted-foreground px-1">
+                    Permanently delete your account and all associated data.
+                </p>
             </div>
 
             {/* Footer Info */}
