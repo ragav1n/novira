@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, ChevronRight, MoreHorizontal } from 'lucide-react';
+import { Plus, ChevronRight, MoreHorizontal, LogOut } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
@@ -46,12 +46,20 @@ export function DashboardView() {
                     </h1>
                     <p className="text-sm text-muted-foreground">Track your expenses wisely</p>
                 </div>
-                <button
-                    onClick={() => router.push('/add')}
-                    className="w-10 h-10 rounded-full bg-primary/20 hover:bg-primary/30 flex items-center justify-center border border-primary/20 transition-colors"
-                >
-                    <Plus className="w-5 h-5 text-primary" />
-                </button>
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={() => router.push('/signin')}
+                        className="w-10 h-10 rounded-full bg-secondary/20 hover:bg-secondary/30 flex items-center justify-center border border-white/5 transition-colors"
+                    >
+                        <LogOut className="w-4 h-4 text-muted-foreground" />
+                    </button>
+                    <button
+                        onClick={() => router.push('/add')}
+                        className="w-10 h-10 rounded-full bg-primary/20 hover:bg-primary/30 flex items-center justify-center border border-primary/20 transition-colors"
+                    >
+                        <Plus className="w-5 h-5 text-primary" />
+                    </button>
+                </div>
             </div>
 
             {/* Total Spent Card */}

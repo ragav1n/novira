@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { ChevronLeft, User, Download, Cloud, FolderPlus, Moon, Bell, AlertTriangle, Shield, CreditCard, Lock, HelpCircle, ChevronRight, SlidersHorizontal } from 'lucide-react';
+import { ChevronLeft, User, Download, Cloud, FolderPlus, Moon, Bell, AlertTriangle, Shield, CreditCard, Lock, HelpCircle, ChevronRight, SlidersHorizontal, LogOut } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
@@ -115,6 +115,17 @@ export function SettingsView() {
                         <ChevronRight className="w-4 h-4 text-muted-foreground" />
                     </button>
                 </div>
+            </div>
+
+            {/* Logout */}
+            <div className="pt-2">
+                <button
+                    onClick={() => router.push('/signin')}
+                    className="w-full flex items-center justify-center gap-2 p-3 rounded-xl bg-destructive/10 hover:bg-destructive/20 text-destructive transition-colors duration-200 border border-destructive/20"
+                >
+                    <LogOut className="w-4 h-4" />
+                    <span className="font-medium text-sm">Log Out</span>
+                </button>
             </div>
 
             {/* Footer Info */}

@@ -32,6 +32,9 @@ export function MobileLayout({ children }: { children: React.ReactNode }) {
         }
     };
 
+    const pathname = usePathname();
+    const isAuthPage = ['/signin', '/signup'].includes(pathname);
+
     return (
         <div className="min-h-screen w-full bg-background text-foreground relative overflow-hidden font-sans select-none">
 
@@ -41,14 +44,16 @@ export function MobileLayout({ children }: { children: React.ReactNode }) {
             </main>
 
             {/* Bottom Navigation */}
-            <div className="fixed bottom-6 left-0 right-0 z-50 flex justify-center px-4">
-                <ExpandableTabs
-                    tabs={tabs}
-                    className="bg-background/80 backdrop-blur-xl border-white/10 shadow-2xl shadow-primary/20"
-                    activeColor="text-primary bg-primary/10"
-                    onChange={handleTabChange}
-                />
-            </div>
+            {!isAuthPage && (
+                <div className="fixed bottom-6 left-0 right-0 z-50 flex justify-center px-4">
+                    <ExpandableTabs
+                        tabs={tabs}
+                        className="bg-background/80 backdrop-blur-xl border-white/10 shadow-2xl shadow-primary/20"
+                        activeColor="text-primary bg-primary/10"
+                        onChange={handleTabChange}
+                    />
+                </div>
+            )}
 
             <Toaster />
         </div>
