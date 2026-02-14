@@ -22,6 +22,7 @@ interface UserPreferencesContextType {
     setBudgetAlertsEnabled: (enabled: boolean) => Promise<void>;
     monthlyBudget: number;
     setMonthlyBudget: (budget: number) => Promise<void>;
+    userId: string | null;
 }
 
 const UserPreferencesContext = createContext<UserPreferencesContextType | undefined>(undefined);
@@ -33,7 +34,9 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
     const [budgets, setBudgets] = useState<Record<string, number>>({});
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const [loading, setLoading] = useState(true);
+    const [userId, setUserId] = useState<string | null>(null);
     const [exchangeRates, setExchangeRates] = useState<Record<string, number>>({});
+
 
     // Fetch Exchange Rates when currency changes
     useEffect(() => {
@@ -70,6 +73,7 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
                 if (data.budget_alerts !== null) setBudgetAlertsEnabledState(data.budget_alerts);
                 if (data.monthly_budget) setMonthlyBudgetState(data.monthly_budget);
                 if (data.budgets) setBudgets(data.budgets as Record<string, number>);
+                setUserId(user.id);
             }
             if (error && error.code !== 'PGRST116') {
                 console.error('Error fetching preferences:', error);
@@ -242,7 +246,8 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
             budgetAlertsEnabled,
             setBudgetAlertsEnabled,
             monthlyBudget,
-            setMonthlyBudget
+            setMonthlyBudget,
+            userId
         }}>
             {children}
         </UserPreferencesContext.Provider>

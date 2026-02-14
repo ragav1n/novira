@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { Home, Plus, BarChart2, Search, Settings } from 'lucide-react';
+import { Home, Plus, BarChart2, Search, Settings, Users } from 'lucide-react';
 // Use the new components from ui folder
 import { FallingPattern } from '@/components/ui/falling-pattern';
 import { ExpandableTabs } from '@/components/ui/expandable-tabs';
@@ -17,12 +17,13 @@ export function MobileLayout({ children }: { children: React.ReactNode }) {
         { title: "Home", icon: Home },
         { title: "Add", icon: Plus },
         { title: "Analytics", icon: BarChart2 },
+        { title: "Groups", icon: Users },
         { type: "separator" } as const,
         { title: "Search", icon: Search },
         { title: "Settings", icon: Settings },
     ];
 
-    const routes = ['/', '/add', '/analytics', null, '/search', '/settings'];
+    const routes = ['/', '/add', '/analytics', '/groups', null, '/search', '/settings'];
 
     const handleTabChange = (index: number | null) => {
         if (index !== null) {

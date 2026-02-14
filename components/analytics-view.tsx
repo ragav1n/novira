@@ -86,10 +86,18 @@ export function AnalyticsView() {
     const [totalSpentInRange, setTotalSpentInRange] = useState(0);
     const [dateRange, setDateRange] = useState<DateRange>('6M');
     const { formatCurrency, currency, convertAmount } = useUserPreferences();
+    const [userId, setUserId] = useState<string | null>(null);
+
+    useEffect(() => {
+        supabase.auth.getSession().then(({ data: { session } }) => {
+            setUserId(session?.user?.id || null);
+        });
+    }, []);
+
 
     useEffect(() => {
         fetchData();
-    }, [dateRange, currency]);
+    }, [dateRange, currency, userId]);
 
     const fetchData = async () => {
         setLoading(true);
@@ -97,11 +105,19 @@ export function AnalyticsView() {
             const { data: { session } } = await supabase.auth.getSession();
             const user = session?.user;
             if (!user) return;
+            setUserId(user.id);
 
             let query = supabase
                 .from('transactions')
-                .select('*')
-                .order('date', { ascending: true }); // Order ascending for chart
+                .select(`
+                    *,
+                    splits (
+                        user_id,
+                        amount,
+                        is_paid
+                    )
+                `)
+                .order('date', { ascending: true });
 
             // Apply Date Filter
             const now = new Date();
@@ -119,7 +135,7 @@ export function AnalyticsView() {
             const { data: transactions } = await query;
 
             if (transactions) {
-                processTransactions(transactions, dateRange);
+                processTransactions(transactions, dateRange, user.id);
             }
         } catch (error) {
             console.error("Error fetching analytics:", error);
@@ -128,7 +144,7 @@ export function AnalyticsView() {
         }
     };
 
-    const processTransactions = (transactions: any[], range: DateRange) => {
+    const processTransactions = (transactions: any[], range: DateRange, currentUserId: string | null) => {
         const now = new Date();
 
         // 1. Process Trend Data
@@ -167,7 +183,21 @@ export function AnalyticsView() {
             if (monthsMap[monthKey]) {
                 const cat = tx.category.toLowerCase();
                 if (!monthsMap[monthKey][cat]) monthsMap[monthKey][cat] = 0; // Init if category new
-                monthsMap[monthKey][cat] += convertAmount(Number(tx.amount), tx.currency || 'USD');
+
+                let myShare = Number(tx.amount);
+                if (tx.splits && tx.splits.length > 0) {
+                    if (tx.user_id === userId) {
+                        const othersOwe = tx.splits.reduce((sum: number, s: any) => sum + Number(s.amount), 0);
+                        myShare = Number(tx.amount) - othersOwe;
+                    } else {
+                        const mySplit = tx.splits.find((s: any) => s.user_id === userId);
+                        myShare = mySplit ? Number(mySplit.amount) : 0;
+                    }
+                } else if (tx.user_id !== userId) {
+                    myShare = 0;
+                }
+
+                monthsMap[monthKey][cat] += convertAmount(myShare, tx.currency || 'USD');
             }
         });
 
@@ -189,9 +219,25 @@ export function AnalyticsView() {
 
         transactions.forEach(tx => {
             const cat = tx.category.toLowerCase();
-            const amount = convertAmount(Number(tx.amount), tx.currency || 'USD');
-            breakdownMap[cat] = (breakdownMap[cat] || 0) + amount;
-            total += amount;
+
+            let myShare = Number(tx.amount);
+            if (tx.splits && tx.splits.length > 0) {
+                if (tx.user_id === currentUserId) {
+                    const othersOwe = tx.splits.reduce((sum: number, s: any) => sum + Number(s.amount), 0);
+                    myShare = Number(tx.amount) - othersOwe;
+                } else {
+                    const mySplit = tx.splits.find((s: any) => s.user_id === currentUserId);
+                    myShare = mySplit ? Number(mySplit.amount) : 0;
+                }
+            } else if (tx.user_id !== currentUserId) {
+                myShare = 0;
+            }
+
+            if (myShare > 0) {
+                const amount = convertAmount(myShare, tx.currency || 'USD');
+                breakdownMap[cat] = (breakdownMap[cat] || 0) + amount;
+                total += amount;
+            }
         });
 
         setTotalSpentInRange(total);

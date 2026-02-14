@@ -4,6 +4,7 @@ import { Analytics } from '@vercel/analytics/next'
 import './globals.css'
 import { MobileLayout } from '@/components/mobile-layout'
 import { UserPreferencesProvider } from '@/components/providers/user-preferences-provider'
+import { GroupsProvider } from '@/components/providers/groups-provider'
 
 const geist = Geist({
   subsets: ["latin"],
@@ -43,7 +44,9 @@ export default function RootLayout({
       <body className={`${geist.variable} ${geistMono.variable} font-sans antialiased`}>
         <MobileLayout>
           <UserPreferencesProvider>
-            {children}
+            <GroupsProvider>
+              {children}
+            </GroupsProvider>
           </UserPreferencesProvider>
         </MobileLayout>
         <Analytics />

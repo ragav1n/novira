@@ -17,6 +17,10 @@ import { TimePicker } from "@/components/ui/datetime-picker";
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { useUserPreferences } from '@/components/providers/user-preferences-provider';
+import { useGroups } from '@/components/providers/groups-provider';
+import { Switch } from '@/components/ui/switch';
+import { Badge } from '@/components/ui/badge';
+import { Users, User, CheckCircle2 } from 'lucide-react';
 
 const dropdownCategories: Category[] = [
     { id: 'food', label: 'Food & Dining', icon: Utensils, color: '#FF6B6B' },
@@ -37,6 +41,12 @@ export function AddExpenseView() {
     const [paymentMethod, setPaymentMethod] = useState<'Cash' | 'Debit Card' | 'Credit Card'>('Cash');
     const [loading, setLoading] = useState(false);
     const { currency } = useUserPreferences();
+    const { groups, friends } = useGroups();
+
+    // Splitting State
+    const [isSplitEnabled, setIsSplitEnabled] = useState(false);
+    const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
+    const [selectedFriendIds, setSelectedFriendIds] = useState<string[]>([]);
 
     const handleSubmit = async () => {
         if (!amount || !description || !date) {
@@ -54,7 +64,7 @@ export function AddExpenseView() {
                 return;
             }
 
-            const { error } = await supabase.from('transactions').insert({
+            const { data: transaction, error: txError } = await supabase.from('transactions').insert({
                 user_id: user.id,
                 amount: parseFloat(amount),
                 description,
@@ -62,10 +72,42 @@ export function AddExpenseView() {
                 date: format(date, 'yyyy-MM-dd'),
                 payment_method: paymentMethod,
                 notes,
-                currency: currency // Store the transaction currency
-            });
+                currency: currency,
+                group_id: selectedGroupId
+            }).select().single();
 
-            if (error) throw error;
+            if (txError) throw txError;
+
+            // Handle Splits
+            if (isSplitEnabled) {
+                let debtors: string[] = [];
+                if (selectedGroupId) {
+                    // Fetch group members
+                    const { data: members } = await supabase
+                        .from('group_members')
+                        .select('user_id')
+                        .eq('group_id', selectedGroupId);
+
+                    if (members) {
+                        debtors = members.map(m => m.user_id).filter(id => id !== user.id);
+                    }
+                } else {
+                    debtors = selectedFriendIds;
+                }
+
+                if (debtors.length > 0) {
+                    const splitAmount = parseFloat(amount) / (debtors.length + 1);
+                    const splitRecords = debtors.map(debtorId => ({
+                        transaction_id: transaction.id,
+                        user_id: debtorId,
+                        amount: splitAmount,
+                        is_paid: false
+                    }));
+
+                    const { error: splitError } = await supabase.from('splits').insert(splitRecords);
+                    if (splitError) throw splitError;
+                }
+            }
 
             toast.success('Expense added successfully!');
             router.push('/');
@@ -204,6 +246,125 @@ export function AddExpenseView() {
                         </div>
                     </div>
                 </div>
+            </div>
+
+            {/* Split Expense Section */}
+            <div className="space-y-4 p-4 rounded-2xl bg-secondary/10 border border-white/5">
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                        <Users className="w-5 h-5 text-primary" />
+                        <div>
+                            <p className="text-sm font-medium">Split this expense</p>
+                            <p className="text-[10px] text-muted-foreground">Divide cost with others</p>
+                        </div>
+                    </div>
+                    <Switch
+                        checked={isSplitEnabled}
+                        onCheckedChange={setIsSplitEnabled}
+                    />
+                </div>
+
+                {isSplitEnabled && (
+                    <div className="space-y-4 pt-2 animate-in fade-in slide-in-from-top-2 duration-300">
+                        {/* Group Selection */}
+                        <div className="space-y-2">
+                            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Split with Group</p>
+                            <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1 scrollbar-hide">
+                                {groups.map((group) => (
+                                    <div
+                                        key={group.id}
+                                        onClick={() => {
+                                            setSelectedGroupId(selectedGroupId === group.id ? null : group.id);
+                                            setSelectedFriendIds([]);
+                                        }}
+                                        className={cn(
+                                            "flex flex-col items-center gap-1.5 p-3 rounded-xl border transition-all min-w-[80px] cursor-pointer",
+                                            selectedGroupId === group.id
+                                                ? "bg-primary/20 border-primary shadow-[0_0_15px_rgba(138,43,226,0.2)]"
+                                                : "bg-background/20 border-white/5 hover:border-white/10"
+                                        )}
+                                    >
+                                        <div className="w-10 h-10 rounded-full bg-secondary/30 flex items-center justify-center relative">
+                                            <Users className="w-5 h-5" />
+                                            {selectedGroupId === group.id && (
+                                                <div className="absolute -top-1 -right-1">
+                                                    <CheckCircle2 className="w-4 h-4 text-primary fill-background" />
+                                                </div>
+                                            )}
+                                        </div>
+                                        <span className="text-[10px] font-medium truncate w-16 text-center">{group.name}</span>
+                                    </div>
+                                ))}
+                                {groups.length === 0 && (
+                                    <p className="text-[11px] text-muted-foreground py-2">No groups found. Create one in Settings.</p>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Individual Friend Selection */}
+                        <div className="space-y-2">
+                            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Or Split with Friends</p>
+                            <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1 scrollbar-hide">
+                                {friends.map((friend) => (
+                                    <div
+                                        key={friend.id}
+                                        onClick={() => {
+                                            if (selectedGroupId) setSelectedGroupId(null);
+                                            setSelectedFriendIds(prev =>
+                                                prev.includes(friend.id)
+                                                    ? prev.filter(id => id !== friend.id)
+                                                    : [...prev, friend.id]
+                                            );
+                                        }}
+                                        className={cn(
+                                            "flex flex-col items-center gap-1.5 p-3 rounded-xl border transition-all min-w-[80px] cursor-pointer",
+                                            selectedFriendIds.includes(friend.id)
+                                                ? "bg-primary/20 border-primary shadow-[0_0_15px_rgba(138,43,226,0.2)]"
+                                                : "bg-background/20 border-white/5 hover:border-white/10"
+                                        )}
+                                    >
+                                        <div className="w-10 h-10 rounded-full overflow-hidden border border-white/5 relative">
+                                            {friend.avatar_url ? (
+                                                <img src={friend.avatar_url} alt={friend.full_name} className="w-full h-full object-cover" />
+                                            ) : (
+                                                <div className="w-full h-full flex items-center justify-center bg-secondary/30">
+                                                    <User className="w-5 h-5" />
+                                                </div>
+                                            )}
+                                            {selectedFriendIds.includes(friend.id) && (
+                                                <div className="absolute -top-1 -right-1">
+                                                    <CheckCircle2 className="w-4 h-4 text-primary fill-background" />
+                                                </div>
+                                            )}
+                                        </div>
+                                        <span className="text-[10px] font-medium truncate w-16 text-center">{friend.full_name.split(' ')[0]}</span>
+                                    </div>
+                                ))}
+                                {friends.length === 0 && (
+                                    <p className="text-[11px] text-muted-foreground py-2">No friends found.</p>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Split Summary */}
+                        {(selectedGroupId || selectedFriendIds.length > 0) && (
+                            <div className="bg-primary/5 rounded-xl p-3 border border-primary/10">
+                                <div className="flex justify-between items-center text-xs">
+                                    <span className="text-muted-foreground">Splitting with:</span>
+                                    <span className="font-semibold text-primary">
+                                        {selectedGroupId ? "Group" : `${selectedFriendIds.length} Friend${selectedFriendIds.length > 1 ? 's' : ''}`}
+                                    </span>
+                                </div>
+                                <div className="flex justify-between items-center text-xs mt-1">
+                                    <span className="text-muted-foreground">Each person pays:</span>
+                                    <span className="font-bold">
+                                        {(parseFloat(amount || '0') / ((selectedGroupId ? 3 : selectedFriendIds.length) + 1)).toFixed(2)} {currency === 'INR' ? '₹' : currency === 'EUR' ? '€' : '$'}
+                                    </span>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
             </div>
 
             {/* Notes */}

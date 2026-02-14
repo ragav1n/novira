@@ -4,7 +4,7 @@ import { useUserPreferences } from '@/components/providers/user-preferences-prov
 import { BudgetAlertManager } from '@/components/budget-alert-manager';
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, LogOut, Utensils, Car, Zap, ShoppingBag, HeartPulse, Clapperboard, CircleDollarSign } from 'lucide-react';
+import { Plus, Utensils, Car, Zap, ShoppingBag, HeartPulse, Clapperboard, CircleDollarSign, ArrowUpRight, ArrowDownLeft, Users } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Pie, PieChart } from 'recharts';
@@ -12,6 +12,7 @@ import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from "
 import { supabase } from '@/lib/supabase';
 import { format } from 'date-fns';
 import { WaveLoader } from '@/components/ui/wave-loader';
+import { useGroups } from './providers/groups-provider';
 import {
     Dialog,
     DialogContent,
@@ -50,9 +51,13 @@ type Transaction = {
     category: string;
     date: string;
     created_at: string;
-
-    currency?: string; // Optional for backward compatibility
-    icon?: string; // Derived for display
+    user_id: string;
+    currency?: string;
+    splits?: {
+        user_id: string;
+        amount: number;
+        is_paid: boolean;
+    }[];
 };
 
 type SpendingCategory = {
@@ -67,9 +72,11 @@ export function DashboardView() {
     const [userName, setUserName] = useState<string>('User');
     const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
     const [transactions, setTransactions] = useState<Transaction[]>([]);
+    const [userId, setUserId] = useState<string | null>(null);
 
     const [loading, setLoading] = useState(true);
     const { formatCurrency, currency, convertAmount, monthlyBudget } = useUserPreferences();
+    const { balances } = useGroups();
 
     useEffect(() => {
         async function fetchData() {
@@ -77,8 +84,8 @@ export function DashboardView() {
                 const { data: { session } } = await supabase.auth.getSession();
                 const user = session?.user;
                 if (!user) return;
+                setUserId(user.id);
 
-                // Fetch Profile
                 // Fetch Profile
                 const { data: profile } = await supabase
                     .from('profiles')
@@ -91,10 +98,10 @@ export function DashboardView() {
                     setAvatarUrl(profile.avatar_url);
                 }
 
-                // Fetch Transactions
-                const { data: txs, error } = await supabase
+                // Fetch Transactions with Splits
+                const { data: txs } = await supabase
                     .from('transactions')
-                    .select('*')
+                    .select('*, splits(*)')
                     .order('date', { ascending: false })
                     .order('created_at', { ascending: false });
 
@@ -110,19 +117,51 @@ export function DashboardView() {
         fetchData();
     }, []);
 
-    // Calculate totals based on ALL transactions, converted to current currency
+    // Calculate personal share for budget tracking
     const totalSpent = transactions.reduce((acc, tx) => {
-        return acc + convertAmount(Number(tx.amount), tx.currency || 'USD');
+        if (!userId) return acc;
+
+        let myShare = Number(tx.amount);
+        if (tx.splits && tx.splits.length > 0) {
+            if (tx.user_id === userId) {
+                const othersOwe = tx.splits.reduce((sum, s) => sum + Number(s.amount), 0);
+                myShare = Number(tx.amount) - othersOwe;
+            } else {
+                const mySplit = tx.splits.find(s => s.user_id === userId);
+                myShare = mySplit ? Number(mySplit.amount) : 0;
+            }
+        } else if (tx.user_id !== userId) {
+            myShare = 0;
+        }
+
+        return acc + convertAmount(myShare, tx.currency || 'USD');
     }, 0);
 
     const remaining = monthlyBudget - totalSpent;
     const progress = Math.min((totalSpent / monthlyBudget) * 100, 100);
 
-    // Calculate Spending by Category (converted)
+    // Calculate Spending by Category (converted personal share)
     const spendingByCategory = transactions.reduce((acc, tx) => {
+        if (!userId) return acc;
         const cat = tx.category.toLowerCase();
-        if (!acc[cat]) acc[cat] = 0;
-        acc[cat] += convertAmount(Number(tx.amount), tx.currency || 'USD');
+
+        let myShare = Number(tx.amount);
+        if (tx.splits && tx.splits.length > 0) {
+            if (tx.user_id === userId) {
+                const othersOwe = tx.splits.reduce((sum, s) => sum + Number(s.amount), 0);
+                myShare = Number(tx.amount) - othersOwe;
+            } else {
+                const mySplit = tx.splits.find(s => s.user_id === userId);
+                myShare = mySplit ? Number(mySplit.amount) : 0;
+            }
+        } else if (tx.user_id !== userId) {
+            myShare = 0;
+        }
+
+        if (myShare > 0) {
+            if (!acc[cat]) acc[cat] = 0;
+            acc[cat] += convertAmount(myShare, tx.currency || 'USD');
+        }
         return acc;
     }, {} as Record<string, number>);
 
@@ -132,11 +171,6 @@ export function DashboardView() {
         color: CATEGORY_COLORS[cat] || CATEGORY_COLORS.others,
         fill: CATEGORY_COLORS[cat] || CATEGORY_COLORS.others,
     }));
-
-    const handleSignOut = async () => {
-        await supabase.auth.signOut();
-        router.push('/signin');
-    };
 
     const getIconForCategory = (category: string) => {
         switch (category.toLowerCase()) {
@@ -150,9 +184,6 @@ export function DashboardView() {
         }
     };
 
-
-
-
     if (loading) {
         return (
             <div className="h-full w-full flex flex-col items-center justify-center min-h-[50vh]">
@@ -164,10 +195,8 @@ export function DashboardView() {
     return (
         <div className="p-5 space-y-6 max-w-md mx-auto relative pb-24">
             {/* Header */}
-            {/* Header */}
             <div className="flex justify-between items-center pt-2">
                 <div className="flex items-center gap-3">
-                    {/* App Logo */}
                     <div className="w-10 h-10 relative shrink-0">
                         <img src="/Novira.png" alt="Novira" className="w-full h-full object-contain drop-shadow-[0_0_8px_rgba(138,43,226,0.5)]" />
                     </div>
@@ -179,7 +208,6 @@ export function DashboardView() {
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
-                    {/* Avatar (Links to Settings) */}
                     <div
                         onClick={() => router.push('/settings')}
                         className="w-10 h-10 rounded-full bg-secondary/20 border border-white/5 overflow-hidden flex items-center justify-center text-xs font-bold text-muted-foreground uppercase shrink-0 cursor-pointer hover:border-primary/50 transition-colors"
@@ -190,7 +218,6 @@ export function DashboardView() {
                             userName.substring(0, 2)
                         )}
                     </div>
-
                     <button
                         onClick={() => router.push('/add')}
                         className="w-10 h-10 rounded-full bg-primary/20 hover:bg-primary/30 flex items-center justify-center border border-primary/20 transition-colors"
@@ -207,18 +234,16 @@ export function DashboardView() {
                 <div className="absolute top-0 right-0 p-6 opacity-10">
                     <span className="text-9xl font-bold text-white">{currency === 'EUR' ? '€' : currency === 'INR' ? '₹' : '$'}</span>
                 </div>
-
                 <div className="relative z-10 space-y-6">
                     <div className="flex justify-between items-start">
                         <div>
-                            <p className="text-white/80 text-sm font-medium">Total Spent This Month</p>
+                            <p className="text-white/80 text-sm font-medium">Personal Share Spent</p>
                             <h2 className="text-4xl font-bold text-white mt-1">{formatCurrency(totalSpent)}</h2>
                         </div>
                         <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center backdrop-blur-sm">
                             <span className="text-xl font-bold text-white">{currency === 'EUR' ? '€' : currency === 'INR' ? '₹' : '$'}</span>
                         </div>
                     </div>
-
                     <div className="space-y-2">
                         <div className="flex justify-between text-xs font-medium text-white/80">
                             <span>Budget: {formatCurrency(monthlyBudget)}</span>
@@ -227,11 +252,32 @@ export function DashboardView() {
                         <Progress value={progress} className="h-2 bg-black/30" indicatorClassName="bg-white" />
                         <div className="flex justify-between text-[10px] text-white/60">
                             <span>{progress.toFixed(1)}% used</span>
-                            {/* Simple generic message or date calc */}
                             <span>{new Date().getDate()}th of Month</span>
                         </div>
                     </div>
                 </div>
+            </div>
+
+            {/* Balance Summary Card */}
+            <div className="grid grid-cols-2 gap-4">
+                <Card className="bg-emerald-500/10 border-emerald-500/20">
+                    <CardContent className="p-4 flex flex-col items-center justify-center text-center">
+                        <div className="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center mb-2">
+                            <ArrowDownLeft className="w-4 h-4 text-emerald-500" />
+                        </div>
+                        <p className="text-[10px] text-emerald-500 font-bold uppercase tracking-wider">You are owed</p>
+                        <h4 className="text-lg font-bold text-emerald-500">{formatCurrency(balances.totalOwedToMe)}</h4>
+                    </CardContent>
+                </Card>
+                <Card className="bg-rose-500/10 border-rose-500/20">
+                    <CardContent className="p-4 flex flex-col items-center justify-center text-center">
+                        <div className="w-8 h-8 rounded-full bg-rose-500/20 flex items-center justify-center mb-2">
+                            <ArrowUpRight className="w-4 h-4 text-rose-500" />
+                        </div>
+                        <p className="text-[10px] text-rose-500 font-bold uppercase tracking-wider">You owe</p>
+                        <h4 className="text-lg font-bold text-rose-500">{formatCurrency(balances.totalOwed)}</h4>
+                    </CardContent>
+                </Card>
             </div>
 
             {/* Spending by Category */}
@@ -240,22 +286,14 @@ export function DashboardView() {
                     <h3 className="text-lg font-bold">Spending by Category</h3>
                     <span className="text-xs bg-secondary/30 px-3 py-1 rounded-full text-primary border border-primary/20">Current Month</span>
                 </div>
-
                 <Card className="border-none bg-card/40 backdrop-blur-md shadow-none">
                     <CardContent className="p-4 flex items-center justify-between gap-4">
-                        {/* Chart Circle */}
                         {spendingData.length > 0 ? (
                             <>
                                 <div className="w-32 h-32 relative flex-shrink-0">
-                                    <ChartContainer
-                                        config={chartConfig}
-                                        className="mx-auto aspect-square max-h-[250px]"
-                                    >
+                                    <ChartContainer config={chartConfig} className="mx-auto aspect-square max-h-[250px]">
                                         <PieChart>
-                                            <ChartTooltip
-                                                cursor={false}
-                                                content={<ChartTooltipContent hideLabel />}
-                                            />
+                                            <ChartTooltip cursor={false} content={<ChartTooltipContent hideLabel />} />
                                             <Pie
                                                 data={spendingData}
                                                 dataKey="value"
@@ -269,8 +307,6 @@ export function DashboardView() {
                                         </PieChart>
                                     </ChartContainer>
                                 </div>
-
-                                {/* Legend */}
                                 <div className="flex-1 space-y-3">
                                     {spendingData.map((item) => (
                                         <div key={item.name} className="flex items-center justify-between text-xs">
@@ -278,16 +314,14 @@ export function DashboardView() {
                                                 <div className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }} />
                                                 <span className="text-foreground/80">{item.name}</span>
                                             </div>
-                                            <div className="flex flex-col items-end">
-                                                <span className="font-semibold">{formatCurrency(item.value)}</span>
-                                            </div>
+                                            <span className="font-semibold">{formatCurrency(item.value)}</span>
                                         </div>
                                     ))}
                                 </div>
                             </>
                         ) : (
                             <div className="w-full text-center py-8 text-muted-foreground text-sm">
-                                No expenses yet. Click + to add one!
+                                No personal expenses yet.
                             </div>
                         )}
                     </CardContent>
@@ -298,7 +332,6 @@ export function DashboardView() {
             <div className="space-y-4">
                 <div className="flex justify-between items-center">
                     <h3 className="text-lg font-bold">Recent Transactions</h3>
-
                     <Dialog>
                         <DialogTrigger asChild>
                             <button className="text-xs text-primary hover:text-primary/80">View All</button>
@@ -306,17 +339,20 @@ export function DashboardView() {
                         <DialogContent className="max-w-md max-h-[80vh] flex flex-col">
                             <DialogHeader>
                                 <DialogTitle>All Transactions</DialogTitle>
-                                <DialogDescription>
-                                    History of all your expenses.
-                                </DialogDescription>
+                                <DialogDescription>History of all your expenses.</DialogDescription>
                             </DialogHeader>
                             <ScrollArea className="flex-1 -mr-4 pr-4">
                                 <div className="space-y-3 pt-4">
                                     {transactions.map((tx) => (
                                         <div key={tx.id} className="flex items-center justify-between p-3 rounded-2xl bg-card/20 border border-white/5 hover:bg-card/40 transition-colors">
                                             <div className="flex items-center gap-3">
-                                                <div className="w-10 h-10 rounded-full bg-secondary/20 flex items-center justify-center border border-white/5">
+                                                <div className="w-10 h-10 rounded-full bg-secondary/20 flex items-center justify-center border border-white/5 relative">
                                                     {getIconForCategory(tx.category)}
+                                                    {tx.splits && tx.splits.length > 0 && (
+                                                        <div className="absolute -bottom-1 -right-1 bg-primary rounded-full p-0.5 border border-background">
+                                                            <Users className="w-2.5 h-2.5 text-white" />
+                                                        </div>
+                                                    )}
                                                 </div>
                                                 <div>
                                                     <p className="font-medium text-sm">{tx.description}</p>
@@ -326,13 +362,18 @@ export function DashboardView() {
                                                     </div>
                                                 </div>
                                             </div>
-                                            <span className="font-bold text-sm">-{formatCurrency(Number(tx.amount), tx.currency)}</span>
+                                            <div className="flex flex-col items-end">
+                                                <span className="font-bold text-sm">-{formatCurrency(Number(tx.amount), tx.currency)}</span>
+                                                {tx.splits && tx.splits.length > 0 && (
+                                                    <span className="text-[9px] text-muted-foreground mt-0.5">
+                                                        Split • {tx.splits.length + 1} people
+                                                    </span>
+                                                )}
+                                            </div>
                                         </div>
                                     ))}
                                     {transactions.length === 0 && (
-                                        <div className="text-center py-8 text-muted-foreground">
-                                            No transactions found.
-                                        </div>
+                                        <div className="text-center py-8 text-muted-foreground">No transactions found.</div>
                                     )}
                                 </div>
                             </ScrollArea>
@@ -344,8 +385,13 @@ export function DashboardView() {
                     {transactions.slice(0, 5).map((tx) => (
                         <div key={tx.id} className="flex items-center justify-between p-3 rounded-2xl bg-card/30 border border-white/5 hover:bg-card/50 transition-colors">
                             <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-full bg-secondary/20 flex items-center justify-center border border-white/5">
+                                <div className="w-10 h-10 rounded-full bg-secondary/20 flex items-center justify-center border border-white/5 relative">
                                     {getIconForCategory(tx.category)}
+                                    {tx.splits && tx.splits.length > 0 && (
+                                        <div className="absolute -bottom-1 -right-1 bg-primary rounded-full p-0.5 border border-background">
+                                            <Users className="w-2.5 h-2.5 text-white" />
+                                        </div>
+                                    )}
                                 </div>
                                 <div>
                                     <p className="font-medium text-sm">{tx.description}</p>
@@ -355,17 +401,21 @@ export function DashboardView() {
                                     </div>
                                 </div>
                             </div>
-                            <span className="font-semibold text-sm">-{formatCurrency(Number(tx.amount), tx.currency)}</span>
+                            <div className="flex flex-col items-end">
+                                <span className="font-semibold text-sm">-{formatCurrency(Number(tx.amount), tx.currency)}</span>
+                                {tx.splits && tx.splits.length > 0 && (
+                                    <span className="text-[9px] text-muted-foreground mt-0.5">
+                                        Split
+                                    </span>
+                                )}
+                            </div>
                         </div>
                     ))}
                     {transactions.length === 0 && (
-                        <div className="text-center text-xs text-muted-foreground py-4">
-                            No recent transactions found.
-                        </div>
+                        <div className="text-center text-xs text-muted-foreground py-4">No recent transactions found.</div>
                     )}
                 </div>
             </div>
         </div>
-
     );
 }
