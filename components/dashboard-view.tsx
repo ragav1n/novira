@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { useRouter } from 'next/navigation';
 import { Plus, ChevronRight, MoreHorizontal } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -33,6 +34,8 @@ const transactions = [
 ];
 
 export function DashboardView() {
+    const router = useRouter();
+
     return (
         <div className="p-5 space-y-6 max-w-md mx-auto">
             {/* Header */}
@@ -43,7 +46,10 @@ export function DashboardView() {
                     </h1>
                     <p className="text-sm text-muted-foreground">Track your expenses wisely</p>
                 </div>
-                <button className="w-10 h-10 rounded-full bg-primary/20 hover:bg-primary/30 flex items-center justify-center border border-primary/20 transition-colors">
+                <button
+                    onClick={() => router.push('/add')}
+                    className="w-10 h-10 rounded-full bg-primary/20 hover:bg-primary/30 flex items-center justify-center border border-primary/20 transition-colors"
+                >
                     <Plus className="w-5 h-5 text-primary" />
                 </button>
             </div>

@@ -42,7 +42,6 @@ export function AddExpenseView() {
                 </button>
                 <div className="text-center">
                     <h2 className="text-lg font-semibold">Add Expense</h2>
-                    <p className="text-xs text-muted-foreground">2 of 5</p>
                 </div>
                 <button className="text-sm font-medium text-primary hover:text-primary/80">Next</button>
             </div>
@@ -68,21 +67,6 @@ export function AddExpenseView() {
                     defaultValue="Whole Foods Market"
                     className="bg-secondary/10 border-white/10 h-14"
                 />
-
-                {/* AI Suggestion */}
-                <div className="mt-3 p-3 rounded-xl bg-gradient-to-r from-primary/20 to-primary/5 border border-primary/20">
-                    <div className="flex items-start gap-2">
-                        <Sparkles className="w-4 h-4 text-primary mt-0.5" />
-                        <div className="space-y-1 w-full">
-                            <p className="text-xs font-medium text-primary">AI Suggestion</p>
-                            <p className="text-xs text-muted-foreground">This looks like a Food & Dining expense</p>
-                            <Button size="sm" className="w-full mt-2 h-7 text-xs bg-primary hover:bg-primary/90">
-                                <Sparkles className="w-3 h-3 mr-1" />
-                                Apply Suggestion
-                            </Button>
-                        </div>
-                    </div>
-                </div>
             </div>
 
             {/* Category Selection */}

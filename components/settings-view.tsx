@@ -67,33 +67,6 @@ export function SettingsView() {
                 <p className="text-[10px] text-muted-foreground">Export your expense data for backup or analysis in other tools.</p>
             </div>
 
-            {/* Sync & Backup */}
-            <div className="space-y-3 pt-2">
-                <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
-                    <Cloud className="w-4 h-4" />
-                    <span>Sync & Backup</span>
-                </div>
-
-                <div className="p-4 rounded-xl bg-secondary/5 border border-white/5 space-y-4">
-                    <div className="flex items-start justify-between">
-                        <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center">
-                                <Cloud className="w-5 h-5 text-blue-400" />
-                            </div>
-                            <div>
-                                <p className="font-medium text-sm">Google Drive Backup</p>
-                                <p className="text-xs text-muted-foreground">Last backup: 2 hours ago</p>
-                            </div>
-                        </div>
-                        <span className="px-2 py-0.5 rounded-full bg-green-500/20 text-[10px] text-green-400 font-medium">Connected</span>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                        <Button variant="outline" size="sm" className="bg-transparent border-white/10 hover:bg-white/5 text-xs">Backup Now</Button>
-                        <Button variant="outline" size="sm" className="bg-transparent border-white/10 hover:bg-white/5 text-xs">Sync Data</Button>
-                    </div>
-                </div>
-            </div>
 
             {/* Preferences */}
             <div className="space-y-3 pt-2">
@@ -103,16 +76,6 @@ export function SettingsView() {
                 </div>
 
                 <div className="bg-secondary/5 rounded-xl border border-white/5 divide-y divide-white/5">
-                    <div className="flex items-center justify-between p-3">
-                        <div className="flex items-center gap-3">
-                            <Moon className="w-4 h-4 text-muted-foreground" />
-                            <div>
-                                <p className="text-sm font-medium">Dark Mode</p>
-                                <p className="text-[10px] text-muted-foreground">Switch to dark theme</p>
-                            </div>
-                        </div>
-                        <Switch defaultChecked />
-                    </div>
                     <div className="flex items-center justify-between p-3">
                         <div className="flex items-center gap-3">
                             <Bell className="w-4 h-4 text-muted-foreground" />
@@ -146,22 +109,8 @@ export function SettingsView() {
                 <div className="bg-secondary/5 rounded-xl border border-white/5 divide-y divide-white/5">
                     <button className="w-full flex items-center justify-between p-3 hover:bg-white/5 transition-colors text-left">
                         <div className="flex items-center gap-3">
-                            <CreditCard className="w-4 h-4 text-muted-foreground" />
-                            <span className="text-sm font-medium">Manage Payment Methods</span>
-                        </div>
-                        <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                    </button>
-                    <button className="w-full flex items-center justify-between p-3 hover:bg-white/5 transition-colors text-left">
-                        <div className="flex items-center gap-3">
                             <Lock className="w-4 h-4 text-muted-foreground" />
                             <span className="text-sm font-medium">Change Password</span>
-                        </div>
-                        <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                    </button>
-                    <button className="w-full flex items-center justify-between p-3 hover:bg-white/5 transition-colors text-left">
-                        <div className="flex items-center gap-3">
-                            <HelpCircle className="w-4 h-4 text-muted-foreground" />
-                            <span className="text-sm font-medium">Privacy Settings</span>
                         </div>
                         <ChevronRight className="w-4 h-4 text-muted-foreground" />
                     </button>
@@ -170,7 +119,7 @@ export function SettingsView() {
 
             {/* Footer Info */}
             <div className="text-center py-4 space-y-2">
-                <p className="text-xs text-muted-foreground font-medium">ExpenseTracker v2.1.0</p>
+                <p className="text-xs text-muted-foreground font-medium">ExpenseTracker v1.0.0</p>
                 <div className="flex justify-center gap-4 text-[10px] text-primary">
                     <button>Terms</button>
                     <button>Privacy</button>
