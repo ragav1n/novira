@@ -147,17 +147,7 @@ export function DashboardView() {
         }
     };
 
-    const getEmojiForCategory = (category: string) => {
-        switch (category.toLowerCase()) {
-            case 'food': return '🍔';
-            case 'transport': return '🚗';
-            case 'bills': return '💡';
-            case 'shopping': return '🛍️';
-            case 'healthcare': return '🏥';
-            case 'entertainment': return '🎬';
-            default: return '💸';
-        }
-    }
+
 
 
     if (loading) {
@@ -336,8 +326,8 @@ export function DashboardView() {
                     {transactions.slice(0, 5).map((tx) => (
                         <div key={tx.id} className="flex items-center justify-between p-3 rounded-2xl bg-card/30 border border-white/5 hover:bg-card/50 transition-colors">
                             <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-full bg-secondary/20 flex items-center justify-center text-lg">
-                                    {getEmojiForCategory(tx.category)}
+                                <div className="w-10 h-10 rounded-full bg-secondary/20 flex items-center justify-center border border-white/5">
+                                    {getIconForCategory(tx.category)}
                                 </div>
                                 <div>
                                     <p className="font-medium text-sm">{tx.description}</p>

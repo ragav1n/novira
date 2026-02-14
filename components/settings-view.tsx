@@ -13,6 +13,7 @@ import { toast } from 'sonner';
 import { WaveLoader } from '@/components/ui/wave-loader';
 import { AlertBanner } from '@/components/ui/alert-banner';
 import { AnimatePresence } from 'framer-motion';
+import { generateCSV, generatePDF } from '@/utils/export-utils';
 
 export function SettingsView() {
     const router = useRouter();
@@ -24,7 +25,8 @@ export function SettingsView() {
     const [userEmail, setUserEmail] = useState('');
     const [budgetAlertsEnabled, setBudgetAlertsEnabled] = useState(false);
     const [showAlert, setShowAlert] = useState(false);
-    const { currency, setCurrency } = useUserPreferences();
+    const [loadingExport, setLoadingExport] = useState(false);
+    const { currency, setCurrency, formatCurrency, convertAmount } = useUserPreferences();
 
     useEffect(() => {
         getProfile();
@@ -83,6 +85,39 @@ export function SettingsView() {
             toast.error('Error updating profile: ' + error.message);
         } finally {
             setSaving(false);
+        }
+    };
+
+    const handleExport = async (type: 'csv' | 'pdf') => {
+        setLoadingExport(true);
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return;
+
+            const { data: transactions, error } = await supabase
+                .from('transactions')
+                .select('*')
+                .order('date', { ascending: false });
+
+            if (error) throw error;
+
+            if (!transactions || transactions.length === 0) {
+                toast.error('No transactions to export');
+                return;
+            }
+
+            if (type === 'csv') {
+                generateCSV(transactions, currency, convertAmount, formatCurrency);
+                toast.success('CSV Exported successfully');
+            } else {
+                generatePDF(transactions, currency, convertAmount, formatCurrency);
+                toast.success('PDF Exported successfully');
+            }
+        } catch (error: any) {
+            console.error('Export failed:', error);
+            toast.error('Failed to export data');
+        } finally {
+            setLoadingExport(false);
         }
     };
 
@@ -165,13 +200,23 @@ export function SettingsView() {
                     <span>Export Data</span>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
-                    <Button variant="outline" className="h-16 flex flex-col items-center justify-center gap-1 bg-secondary/5 border-primary/20 hover:bg-primary/10 hover:border-primary/50 transition-all group">
+                    <Button
+                        variant="outline"
+                        onClick={() => handleExport('csv')}
+                        disabled={loadingExport}
+                        className="h-16 flex flex-col items-center justify-center gap-1 bg-secondary/5 border-primary/20 hover:bg-primary/10 hover:border-primary/50 transition-all group"
+                    >
                         <Download className="w-5 h-5 text-primary group-hover:scale-110 transition-transform" />
-                        <span className="text-xs font-medium">Export CSV</span>
+                        <span className="text-xs font-medium">{loadingExport ? 'Exporting...' : 'Export CSV'}</span>
                     </Button>
-                    <Button variant="outline" className="h-16 flex flex-col items-center justify-center gap-1 bg-secondary/5 border-primary/20 hover:bg-primary/10 hover:border-primary/50 transition-all group">
+                    <Button
+                        variant="outline"
+                        onClick={() => handleExport('pdf')}
+                        disabled={loadingExport}
+                        className="h-16 flex flex-col items-center justify-center gap-1 bg-secondary/5 border-primary/20 hover:bg-primary/10 hover:border-primary/50 transition-all group"
+                    >
                         <Download className="w-5 h-5 text-primary group-hover:scale-110 transition-transform" />
-                        <span className="text-xs font-medium">Export PDF</span>
+                        <span className="text-xs font-medium">{loadingExport ? 'Exporting...' : 'Export PDF'}</span>
                     </Button>
                 </div>
                 <p className="text-[10px] text-muted-foreground">Export your expense data for backup or analysis in other tools.</p>
