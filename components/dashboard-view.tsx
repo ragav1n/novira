@@ -4,7 +4,7 @@ import { useUserPreferences } from '@/components/providers/user-preferences-prov
 import { BudgetAlertManager } from '@/components/budget-alert-manager';
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, Utensils, Car, Zap, ShoppingBag, HeartPulse, Clapperboard, CircleDollarSign, ArrowUpRight, ArrowDownLeft, Users } from 'lucide-react';
+import { Plus, Utensils, Car, Zap, ShoppingBag, HeartPulse, Clapperboard, CircleDollarSign, ArrowUpRight, ArrowDownLeft, Users, MoreVertical, Pencil, Trash2, X } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Pie, PieChart } from 'recharts';
@@ -20,8 +20,21 @@ import {
     DialogHeader,
     DialogTitle,
     DialogTrigger,
+    DialogFooter,
+    DialogClose
 } from "@/components/ui/dialog"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
+import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { toast } from 'sonner';
 
 // Constants
 const CATEGORY_COLORS: Record<string, string> = {
@@ -78,6 +91,28 @@ export function DashboardView() {
     const { formatCurrency, currency, convertAmount, monthlyBudget } = useUserPreferences();
     const { balances } = useGroups();
 
+    const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
+    const [isEditOpen, setIsEditOpen] = useState(false);
+
+    const loadTransactions = async () => {
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session?.user) return;
+
+            const { data: txs } = await supabase
+                .from('transactions')
+                .select('*, splits(*)')
+                .order('date', { ascending: false })
+                .order('created_at', { ascending: false });
+
+            if (txs) {
+                setTransactions(txs);
+            }
+        } catch (error) {
+            console.error("Error loading transactions:", error);
+        }
+    };
+
     useEffect(() => {
         async function fetchData() {
             try {
@@ -98,16 +133,7 @@ export function DashboardView() {
                     setAvatarUrl(profile.avatar_url);
                 }
 
-                // Fetch Transactions with Splits
-                const { data: txs } = await supabase
-                    .from('transactions')
-                    .select('*, splits(*)')
-                    .order('date', { ascending: false })
-                    .order('created_at', { ascending: false });
-
-                if (txs) {
-                    setTransactions(txs);
-                }
+                await loadTransactions();
             } catch (error) {
                 console.error("Error fetching data:", error);
             } finally {
@@ -116,6 +142,53 @@ export function DashboardView() {
         }
         fetchData();
     }, []);
+
+    const handleDeleteTransaction = async (txId: string) => {
+        try {
+            const { error } = await supabase
+                .from('transactions')
+                .delete()
+                .eq('id', txId);
+
+            if (error) throw error;
+            toast.success('Transaction deleted');
+            loadTransactions();
+        } catch (error: any) {
+            toast.error('Failed to delete: ' + error.message);
+        }
+    };
+
+    const handleUpdateTransaction = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!editingTransaction) return;
+
+        try {
+            const { error } = await supabase
+                .from('transactions')
+                .update({
+                    description: editingTransaction.description,
+                    category: editingTransaction.category,
+                    amount: editingTransaction.amount, // Allow amount edit if user knows what they are doing (splits might get weird if we don't handle them, but let's allow safe edits first)
+                })
+                .eq('id', editingTransaction.id);
+
+            if (error) throw error;
+            toast.success('Transaction updated');
+            setIsEditOpen(false);
+            setEditingTransaction(null);
+            loadTransactions();
+        } catch (error: any) {
+            toast.error('Failed to update: ' + error.message);
+        }
+    };
+
+    const isRecentUserTransaction = (tx: Transaction) => {
+        if (tx.user_id !== userId) return false;
+        // Get all transactions by this user, assuming 'transactions' is already sorted by date desc
+        const userTxs = transactions.filter(t => t.user_id === userId);
+        // Check if this tx is in the top 3
+        return userTxs.slice(0, 3).some(t => t.id === tx.id);
+    };
 
     // Calculate personal share for budget tracking
     const totalSpent = transactions.reduce((acc, tx) => {
@@ -344,7 +417,7 @@ export function DashboardView() {
                             <ScrollArea className="flex-1 -mr-4 pr-4">
                                 <div className="space-y-3 pt-4">
                                     {transactions.map((tx) => (
-                                        <div key={tx.id} className="flex items-center justify-between p-3 rounded-2xl bg-card/20 border border-white/5 hover:bg-card/40 transition-colors">
+                                        <div key={tx.id} className="flex items-center justify-between p-3 rounded-2xl bg-card/20 border border-white/5 hover:bg-card/40 transition-colors group">
                                             <div className="flex items-center gap-3">
                                                 <div className="w-10 h-10 rounded-full bg-secondary/20 flex items-center justify-center border border-white/5 relative">
                                                     {getIconForCategory(tx.category)}
@@ -362,12 +435,43 @@ export function DashboardView() {
                                                     </div>
                                                 </div>
                                             </div>
-                                            <div className="flex flex-col items-end">
-                                                <span className="font-bold text-sm">-{formatCurrency(Number(tx.amount), tx.currency)}</span>
-                                                {tx.splits && tx.splits.length > 0 && (
-                                                    <span className="text-[9px] text-muted-foreground mt-0.5">
-                                                        Split • {tx.splits.length + 1} people
-                                                    </span>
+                                            <div className="flex items-center gap-2">
+                                                <div className="flex flex-col items-end">
+                                                    <span className="font-bold text-sm">-{formatCurrency(Number(tx.amount), tx.currency)}</span>
+                                                    {tx.splits && tx.splits.length > 0 && (
+                                                        <span className="text-[9px] text-muted-foreground mt-0.5">
+                                                            Split • {tx.splits.length + 1} people
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                {isRecentUserTransaction(tx) && (
+                                                    <DropdownMenu>
+                                                        <DropdownMenuTrigger asChild>
+                                                            <button className="p-1 rounded-full hover:bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                <MoreVertical className="w-4 h-4 text-muted-foreground" />
+                                                            </button>
+                                                        </DropdownMenuTrigger>
+                                                        <DropdownMenuContent align="end">
+                                                            <DropdownMenuItem onClick={() => {
+                                                                setEditingTransaction(tx);
+                                                                setIsEditOpen(true);
+                                                            }}>
+                                                                <Pencil className="w-4 h-4 mr-2" />
+                                                                Edit
+                                                            </DropdownMenuItem>
+                                                            <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => {
+                                                                toast('Delete transaction?', {
+                                                                    action: {
+                                                                        label: 'Delete',
+                                                                        onClick: () => handleDeleteTransaction(tx.id)
+                                                                    }
+                                                                });
+                                                            }}>
+                                                                <Trash2 className="w-4 h-4 mr-2" />
+                                                                Delete
+                                                            </DropdownMenuItem>
+                                                        </DropdownMenuContent>
+                                                    </DropdownMenu>
                                                 )}
                                             </div>
                                         </div>
@@ -383,7 +487,7 @@ export function DashboardView() {
 
                 <div className="space-y-3">
                     {transactions.slice(0, 5).map((tx) => (
-                        <div key={tx.id} className="flex items-center justify-between p-3 rounded-2xl bg-card/30 border border-white/5 hover:bg-card/50 transition-colors">
+                        <div key={tx.id} className="flex items-center justify-between p-3 rounded-2xl bg-card/30 border border-white/5 hover:bg-card/50 transition-colors group">
                             <div className="flex items-center gap-3">
                                 <div className="w-10 h-10 rounded-full bg-secondary/20 flex items-center justify-center border border-white/5 relative">
                                     {getIconForCategory(tx.category)}
@@ -401,12 +505,43 @@ export function DashboardView() {
                                     </div>
                                 </div>
                             </div>
-                            <div className="flex flex-col items-end">
-                                <span className="font-semibold text-sm">-{formatCurrency(Number(tx.amount), tx.currency)}</span>
-                                {tx.splits && tx.splits.length > 0 && (
-                                    <span className="text-[9px] text-muted-foreground mt-0.5">
-                                        Split
-                                    </span>
+                            <div className="flex items-center gap-2">
+                                <div className="flex flex-col items-end">
+                                    <span className="font-semibold text-sm">-{formatCurrency(Number(tx.amount), tx.currency)}</span>
+                                    {tx.splits && tx.splits.length > 0 && (
+                                        <span className="text-[9px] text-muted-foreground mt-0.5">
+                                            Split
+                                        </span>
+                                    )}
+                                </div>
+                                {isRecentUserTransaction(tx) && (
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                            <button className="p-1 rounded-full hover:bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <MoreVertical className="w-4 h-4 text-muted-foreground" />
+                                            </button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end">
+                                            <DropdownMenuItem onClick={() => {
+                                                setEditingTransaction(tx);
+                                                setIsEditOpen(true);
+                                            }}>
+                                                <Pencil className="w-4 h-4 mr-2" />
+                                                Edit
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => {
+                                                toast('Delete transaction?', {
+                                                    action: {
+                                                        label: 'Delete',
+                                                        onClick: () => handleDeleteTransaction(tx.id)
+                                                    }
+                                                });
+                                            }}>
+                                                <Trash2 className="w-4 h-4 mr-2" />
+                                                Delete
+                                            </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
                                 )}
                             </div>
                         </div>
