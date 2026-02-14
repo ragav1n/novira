@@ -1,20 +1,22 @@
 'use client';
 
 import React, { useState } from 'react';
-import { ChevronLeft, Sparkles, Calendar, CreditCard } from 'lucide-react';
+import { ChevronLeft, Sparkles, Calendar, CreditCard, Utensils, Car, Zap, ShoppingBag, HeartPulse, Clapperboard, Layers } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { FloatingLabelInput } from '@/components/ui/floating-label';
+import { FluidDropdown, type Category } from '@/components/ui/fluid-dropdown';
 
-const categories = [
-    { id: 'food', name: 'Food & Dining', icon: '🍽️', color: 'bg-primary/20 border-primary/50' },
-    { id: 'transport', name: 'Transportation', icon: '🚗', color: 'bg-secondary/20 border-white/10' },
-    { id: 'bills', name: 'Bills & Utilities', icon: '⚡', color: 'bg-secondary/20 border-white/10' },
-    { id: 'shopping', name: 'Shopping', icon: '🛍️', color: 'bg-secondary/20 border-white/10' },
-    { id: 'healthcare', name: 'Healthcare', icon: '🏥', color: 'bg-secondary/20 border-white/10' },
-    { id: 'entertainment', name: 'Entertainment', icon: '🎬', color: 'bg-secondary/20 border-white/10' },
+const dropdownCategories: Category[] = [
+    { id: 'food', label: 'Food & Dining', icon: Utensils, color: '#FF6B6B' },
+    { id: 'transport', label: 'Transportation', icon: Car, color: '#4ECDC4' },
+    { id: 'bills', label: 'Bills & Utilities', icon: Zap, color: '#F9C74F' },
+    { id: 'shopping', label: 'Shopping', icon: ShoppingBag, color: '#A06CD5' },
+    { id: 'healthcare', label: 'Healthcare', icon: HeartPulse, color: '#FF9F1C' },
+    { id: 'entertainment', label: 'Entertainment', icon: Clapperboard, color: '#2EC4B6' },
 ];
 
 export function AddExpenseView() {
@@ -53,11 +55,12 @@ export function AddExpenseView() {
             </div>
 
             {/* Description */}
-            <div className="space-y-2">
-                <label className="text-sm font-medium">Description *</label>
-                <Input
+            <div className="space-y-4">
+                <FloatingLabelInput
+                    id="description"
+                    label="Description"
                     defaultValue="Whole Foods Market"
-                    className="bg-secondary/10 border-white/10 h-12"
+                    className="bg-secondary/10 border-white/10 h-14"
                 />
 
                 {/* AI Suggestion */}
@@ -79,25 +82,11 @@ export function AddExpenseView() {
             {/* Category Selection */}
             <div className="space-y-2">
                 <label className="text-sm font-medium">Category *</label>
-                <div className="grid grid-cols-2 gap-3">
-                    {categories.map((cat) => (
-                        <button
-                            key={cat.id}
-                            onClick={() => setSelectedCategory(cat.id)}
-                            className={cn(
-                                "flex items-center gap-3 p-3 rounded-xl border transition-all duration-200",
-                                selectedCategory === cat.id
-                                    ? "bg-primary/20 border-primary shadow-[0_0_10px_rgba(138,43,226,0.2)]"
-                                    : "bg-secondary/20 border-white/5 hover:bg-secondary/30"
-                            )}
-                        >
-                            <span className="text-xl">{cat.icon}</span>
-                            <span className={cn("text-xs font-medium", selectedCategory === cat.id ? "text-white" : "text-muted-foreground")}>
-                                {cat.name}
-                            </span>
-                        </button>
-                    ))}
-                </div>
+                <FluidDropdown
+                    items={dropdownCategories}
+                    onSelect={(cat) => setSelectedCategory(cat.id)}
+                    className="w-full max-w-none"
+                />
             </div>
 
             {/* Date & Payment */}
