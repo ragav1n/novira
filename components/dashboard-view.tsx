@@ -10,7 +10,7 @@ import { Progress } from '@/components/ui/progress';
 import { Pie, PieChart } from 'recharts';
 import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/pie-chart";
 import { supabase } from '@/lib/supabase';
-import { format } from 'date-fns';
+import { format, isSameMonth, parseISO } from 'date-fns';
 import { WaveLoader } from '@/components/ui/wave-loader';
 import { useGroups } from './providers/groups-provider';
 import {
@@ -198,6 +198,10 @@ export function DashboardView() {
     const totalSpent = transactions.reduce((acc, tx) => {
         if (!userId) return acc;
 
+        // Filter for current month using parseISO
+        const txDate = parseISO(tx.date);
+        if (!isSameMonth(txDate, new Date())) return acc;
+
         let myShare = Number(tx.amount);
         if (tx.splits && tx.splits.length > 0) {
             if (tx.user_id === userId) {
@@ -220,6 +224,11 @@ export function DashboardView() {
     // Calculate Spending by Category (converted personal share)
     const spendingByCategory = transactions.reduce((acc, tx) => {
         if (!userId) return acc;
+
+        // Filter for current month
+        const txDate = parseISO(tx.date);
+        if (!isSameMonth(txDate, new Date())) return acc;
+
         const cat = tx.category.toLowerCase();
 
         let myShare = Number(tx.amount);

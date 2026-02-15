@@ -76,7 +76,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
     return null;
 };
 
-type DateRange = '3M' | '6M' | '1Y' | 'ALL';
+type DateRange = '1M' | 'LM' | '3M' | '6M' | '1Y' | 'ALL';
 
 export function AnalyticsView() {
     const router = useRouter();
@@ -84,7 +84,7 @@ export function AnalyticsView() {
     const [categoryTrendData, setCategoryTrendData] = useState<any[]>([]);
     const [categoryBreakdown, setCategoryBreakdown] = useState<any[]>([]);
     const [totalSpentInRange, setTotalSpentInRange] = useState(0);
-    const [dateRange, setDateRange] = useState<DateRange>('6M');
+    const [dateRange, setDateRange] = useState<DateRange>('1M');
     const { formatCurrency, currency, convertAmount } = useUserPreferences();
     const [userId, setUserId] = useState<string | null>(null);
 
@@ -123,7 +123,13 @@ export function AnalyticsView() {
             const now = new Date();
             let startDate: Date | null = null;
 
-            if (dateRange === '3M') startDate = startOfMonth(subMonths(now, 2)); // Current + 2 prev = 3 months
+            if (dateRange === '1M') startDate = startOfMonth(now);
+            else if (dateRange === 'LM') {
+                startDate = startOfMonth(subMonths(now, 1));
+                // For LM we need an upper bound too, as it shouldn't include current month
+                query = query.lt('date', startOfMonth(now).toISOString());
+            }
+            else if (dateRange === '3M') startDate = startOfMonth(subMonths(now, 2)); // Current + 2 prev = 3 months
             else if (dateRange === '6M') startDate = startOfMonth(subMonths(now, 5));
             else if (dateRange === '1Y') startDate = startOfMonth(subYears(now, 1));
             // 'ALL' implies no lower bound filter
@@ -152,7 +158,16 @@ export function AnalyticsView() {
 
         // Determine number of months to display on X-axis
         let monthsBack = 5; // Default 6M (0 to 5)
-        if (range === '3M') monthsBack = 2;
+        if (dateRange === '1M' || dateRange === 'LM') {
+            // For single month views, we might want daily breakdown? 
+            // The current UI puts 'month' on XAxis. 
+            // If we want daily trend for 1M/LM, we need to change XAxis to Day.
+            // For now, to keep it consistent with the "Spending Trend" chart which seems to be monthly,
+            // showing just one dot for the whole month might be boring. 
+            // Let's implement DAILY trend for 1M/LM.
+            monthsBack = -2; // Special flag for Daily
+        }
+        else if (range === '3M') monthsBack = 2;
         else if (range === '1Y') monthsBack = 11;
         else if (range === 'ALL') {
             // For ALL, we don't pre-fill months, we just take what's in the data
@@ -160,7 +175,7 @@ export function AnalyticsView() {
         }
 
         // Initialize months if not ALL
-        if (monthsBack !== -1) {
+        if (monthsBack !== -1 && monthsBack !== -2) {
             for (let i = monthsBack; i >= 0; i--) {
                 const d = subMonths(now, i);
                 const monthKey = format(d, 'MMM yyyy'); // Use Year too to avoid collisions in 1Y view
@@ -169,20 +184,43 @@ export function AnalyticsView() {
             }
         }
 
+        // If Daily (1M or LM)
+        if (monthsBack === -2) {
+            const start = range === 'LM' ? startOfMonth(subMonths(now, 1)) : startOfMonth(now);
+            const end = range === 'LM' ? endOfMonth(subMonths(now, 1)) : (now > endOfMonth(now) ? endOfMonth(now) : now);
+            // Actually just go to end of month for 1M so chart doesn't cut off if today is 15th? 
+            // Or just up to today? Up to end of month is better for XAxis stability.
+            const endRange = endOfMonth(start);
+
+            let current = start;
+            while (current <= endRange) {
+                const dayKey = format(current, 'd MMM');
+                monthsMap[dayKey] = { month: dayKey, rawDate: new Date(current) };
+                Object.keys(CATEGORY_COLORS).forEach(cat => monthsMap[dayKey][cat] = 0);
+                current = new Date(current.setDate(current.getDate() + 1));
+            }
+        }
+
         // Aggregate Data
         transactions.forEach(tx => {
             const date = parseISO(tx.date);
-            const monthKey = format(date, 'MMM yyyy');
+            let timeKey = '';
 
-            // If ALL, create entry if missing
-            if (monthsBack === -1 && !monthsMap[monthKey]) {
-                monthsMap[monthKey] = { month: monthKey, rawDate: date };
-                Object.keys(CATEGORY_COLORS).forEach(cat => monthsMap[monthKey][cat] = 0);
+            if (monthsBack === -2) {
+                timeKey = format(date, 'd MMM');
+            } else {
+                timeKey = format(date, 'MMM yyyy');
             }
 
-            if (monthsMap[monthKey]) {
+            // If ALL, create entry if missing
+            if (monthsBack === -1 && !monthsMap[timeKey]) {
+                monthsMap[timeKey] = { month: timeKey, rawDate: date };
+                Object.keys(CATEGORY_COLORS).forEach(cat => monthsMap[timeKey][cat] = 0);
+            }
+
+            if (monthsMap[timeKey]) {
                 const cat = tx.category.toLowerCase();
-                if (!monthsMap[monthKey][cat]) monthsMap[monthKey][cat] = 0; // Init if category new
+                if (!monthsMap[timeKey][cat]) monthsMap[timeKey][cat] = 0; // Init if category new
 
                 let myShare = Number(tx.amount);
                 if (tx.splits && tx.splits.length > 0) {
@@ -197,7 +235,7 @@ export function AnalyticsView() {
                     myShare = 0;
                 }
 
-                monthsMap[monthKey][cat] += convertAmount(myShare, tx.currency || 'USD');
+                monthsMap[timeKey][cat] += convertAmount(myShare, tx.currency || 'USD');
             }
         });
 
@@ -207,7 +245,9 @@ export function AnalyticsView() {
         // Format month label back to short format for display if needed, or keep MMM yyyy
         const displayData = sortedTrendData.map((item: any) => ({
             ...item,
-            month: range === '1Y' || range === 'ALL' ? format(item.rawDate, 'MMM yy') : format(item.rawDate, 'MMM')
+            month: range === '1Y' || range === 'ALL'
+                ? format(item.rawDate, 'MMM yy')
+                : (range === '1M' || range === 'LM' ? format(item.rawDate, 'MMM d') : format(item.rawDate, 'MMM'))
         }));
 
         setCategoryTrendData(displayData);
@@ -282,6 +322,8 @@ export function AnalyticsView() {
                             <SelectValue placeholder="Period" />
                         </SelectTrigger>
                         <SelectContent align="end">
+                            <SelectItem value="1M">Current Month</SelectItem>
+                            <SelectItem value="LM">Last Month</SelectItem>
                             <SelectItem value="3M">Last 3 Months</SelectItem>
                             <SelectItem value="6M">Last 6 Months</SelectItem>
                             <SelectItem value="1Y">Last Year</SelectItem>
@@ -307,7 +349,14 @@ export function AnalyticsView() {
                                     axisLine={false}
                                     tickLine={false}
                                     tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 10 }}
-                                    interval={dateRange === '1Y' || dateRange === 'ALL' ? 'preserveStartEnd' : 0}
+                                    interval={dateRange === '1M' || dateRange === 'LM' ? 3 : (dateRange === '1Y' || dateRange === 'ALL' ? 'preserveStartEnd' : 0)}
+                                    tickFormatter={(value) => {
+                                        if (dateRange === '1M' || dateRange === 'LM') {
+                                            const parts = value.split(' ');
+                                            return parts.length === 2 ? parts[1] : value;
+                                        }
+                                        return value;
+                                    }}
                                 />
                                 <Tooltip content={<CustomTooltip />} />
                                 {Object.keys(CATEGORY_COLORS).map((cat) => (
