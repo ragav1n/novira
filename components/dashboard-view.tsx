@@ -537,7 +537,7 @@ export function DashboardView() {
                                                     {isRecentUserTransaction(tx) && (
                                                         <DropdownMenu>
                                                             <DropdownMenuTrigger asChild>
-                                                                <button className="p-1 rounded-full hover:bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                <button className="p-1 rounded-full hover:bg-white/10 transition-opacity">
                                                                     <MoreVertical className="w-4 h-4 text-muted-foreground" />
                                                                 </button>
                                                             </DropdownMenuTrigger>
@@ -623,7 +623,7 @@ export function DashboardView() {
                                         {isRecentUserTransaction(tx) && (
                                             <DropdownMenu>
                                                 <DropdownMenuTrigger asChild>
-                                                    <button className="p-1 rounded-full hover:bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <button className="p-1 rounded-full hover:bg-white/10 transition-opacity">
                                                         <MoreVertical className="w-4 h-4 text-muted-foreground" />
                                                     </button>
                                                 </DropdownMenuTrigger>
