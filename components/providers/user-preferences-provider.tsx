@@ -99,7 +99,7 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
         refreshPreferences();
 
         // Subscribe to auth state changes
-        const { data: { subscription: authSubscription } } = supabase.auth.onAuthStateChange((event, session) => {
+        const { data: { subscription: authSubscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
             if (session?.user) {
                 // Determine if we should refresh. 
                 // INITIAL_SESSION: happens on mount if session exists.
@@ -117,6 +117,7 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
                 setBudgetAlertsEnabledState(false);
                 setMonthlyBudgetState(DEFAULT_BUDGETS.USD);
                 setBudgets({});
+                setExchangeRates({}); // Clear rates on logout
             }
         });
 

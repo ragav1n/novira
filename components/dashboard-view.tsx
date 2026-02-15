@@ -66,6 +66,9 @@ type Transaction = {
     created_at: string;
     user_id: string;
     currency?: string;
+    exchange_rate?: number;
+    base_currency?: string;
+    converted_amount?: number;
     splits?: {
         user_id: string;
         amount: number;
@@ -215,6 +218,13 @@ export function DashboardView() {
             myShare = 0;
         }
 
+        // Conversion Logic:
+        // 1. If we have a stored exchange rate and the user is viewing in the base currency it was converted to, utilize the specific rate.
+        // 2. Fallback to real-time conversion.
+        if (tx.exchange_rate && tx.base_currency === currency) {
+            return acc + (myShare * Number(tx.exchange_rate));
+        }
+
         return acc + convertAmount(myShare, tx.currency || 'USD');
     }, 0);
 
@@ -246,7 +256,13 @@ export function DashboardView() {
 
         if (myShare > 0) {
             if (!acc[cat]) acc[cat] = 0;
-            acc[cat] += convertAmount(myShare, tx.currency || 'USD');
+
+            // Same conversion logic as above
+            if (tx.exchange_rate && tx.base_currency === currency) {
+                acc[cat] += (myShare * Number(tx.exchange_rate));
+            } else {
+                acc[cat] += convertAmount(myShare, tx.currency || 'USD');
+            }
         }
         return acc;
     }, {} as Record<string, number>);
@@ -450,7 +466,20 @@ export function DashboardView() {
                                             </div>
                                             <div className="flex items-center gap-2">
                                                 <div className="flex flex-col items-end">
+
                                                     <span className="font-bold text-sm">-{formatCurrency(Number(tx.amount), tx.currency)}</span>
+                                                    {(tx.currency !== currency) && (
+                                                        <div className="text-[10px] text-muted-foreground flex flex-col items-end mt-0.5">
+                                                            {tx.converted_amount && tx.base_currency === currency ? (
+                                                                <>
+                                                                    <span className="font-medium text-emerald-500">≈ {formatCurrency(Number(tx.converted_amount), currency)}</span>
+                                                                    <span className="text-[9px] opacity-70">Rate: {Number(tx.exchange_rate).toFixed(2)}</span>
+                                                                </>
+                                                            ) : (
+                                                                <span className="font-medium text-emerald-500">≈ {formatCurrency(convertAmount(Number(tx.amount), tx.currency || 'USD'), currency)}</span>
+                                                            )}
+                                                        </div>
+                                                    )}
                                                     {tx.splits && tx.splits.length > 0 && (
                                                         <span className="text-[9px] text-muted-foreground mt-0.5">
                                                             Split • {tx.splits.length + 1} people
@@ -521,6 +550,18 @@ export function DashboardView() {
                             <div className="flex items-center gap-2">
                                 <div className="flex flex-col items-end">
                                     <span className="font-semibold text-sm">-{formatCurrency(Number(tx.amount), tx.currency)}</span>
+                                    {(tx.currency !== currency) && (
+                                        <div className="text-[10px] text-muted-foreground flex flex-col items-end mt-0.5">
+                                            {tx.converted_amount && tx.base_currency === currency ? (
+                                                <>
+                                                    <span className="font-medium text-emerald-500">≈ {formatCurrency(Number(tx.converted_amount), currency)}</span>
+                                                    <span className="text-[9px] opacity-70">Rate: {Number(tx.exchange_rate).toFixed(2)}</span>
+                                                </>
+                                            ) : (
+                                                <span className="font-medium text-emerald-500">≈ {formatCurrency(convertAmount(Number(tx.amount), tx.currency || 'USD'), currency)}</span>
+                                            )}
+                                        </div>
+                                    )}
                                     {tx.splits && tx.splits.length > 0 && (
                                         <span className="text-[9px] text-muted-foreground mt-0.5">
                                             Split

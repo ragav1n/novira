@@ -41,7 +41,15 @@ export function AddExpenseView() {
     const [paymentMethod, setPaymentMethod] = useState<'Cash' | 'Debit Card' | 'Credit Card'>('Cash');
     const [loading, setLoading] = useState(false);
     const { currency } = useUserPreferences();
+    const [txCurrency, setTxCurrency] = useState(currency);
     const { groups, friends } = useGroups();
+
+    // Update txCurrency when profile currency changes (only if user hasn't manually changed it yet, or just default to it)
+    // Actually better to just default it on mount, or let it stay if user selected something else.
+    // For simplicity, let's just initialize it with currency. 
+    React.useEffect(() => {
+        setTxCurrency(currency);
+    }, [currency]);
 
     // Splitting State
     const [isSplitEnabled, setIsSplitEnabled] = useState(false);
@@ -64,6 +72,32 @@ export function AddExpenseView() {
                 return;
             }
 
+            // Fetch historical rate if needed
+            let exchangeRate = 1;
+            let convertedAmount = parseFloat(amount);
+
+            if (txCurrency !== currency) {
+                try {
+                    const dateStr = format(date, 'yyyy-MM-dd');
+                    let response = await fetch(`https://api.frankfurter.dev/v1/${dateStr}?from=${txCurrency}&to=${currency}`);
+
+                    if (!response.ok) {
+                        console.warn('Failed to fetch specific date rate, falling back to latest');
+                        response = await fetch(`https://api.frankfurter.dev/v1/latest?from=${txCurrency}&to=${currency}`);
+                    }
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        exchangeRate = data.rates[currency];
+                        convertedAmount = parseFloat(amount) * exchangeRate;
+                    } else {
+                        console.error('Failed to fetch exchange rate, using 1:1');
+                    }
+                } catch (e) {
+                    console.error('Error fetching historical rate:', e);
+                }
+            }
+
             const { data: transaction, error: txError } = await supabase.from('transactions').insert({
                 user_id: user.id,
                 amount: parseFloat(amount),
@@ -72,8 +106,11 @@ export function AddExpenseView() {
                 date: format(date, 'yyyy-MM-dd'),
                 payment_method: paymentMethod,
                 notes,
-                currency: currency,
-                group_id: selectedGroupId
+                currency: txCurrency,
+                group_id: selectedGroupId,
+                exchange_rate: exchangeRate,
+                base_currency: currency,
+                converted_amount: convertedAmount
             }).select().single();
 
             if (txError) throw txError;
@@ -148,8 +185,25 @@ export function AddExpenseView() {
                         className="h-16 text-3xl font-bold pl-12 bg-secondary/10 border-primary/50 focus-visible:ring-primary/50"
                     />
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-bold text-primary">
-                        {currency === 'EUR' ? '€' : currency === 'INR' ? '₹' : '$'}
+                        {txCurrency === 'EUR' ? '€' : txCurrency === 'INR' ? '₹' : '$'}
                     </span>
+                </div>
+                {/* Currency Selection */}
+                <div className="flex gap-2 mt-2">
+                    {['USD', 'EUR', 'INR'].map((curr) => (
+                        <button
+                            key={curr}
+                            onClick={() => setTxCurrency(curr as any)}
+                            className={cn(
+                                "flex-1 py-1 text-xs rounded-md border transition-all",
+                                txCurrency === curr
+                                    ? "bg-primary/20 border-primary text-primary font-medium"
+                                    : "bg-secondary/10 border-white/5 hover:bg-secondary/20 text-muted-foreground"
+                            )}
+                        >
+                            {curr}
+                        </button>
+                    ))}
                 </div>
             </div>
 

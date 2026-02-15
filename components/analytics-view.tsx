@@ -235,7 +235,12 @@ export function AnalyticsView() {
                     myShare = 0;
                 }
 
-                monthsMap[timeKey][cat] += convertAmount(myShare, tx.currency || 'USD');
+                // Conversion Logic
+                if (tx.exchange_rate && tx.base_currency === currency) {
+                    monthsMap[timeKey][cat] += (myShare * Number(tx.exchange_rate));
+                } else {
+                    monthsMap[timeKey][cat] += convertAmount(myShare, tx.currency || 'USD');
+                }
             }
         });
 
@@ -274,7 +279,12 @@ export function AnalyticsView() {
             }
 
             if (myShare > 0) {
-                const amount = convertAmount(myShare, tx.currency || 'USD');
+                let amount = 0;
+                if (tx.exchange_rate && tx.base_currency === currency) {
+                    amount = (myShare * Number(tx.exchange_rate));
+                } else {
+                    amount = convertAmount(myShare, tx.currency || 'USD');
+                }
                 breakdownMap[cat] = (breakdownMap[cat] || 0) + amount;
                 total += amount;
             }

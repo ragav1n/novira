@@ -11,6 +11,9 @@ interface ExportTransaction {
     amount: number;
     currency?: string;
     payment_method: string;
+    exchange_rate?: number;
+    base_currency?: string;
+    converted_amount?: number;
 }
 
 export const generateCSV = (
@@ -27,12 +30,29 @@ export const generateCSV = (
         'Payment Method',
         'Original Amount',
         'Original Currency',
-        `Amount (${currency})`
+        'Exchange Rate',
+        'Converted Amount',
+        'Base Currency'
     ];
 
     // CSV Rows
     const rows = transactions.map(tx => {
-        const convertedAmount = convertAmount(Number(tx.amount), tx.currency || 'USD');
+        let convertedAmount = 0;
+        let exchangeRate = 0;
+        let baseCurrency = currency; // Default to current profile currency if not stored
+
+        // Use stored values if available and matching base currency
+        if (tx.converted_amount && tx.base_currency === currency) {
+            convertedAmount = Number(tx.converted_amount);
+            exchangeRate = Number(tx.exchange_rate) || 0;
+            baseCurrency = tx.base_currency;
+        } else {
+            // Fallback to real-time
+            convertedAmount = convertAmount(Number(tx.amount), tx.currency || 'USD');
+            // Estimate rate
+            exchangeRate = Number(tx.amount) !== 0 ? convertedAmount / Number(tx.amount) : 0;
+        }
+
         return [
             format(new Date(tx.date), 'yyyy-MM-dd'),
             `"${tx.description.replace(/"/g, '""')}"`, // Escape quotes
@@ -40,7 +60,9 @@ export const generateCSV = (
             tx.payment_method,
             tx.amount,
             tx.currency || 'USD',
-            convertedAmount.toFixed(2)
+            exchangeRate.toFixed(4),
+            convertedAmount.toFixed(2),
+            baseCurrency
         ].join(',');
     });
 
@@ -79,19 +101,36 @@ export const generatePDF = (
     doc.text(`Total Spent: ${formatForPDF(totalSpent, currency)}`, 14, 35);
 
     // Table
-    const tableColumn = ["Date", "Description", "Category", "Amount", "Converted"];
+    const tableColumn = ["Date", "Description", "Category", "Amount", "Rate", "Converted"];
     const tableRows = transactions.map(tx => {
-        const converted = convertAmount(Number(tx.amount), tx.currency || 'USD');
+        let converted = 0;
+        let rate = 0;
+
+        // Use stored values if available and matching base currency
+        if (tx.converted_amount && tx.base_currency === currency) {
+            converted = Number(tx.converted_amount);
+            rate = Number(tx.exchange_rate) || 0;
+        } else {
+            // Fallback to real-time
+            converted = convertAmount(Number(tx.amount), tx.currency || 'USD');
+            // Estimate rate
+            rate = Number(tx.amount) !== 0 ? converted / Number(tx.amount) : 0;
+        }
+
+        // Only show rate if currencies differ
+        const rateStr = (tx.currency || 'USD') !== currency ? rate.toFixed(2) : '-';
+
         return [
             format(new Date(tx.date), 'MMM d, yyyy'),
             tx.description,
             tx.category,
             formatForPDF(Number(tx.amount), tx.currency), // Original
+            rateStr,
             formatForPDF(converted, currency) // Converted
         ];
     });
 
-    autoTable(doc, {
+    autoTable(doc as any, {
         head: [tableColumn],
         body: tableRows,
         foot: [['Total', '', '', '', formatForPDF(totalSpent, currency)]],
