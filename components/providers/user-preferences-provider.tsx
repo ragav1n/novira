@@ -56,9 +56,14 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
         fetchRates();
     }, [currency]);
 
-    const refreshPreferences = async () => {
+    const refreshPreferences = async (currentSession?: any) => {
         try {
-            const { data: { session } } = await supabase.auth.getSession();
+            let session = currentSession;
+            if (!session) {
+                const { data } = await supabase.auth.getSession();
+                session = data.session;
+            }
+
             const user = session?.user;
             if (!user) return;
             setUserId(user.id);
@@ -93,6 +98,28 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
 
         refreshPreferences();
 
+        // Subscribe to auth state changes
+        const { data: { subscription: authSubscription } } = supabase.auth.onAuthStateChange((event, session) => {
+            if (session?.user) {
+                // Determine if we should refresh. 
+                // INITIAL_SESSION: happens on mount if session exists.
+                // SIGNED_IN: happens on login.
+                // TOKEN_REFRESHED: happens periodically.
+                if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+                    setUserId(session.user.id);
+                    refreshPreferences(session);
+                }
+            }
+
+            if (event === 'SIGNED_OUT') {
+                setUserId(null);
+                setCurrencyState('USD');
+                setBudgetAlertsEnabledState(false);
+                setMonthlyBudgetState(DEFAULT_BUDGETS.USD);
+                setBudgets({});
+            }
+        });
+
         // Subscribe to realtime changes for instant updates across tabs/components
         const channel = supabase
             .channel('schema-db-changes')
@@ -116,6 +143,7 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
             .subscribe();
 
         return () => {
+            authSubscription.unsubscribe();
             supabase.removeChannel(channel);
         };
     }, []);

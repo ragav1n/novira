@@ -73,9 +73,13 @@ export function GroupsProvider({ children }: { children: React.ReactNode }) {
     const [pendingSplits, setPendingSplits] = useState<Split[]>([]);
     const [loading, setLoading] = useState(true);
 
-    const refreshData = async () => {
+    const refreshData = async (currentSession?: any) => {
         try {
-            const { data: { session } } = await supabase.auth.getSession();
+            let session = currentSession;
+            if (!session) {
+                const { data } = await supabase.auth.getSession();
+                session = data.session;
+            }
             const user = session?.user;
             if (!user) return;
 
@@ -238,12 +242,29 @@ export function GroupsProvider({ children }: { children: React.ReactNode }) {
 
     useEffect(() => {
         refreshData();
+
+        // Subscribe to auth state changes
+        const { data: { subscription: authSubscription } } = supabase.auth.onAuthStateChange((event, session) => {
+            if (session?.user && (event === 'INITIAL_SESSION' || event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED')) {
+                refreshData(session);
+            } else if (event === 'SIGNED_OUT') {
+                setGroups([]);
+                setFriends([]);
+                setFriendRequests([]);
+                setBalances({ totalOwed: 0, totalOwedToMe: 0 });
+                setPendingSplits([]);
+            }
+        });
+
         const channel = supabase.channel('splits-and-groups')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'splits' }, () => refreshData())
             .on('postgres_changes', { event: '*', schema: 'public', table: 'groups' }, () => refreshData())
             .on('postgres_changes', { event: '*', schema: 'public', table: 'friendships' }, () => refreshData())
             .subscribe();
-        return () => { supabase.removeChannel(channel); };
+        return () => {
+            authSubscription.unsubscribe();
+            supabase.removeChannel(channel);
+        };
     }, []);
 
     const createGroup = async (name: string) => {
