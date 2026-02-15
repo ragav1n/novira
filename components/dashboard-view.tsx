@@ -340,8 +340,8 @@ export function DashboardView() {
 
             <BudgetAlertManager totalSpent={totalSpent} />
 
-            {/* Empty State - No Groups or Friends */}
-            {(!loading && groups.length === 0 && friends.length === 0) && (
+            {/* Empty State - No Groups or Friends AND No Transactions (Brand New User) */}
+            {(!loading && groups.length === 0 && friends.length === 0 && transactions.length === 0) && (
                 <Card className="bg-card/40 border-primary/20 overflow-hidden relative">
                     <div className="absolute top-0 right-0 p-8 opacity-5">
                         <Users className="w-24 h-24" />
