@@ -30,7 +30,7 @@ import { toast } from 'sonner';
 export function GroupsView() {
     const router = useRouter();
     const { groups, friends, friendRequests, balances, pendingSplits, createGroup, addFriendByEmail, addMemberToGroup, settleSplit, acceptFriendRequest, declineFriendRequest, leaveGroup, removeFriend } = useGroups();
-    const { formatCurrency, userId } = useUserPreferences();
+    const { formatCurrency, userId, currency, convertAmount } = useUserPreferences();
 
     const [isAddGroupOpen, setIsAddGroupOpen] = useState(false);
     const [newGroupName, setNewGroupName] = useState('');
@@ -421,27 +421,44 @@ export function GroupsView() {
                                             </p>
                                         </div>
                                     </div>
-                                    <div className="flex flex-col items-end gap-2">
+                                    <div className="flex flex-col items-end gap-1">
                                         <span className={cn(
                                             "font-bold text-sm",
                                             isDebtor ? "text-rose-500" : "text-emerald-500"
                                         )}>
-                                            {isDebtor ? '-' : '+'}{formatCurrency(split.amount)}
+                                            {isDebtor ? '-' : '+'}
+                                            {// Use transaction currency if available, else user's currency prefix/suffix might be wrong if we just use formatCurrency with number
+                                                // formatCurrency uses user's currency preference by default. 
+                                                // We want to show: "10 USD" (Original) if different from user currency.
+                                                // And "≈ €9.00" (Converted)
+
+                                                // If tx currency is known and different:
+                                                split.transaction?.currency && split.transaction.currency !== currency
+                                                    ? new Intl.NumberFormat('en-US', { style: 'currency', currency: split.transaction.currency }).format(split.amount)
+                                                    : formatCurrency(split.amount)
+                                            }
                                         </span>
-                                        <Button
-                                            size="sm"
-                                            className="h-7 text-[10px] rounded-full bg-primary/20 text-primary border border-primary/20 hover:bg-primary/30"
-                                            onClick={async () => {
-                                                try {
-                                                    await settleSplit(split.id);
-                                                    toast.success('Split settled!');
-                                                } catch (error: any) {
-                                                    toast.error(error.message || 'Failed to settle split');
-                                                }
-                                            }}
-                                        >
-                                            Settle
-                                        </Button>
+                                        {split.transaction?.currency && split.transaction.currency !== currency && (
+                                            <span className="text-[10px] text-muted-foreground">
+                                                ≈ {formatCurrency(convertAmount(split.amount, split.transaction.currency))}
+                                            </span>
+                                        )}
+                                        {isDebtor && (
+                                            <Button
+                                                size="sm"
+                                                className="h-7 text-[10px] rounded-full bg-primary/20 text-primary border border-primary/20 hover:bg-primary/30"
+                                                onClick={async () => {
+                                                    try {
+                                                        await settleSplit(split.id);
+                                                        toast.success('Split settled!');
+                                                    } catch (error: any) {
+                                                        toast.error(error.message || 'Failed to settle split');
+                                                    }
+                                                }}
+                                            >
+                                                Settle
+                                            </Button>
+                                        )}
                                     </div>
                                 </div>
                             );

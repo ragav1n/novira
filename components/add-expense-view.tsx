@@ -412,7 +412,7 @@ export function AddExpenseView() {
                                 <div className="flex justify-between items-center text-xs mt-1">
                                     <span className="text-muted-foreground">Each person pays:</span>
                                     <span className="font-bold">
-                                        {(parseFloat(amount || '0') / ((selectedGroupId ? 3 : selectedFriendIds.length) + 1)).toFixed(2)} {currency === 'INR' ? '₹' : currency === 'EUR' ? '€' : '$'}
+                                        {(parseFloat(amount || '0') / ((selectedGroupId ? (groups.find(g => g.id === selectedGroupId)?.members.length || 1) : selectedFriendIds.length + 1))).toFixed(2)} {currency === 'INR' ? '₹' : currency === 'EUR' ? '€' : '$'}
                                     </span>
                                 </div>
                             </div>

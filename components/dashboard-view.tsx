@@ -35,6 +35,7 @@ import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
 
 // Constants
 const CATEGORY_COLORS: Record<string, string> = {
@@ -45,6 +46,7 @@ const CATEGORY_COLORS: Record<string, string> = {
     healthcare: '#FF9F1C', // Orange
     entertainment: '#2EC4B6', // Light Blue
     others: '#C7F464',    // Lime
+    settlement: '#10B981', // Emerald for settlement
 };
 
 const chartConfig: ChartConfig = {
@@ -197,30 +199,40 @@ export function DashboardView() {
         return userTxs.slice(0, 3).some(t => t.id === tx.id);
     };
 
+    const calculateUserShare = (tx: Transaction, currentUserId: string | null) => {
+        if (!currentUserId) return 0;
+
+        // CASH BASIS LOGIC:
+        // 1. If I PAID the transaction (user_id === currentUserId), I spent the FULL amount immediately.
+        //    Reimbursements will come later as separate 'Settlement Received' transactions (negative amount).
+        if (tx.user_id === currentUserId) {
+            return Number(tx.amount);
+        }
+
+        // 2. If I am a DEBTOR (in splits) but didn't pay:
+        //    - I haven't "spent" money yet in cash items.
+        //    - My expense will be recorded when I SETTLE (via 'Settlement Sent' transaction).
+        //    - So for the ORIGINAL split transaction, my share is 0.
+        return 0;
+    };
+
     // Calculate personal share for budget tracking
     const totalSpent = transactions.reduce((acc, tx) => {
         if (!userId) return acc;
+
+        // Exclude settlements from "Spent"? 
+        // NO. With Cash Basis logic:
+        // - Payer gets "Settled: Food" (Income/Negative). This reduces Total Spent. Correct.
+        // - Debtor gets "Settled: Food" (Expense/Positive). This increases Total Spent. Correct.
+        // So we include ALL transactions.
 
         // Filter for current month using parseISO
         const txDate = parseISO(tx.date);
         if (!isSameMonth(txDate, new Date())) return acc;
 
-        let myShare = Number(tx.amount);
-        if (tx.splits && tx.splits.length > 0) {
-            if (tx.user_id === userId) {
-                const othersOwe = tx.splits.reduce((sum, s) => sum + Number(s.amount), 0);
-                myShare = Number(tx.amount) - othersOwe;
-            } else {
-                const mySplit = tx.splits.find(s => s.user_id === userId);
-                myShare = mySplit ? Number(mySplit.amount) : 0;
-            }
-        } else if (tx.user_id !== userId) {
-            myShare = 0;
-        }
+        const myShare = calculateUserShare(tx, userId);
 
         // Conversion Logic:
-        // 1. If we have a stored exchange rate and the user is viewing in the base currency it was converted to, utilize the specific rate.
-        // 2. Fallback to real-time conversion.
         if (tx.exchange_rate && tx.base_currency === currency) {
             return acc + (myShare * Number(tx.exchange_rate));
         }
@@ -235,29 +247,18 @@ export function DashboardView() {
     const spendingByCategory = transactions.reduce((acc, tx) => {
         if (!userId) return acc;
 
-        // Filter for current month
+        // Include all categories (settlements now inherit category)
+
+        // Filter for current month using parseISO
         const txDate = parseISO(tx.date);
         if (!isSameMonth(txDate, new Date())) return acc;
 
         const cat = tx.category.toLowerCase();
-
-        let myShare = Number(tx.amount);
-        if (tx.splits && tx.splits.length > 0) {
-            if (tx.user_id === userId) {
-                const othersOwe = tx.splits.reduce((sum, s) => sum + Number(s.amount), 0);
-                myShare = Number(tx.amount) - othersOwe;
-            } else {
-                const mySplit = tx.splits.find(s => s.user_id === userId);
-                myShare = mySplit ? Number(mySplit.amount) : 0;
-            }
-        } else if (tx.user_id !== userId) {
-            myShare = 0;
-        }
+        const myShare = calculateUserShare(tx, userId);
 
         if (myShare > 0) {
             if (!acc[cat]) acc[cat] = 0;
 
-            // Same conversion logic as above
             if (tx.exchange_rate && tx.base_currency === currency) {
                 acc[cat] += (myShare * Number(tx.exchange_rate));
             } else {
@@ -282,6 +283,7 @@ export function DashboardView() {
             case 'shopping': return <ShoppingBag className="w-5 h-5 text-white" />;
             case 'healthcare': return <HeartPulse className="w-5 h-5 text-white" />;
             case 'entertainment': return <Clapperboard className="w-5 h-5 text-white" />;
+            case 'settlement': return <ArrowUpRight className="w-5 h-5 text-white" />;
             default: return <CircleDollarSign className="w-5 h-5 text-white" />;
         }
     };
@@ -293,6 +295,13 @@ export function DashboardView() {
             </div>
         );
     }
+
+    // Filter transactions to only show relevant ones (where user has a share or paid)
+    const displayTransactions = transactions.filter(tx => {
+        if (tx.user_id === userId) return true; // I paid
+        if (tx.splits && tx.splits.some(s => s.user_id === userId)) return true; // I'm in splits
+        return false;
+    });
 
     return (
         <div className="p-5 space-y-6 max-w-md mx-auto relative pb-24">
@@ -445,80 +454,87 @@ export function DashboardView() {
                             </DialogHeader>
                             <ScrollArea className="flex-1 -mr-4 pr-4">
                                 <div className="space-y-3 pt-4">
-                                    {transactions.map((tx) => (
-                                        <div key={tx.id} className="flex items-center justify-between p-3 rounded-2xl bg-card/20 border border-white/5 hover:bg-card/40 transition-colors group">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-10 h-10 rounded-full bg-secondary/20 flex items-center justify-center border border-white/5 relative">
-                                                    {getIconForCategory(tx.category)}
-                                                    {tx.splits && tx.splits.length > 0 && (
-                                                        <div className="absolute -bottom-1 -right-1 bg-primary rounded-full p-0.5 border border-background">
-                                                            <Users className="w-2.5 h-2.5 text-white" />
+                                    {displayTransactions.map((tx) => {
+                                        const myShare = calculateUserShare(tx, userId);
+                                        return (
+                                            <div key={tx.id} className="flex items-center justify-between p-3 rounded-2xl bg-card/20 border border-white/5 hover:bg-card/40 transition-colors group">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-10 h-10 rounded-full bg-secondary/20 flex items-center justify-center border border-white/5 relative">
+                                                        {getIconForCategory(tx.category)}
+                                                        {tx.splits && tx.splits.length > 0 && (
+                                                            <div className="absolute -bottom-1 -right-1 bg-primary rounded-full p-0.5 border border-background">
+                                                                <Users className="w-2.5 h-2.5 text-white" />
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    <div>
+                                                        <p className="font-medium text-sm">{tx.description}</p>
+                                                        <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
+                                                            <span className="px-1.5 py-0.5 rounded bg-primary/10 text-[10px] text-primary border border-primary/10 capitalize">{tx.category}</span>
+                                                            <span>• {format(new Date(tx.date), 'MMM d, yyyy')}</span>
                                                         </div>
-                                                    )}
-                                                </div>
-                                                <div>
-                                                    <p className="font-medium text-sm">{tx.description}</p>
-                                                    <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
-                                                        <span className="px-1.5 py-0.5 rounded bg-primary/10 text-[10px] text-primary border border-primary/10 capitalize">{tx.category}</span>
-                                                        <span>• {format(new Date(tx.date), 'MMM d, yyyy')}</span>
                                                     </div>
                                                 </div>
-                                            </div>
-                                            <div className="flex items-center gap-2">
-                                                <div className="flex flex-col items-end">
+                                                <div className="flex items-center gap-2">
+                                                    <div className="flex flex-col items-end">
 
-                                                    <span className="font-bold text-sm">-{formatCurrency(Number(tx.amount), tx.currency)}</span>
-                                                    {(tx.currency !== currency) && (
-                                                        <div className="text-[10px] text-muted-foreground flex flex-col items-end mt-0.5">
-                                                            {tx.converted_amount && tx.base_currency === currency ? (
-                                                                <>
-                                                                    <span className="font-medium text-emerald-500">≈ {formatCurrency(Number(tx.converted_amount), currency)}</span>
-                                                                    <span className="text-[9px] opacity-70">Rate: {Number(tx.exchange_rate).toFixed(2)}</span>
-                                                                </>
-                                                            ) : (
-                                                                <span className="font-medium text-emerald-500">≈ {formatCurrency(convertAmount(Number(tx.amount), tx.currency || 'USD'), currency)}</span>
-                                                            )}
-                                                        </div>
-                                                    )}
-                                                    {tx.splits && tx.splits.length > 0 && (
-                                                        <span className="text-[9px] text-muted-foreground mt-0.5">
-                                                            Split • {tx.splits.length + 1} people
+                                                        <span className={cn(
+                                                            "font-bold text-sm",
+                                                            // If it's income (e.g. settlement where I am creditor), it might be handled differently,
+                                                            // but currently 'amount' in DB is usually positive for expense.
+                                                            // If I am creditor in settlement, amount is negative in DB (from our RPC).
+                                                            // calculateUserShare returns 'Number(tx.amount)' which is negative (-50).
+                                                            myShare < 0 ? "text-emerald-500" : ""
+                                                        )}>
+                                                            {myShare < 0 ? '+' : '-'}{formatCurrency(Math.abs(myShare), tx.currency)}
                                                         </span>
+                                                        {(tx.currency !== currency) && (
+                                                            <div className="text-[10px] text-muted-foreground flex flex-col items-end mt-0.5">
+                                                                <span className="font-medium text-emerald-500">
+                                                                    ≈ {formatCurrency(convertAmount(Math.abs(myShare), tx.currency || 'USD'), currency)}
+                                                                </span>
+                                                            </div>
+                                                        )}
+                                                        {tx.splits && tx.splits.length > 0 && (
+                                                            <span className="text-[9px] text-muted-foreground mt-0.5">
+                                                                My Share
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    {isRecentUserTransaction(tx) && (
+                                                        <DropdownMenu>
+                                                            <DropdownMenuTrigger asChild>
+                                                                <button className="p-1 rounded-full hover:bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                    <MoreVertical className="w-4 h-4 text-muted-foreground" />
+                                                                </button>
+                                                            </DropdownMenuTrigger>
+                                                            <DropdownMenuContent align="end">
+                                                                <DropdownMenuItem onClick={() => {
+                                                                    setEditingTransaction(tx);
+                                                                    setIsEditOpen(true);
+                                                                }}>
+                                                                    <Pencil className="w-4 h-4 mr-2" />
+                                                                    Edit
+                                                                </DropdownMenuItem>
+                                                                <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => {
+                                                                    toast('Delete transaction?', {
+                                                                        action: {
+                                                                            label: 'Delete',
+                                                                            onClick: () => handleDeleteTransaction(tx.id)
+                                                                        }
+                                                                    });
+                                                                }}>
+                                                                    <Trash2 className="w-4 h-4 mr-2" />
+                                                                    Delete
+                                                                </DropdownMenuItem>
+                                                            </DropdownMenuContent>
+                                                        </DropdownMenu>
                                                     )}
                                                 </div>
-                                                {isRecentUserTransaction(tx) && (
-                                                    <DropdownMenu>
-                                                        <DropdownMenuTrigger asChild>
-                                                            <button className="p-1 rounded-full hover:bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                                <MoreVertical className="w-4 h-4 text-muted-foreground" />
-                                                            </button>
-                                                        </DropdownMenuTrigger>
-                                                        <DropdownMenuContent align="end">
-                                                            <DropdownMenuItem onClick={() => {
-                                                                setEditingTransaction(tx);
-                                                                setIsEditOpen(true);
-                                                            }}>
-                                                                <Pencil className="w-4 h-4 mr-2" />
-                                                                Edit
-                                                            </DropdownMenuItem>
-                                                            <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => {
-                                                                toast('Delete transaction?', {
-                                                                    action: {
-                                                                        label: 'Delete',
-                                                                        onClick: () => handleDeleteTransaction(tx.id)
-                                                                    }
-                                                                });
-                                                            }}>
-                                                                <Trash2 className="w-4 h-4 mr-2" />
-                                                                Delete
-                                                            </DropdownMenuItem>
-                                                        </DropdownMenuContent>
-                                                    </DropdownMenu>
-                                                )}
                                             </div>
-                                        </div>
-                                    ))}
-                                    {transactions.length === 0 && (
+                                        );
+                                    })}
+                                    {displayTransactions.length === 0 && (
                                         <div className="text-center py-8 text-muted-foreground">No transactions found.</div>
                                     )}
                                 </div>
@@ -528,79 +544,84 @@ export function DashboardView() {
                 </div>
 
                 <div className="space-y-3">
-                    {transactions.slice(0, 5).map((tx) => (
-                        <div key={tx.id} className="flex items-center justify-between p-3 rounded-2xl bg-card/30 border border-white/5 hover:bg-card/50 transition-colors group">
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-full bg-secondary/20 flex items-center justify-center border border-white/5 relative">
-                                    {getIconForCategory(tx.category)}
-                                    {tx.splits && tx.splits.length > 0 && (
-                                        <div className="absolute -bottom-1 -right-1 bg-primary rounded-full p-0.5 border border-background">
-                                            <Users className="w-2.5 h-2.5 text-white" />
+                    {displayTransactions.slice(0, 5).map((tx) => {
+                        const myShare = calculateUserShare(tx, userId);
+                        return (
+                            <div key={tx.id} className="flex items-center justify-between p-3 rounded-2xl bg-card/30 border border-white/5 hover:bg-card/50 transition-colors group">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-full bg-secondary/20 flex items-center justify-center border border-white/5 relative">
+                                        {getIconForCategory(tx.category)}
+                                        {tx.splits && tx.splits.length > 0 && (
+                                            <div className="absolute -bottom-1 -right-1 bg-primary rounded-full p-0.5 border border-background">
+                                                <Users className="w-2.5 h-2.5 text-white" />
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div>
+                                        <p className="font-medium text-sm">{tx.description}</p>
+                                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                            <span className="px-1.5 py-0.5 rounded bg-primary/10 text-[10px] text-primary capitalize">{tx.category}</span>
+                                            <span>• {format(new Date(tx.date), 'MMM d')}</span>
                                         </div>
-                                    )}
+                                    </div>
                                 </div>
-                                <div>
-                                    <p className="font-medium text-sm">{tx.description}</p>
-                                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                        <span className="px-1.5 py-0.5 rounded bg-primary/10 text-[10px] text-primary capitalize">{tx.category}</span>
-                                        <span>• {format(new Date(tx.date), 'MMM d')}</span>
+                                <div className="flex items-center gap-2">
+                                    <div className="flex flex-col items-end">
+                                        <span className={cn(
+                                            "font-semibold text-sm",
+                                            myShare < 0 ? "text-emerald-500" : ""
+                                        )}>
+                                            {myShare < 0 ? '+' : '-'}{formatCurrency(Math.abs(myShare), tx.currency)}
+                                        </span>
+                                        {(tx.currency !== currency) && (
+                                            <div className="text-[10px] text-muted-foreground flex flex-col items-end mt-0.5">
+                                                <span className="font-medium text-emerald-500">
+                                                    ≈ {formatCurrency(convertAmount(Math.abs(myShare), tx.currency || 'USD'), currency)}
+                                                </span>
+                                            </div>
+                                        )}
+                                        {tx.splits && tx.splits.length > 0 && (
+                                            <span className="text-[9px] text-muted-foreground mt-0.5">
+                                                My Share
+                                            </span>
+                                        )}
+                                    </div>
+                                    <div className="w-6 h-6 flex items-center justify-center">
+                                        {isRecentUserTransaction(tx) && (
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <button className="p-1 rounded-full hover:bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <MoreVertical className="w-4 h-4 text-muted-foreground" />
+                                                    </button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent align="end">
+                                                    <DropdownMenuItem onClick={() => {
+                                                        setEditingTransaction(tx);
+                                                        setIsEditOpen(true);
+                                                    }}>
+                                                        <Pencil className="w-4 h-4 mr-2" />
+                                                        Edit
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => {
+                                                        toast('Delete transaction?', {
+                                                            action: {
+                                                                label: 'Delete',
+                                                                onClick: () => handleDeleteTransaction(tx.id)
+                                                            }
+                                                        });
+                                                    }}>
+                                                        <Trash2 className="w-4 h-4 mr-2" />
+                                                        Delete
+                                                    </DropdownMenuItem>
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
+                                        )}
                                     </div>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-2">
-                                <div className="flex flex-col items-end">
-                                    <span className="font-semibold text-sm">-{formatCurrency(Number(tx.amount), tx.currency)}</span>
-                                    {(tx.currency !== currency) && (
-                                        <div className="text-[10px] text-muted-foreground flex flex-col items-end mt-0.5">
-                                            {tx.converted_amount && tx.base_currency === currency ? (
-                                                <>
-                                                    <span className="font-medium text-emerald-500">≈ {formatCurrency(Number(tx.converted_amount), currency)}</span>
-                                                    <span className="text-[9px] opacity-70">Rate: {Number(tx.exchange_rate).toFixed(2)}</span>
-                                                </>
-                                            ) : (
-                                                <span className="font-medium text-emerald-500">≈ {formatCurrency(convertAmount(Number(tx.amount), tx.currency || 'USD'), currency)}</span>
-                                            )}
-                                        </div>
-                                    )}
-                                    {tx.splits && tx.splits.length > 0 && (
-                                        <span className="text-[9px] text-muted-foreground mt-0.5">
-                                            Split
-                                        </span>
-                                    )}
-                                </div>
-                                {isRecentUserTransaction(tx) && (
-                                    <DropdownMenu>
-                                        <DropdownMenuTrigger asChild>
-                                            <button className="p-1 rounded-full hover:bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <MoreVertical className="w-4 h-4 text-muted-foreground" />
-                                            </button>
-                                        </DropdownMenuTrigger>
-                                        <DropdownMenuContent align="end">
-                                            <DropdownMenuItem onClick={() => {
-                                                setEditingTransaction(tx);
-                                                setIsEditOpen(true);
-                                            }}>
-                                                <Pencil className="w-4 h-4 mr-2" />
-                                                Edit
-                                            </DropdownMenuItem>
-                                            <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => {
-                                                toast('Delete transaction?', {
-                                                    action: {
-                                                        label: 'Delete',
-                                                        onClick: () => handleDeleteTransaction(tx.id)
-                                                    }
-                                                });
-                                            }}>
-                                                <Trash2 className="w-4 h-4 mr-2" />
-                                                Delete
-                                            </DropdownMenuItem>
-                                        </DropdownMenuContent>
-                                    </DropdownMenu>
-                                )}
-                            </div>
-                        </div>
-                    ))}
-                    {transactions.length === 0 && (
+                        );
+                    })}
+                    {displayTransactions.length === 0 && (
                         <div className="text-center text-xs text-muted-foreground py-4">No recent transactions found.</div>
                     )}
                 </div>
