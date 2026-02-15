@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 import { Plus, Utensils, Car, Zap, ShoppingBag, HeartPulse, Clapperboard, CircleDollarSign, ArrowUpRight, ArrowDownLeft, Users, MoreVertical, Pencil, Trash2, X } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { Pie, PieChart } from 'recharts';
+import { Pie, PieChart, Cell } from 'recharts';
 import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/pie-chart";
 import { supabase } from '@/lib/supabase';
 import { format, isSameMonth, parseISO } from 'date-fns';
@@ -94,7 +94,7 @@ export function DashboardView() {
 
     const [loading, setLoading] = useState(true);
     const { formatCurrency, currency, convertAmount, monthlyBudget, userId: providerUserId } = useUserPreferences();
-    const { balances } = useGroups();
+    const { balances, groups, friends } = useGroups();
 
     const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
     const [isEditOpen, setIsEditOpen] = useState(false);
@@ -340,6 +340,35 @@ export function DashboardView() {
 
             <BudgetAlertManager totalSpent={totalSpent} />
 
+            {/* Empty State - No Groups or Friends */}
+            {(!loading && groups.length === 0 && friends.length === 0) && (
+                <Card className="bg-card/40 border-primary/20 overflow-hidden relative">
+                    <div className="absolute top-0 right-0 p-8 opacity-5">
+                        <Users className="w-24 h-24" />
+                    </div>
+                    <CardContent className="p-5 relative z-10">
+                        <h3 className="font-bold text-lg mb-1">Welcome to Novira!</h3>
+                        <p className="text-xs text-muted-foreground mb-4">Start by creating a group or adding friends to split expenses.</p>
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => router.push('/groups')}
+                                className="flex-1 bg-primary text-white text-xs font-bold py-2.5 px-4 rounded-xl hover:bg-primary/90 transition-colors flex items-center justify-center gap-2"
+                            >
+                                <Plus className="w-4 h-4" />
+                                Start a Group
+                            </button>
+                            <button
+                                onClick={() => router.push('/groups')}
+                                className="flex-1 bg-secondary/20 text-foreground text-xs font-bold py-2.5 px-4 rounded-xl hover:bg-secondary/30 transition-colors flex items-center justify-center gap-2 border border-white/5"
+                            >
+                                <Users className="w-4 h-4" />
+                                Add Friends
+                            </button>
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
+
             {/* Total Spent Card */}
             <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#8A2BE2] to-[#4B0082] p-6 shadow-xl shadow-primary/20">
                 <div className="absolute top-0 right-0 p-6 opacity-10">
@@ -414,7 +443,11 @@ export function DashboardView() {
                                                 paddingAngle={5}
                                                 cornerRadius={5}
                                                 strokeWidth={0}
-                                            />
+                                            >
+                                                {spendingData.map((entry, index) => (
+                                                    <Cell key={`cell-${index}`} fill={entry.color} />
+                                                ))}
+                                            </Pie>
                                         </PieChart>
                                     </ChartContainer>
                                 </div>

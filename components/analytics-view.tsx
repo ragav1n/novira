@@ -5,7 +5,7 @@ import { ChevronLeft, MoreHorizontal, Filter } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
-import { LineChart, Line, XAxis, Tooltip, ResponsiveContainer, Pie, PieChart } from 'recharts';
+import { LineChart, Line, XAxis, Tooltip, ResponsiveContainer, Pie, PieChart, Cell } from 'recharts';
 import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/pie-chart";
 import { supabase } from '@/lib/supabase';
 import { format, subMonths, startOfMonth, endOfMonth, isSameMonth, parseISO, subYears } from 'date-fns';
@@ -418,6 +418,9 @@ export function AnalyticsView() {
                                     paddingAngle={5}
                                     cornerRadius={5}
                                 >
+                                    {categoryBreakdown.map((entry, index) => (
+                                        <Cell key={`cell-${index}`} fill={entry.color} />
+                                    ))}
                                 </Pie>
                             </PieChart>
                         </ChartContainer>

@@ -5,23 +5,32 @@
  * Uses sessionStorage to persist across page reloads in the same tab.
  */
 
-const STORAGE_KEY = 'novira_auth_last_attempt';
-const COOLDOWN_MS = 3000; // 3 seconds cooldown
+const STORAGE_KEY_PREFIX = 'novira_auth_limit_';
+const COOLDOWN_LOGIN = 3000; // 3 seconds for login
+const COOLDOWN_SIGNUP = 60000; // 60 seconds for signup (email triggers)
+
+type AuthAction = 'login' | 'signup';
 
 export const authRateLimiter = {
     /**
-     * Checks if the user is currently rate limited.
+     * Checks if the user is currently rate limited for a specific action.
+     * @param action 'login' or 'signup'
      * @returns { number } The remaining time in ms, or 0 if allowed.
      */
-    check: (): number => {
+    check: (action: AuthAction = 'login'): number => {
         if (typeof window === 'undefined') return 0;
 
-        const lastAttempt = sessionStorage.getItem(STORAGE_KEY);
+        const key = `${STORAGE_KEY_PREFIX}${action}`;
+        const storage = action === 'signup' ? localStorage : sessionStorage;
+
+        const lastAttempt = storage.getItem(key);
         if (!lastAttempt) return 0;
 
+        const cooldown = action === 'signup' ? COOLDOWN_SIGNUP : COOLDOWN_LOGIN;
         const timeSince = Date.now() - parseInt(lastAttempt, 10);
-        if (timeSince < COOLDOWN_MS) {
-            return COOLDOWN_MS - timeSince;
+
+        if (timeSince < cooldown) {
+            return cooldown - timeSince;
         }
 
         return 0;
@@ -29,18 +38,23 @@ export const authRateLimiter = {
 
     /**
      * Records a new authentication attempt.
+     * @param action 'login' or 'signup'
      */
-    recordOK: () => {
+    recordOK: (action: AuthAction = 'login') => {
         if (typeof window === 'undefined') return;
-        sessionStorage.setItem(STORAGE_KEY, Date.now().toString());
+
+        const key = `${STORAGE_KEY_PREFIX}${action}`;
+        const storage = action === 'signup' ? localStorage : sessionStorage;
+
+        storage.setItem(key, Date.now().toString());
     },
 
     /**
-     * Clears the rate limit (optional, e.g. on successful login if desired, 
-     * though keeping it strict is safer)
+     * Clears the rate limit
      */
     clear: () => {
         if (typeof window === 'undefined') return;
-        sessionStorage.removeItem(STORAGE_KEY);
+        sessionStorage.removeItem(`${STORAGE_KEY_PREFIX}login`);
+        localStorage.removeItem(`${STORAGE_KEY_PREFIX}signup`);
     }
 };

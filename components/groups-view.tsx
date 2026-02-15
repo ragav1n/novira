@@ -280,12 +280,22 @@ export function GroupsView() {
                             </Card>
                         ))
                     ) : (
-                        <div className="text-center py-12 space-y-3">
-                            <div className="w-16 h-16 rounded-full bg-secondary/20 flex items-center justify-center mx-auto">
-                                <Users className="w-8 h-8 text-muted-foreground/30" />
+                        <Card className="bg-card/40 border-primary/20 overflow-hidden relative mx-4">
+                            <div className="absolute top-0 right-0 p-8 opacity-5">
+                                <Users className="w-24 h-24" />
                             </div>
-                            <p className="text-sm text-muted-foreground">No groups yet. Create one to split expenses!</p>
-                        </div>
+                            <CardContent className="p-5 relative z-10 text-center">
+                                <h3 className="font-bold text-lg mb-1">No groups yet</h3>
+                                <p className="text-xs text-muted-foreground mb-4">Create a group to start splitting expenses with friends.</p>
+                                <button
+                                    onClick={() => setIsAddGroupOpen(true)}
+                                    className="w-full bg-primary text-white text-xs font-bold py-2.5 px-4 rounded-xl hover:bg-primary/90 transition-colors flex items-center justify-center gap-2"
+                                >
+                                    <Plus className="w-4 h-4" />
+                                    Start a Group
+                                </button>
+                            </CardContent>
+                        </Card>
                     )}
                 </TabsContent>
 
@@ -393,12 +403,22 @@ export function GroupsView() {
                             </div>
                         ))
                     ) : (
-                        <div className="text-center py-12 space-y-3">
-                            <div className="w-16 h-16 rounded-full bg-secondary/20 flex items-center justify-center mx-auto">
-                                <UserPlus className="w-8 h-8 text-muted-foreground/30" />
+                        <Card className="bg-card/40 border-primary/20 overflow-hidden relative mx-4">
+                            <div className="absolute top-0 right-0 p-8 opacity-5">
+                                <UserPlus className="w-24 h-24" />
                             </div>
-                            <p className="text-sm text-muted-foreground">Add friends by email to start splitting.</p>
-                        </div>
+                            <CardContent className="p-5 relative z-10 text-center">
+                                <h3 className="font-bold text-lg mb-1">No friends yet</h3>
+                                <p className="text-xs text-muted-foreground mb-4">Add friends by email to start splitting bills.</p>
+                                <button
+                                    onClick={() => setIsAddFriendOpen(true)}
+                                    className="w-full bg-secondary/20 text-foreground text-xs font-bold py-2.5 px-4 rounded-xl hover:bg-secondary/30 transition-colors flex items-center justify-center gap-2 border border-white/5"
+                                >
+                                    <UserPlus className="w-4 h-4" />
+                                    Add Friend
+                                </button>
+                            </CardContent>
+                        </Card>
                     )}
                 </TabsContent>
                 <TabsContent value="settlements" className="mt-6 space-y-4">

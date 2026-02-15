@@ -74,7 +74,8 @@ export function Component({ isSignUp = false }: { isSignUp?: boolean }) {
     }
 
     // 2. Check Rate Limit
-    const remainingTime = authRateLimiter.check();
+    const action = isSignUp ? 'signup' : 'login';
+    const remainingTime = authRateLimiter.check(action);
     if (remainingTime > 0) {
       const seconds = Math.ceil(remainingTime / 1000);
       setError(`Please wait ${seconds}s before trying again.`);
@@ -108,7 +109,7 @@ export function Component({ isSignUp = false }: { isSignUp?: boolean }) {
     // 3. Set Lock & Loading
     isSubmittingRef.current = true;
     setIsLoading(true);
-    authRateLimiter.recordOK(); // Record attempt
+    authRateLimiter.recordOK(action); // Record attempt
 
     try {
       if (isSignUp) {
@@ -142,7 +143,15 @@ export function Component({ isSignUp = false }: { isSignUp?: boolean }) {
         }
       }
     } catch (error: any) {
-      setError(error.message || 'Authentication failed');
+      console.error("Auth error:", error);
+
+      // Better error handling for rate limits
+      if (error.status === 429 || error.message?.toLowerCase().includes('rate limit')) {
+        setError('Too many requests. Please wait a moment before trying again.');
+      } else {
+        setError(error.message || 'Authentication failed');
+      }
+
       // Release lock on error only (on success we navigate away)
       isSubmittingRef.current = false;
     } finally {
