@@ -41,7 +41,7 @@ export function AddExpenseView() {
     const [date, setDate] = useState<Date | undefined>(new Date());
     const [paymentMethod, setPaymentMethod] = useState<'Cash' | 'Debit Card' | 'Credit Card'>('Cash');
     const [loading, setLoading] = useState(false);
-    const { currency, userId } = useUserPreferences();
+    const { currency, userId, formatCurrency, convertAmount } = useUserPreferences();
     const [txCurrency, setTxCurrency] = useState(currency);
     const { groups, friends } = useGroups();
 
@@ -411,9 +411,16 @@ export function AddExpenseView() {
                                 </div>
                                 <div className="flex justify-between items-center text-xs mt-1">
                                     <span className="text-muted-foreground">Each person pays:</span>
-                                    <span className="font-bold">
-                                        {(parseFloat(amount || '0') / ((selectedGroupId ? (groups.find(g => g.id === selectedGroupId)?.members.length || 1) : selectedFriendIds.length + 1))).toFixed(2)} {currency === 'INR' ? '₹' : currency === 'EUR' ? '€' : '$'}
-                                    </span>
+                                    <div className="flex flex-col items-end">
+                                        <span className="font-bold">
+                                            {(parseFloat(amount || '0') / ((selectedGroupId ? (groups.find(g => g.id === selectedGroupId)?.members.length || 1) : selectedFriendIds.length + 1))).toFixed(2)} {txCurrency === 'INR' ? '₹' : txCurrency === 'EUR' ? '€' : '$'}
+                                        </span>
+                                        {txCurrency !== currency && (
+                                            <span className="text-[10px] text-muted-foreground mt-0.5">
+                                                ≈ {formatCurrency(convertAmount(parseFloat(amount || '0') / ((selectedGroupId ? (groups.find(g => g.id === selectedGroupId)?.members.length || 1) : selectedFriendIds.length + 1)), txCurrency))}
+                                            </span>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         )}
