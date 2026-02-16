@@ -466,7 +466,7 @@ export function SettingsView() {
 
             {/* Footer Info */}
             <div className="text-center py-4 space-y-2">
-                <p className="text-xs text-muted-foreground font-medium">Novira v1.0.0</p>
+                <p className="text-xs text-muted-foreground font-medium">Novira v1.</p>
                 <div className="flex justify-center items-center gap-2 text-[10px] text-muted-foreground">
                     <Shield className="w-3 h-3" />
                     <span>Secure & Encrypted</span>

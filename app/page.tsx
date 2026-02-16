@@ -17,13 +17,7 @@ export default function Page() {
   }
 
   if (!isAuthenticated) {
-    return (
-      <div className="min-h-[100dvh] w-full relative overflow-hidden flex items-center justify-center">
-        <div className="relative z-10">
-          <SignInCard isSignUp={false} />
-        </div>
-      </div>
-    )
+    return <SignInCard isSignUp={false} />
   }
 
   return <DashboardView />
