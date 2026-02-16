@@ -523,7 +523,7 @@ export function DashboardView() {
                                 <DialogTitle>All Transactions</DialogTitle>
                                 <DialogDescription>History of all your expenses.</DialogDescription>
                             </DialogHeader>
-                            <ScrollArea className="flex-1 -mr-4 pr-4">
+                            <div className="flex-1 overflow-y-auto -mr-4 pr-4 min-h-0">
                                 <div className="space-y-3 pt-4">
                                     {displayTransactions.map((tx) => {
                                         const myShare = calculateUserShare(tx, userId);
@@ -612,7 +612,7 @@ export function DashboardView() {
                                         <div className="text-center py-8 text-muted-foreground">No transactions found.</div>
                                     )}
                                 </div>
-                            </ScrollArea>
+                            </div>
                         </DialogContent>
                     </Dialog>
                 </div>

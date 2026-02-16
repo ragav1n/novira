@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { ChevronLeft, User, Download, AlertTriangle, Shield, Lock, ChevronRight, SlidersHorizontal, LogOut, Banknote } from 'lucide-react';
+import { ChevronLeft, User, Download, AlertTriangle, Shield, Lock, ChevronRight, SlidersHorizontal, LogOut, Banknote, FileSpreadsheet } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
@@ -294,13 +294,22 @@ export function SettingsView() {
                 </div>
             </div>
 
-            {/* Export Data */}
+            {/* Data Management */}
             <div className="space-y-3 pt-2">
                 <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
                     <Download className="w-4 h-4" />
-                    <span>Export Data</span>
+                    <span>Data Management</span>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
+                    <Button
+                        variant="outline"
+                        onClick={() => router.push('/import')}
+                        disabled={loadingExport}
+                        className="h-16 flex flex-col items-center justify-center gap-1 bg-secondary/5 border-primary/20 hover:bg-primary/10 hover:border-primary/50 transition-all group col-span-2"
+                    >
+                        <FileSpreadsheet className="w-5 h-5 text-primary group-hover:scale-110 transition-transform" />
+                        <span className="text-xs font-medium">Import Bank Statement (Excel/CSV)</span>
+                    </Button>
                     <Button
                         variant="outline"
                         onClick={() => handleExport('csv')}
@@ -320,7 +329,7 @@ export function SettingsView() {
                         <span className="text-xs font-medium">{loadingExport ? 'Exporting...' : 'Export PDF'}</span>
                     </Button>
                 </div>
-                <p className="text-[10px] text-muted-foreground">Export your expense data for backup or analysis in other tools.</p>
+                <p className="text-[10px] text-muted-foreground">Import bank statements or export your expense data.</p>
             </div>
 
             {/* Preferences */}
