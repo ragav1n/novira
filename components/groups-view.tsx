@@ -50,6 +50,7 @@ export function GroupsView() {
     // Member management state
     const [isManageMembersOpen, setIsManageMembersOpen] = useState(false);
     const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
+    const [isProcessing, setIsProcessing] = useState(false);
 
     const handleCreateGroup = async () => {
         if (!newGroupName.trim()) return;
@@ -73,8 +74,9 @@ export function GroupsView() {
 
     const handleAddFriend = async () => {
         const input = friendEmail.trim();
-        if (!input) return;
+        if (!input || isProcessing) return;
 
+        setIsProcessing(true);
         try {
             if (input.includes('@')) {
                 await addFriendByEmail(input);
@@ -87,6 +89,8 @@ export function GroupsView() {
             toast.success('Friend request sent!');
         } catch (error: any) {
             toast.error(error.message || 'Failed to add friend');
+        } finally {
+            setIsProcessing(false);
         }
     };
 
@@ -178,8 +182,12 @@ export function GroupsView() {
                                             className="bg-secondary/20 border-white/5 h-12 rounded-2xl"
                                         />
                                     </div>
-                                    <Button onClick={handleAddFriend} className="w-full h-12 rounded-2xl bg-primary hover:bg-primary/80 text-white font-bold">
-                                        Send Friend Request
+                                    <Button
+                                        onClick={handleAddFriend}
+                                        disabled={isProcessing}
+                                        className="w-full h-12 rounded-2xl bg-primary hover:bg-primary/80 text-white font-bold"
+                                    >
+                                        {isProcessing ? 'Sending...' : 'Send Friend Request'}
                                     </Button>
                                 </TabsContent>
 
@@ -187,13 +195,26 @@ export function GroupsView() {
                                     <div className="h-64 w-full bg-black rounded-2xl overflow-hidden relative border border-white/10">
                                         <QrScanner
                                             onScan={async (scannedId) => {
+                                                if (isProcessing) return;
                                                 console.log("Scanned:", scannedId);
+
+                                                setIsProcessing(true);
                                                 try {
                                                     await addFriendById(scannedId);
                                                     setIsAddFriendOpen(false);
                                                     toast.success('Friend request sent!');
                                                 } catch (error: any) {
-                                                    toast.error(error.message || 'Failed to add friend');
+                                                    // Ignore duplicate requests silently if they happen very fast or show error
+                                                    if (error.message !== 'You are already friends (or have a pending request) with this user') {
+                                                        toast.error(error.message || 'Failed to add friend');
+                                                    } else {
+                                                        // It's a duplicate, maybe just close dialog to avoid confusion or show success
+                                                        toast.info('Request already sent');
+                                                        setIsAddFriendOpen(false);
+                                                    }
+                                                } finally {
+                                                    // Small delay before allowing next scan if we didn't close dialog
+                                                    setTimeout(() => setIsProcessing(false), 1000);
                                                 }
                                             }}
                                             className="w-full h-full"

@@ -305,11 +305,12 @@ export function GroupsProvider({ children }: { children: React.ReactNode }) {
                     }
                     if (status === 'CHANNEL_ERROR') {
                         console.error('Realtime Channel Error:', err);
-                        toast.error(`Realtime Error: ${err?.message || 'Unknown'}`);
+                        // Suppress toast to avoid startling users on minor bugs/network blips
+                        // toast.error(`Realtime Error: ${err?.message || 'Unknown'}`);
                     }
                     if (status === 'TIMED_OUT') {
                         console.error('Realtime Connection Timed Out');
-                        toast.error('Realtime Connection Timed Out. Retrying...');
+                        // toast.error('Realtime Connection Timed Out. Retrying...');
                     }
                 });
         }, 500);

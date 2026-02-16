@@ -1,8 +1,17 @@
-'use server';
+import { z } from 'zod';
 
-import { createClient } from '@supabase/supabase-js';
+const DeleteAccountSchema = z.object({
+    email: z.string().email(),
+    password: z.string().min(1, "Password is required"),
+});
 
 export async function deleteAccount(email: string, password: string) {
+    const result = DeleteAccountSchema.safeParse({ email, password });
+
+    if (!result.success) {
+        return { error: 'Invalid input data' };
+    }
+
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
     const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
     const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
