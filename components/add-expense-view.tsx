@@ -28,6 +28,7 @@ const dropdownCategories: Category[] = [
     { id: 'healthcare', label: 'Healthcare', icon: HeartPulse, color: '#FF9F1C' },
     { id: 'entertainment', label: 'Entertainment', icon: Clapperboard, color: '#FF1493' },
     { id: 'others', label: 'Others', icon: HelpCircle, color: '#C7F464' },
+    { id: 'uncategorized', label: 'Uncategorized', icon: HelpCircle, color: '#94A3B8' },
 ];
 
 export function AddExpenseView() {

@@ -4,7 +4,7 @@ import { useUserPreferences } from '@/components/providers/user-preferences-prov
 import { BudgetAlertManager } from '@/components/budget-alert-manager';
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, Utensils, Car, Zap, ShoppingBag, HeartPulse, Clapperboard, CircleDollarSign, ArrowUpRight, ArrowDownLeft, Users, MoreVertical, Pencil, Trash2, X, History, Clock } from 'lucide-react';
+import { Plus, Utensils, Car, Zap, ShoppingBag, HeartPulse, Clapperboard, CircleDollarSign, ArrowUpRight, ArrowDownLeft, Users, MoreVertical, Pencil, Trash2, X, History, Clock, HelpCircle } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Pie, PieChart, Cell } from 'recharts';
@@ -47,6 +47,7 @@ const CATEGORY_COLORS: Record<string, string> = {
     entertainment: '#FF1493', // Deep Pink
     others: '#C7F464',    // Lime
     settlement: '#10B981', // Emerald for settlement
+    uncategorized: '#6366F1', // Indigo-500 for Uncategorized
 };
 
 const chartConfig: ChartConfig = {
@@ -57,6 +58,7 @@ const chartConfig: ChartConfig = {
     healthcare: { label: "Healthcare", color: CATEGORY_COLORS.healthcare },
     entertainment: { label: "Entertainment", color: CATEGORY_COLORS.entertainment },
     others: { label: "Others", color: CATEGORY_COLORS.others },
+    uncategorized: { label: "Uncategorized", color: CATEGORY_COLORS.uncategorized },
 };
 
 type Transaction = {
@@ -322,6 +324,7 @@ export function DashboardView() {
             case 'healthcare': return <HeartPulse className="w-5 h-5 text-white" />;
             case 'entertainment': return <Clapperboard className="w-5 h-5 text-white" />;
             case 'settlement': return <ArrowUpRight className="w-5 h-5 text-white" />;
+            case 'uncategorized': return <HelpCircle className="w-5 h-5 text-white" />;
             default: return <CircleDollarSign className="w-5 h-5 text-white" />;
         }
     };
@@ -539,7 +542,7 @@ export function DashboardView() {
                                                         )}
                                                     </div>
                                                     <div>
-                                                        <p className="font-medium text-sm">{tx.description}</p>
+                                                        <p className="font-medium text-sm truncate max-w-[200px]" title={tx.description}>{tx.description}</p>
                                                         <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
                                                             <span className="px-1.5 py-0.5 rounded bg-primary/10 text-[10px] text-primary border border-primary/10 capitalize">{tx.category}</span>
                                                             <span className="font-medium text-[10px] text-primary/80">
@@ -632,7 +635,7 @@ export function DashboardView() {
                                         )}
                                     </div>
                                     <div>
-                                        <p className="font-medium text-sm">{tx.description}</p>
+                                        <p className="font-medium text-sm truncate max-w-[180px]" title={tx.description}>{tx.description}</p>
                                         <div className="flex items-center gap-2 text-xs text-muted-foreground">
                                             <span className="px-1.5 py-0.5 rounded bg-primary/10 text-[10px] text-primary capitalize">{tx.category}</span>
                                             <span className="font-medium text-[10px] text-primary/80">

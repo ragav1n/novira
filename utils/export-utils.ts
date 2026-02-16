@@ -57,7 +57,7 @@ export const generateCSV = (
             format(new Date(tx.date), 'yyyy-MM-dd'),
             `"${tx.description.replace(/"/g, '""')}"`, // Escape quotes
             tx.category,
-            tx.payment_method,
+            tx.payment_method || '-',
             tx.amount,
             tx.currency || 'USD',
             exchangeRate.toFixed(4),
@@ -66,7 +66,20 @@ export const generateCSV = (
         ].join(',');
     });
 
-    const csvContent = [headers.join(','), ...rows].join('\n');
+    const totalSpent = transactions.reduce((acc, tx) => acc + convertAmount(Number(tx.amount), tx.currency || 'USD'), 0);
+    const totalRow = [
+        'Total',
+        '',
+        '',
+        '', // Payment Method
+        '', // Amount
+        '', // Currency
+        '', // Rate
+        convertAmount(totalSpent, currency).toFixed(2),
+        currency
+    ].join(',');
+
+    const csvContent = [headers.join(','), ...rows, totalRow].join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -101,7 +114,7 @@ export const generatePDF = (
     doc.text(`Total Spent: ${formatForPDF(totalSpent, currency)}`, 14, 35);
 
     // Table
-    const tableColumn = ["Date", "Description", "Category", "Amount", "Rate", "Converted"];
+    const tableColumn = ["Date", "Description", "Category", "Payment Method", "Amount", "Rate", "Converted"];
     const tableRows = transactions.map(tx => {
         let converted = 0;
         let rate = 0;
@@ -124,6 +137,7 @@ export const generatePDF = (
             format(new Date(tx.date), 'MMM d, yyyy'),
             tx.description,
             tx.category,
+            tx.payment_method || '-',
             formatForPDF(Number(tx.amount), tx.currency), // Original
             rateStr,
             formatForPDF(converted, currency) // Converted
@@ -133,11 +147,21 @@ export const generatePDF = (
     autoTable(doc as any, {
         head: [tableColumn],
         body: tableRows,
-        foot: [['Total', '', '', '', formatForPDF(totalSpent, currency)]],
+        foot: [['Total', '', '', '', '', '', formatForPDF(totalSpent, currency)]],
+        showFoot: 'lastPage',
         startY: 40,
-        styles: { fontSize: 8 },
-        headStyles: { fillColor: [138, 43, 226], textColor: [255, 255, 255] }, // Electric Purple
-        footStyles: { fillColor: [138, 43, 226], textColor: [255, 255, 255], fontStyle: 'bold' }, // Match header
+        styles: { fontSize: 8, cellPadding: 2, halign: 'center' },
+        columnStyles: {
+            0: { cellWidth: 20 }, // Date
+            1: { cellWidth: 'auto' }, // Description
+            2: { cellWidth: 20 }, // Category
+            3: { cellWidth: 25 }, // Payment Method
+            4: { cellWidth: 20 }, // Amount
+            5: { cellWidth: 15 }, // Rate
+            6: { cellWidth: 25 }  // Converted
+        },
+        headStyles: { fillColor: [138, 43, 226], textColor: [255, 255, 255], halign: 'center' }, // Electric Purple
+        footStyles: { fillColor: [138, 43, 226], textColor: [255, 255, 255], fontStyle: 'bold', halign: 'center' }, // Match header
         alternateRowStyles: { fillColor: [245, 245, 245] },
     });
 

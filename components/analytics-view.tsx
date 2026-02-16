@@ -28,6 +28,7 @@ const CATEGORY_COLORS: Record<string, string> = {
     healthcare: '#FF9F1C', // Orange
     entertainment: '#FF1493', // Deep Pink
     others: '#C7F464',    // Lime
+    uncategorized: '#6366F1', // Indigo-500
 };
 
 const chartConfig: ChartConfig = {
@@ -38,6 +39,7 @@ const chartConfig: ChartConfig = {
     healthcare: { label: "Healthcare", color: CATEGORY_COLORS.healthcare },
     entertainment: { label: "Entertainment", color: CATEGORY_COLORS.entertainment },
     others: { label: "Others", color: CATEGORY_COLORS.others },
+    uncategorized: { label: "Uncategorized", color: CATEGORY_COLORS.uncategorized },
 };
 
 // Custom Tooltip Component

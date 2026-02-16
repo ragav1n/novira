@@ -85,12 +85,13 @@ export function ImportView() {
 
     // Categories for mapping/fallback
     const CATEGORIES = [
-        'Food', 'Transport', 'Bills', 'Shopping', 'Healthcare', 'Entertainment', 'Others'
+        'Food', 'Transport', 'Bills', 'Shopping', 'Healthcare', 'Entertainment', 'Others', 'Uncategorized'
     ];
 
     const findHeaderRow = (data: any[][]): { index: number, headers: string[] } => {
         // Look for common header keywords in first 1000 rows (some banks have huge headers)
-        const keywords = ['date', 'time', 'description', 'particulars', 'narration', 'amount', 'debit', 'credit', 'balance', 'withdraw', 'deposit', 'value'];
+        // Added 'txn date', 'value date', 'ref no./cheque no.' for SBI
+        const keywords = ['date', 'time', 'description', 'particulars', 'narration', 'amount', 'debit', 'credit', 'balance', 'withdraw', 'deposit', 'value', 'txn date', 'ref no', 'cheque no'];
 
         for (let i = 0; i < Math.min(data.length, 1000); i++) {
             const row = data[i];
@@ -149,8 +150,8 @@ export function ImportView() {
 
         // Amount logic
         const amtIdx = lowerHeaders.findIndex(h => h.includes('amount') || (h.includes('amt') && !h.includes('withdraw') && !h.includes('deposit')));
-        const debitIdx = lowerHeaders.findIndex(h => h.includes('debit') || h.includes('withdraw') || h.includes('dr'));
-        const creditIdx = lowerHeaders.findIndex(h => h.includes('credit') || h.includes('deposit') || h.includes('cr'));
+        const debitIdx = lowerHeaders.findIndex(h => h.includes('debit') || h.includes('withdraw') || h === 'dr');
+        const creditIdx = lowerHeaders.findIndex(h => h.includes('credit') || h.includes('deposit') || h === 'cr');
 
         if (debitIdx >= 0 || creditIdx >= 0) {
             setAmountMode('split');
@@ -287,7 +288,7 @@ export function ImportView() {
             const formats = [
                 'dd/MM/yy', 'MM/dd/yy', 'yy-MM-dd', 'yy/MM/dd', 'dd-MM-yy',
                 'yyyy-MM-dd', 'dd/MM/yyyy', 'MM/dd/yyyy', 'dd-MM-yyyy', 'yyyy/MM/dd',
-                'dd-MMM-yyyy', 'dd/MMM/yyyy'
+                'dd-MMM-yyyy', 'dd/MMM/yyyy', 'd-MMM-yy', 'dd-MMM-yy', 'd-MMM-yyyy'
             ];
             // Normalize separators
             const normDateStr = String(dateStr).trim();
@@ -320,7 +321,7 @@ export function ImportView() {
             }
 
             // CATEGORY LOGIC
-            let category = 'Others';
+            let category = 'Uncategorized';
             if (catStr) {
                 const match = CATEGORIES.find(c => c.toLowerCase() === String(catStr).toLowerCase());
                 if (match) category = match;
@@ -337,12 +338,14 @@ export function ImportView() {
             // PAYMENT METHOD LOGIC
             let paymentMethod = 'Bank Transfer';
             const lowerDescForMethod = String(descStr).toLowerCase();
-            if (lowerDescForMethod.includes('upi')) {
+            if (lowerDescForMethod.includes('upi') || lowerDescForMethod.includes('upi/dr') || lowerDescForMethod.includes('upi/cr')) {
                 paymentMethod = 'UPI';
-            } else if (lowerDescForMethod.includes('debit card')) {
+            } else if (lowerDescForMethod.includes('debit card') || lowerDescForMethod.includes('pos') || lowerDescForMethod.includes('atm')) {
                 paymentMethod = 'Debit Card';
             } else if (lowerDescForMethod.includes('credit card')) {
                 paymentMethod = 'Credit Card';
+            } else if (lowerDescForMethod.includes('neft') || lowerDescForMethod.includes('rtgs') || lowerDescForMethod.includes('imps') || lowerDescForMethod.includes('transfer')) {
+                paymentMethod = 'Bank Transfer';
             }
 
             return {
