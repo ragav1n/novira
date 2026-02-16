@@ -64,6 +64,7 @@ type Transaction = {
     description: string;
     amount: number;
     category: string;
+    is_settlement?: boolean;
     date: string;
     created_at: string;
     user_id: string;
@@ -76,6 +77,9 @@ type Transaction = {
         amount: number;
         is_paid: boolean;
     }[];
+    profile?: {
+        full_name: string;
+    };
 };
 
 type SpendingCategory = {
@@ -140,7 +144,7 @@ export function DashboardView() {
         try {
             const { data: txs } = await supabase
                 .from('transactions')
-                .select('*, splits(*)')
+                .select('*, profile:profiles(full_name), splits(*)')
                 .order('date', { ascending: false })
                 .order('created_at', { ascending: false });
 
@@ -504,6 +508,9 @@ export function DashboardView() {
                                                         <p className="font-medium text-sm">{tx.description}</p>
                                                         <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
                                                             <span className="px-1.5 py-0.5 rounded bg-primary/10 text-[10px] text-primary border border-primary/10 capitalize">{tx.category}</span>
+                                                            <span className="font-medium text-[10px] text-primary/80">
+                                                                {tx.user_id === userId ? 'You paid' : `Paid by ${tx.profile?.full_name?.split(' ')[0] || 'Unknown'}`}
+                                                            </span>
                                                             <span>• {format(new Date(tx.date), 'MMM d, yyyy')}</span>
                                                         </div>
                                                     </div>
@@ -534,7 +541,7 @@ export function DashboardView() {
                                                             </span>
                                                         )}
                                                     </div>
-                                                    {isRecentUserTransaction(tx) && (
+                                                    {isRecentUserTransaction(tx) && !tx.is_settlement && (!tx.splits || tx.splits.length === 0) && (
                                                         <DropdownMenu>
                                                             <DropdownMenuTrigger asChild>
                                                                 <button className="p-1 rounded-full hover:bg-white/10 transition-opacity">
@@ -594,6 +601,9 @@ export function DashboardView() {
                                         <p className="font-medium text-sm">{tx.description}</p>
                                         <div className="flex items-center gap-2 text-xs text-muted-foreground">
                                             <span className="px-1.5 py-0.5 rounded bg-primary/10 text-[10px] text-primary capitalize">{tx.category}</span>
+                                            <span className="font-medium text-[10px] text-primary/80">
+                                                {tx.user_id === userId ? 'You paid' : `Paid by ${tx.profile?.full_name?.split(' ')[0] || 'Unknown'}`}
+                                            </span>
                                             <span>• {format(new Date(tx.date), 'MMM d')}</span>
                                         </div>
                                     </div>
@@ -620,7 +630,7 @@ export function DashboardView() {
                                         )}
                                     </div>
                                     <div className="w-6 h-6 flex items-center justify-center">
-                                        {isRecentUserTransaction(tx) && (
+                                        {isRecentUserTransaction(tx) && !tx.is_settlement && (!tx.splits || tx.splits.length === 0) && (
                                             <DropdownMenu>
                                                 <DropdownMenuTrigger asChild>
                                                     <button className="p-1 rounded-full hover:bg-white/10 transition-opacity">

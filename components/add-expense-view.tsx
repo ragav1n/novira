@@ -58,12 +58,15 @@ export function AddExpenseView() {
     const [selectedFriendIds, setSelectedFriendIds] = useState<string[]>([]);
 
     const handleSubmit = async () => {
-        if (!amount || !description || !date) {
+        if (!amount || parseFloat(amount) <= 0 || !description || !date) {
+            if (amount && parseFloat(amount) <= 0) {
+                toast.error('Amount must be greater than 0');
+                return;
+            }
             toast.error('Please fill in all required fields');
             return;
         }
 
-        setLoading(true);
         setLoading(true);
         try {
             if (!userId) {
@@ -180,6 +183,8 @@ export function AddExpenseView() {
                     <Input
                         value={amount}
                         type="number"
+                        min="0"
+                        step="0.01"
                         placeholder="0.00"
                         onChange={(e) => setAmount(e.target.value)}
                         className="h-16 text-3xl font-bold pl-12 bg-secondary/10 border-primary/50 focus-visible:ring-primary/50"

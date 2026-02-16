@@ -322,7 +322,7 @@ export function GroupsProvider({ children }: { children: React.ReactNode }) {
                 supabase.removeChannel(channel);
             }
         };
-    }, [userId]);
+    }, [userId, userCurrency, convertAmount]);
 
     // ... (keep createGroup, addFriendByEmail, etc. methods, but remove getSession calls if they use userId from closure or check context, though some methods might still need separate checks or can use userId from context safely)
     // Actually, for helper methods called by UI, we can use `userId` from context.
