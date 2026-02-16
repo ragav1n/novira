@@ -70,8 +70,14 @@ export function DeleteAccountDialog({ trigger }: DeleteAccountDialogProps) {
             toast.success('Account deleted successfully');
             setOpen(false);
 
-            // Sign out locally just in case, though server action should have handled user deletion
-            await supabase.auth.signOut();
+            // Sign out locally. This might throw a 403 because the user is already deleted, 
+            // but we want to clear the local session/cookies anyway.
+            try {
+                await supabase.auth.signOut();
+            } catch (signOutError) {
+                console.warn('Sign out during deletion failed (expected):', signOutError);
+            }
+
             router.push('/signin');
 
         } catch (error: any) {
@@ -115,9 +121,16 @@ export function DeleteAccountDialog({ trigger }: DeleteAccountDialogProps) {
                             <h2 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-b from-white to-white/70">
                                 Delete Account
                             </h2>
-                            <div className="text-white/50 text-xs px-4">
-                                <p>This action is <span className="text-destructive font-semibold">irreversible</span>.</p>
-                                <p>All your data, groups, and friends will be permanently removed.</p>
+                            <div className="text-white/60 text-[13px] px-2 leading-relaxed space-y-2">
+                                <p>You are about to <span className="text-destructive font-bold uppercase tracking-tight">permanently delete</span> your account.</p>
+                                <div className="bg-destructive/10 rounded-lg p-3 border border-destructive/20 text-destructive-foreground/90 text-xs text-left">
+                                    <p className="font-bold mb-1 decoration-destructive/30">What will happen:</p>
+                                    <ul className="list-disc list-inside space-y-1 opacity-90 font-medium">
+                                        <li>You will be <span className="font-bold text-destructive">removed from all groups</span></li>
+                                        <li>Your <span className="font-bold text-destructive">friendships will be deleted</span></li>
+                                        <li>All your <span className="font-bold text-destructive">expense data will vanish</span></li>
+                                    </ul>
+                                </div>
                             </div>
                         </div>
 
