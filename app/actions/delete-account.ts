@@ -1,4 +1,7 @@
+'use server';
+
 import { z } from 'zod';
+import { createClient } from '@supabase/supabase-js';
 
 const DeleteAccountSchema = z.object({
     email: z.string().email(),

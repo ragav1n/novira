@@ -33,4 +33,3 @@ ts-debug.log*
 *.tsbuildinfo
 next-env.d.ts
 supabase/email_templates
-supabase/migrations
