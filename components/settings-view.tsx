@@ -52,6 +52,8 @@ export function SettingsView() {
     // Local state for budget input to allow typing before saving
     const [localBudget, setLocalBudget] = useState(monthlyBudget.toString());
 
+    const [hasPassword, setHasPassword] = useState(false);
+
     useEffect(() => {
         setLocalBudget(monthlyBudget.toString());
     }, [monthlyBudget]);
@@ -62,19 +64,17 @@ export function SettingsView() {
 
     const getProfile = async () => {
         try {
-            if (!userId) return;
-            setUserEmail(''); // Email might not be available if not in session, but profile has it? No profile table might rely on sync. 
-            // Actually, email is in auth.users, not profiles usually, unless synced.
-            // Let's explicitly fetch email if needed or just skip it if not critical. 
-            // For now, let's try to get session ONLY for email if we really need it, or just ignore. 
-            // The UI uses email for avatar fallback. 
-            // Let's keep a single getSession call just for email if strictly needed, or better, 
-            // if we can get email from profile if we added it there. 
-            // Checking previous code: `user.email`. 
-            // We can fetch session for email, or just rely on profile name.
+            // Always get the latest user object to check identities
+            const { data: { user } } = await supabase.auth.getUser();
 
-            const { data: { session } } = await supabase.auth.getSession();
-            if (session?.user?.email) setUserEmail(session.user.email);
+            if (user) {
+                if (user.email) setUserEmail(user.email);
+                // Check if user has an email identity (implies they have a password)
+                const hasEmailIdentity = user.identities?.some(identity => identity.provider === 'email');
+                setHasPassword(!!hasEmailIdentity);
+            }
+
+            if (!userId) return;
 
             const { data, error } = await supabase
                 .from('profiles')
@@ -453,17 +453,19 @@ export function SettingsView() {
                 </div>
 
                 <div className="bg-secondary/5 rounded-xl border border-white/5 divide-y divide-white/5">
-                    <ChangePasswordDialog
-                        trigger={
-                            <button className="w-full flex items-center justify-between p-3 hover:bg-white/5 transition-colors text-left outline-none">
-                                <div className="flex items-center gap-3">
-                                    <Lock className="w-4 h-4 text-muted-foreground" />
-                                    <span className="text-sm font-medium">Change Password</span>
-                                </div>
-                                <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                            </button>
-                        }
-                    />
+                    {hasPassword && (
+                        <ChangePasswordDialog
+                            trigger={
+                                <button className="w-full flex items-center justify-between p-3 hover:bg-white/5 transition-colors text-left outline-none">
+                                    <div className="flex items-center gap-3">
+                                        <Lock className="w-4 h-4 text-muted-foreground" />
+                                        <span className="text-sm font-medium">Change Password</span>
+                                    </div>
+                                    <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                                </button>
+                            }
+                        />
+                    )}
                 </div>
             </div>
 

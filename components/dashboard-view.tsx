@@ -36,6 +36,9 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { FeatureAnnouncementModal } from '@/components/feature-announcement-modal';
+import { WelcomeModal } from '@/components/welcome-modal';
+import { LATEST_FEATURE_ANNOUNCEMENT } from '@/lib/feature-flags';
 
 // Constants
 const CATEGORY_COLORS: Record<string, string> = {
@@ -119,16 +122,28 @@ export function DashboardView() {
     const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
     const [loadingAudit, setLoadingAudit] = useState(false);
 
-    // Sync provider userId to local state if needed, or just use it directly
-    // We kept the local state 'userId' for now to minimize refactor impact, 
-    // but we'll sync it.
-    // Sync provider userId to local state if needed, or just use it directly
-    // We kept the local state 'userId' for now to minimize refactor impact, 
-    // but we'll sync it.
+    // Modal Sequencing State
+    const [activeModal, setActiveModal] = useState<'welcome' | 'announcement' | null>(null);
+
+    // Sync provider userId and handle modal sequencing
     useEffect(() => {
         if (providerUserId) {
             setUserId(providerUserId);
-            // Fetch Profile - optimization: could be in provider but keeping here for now
+
+            // Modal Sequencing Logic
+            const hasSeenWelcome = localStorage.getItem('welcome_seen');
+            const lastSeenFeatureId = localStorage.getItem('last_seen_feature_id');
+            const hasNewAnnouncement = lastSeenFeatureId !== LATEST_FEATURE_ANNOUNCEMENT.id;
+
+            if (!hasSeenWelcome) {
+                // New User: Sequence Welcome -> Announcement (if any)
+                setTimeout(() => setActiveModal('welcome'), 1500);
+            } else if (hasNewAnnouncement) {
+                // Returning User with new update
+                setTimeout(() => setActiveModal('announcement'), 1500);
+            }
+
+            // Fetch Profile
             const fetchProfile = async () => {
                 try {
                     const { data: profile } = await supabase
@@ -150,11 +165,9 @@ export function DashboardView() {
             };
             fetchProfile();
         } else if (!loading) {
-            // If provider finished loading and no user, we might want to redirect or just show empty?
-            // But layout handles redirect for protected pages.
             setLoading(false);
         }
-    }, [providerUserId]);
+    }, [providerUserId, loading]);
 
     const loadTransactions = async (currentUserId: string) => {
         try {
@@ -783,6 +796,23 @@ export function DashboardView() {
                     </DialogContent>
                 </Dialog>
             </div>
+
+            {/* Feature Modals */}
+            <WelcomeModal
+                onClose={() => {
+                    const lastSeenFeatureId = localStorage.getItem('last_seen_feature_id');
+                    if (lastSeenFeatureId !== LATEST_FEATURE_ANNOUNCEMENT.id) {
+                        setActiveModal('announcement');
+                    } else {
+                        setActiveModal(null);
+                    }
+                }}
+            />
+
+            <FeatureAnnouncementModal
+                showAnnouncement={activeModal === 'announcement'}
+                onClose={() => setActiveModal(null)}
+            />
         </div >
     );
 }

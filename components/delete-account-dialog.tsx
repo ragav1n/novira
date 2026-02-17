@@ -35,22 +35,41 @@ export function DeleteAccountDialog({ trigger }: DeleteAccountDialogProps) {
     const router = useRouter();
     const [open, setOpen] = useState(false);
     const [password, setPassword] = useState('');
+    const [confirmPhrase, setConfirmPhrase] = useState('');
+    const [provider, setProvider] = useState<string | null>(null);
     const [showPassword, setShowPassword] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [focusedInput, setFocusedInput] = useState<string | null>(null);
 
+    React.useEffect(() => {
+        if (open) {
+            const getProvider = async () => {
+                const { data: { user } } = await supabase.auth.getUser();
+                setProvider(user?.app_metadata?.provider || 'email');
+            };
+            getProvider();
+        }
+    }, [open]);
+
+    const isOAuth = provider && provider !== 'email';
+    const isReadyToSubmit = isOAuth ? confirmPhrase === 'DELETE' : password.length > 0;
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        if (!password) {
+        if (!isOAuth && !password) {
             toast.error('Please enter your password to confirm');
+            return;
+        }
+
+        if (isOAuth && confirmPhrase !== 'DELETE') {
+            toast.error('Please type DELETE to confirm');
             return;
         }
 
         setIsLoading(true);
 
         try {
-            // Get current user email locally to pass to server action
             const { data: { user } } = await supabase.auth.getUser();
             if (!user?.email) {
                 toast.error('Could not identify user account');
@@ -58,7 +77,7 @@ export function DeleteAccountDialog({ trigger }: DeleteAccountDialogProps) {
                 return;
             }
 
-            const result = await deleteAccount(user.email, password);
+            const result = await deleteAccount(user.email, isOAuth ? undefined : password);
 
             if (result.error) {
                 toast.error(result.error);
@@ -66,12 +85,9 @@ export function DeleteAccountDialog({ trigger }: DeleteAccountDialogProps) {
                 return;
             }
 
-            // Success case
             toast.success('Account deleted successfully');
             setOpen(false);
 
-            // Sign out locally. This might throw a 403 because the user is already deleted, 
-            // but we want to clear the local session/cookies anyway.
             try {
                 await supabase.auth.signOut();
             } catch (signOutError) {
@@ -99,13 +115,9 @@ export function DeleteAccountDialog({ trigger }: DeleteAccountDialogProps) {
                 </VisuallyHidden.Root>
 
                 <div className="relative group">
-                    {/* Card border glow - destructive red */}
                     <div className="absolute -inset-[1px] rounded-2xl bg-gradient-to-r from-destructive/10 via-destructive/30 to-destructive/10 opacity-70 blur-sm pointer-events-none" />
 
-                    {/* Glass card background */}
                     <div className="relative bg-black/80 backdrop-blur-xl rounded-2xl p-6 border border-white/10 shadow-2xl overflow-hidden">
-
-                        {/* Close button */}
                         <button
                             onClick={() => setOpen(false)}
                             className="absolute top-4 right-4 p-1 rounded-full text-muted-foreground hover:text-white hover:bg-white/10 transition-colors"
@@ -113,7 +125,6 @@ export function DeleteAccountDialog({ trigger }: DeleteAccountDialogProps) {
                             <X className="w-4 h-4" />
                         </button>
 
-                        {/* Header */}
                         <div className="text-center space-y-2 mb-6">
                             <div className="mx-auto w-12 h-12 rounded-full bg-destructive/10 flex items-center justify-center mb-2">
                                 <AlertTriangle className="w-6 h-6 text-destructive" />
@@ -134,53 +145,62 @@ export function DeleteAccountDialog({ trigger }: DeleteAccountDialogProps) {
                             </div>
                         </div>
 
-                        {/* Form */}
                         <form onSubmit={handleSubmit} className="space-y-4">
-                            {/* Password Input */}
-                            <motion.div
-                                className={`relative ${focusedInput === "password" ? 'z-10' : ''}`}
-                                whileFocus={{ scale: 1.02 }}
-                                whileHover={{ scale: 1.01 }}
-                                transition={{ type: "spring", stiffness: 400, damping: 25 }}
-                            >
-                                <div className="absolute -inset-[0.5px] bg-gradient-to-r from-destructive/20 via-destructive/10 to-destructive/20 rounded-lg opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none" />
-
-                                <div className="relative flex items-center overflow-hidden rounded-lg">
-                                    <Lock className={`absolute left-3 w-4 h-4 transition-all duration-300 ${focusedInput === "password" ? 'text-destructive' : 'text-muted-foreground'}`} />
-
-                                    <Input
-                                        type={showPassword ? "text" : "password"}
-                                        placeholder="Confirm Password"
-                                        value={password}
-                                        onChange={(e) => setPassword(e.target.value)}
-                                        onFocus={() => setFocusedInput("password")}
-                                        onBlur={() => setFocusedInput(null)}
-                                        className="w-full bg-white/5 border-transparent focus:border-destructive/40 text-white placeholder:text-white/30 h-10 transition-all duration-300 pl-10 pr-10 focus:bg-white/10"
-                                    />
-
-                                    <div
-                                        onClick={() => setShowPassword(!showPassword)}
-                                        className="absolute right-3 cursor-pointer"
-                                    >
-                                        {showPassword ? (
-                                            <Eye className="w-4 h-4 text-muted-foreground hover:text-destructive transition-colors duration-300" />
-                                        ) : (
-                                            <EyeClosed className="w-4 h-4 text-muted-foreground hover:text-destructive transition-colors duration-300" />
-                                        )}
+                            {isOAuth ? (
+                                <motion.div
+                                    className={`relative ${focusedInput === "confirmPhrase" ? 'z-10' : ''}`}
+                                    whileFocus={{ scale: 1.02 }}
+                                    whileHover={{ scale: 1.01 }}
+                                    transition={{ type: "spring", stiffness: 400, damping: 25 }}
+                                >
+                                    <div className="absolute -inset-[0.5px] bg-gradient-to-r from-destructive/20 via-destructive/10 to-destructive/20 rounded-lg opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none" />
+                                    <div className="relative flex flex-col gap-2">
+                                        <label className="text-[10px] text-muted-foreground font-bold uppercase ml-1">Type <span className="text-destructive">DELETE</span> to confirm</label>
+                                        <Input
+                                            type="text"
+                                            placeholder="Type DELETE"
+                                            value={confirmPhrase}
+                                            onChange={(e) => setConfirmPhrase(e.target.value)}
+                                            onFocus={() => setFocusedInput("confirmPhrase")}
+                                            onBlur={() => setFocusedInput(null)}
+                                            className="w-full bg-white/5 border-transparent focus:border-destructive/40 text-white placeholder:text-white/30 h-10 transition-all duration-300 px-3 focus:bg-white/10"
+                                        />
                                     </div>
-                                </div>
-                            </motion.div>
+                                </motion.div>
+                            ) : (
+                                <motion.div
+                                    className={`relative ${focusedInput === "password" ? 'z-10' : ''}`}
+                                    whileFocus={{ scale: 1.02 }}
+                                    whileHover={{ scale: 1.01 }}
+                                    transition={{ type: "spring", stiffness: 400, damping: 25 }}
+                                >
+                                    <div className="absolute -inset-[0.5px] bg-gradient-to-r from-destructive/20 via-destructive/10 to-destructive/20 rounded-lg opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none" />
+                                    <div className="relative flex items-center overflow-hidden rounded-lg">
+                                        <Lock className={`absolute left-3 w-4 h-4 transition-all duration-300 ${focusedInput === "password" ? 'text-destructive' : 'text-muted-foreground'}`} />
+                                        <Input
+                                            type={showPassword ? "text" : "password"}
+                                            placeholder="Confirm Password"
+                                            value={password}
+                                            onChange={(e) => setPassword(e.target.value)}
+                                            onFocus={() => setFocusedInput("password")}
+                                            onBlur={() => setFocusedInput(null)}
+                                            className="w-full bg-white/5 border-transparent focus:border-destructive/40 text-white placeholder:text-white/30 h-10 transition-all duration-300 pl-10 pr-10 focus:bg-white/10"
+                                        />
+                                        <div onClick={() => setShowPassword(!showPassword)} className="absolute right-3 cursor-pointer">
+                                            {showPassword ? <Eye className="w-4 h-4 text-muted-foreground hover:text-white" /> : <EyeClosed className="w-4 h-4 text-muted-foreground hover:text-white" />}
+                                        </div>
+                                    </div>
+                                </motion.div>
+                            )}
 
-                            {/* Delete Button */}
                             <motion.button
                                 whileHover={{ scale: 1.02 }}
                                 whileTap={{ scale: 0.98 }}
                                 type="submit"
-                                disabled={isLoading}
-                                className="w-full relative group/button mt-4"
+                                disabled={isLoading || !isReadyToSubmit}
+                                className="w-full relative group/button mt-4 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 <div className="absolute inset-0 bg-destructive/20 rounded-lg blur-lg opacity-0 group-hover/button:opacity-70 transition-opacity duration-300" />
-
                                 <div className="relative overflow-hidden bg-destructive text-destructive-foreground font-medium h-10 rounded-lg transition-all duration-300 flex items-center justify-center">
                                     <AnimatePresence mode="wait">
                                         {isLoading ? (

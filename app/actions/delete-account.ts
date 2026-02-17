@@ -1,14 +1,15 @@
 'use server';
 
 import { z } from 'zod';
-import { createClient } from '@supabase/supabase-js';
+import { createClient as createAdminClient } from '@supabase/supabase-js';
+import { createClient } from '@/utils/supabase/server';
 
 const DeleteAccountSchema = z.object({
     email: z.string().email(),
-    password: z.string().min(1, "Password is required"),
+    password: z.string().optional(),
 });
 
-export async function deleteAccount(email: string, password: string) {
+export async function deleteAccount(email: string, password?: string) {
     const result = DeleteAccountSchema.safeParse({ email, password });
 
     if (!result.success) {
@@ -25,28 +26,47 @@ export async function deleteAccount(email: string, password: string) {
     }
 
     try {
-        // 1. Verify credentials by attempting to sign in
-        const authClient = createClient(supabaseUrl, supabaseAnonKey);
-        const { data: { user }, error: signInError } = await authClient.auth.signInWithPassword({
-            email,
-            password,
-        });
+        // 1. Verify current session and email match
+        const supabase = await createClient();
+        const { data: { user: currentUser }, error: userError } = await supabase.auth.getUser();
 
-        if (signInError || !user) {
-            return { error: 'Invalid password' };
+        if (userError || !currentUser || currentUser.email !== email) {
+            return { error: 'Unauthorized: You can only delete your own account' };
         }
 
-        // 2. Initialize admin client for deletion
-        const adminClient = createClient(supabaseUrl, supabaseServiceRoleKey, {
+        // 2. Identity Verification Logic
+        if (password) {
+            // Verify credentials by attempting to sign in
+            const authClient = createAdminClient(supabaseUrl, supabaseAnonKey);
+            const { error: signInError } = await authClient.auth.signInWithPassword({
+                email,
+                password,
+            });
+
+            if (signInError) {
+                return { error: 'Invalid password' };
+            }
+        } else {
+            // No password provided: Check if user is OAuth
+            const provider = currentUser.app_metadata?.provider;
+            if (provider === 'email') {
+                return { error: 'Password is required for email-based accounts' };
+            }
+            // If provider is 'google' or other OAuth, allow proceeding without password
+            // since they are already authenticated via their provider.
+        }
+
+        // 3. Initialize admin client for deletion
+        const adminClient = createAdminClient(supabaseUrl, supabaseServiceRoleKey, {
             auth: {
                 autoRefreshToken: false,
                 persistSession: false
             }
         });
 
-        // 3. Prepare data for deletion (RPC)
+        // 4. Prepare data for deletion (RPC)
         const { error: rpcError } = await adminClient.rpc('prepare_delete_account', {
-            p_user_id: user.id
+            p_user_id: currentUser.id
         });
 
         if (rpcError) {
@@ -54,8 +74,8 @@ export async function deleteAccount(email: string, password: string) {
             return { error: 'Failed to clean up user data. Please try again.' };
         }
 
-        // 4. Delete the user from auth.users
-        const { error: deleteError } = await adminClient.auth.admin.deleteUser(user.id);
+        // 5. Delete the user from auth.users
+        const { error: deleteError } = await adminClient.auth.admin.deleteUser(currentUser.id);
 
         if (deleteError) {
             console.error('Error deleting user:', deleteError);
