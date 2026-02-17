@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { ChevronLeft, User, Download, AlertTriangle, Shield, Lock, ChevronRight, SlidersHorizontal, LogOut, Banknote, FileSpreadsheet } from 'lucide-react';
+import { ChevronLeft, User, Download, AlertTriangle, Shield, Lock, ChevronRight, SlidersHorizontal, LogOut, Banknote, FileSpreadsheet, ShieldCheck } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
@@ -46,7 +46,8 @@ export function SettingsView() {
         setBudgetAlertsEnabled,
         monthlyBudget,
         setMonthlyBudget,
-        userId
+        userId,
+        user
     } = useUserPreferences();
 
     // Local state for budget input to allow typing before saving
@@ -64,12 +65,10 @@ export function SettingsView() {
 
     const getProfile = async () => {
         try {
-            // Always get the latest user object to check identities
-            const { data: { user } } = await supabase.auth.getUser();
-
             if (user) {
                 if (user.email) setUserEmail(user.email);
-                // Check if user has an email identity (implies they have a password)
+
+                // User has a password if they have an 'email' identity
                 const hasEmailIdentity = user.identities?.some(identity => identity.provider === 'email');
                 setHasPassword(!!hasEmailIdentity);
             }
@@ -96,6 +95,7 @@ export function SettingsView() {
             setLoading(false);
         }
     };
+
 
     const updateProfile = async () => {
         setSaving(true);
@@ -235,9 +235,9 @@ export function SettingsView() {
         );
     }
 
+
     return (
         <div className="p-5 space-y-6 max-w-md mx-auto relative min-h-full">
-            {/* Header */}
             {/* Header */}
             <div className="flex items-center justify-between mb-6">
                 <button
@@ -445,6 +445,7 @@ export function SettingsView() {
                 )}
             </AnimatePresence>
 
+
             {/* Security */}
             <div className="space-y-3 pt-2">
                 <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
@@ -453,18 +454,41 @@ export function SettingsView() {
                 </div>
 
                 <div className="bg-secondary/5 rounded-xl border border-white/5 divide-y divide-white/5">
-                    {hasPassword && (
+                    {/* Primary Email (ReadOnly) */}
+                    <div className="flex items-center justify-between p-3">
+                        <div className="flex items-center gap-3">
+                            <Lock className="w-4 h-4 text-muted-foreground" />
+                            <div>
+                                <p className="text-sm font-medium">Account Email</p>
+                                <p className="text-[10px] text-muted-foreground">{userEmail}</p>
+                            </div>
+                        </div>
+                        <div className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-white/5 text-muted-foreground border border-white/10">
+                            Primary
+                        </div>
+                    </div>
+
+                    {hasPassword ? (
                         <ChangePasswordDialog
+                            mode="change"
+                            onSuccess={getProfile}
                             trigger={
-                                <button className="w-full flex items-center justify-between p-3 hover:bg-white/5 transition-colors text-left outline-none">
+                                <button className="w-full flex items-center justify-between p-3 hover:bg-white/5 transition-colors text-left outline-none group/btn">
                                     <div className="flex items-center gap-3">
-                                        <Lock className="w-4 h-4 text-muted-foreground" />
+                                        <Lock className="w-4 h-4 text-muted-foreground group-hover/btn:text-primary transition-colors" />
                                         <span className="text-sm font-medium">Change Password</span>
                                     </div>
-                                    <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                                    <ChevronRight className="w-4 h-4 text-muted-foreground group-hover/btn:translate-x-0.5 transition-all" />
                                 </button>
                             }
                         />
+                    ) : (
+                        <div className="flex items-center justify-between p-3 bg-white/[0.02]">
+                            <div className="flex items-center gap-3">
+                                <ShieldCheck className="w-4 h-4 text-primary" />
+                                <span className="text-sm font-medium text-muted-foreground">Connected via Google</span>
+                            </div>
+                        </div>
                     )}
                 </div>
             </div>
@@ -482,8 +506,6 @@ export function SettingsView() {
 
             {/* Danger Zone - Refined */}
             <div className="space-y-3 pt-2">
-                {/* No header, just part of the flow or separate section */}
-
                 <div className="bg-secondary/5 rounded-xl border border-white/5 overflow-hidden">
                     <DeleteAccountDialog
                         trigger={

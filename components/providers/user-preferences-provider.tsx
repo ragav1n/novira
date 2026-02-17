@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { User, Session } from '@supabase/supabase-js';
@@ -47,6 +47,45 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
     const [budgets, setBudgets] = useState<Record<string, number>>({});
     const [exchangeRates, setExchangeRates] = useState<Record<string, number>>({});
 
+    const loadPreferences = useCallback(async (uid: string) => {
+        try {
+            const { data, error } = await supabase
+                .from('profiles')
+                .select('currency, budget_alerts, monthly_budget, budgets')
+                .eq('id', uid)
+                .single();
+
+            if (data) {
+                if (data.currency) setCurrencyState(data.currency as Currency);
+                if (data.budget_alerts !== null) setBudgetAlertsEnabledState(data.budget_alerts);
+                if (data.monthly_budget) setMonthlyBudgetState(data.monthly_budget);
+                if (data.budgets) setBudgets(data.budgets as Record<string, number>);
+            }
+            if (error && error.code !== 'PGRST116') {
+                console.error('Error fetching preferences:', error);
+            }
+        } catch (error) {
+            console.error('Error loading preferences:', error);
+        }
+    }, []);
+
+    const handleSession = useCallback(async (session: Session | null) => {
+        const currentUser = session?.user ?? null;
+        setUser(currentUser);
+        setUserId(currentUser?.id ?? null);
+
+        if (currentUser) {
+            await loadPreferences(currentUser.id);
+        } else {
+            // Reset preferences on logout
+            setCurrencyState('USD');
+            setBudgetAlertsEnabledState(false);
+            setMonthlyBudgetState(DEFAULT_BUDGETS.USD);
+            setBudgets({});
+            setExchangeRates({});
+        }
+    }, [loadPreferences]);
+
     // Initialize Auth and Listen for Changes
     useEffect(() => {
         let mounted = true;
@@ -79,45 +118,6 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
         };
     }, []);
 
-    const handleSession = async (session: Session | null) => {
-        const currentUser = session?.user ?? null;
-        setUser(currentUser);
-        setUserId(currentUser?.id ?? null);
-
-        if (currentUser) {
-            await loadPreferences(currentUser.id);
-        } else {
-            // Reset preferences on logout
-            setCurrencyState('USD');
-            setBudgetAlertsEnabledState(false);
-            setMonthlyBudgetState(DEFAULT_BUDGETS.USD);
-            setBudgets({});
-            setExchangeRates({});
-        }
-    };
-
-    const loadPreferences = async (uid: string) => {
-        try {
-            const { data, error } = await supabase
-                .from('profiles')
-                .select('currency, budget_alerts, monthly_budget, budgets')
-                .eq('id', uid)
-                .single();
-
-            if (data) {
-                if (data.currency) setCurrencyState(data.currency as Currency);
-                if (data.budget_alerts !== null) setBudgetAlertsEnabledState(data.budget_alerts);
-                if (data.monthly_budget) setMonthlyBudgetState(data.monthly_budget);
-                if (data.budgets) setBudgets(data.budgets as Record<string, number>);
-            }
-            if (error && error.code !== 'PGRST116') {
-                console.error('Error fetching preferences:', error);
-            }
-        } catch (error) {
-            console.error('Error loading preferences:', error);
-        }
-    };
-
     // Fetch Exchange Rates when currency changes
     useEffect(() => {
         const fetchRates = async () => {
@@ -134,13 +134,43 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
         fetchRates();
     }, [currency]);
 
-    const refreshPreferences = async () => {
+    const refreshPreferences = useCallback(async () => {
         if (userId) {
             await loadPreferences(userId);
         }
-    };
+    }, [userId, loadPreferences]);
 
-    const setCurrency = async (newCurrency: Currency) => {
+    const formatCurrency = useCallback((amount: number, currencyOverride?: string) => {
+        const targetCurrency = currencyOverride || currency;
+
+        if (targetCurrency === 'EUR') {
+            return new Intl.NumberFormat('en-IE', {
+                style: 'currency',
+                currency: 'EUR',
+            }).format(amount);
+        }
+
+        if (targetCurrency === 'INR') {
+            return new Intl.NumberFormat('en-IN', {
+                style: 'currency',
+                currency: 'INR',
+                maximumFractionDigits: 0
+            }).format(amount);
+        }
+
+        return new Intl.NumberFormat('en-US', {
+            style: 'currency',
+            currency: targetCurrency,
+        }).format(amount);
+    }, [currency]);
+
+    const convertAmount = useCallback((amount: number, fromCurrency: string): number => {
+        if (!fromCurrency || fromCurrency === currency) return amount;
+        const rate = exchangeRates[fromCurrency];
+        return rate ? amount / rate : amount;
+    }, [currency, exchangeRates]);
+
+    const setCurrency = useCallback(async (newCurrency: Currency) => {
         if (newCurrency === currency) return;
         const newBudget = budgets[newCurrency] || DEFAULT_BUDGETS[newCurrency];
 
@@ -165,9 +195,9 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
                 refreshPreferences();
             }
         }
-    };
+    }, [currency, budgets, userId, formatCurrency, refreshPreferences]);
 
-    const setBudgetAlertsEnabled = async (enabled: boolean) => {
+    const setBudgetAlertsEnabled = useCallback(async (enabled: boolean) => {
         setBudgetAlertsEnabledState(enabled);
 
         if (userId) {
@@ -184,9 +214,9 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
                 refreshPreferences();
             }
         }
-    };
+    }, [userId, refreshPreferences]);
 
-    const setMonthlyBudget = async (budget: number) => {
+    const setMonthlyBudget = useCallback(async (budget: number) => {
         const updatedBudgets = { ...budgets, [currency]: budget };
         setMonthlyBudgetState(budget);
         setBudgets(updatedBudgets);
@@ -208,54 +238,39 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
                 refreshPreferences();
             }
         }
-    };
+    }, [currency, budgets, userId, refreshPreferences]);
 
-    const formatCurrency = (amount: number, currencyOverride?: string) => {
-        const targetCurrency = currencyOverride || currency;
-
-        if (targetCurrency === 'EUR') {
-            return new Intl.NumberFormat('en-IE', {
-                style: 'currency',
-                currency: 'EUR',
-            }).format(amount);
-        }
-
-        if (targetCurrency === 'INR') {
-            return new Intl.NumberFormat('en-IN', {
-                style: 'currency',
-                currency: 'INR',
-                maximumFractionDigits: 0
-            }).format(amount);
-        }
-
-        return new Intl.NumberFormat('en-US', {
-            style: 'currency',
-            currency: targetCurrency,
-        }).format(amount);
-    };
-
-    const convertAmount = (amount: number, fromCurrency: string): number => {
-        if (!fromCurrency || fromCurrency === currency) return amount;
-        const rate = exchangeRates[fromCurrency];
-        return rate ? amount / rate : amount;
-    };
+    const contextValue = useMemo(() => ({
+        user,
+        userId,
+        isAuthenticated: !!userId,
+        isLoading,
+        currency,
+        setCurrency,
+        formatCurrency,
+        refreshPreferences,
+        convertAmount,
+        budgetAlertsEnabled,
+        setBudgetAlertsEnabled,
+        monthlyBudget,
+        setMonthlyBudget,
+    }), [
+        user,
+        userId,
+        isLoading,
+        currency,
+        setCurrency,
+        formatCurrency,
+        refreshPreferences,
+        convertAmount,
+        budgetAlertsEnabled,
+        setBudgetAlertsEnabled,
+        monthlyBudget,
+        setMonthlyBudget,
+    ]);
 
     return (
-        <UserPreferencesContext.Provider value={{
-            user,
-            userId,
-            isAuthenticated: !!userId,
-            isLoading,
-            currency,
-            setCurrency,
-            formatCurrency,
-            refreshPreferences,
-            convertAmount,
-            budgetAlertsEnabled,
-            setBudgetAlertsEnabled,
-            monthlyBudget,
-            setMonthlyBudget,
-        }}>
+        <UserPreferencesContext.Provider value={contextValue}>
             {children}
         </UserPreferencesContext.Provider>
     );

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { useUserPreferences } from './user-preferences-provider';
@@ -83,7 +83,7 @@ export function GroupsProvider({ children }: { children: React.ReactNode }) {
 
     const { userId, convertAmount, currency: userCurrency, isLoading: authLoading } = useUserPreferences();
 
-    const refreshData = async () => {
+    const refreshData = useCallback(async () => {
         if (!userId) {
             setGroups([]);
             setFriends([]);
@@ -268,7 +268,7 @@ export function GroupsProvider({ children }: { children: React.ReactNode }) {
         } finally {
             setLoading(false);
         }
-    };
+    }, [userId, userCurrency, convertAmount]);
 
     useEffect(() => {
         if (!userId) return;
@@ -322,7 +322,7 @@ export function GroupsProvider({ children }: { children: React.ReactNode }) {
                 supabase.removeChannel(channel);
             }
         };
-    }, [userId, userCurrency, convertAmount]);
+    }, [userId, userCurrency, convertAmount, refreshData]);
 
     // ... (keep createGroup, addFriendByEmail, etc. methods, but remove getSession calls if they use userId from closure or check context, though some methods might still need separate checks or can use userId from context safely)
     // Actually, for helper methods called by UI, we can use `userId` from context.
@@ -500,12 +500,18 @@ export function GroupsProvider({ children }: { children: React.ReactNode }) {
         return true;
     };
 
+    const contextValue = useMemo(() => ({
+        groups, friends, friendRequests, balances, pendingSplits, loading,
+        refreshData, createGroup, addFriendByEmail, addFriendById, addMemberToGroup, settleSplit,
+        acceptFriendRequest, declineFriendRequest, leaveGroup, removeFriend
+    }), [
+        groups, friends, friendRequests, balances, pendingSplits, loading,
+        refreshData, createGroup, addFriendByEmail, addFriendById, addMemberToGroup, settleSplit,
+        acceptFriendRequest, declineFriendRequest, leaveGroup, removeFriend
+    ]);
+
     return (
-        <GroupsContext.Provider value={{
-            groups, friends, friendRequests, balances, pendingSplits, loading,
-            refreshData, createGroup, addFriendByEmail, addFriendById, addMemberToGroup, settleSplit,
-            acceptFriendRequest, declineFriendRequest, leaveGroup, removeFriend
-        }}>
+        <GroupsContext.Provider value={contextValue}>
             {children}
         </GroupsContext.Provider>
     );

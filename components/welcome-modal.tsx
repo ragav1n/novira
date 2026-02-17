@@ -7,6 +7,7 @@ import { WELCOME_FEATURES } from '@/lib/feature-flags';
 import { Button } from '@/components/ui/button';
 
 interface WelcomeModalProps {
+    isOpen: boolean;
     onClose: () => void;
 }
 
@@ -22,20 +23,8 @@ const ICON_MAP: Record<string, any> = {
     export: FileDown,
 };
 
-export function WelcomeModal({ onClose }: WelcomeModalProps) {
-    const [isOpen, setIsOpen] = useState(false);
-
-    useEffect(() => {
-        const hasSeenWelcome = localStorage.getItem('welcome_seen');
-        if (!hasSeenWelcome) {
-            const timer = setTimeout(() => setIsOpen(true), 1000);
-            return () => clearTimeout(timer);
-        }
-    }, []);
-
+export function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
     const handleClose = () => {
-        setIsOpen(false);
-        localStorage.setItem('welcome_seen', 'true');
         onClose();
     };
 

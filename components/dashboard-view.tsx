@@ -130,13 +130,13 @@ export function DashboardView() {
         if (providerUserId) {
             setUserId(providerUserId);
 
-            // Modal Sequencing Logic
-            const hasSeenWelcome = localStorage.getItem('welcome_seen');
-            const lastSeenFeatureId = localStorage.getItem('last_seen_feature_id');
+            // Modal Sequencing Logic (Per-User)
+            const hasSeenWelcome = localStorage.getItem(`welcome_seen_${providerUserId}`);
+            const lastSeenFeatureId = localStorage.getItem(`last_seen_feature_id_${providerUserId}`) || localStorage.getItem('last_seen_feature_id');
             const hasNewAnnouncement = lastSeenFeatureId !== LATEST_FEATURE_ANNOUNCEMENT.id;
 
             if (!hasSeenWelcome) {
-                // New User: Sequence Welcome -> Announcement (if any)
+                // New User (or newly recreated account): Show Welcome
                 setTimeout(() => setActiveModal('welcome'), 1500);
             } else if (hasNewAnnouncement) {
                 // Returning User with new update
@@ -799,9 +799,17 @@ export function DashboardView() {
 
             {/* Feature Modals */}
             <WelcomeModal
+                isOpen={activeModal === 'welcome'}
                 onClose={() => {
-                    const lastSeenFeatureId = localStorage.getItem('last_seen_feature_id');
-                    if (lastSeenFeatureId !== LATEST_FEATURE_ANNOUNCEMENT.id) {
+                    if (userId) {
+                        localStorage.setItem(`welcome_seen_${userId}`, 'true');
+                    }
+
+                    const lastSeenId = userId
+                        ? localStorage.getItem(`last_seen_feature_id_${userId}`)
+                        : localStorage.getItem('last_seen_feature_id');
+
+                    if (lastSeenId !== LATEST_FEATURE_ANNOUNCEMENT.id) {
                         setActiveModal('announcement');
                     } else {
                         setActiveModal(null);
@@ -811,6 +819,7 @@ export function DashboardView() {
 
             <FeatureAnnouncementModal
                 showAnnouncement={activeModal === 'announcement'}
+                userId={userId}
                 onClose={() => setActiveModal(null)}
             />
         </div >

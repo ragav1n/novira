@@ -7,10 +7,11 @@ import { createClient } from '@/utils/supabase/server';
 const DeleteAccountSchema = z.object({
     email: z.string().email(),
     password: z.string().optional(),
+    otpToken: z.string().optional(),
 });
 
-export async function deleteAccount(email: string, password?: string) {
-    const result = DeleteAccountSchema.safeParse({ email, password });
+export async function deleteAccount(email: string, password?: string, otpToken?: string) {
+    const result = DeleteAccountSchema.safeParse({ email, password, otpToken });
 
     if (!result.success) {
         return { error: 'Invalid input data' };
@@ -34,6 +35,13 @@ export async function deleteAccount(email: string, password?: string) {
             return { error: 'Unauthorized: You can only delete your own account' };
         }
 
+        const adminClient = createAdminClient(supabaseUrl, supabaseServiceRoleKey, {
+            auth: {
+                autoRefreshToken: false,
+                persistSession: false
+            }
+        });
+
         // 2. Identity Verification Logic
         if (password) {
             // Verify credentials by attempting to sign in
@@ -46,23 +54,29 @@ export async function deleteAccount(email: string, password?: string) {
             if (signInError) {
                 return { error: 'Invalid password' };
             }
-        } else {
-            // No password provided: Check if user is OAuth
-            const provider = currentUser.app_metadata?.provider;
-            if (provider === 'email') {
-                return { error: 'Password is required for email-based accounts' };
+        } else if (otpToken) {
+            // Verify reauthentication OTP
+            const { error: otpError } = await supabase.auth.verifyOtp({
+                email,
+                token: otpToken,
+                type: 'reauthentication' as any
+            });
+
+            if (otpError) {
+                console.error('OTP verification error:', otpError);
+                return { error: 'Invalid or expired verification code' };
             }
-            // If provider is 'google' or other OAuth, allow proceeding without password
-            // since they are already authenticated via their provider.
+        } else {
+            // No password or OTP provided: Check if user has a password set
+            const providers = (currentUser.app_metadata?.providers as string[]) || [];
+            if (providers.includes('email')) {
+                return { error: 'Password is required to delete this account' };
+            }
+            return { error: 'Verification code is required to delete this account' };
         }
 
         // 3. Initialize admin client for deletion
-        const adminClient = createAdminClient(supabaseUrl, supabaseServiceRoleKey, {
-            auth: {
-                autoRefreshToken: false,
-                persistSession: false
-            }
-        });
+        // (adminClient is already initialized above)
 
         // 4. Prepare data for deletion (RPC)
         const { error: rpcError } = await adminClient.rpc('prepare_delete_account', {

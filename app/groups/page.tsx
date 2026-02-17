@@ -5,24 +5,19 @@ import { supabase } from '@/lib/supabase'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Session } from '@supabase/supabase-js'
+import { useUserPreferences } from '@/components/providers/user-preferences-provider'
 
 export default function GroupsPage() {
     const router = useRouter()
-    const [session, setSession] = useState<Session | null>(null)
-    const [loading, setLoading] = useState(true)
+    const { isAuthenticated, isLoading } = useUserPreferences()
 
     useEffect(() => {
-        supabase.auth.getSession().then(({ data: { session } }) => {
-            if (!session) {
-                router.push('/signin')
-            } else {
-                setSession(session)
-            }
-            setLoading(false)
-        })
-    }, [router])
+        if (!isLoading && !isAuthenticated) {
+            router.push('/signin')
+        }
+    }, [isLoading, isAuthenticated, router])
 
-    if (loading) {
+    if (isLoading) {
         return (
             <div className="flex h-screen w-screen items-center justify-center bg-background">
                 <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
@@ -30,7 +25,7 @@ export default function GroupsPage() {
         )
     }
 
-    if (!session) return null
+    if (!isAuthenticated) return null
 
     return <GroupsView />
 }

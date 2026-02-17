@@ -8,10 +8,11 @@ import { Button } from '@/components/ui/button';
 
 interface FeatureAnnouncementModalProps {
     showAnnouncement?: boolean;
+    userId?: string | null;
     onClose?: () => void;
 }
 
-export function FeatureAnnouncementModal({ showAnnouncement = false, onClose }: FeatureAnnouncementModalProps) {
+export function FeatureAnnouncementModal({ showAnnouncement = false, userId, onClose }: FeatureAnnouncementModalProps) {
     const [isOpen, setIsOpen] = useState(false);
 
     useEffect(() => {
@@ -22,8 +23,12 @@ export function FeatureAnnouncementModal({ showAnnouncement = false, onClose }: 
 
     const handleClose = () => {
         setIsOpen(false);
-        // Save to localStorage so we don't show it again
-        localStorage.setItem('last_seen_feature_id', LATEST_FEATURE_ANNOUNCEMENT.id);
+        // Save to localStorage so we don't show it again for this specific user
+        if (userId) {
+            localStorage.setItem(`last_seen_feature_id_${userId}`, LATEST_FEATURE_ANNOUNCEMENT.id);
+        } else {
+            localStorage.setItem('last_seen_feature_id', LATEST_FEATURE_ANNOUNCEMENT.id);
+        }
         if (onClose) onClose();
     };
 
