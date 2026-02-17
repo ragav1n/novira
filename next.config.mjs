@@ -1,17 +1,5 @@
 const securityHeaders = [
   {
-    key: 'Content-Security-Policy',
-    value: [
-      "default-src 'self'",
-      "script-src 'self' 'unsafe-inline'",
-      "style-src 'self' 'unsafe-inline'",
-      "img-src 'self' blob: data: https://*.supabase.co",
-      "font-src 'self'",
-      "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.frankfurter.dev",
-      "frame-ancestors 'none'",
-    ].join('; '),
-  },
-  {
     key: 'Access-Control-Allow-Origin',
     value: process.env.NEXT_PUBLIC_APP_URL || '*',
   },

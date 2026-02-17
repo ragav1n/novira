@@ -35,11 +35,15 @@ export const viewport = {
   userScalable: false,
 }
 
-export default function RootLayout({
+import { headers } from 'next/headers'
+
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode
 }>) {
+  const nonce = (await headers()).get('x-nonce') ?? ''
+
   return (
     <html lang="en">
       <body suppressHydrationWarning className={`${geist.variable} ${geistMono.variable} font-sans antialiased`}>

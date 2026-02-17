@@ -2,11 +2,46 @@ import { type NextRequest } from 'next/server'
 import { updateSession } from '@/utils/supabase/middleware'
 
 export async function proxy(request: NextRequest) {
-    return await updateSession(request)
+    const nonce = Buffer.from(crypto.randomUUID()).toString('base64')
+    const isDev = process.env.NODE_ENV === 'development'
+
+    const csp = [
+        "default-src 'self'",
+        `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' ${isDev ? "'unsafe-eval'" : ''}`,
+        `style-src 'self' 'nonce-${nonce}'`,
+        "img-src 'self' blob: data: https://*.supabase.co",
+        "font-src 'self'",
+        "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.frankfurter.dev",
+        "frame-ancestors 'none'",
+        "object-src 'none'",
+        "base-uri 'self'",
+        "form-action 'self'",
+        "upgrade-insecure-requests",
+    ].join('; ')
+
+    // Set nonce directly on the NextRequest headers
+    request.headers.set('x-nonce', nonce)
+
+    // Pass the original NextRequest (now with nonce header) to Supabase
+    const response = await updateSession(request)
+
+    // Set CSP and security headers ON that same response
+    response.headers.set('Content-Security-Policy', csp)
+    response.headers.set('Cross-Origin-Opener-Policy', 'same-origin')
+    response.headers.set('Cross-Origin-Embedder-Policy', 'unsafe-none')
+    response.headers.set('Cross-Origin-Resource-Policy', 'cross-origin')
+
+    return response
 }
 
 export const config = {
     matcher: [
-        '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+        {
+            source: '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+            missing: [
+                { type: 'header', key: 'next-router-prefetch' },
+                { type: 'header', key: 'purpose', value: 'prefetch' },
+            ],
+        },
     ],
 }
