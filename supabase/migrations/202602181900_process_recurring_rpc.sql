@@ -14,6 +14,7 @@ BEGIN
     FOR template_record IN 
         SELECT * FROM recurring_templates 
         WHERE user_id = user_id_input AND is_active = TRUE AND next_occurrence <= CURRENT_DATE
+        FOR UPDATE
     LOOP
         process_date := template_record.next_occurrence;
         
@@ -22,7 +23,7 @@ BEGIN
             INSERT INTO transactions (
                 user_id, amount, description, category, date, payment_method, 
                 notes, currency, group_id, bucket_id, base_currency, 
-                exchange_rate, converted_amount
+                exchange_rate, converted_amount, is_recurring
             )
             VALUES (
                 template_record.user_id, 
@@ -37,7 +38,8 @@ BEGIN
                 (NULLIF(template_record.metadata->>'bucket_id', 'null'))::UUID,
                 template_record.currency, 
                 1, 
-                template_record.amount
+                template_record.amount,
+                TRUE
             )
             RETURNING id INTO new_transaction_id;
 

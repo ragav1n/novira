@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { ChevronLeft, Search, SlidersHorizontal, Utensils, Car, Zap, ShoppingBag, HeartPulse, Clapperboard, Wallet, Banknote, CreditCard, CircleDollarSign, HelpCircle, Tag, Plane, Home, Gift, ShoppingCart, Stethoscope, Gamepad2, School, Laptop, Music, Heart } from 'lucide-react';
+import { ChevronLeft, Search, SlidersHorizontal, Utensils, Car, Zap, ShoppingBag, HeartPulse, Clapperboard, Wallet, Banknote, CreditCard, CircleDollarSign, HelpCircle, Tag, Plane, Home, Gift, ShoppingCart, Stethoscope, Gamepad2, School, Laptop, Music, Heart, RefreshCcw } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { Input } from '@/components/ui/input';
@@ -45,6 +45,7 @@ type Transaction = {
     payment_method: string;
     created_at: string;
     currency?: string;
+    is_recurring?: boolean;
     bucket_id?: string;
 };
 
@@ -534,16 +535,26 @@ export function SearchView() {
                                                 <span className="px-1.5 py-0.5 rounded bg-primary/10 text-[10px] text-primary border border-primary/10 capitalize shrink-0">{tx.category}</span>
                                                 <span className="shrink-0">• {tx.payment_method}</span>
                                                 <span className="shrink-0">• {format(parseISO(tx.date), 'MMM d')}</span>
-                                                {tx.bucket_id && buckets.find(b => b.id === tx.bucket_id) && (
-                                                    <span className="flex items-center gap-1 font-bold text-amber-500 shrink-0">
-                                                        <span>•</span>
-                                                        <div className="w-3 h-3">
-                                                            {getBucketIcon(buckets.find(b => b.id === tx.bucket_id)?.icon)}
-                                                        </div>
-                                                        <span>{buckets.find(b => b.id === tx.bucket_id)?.name}</span>
-                                                    </span>
-                                                )}
                                             </div>
+
+                                            {(tx.bucket_id || tx.is_recurring) && (
+                                                <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                                                    {tx.bucket_id && buckets.find(b => b.id === tx.bucket_id) && (
+                                                        <span className="px-1.5 py-0.5 rounded bg-amber-500/10 text-[10px] text-amber-500 border border-amber-500/10 font-bold flex items-center gap-1 shrink-0">
+                                                            <div className="w-2.5 h-2.5">
+                                                                {getBucketIcon(buckets.find(b => b.id === tx.bucket_id)?.icon)}
+                                                            </div>
+                                                            {buckets.find(b => b.id === tx.bucket_id)?.name}
+                                                        </span>
+                                                    )}
+                                                    {tx.is_recurring && (
+                                                        <span className="px-1.5 py-0.5 rounded bg-sky-500/10 text-[10px] text-sky-500 border border-sky-500/10 font-bold flex items-center gap-1 shrink-0">
+                                                            <RefreshCcw className="w-2.5 h-2.5" />
+                                                            Recurring
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                     <span className="font-bold text-sm shrink-0 ml-2 whitespace-nowrap">-{formatCurrency(Number(tx.amount), tx.currency)}</span>

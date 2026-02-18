@@ -15,6 +15,7 @@ interface ExportTransaction {
     converted_amount?: number;
     bucket_id?: string;
     group_id?: string;
+    is_recurring?: boolean;
 }
 
 const CATEGORY_COLORS: Record<string, [number, number, number]> = {
@@ -136,7 +137,7 @@ export const generateCSV = (
     const bucketMap = Object.fromEntries(buckets.map(b => [b.id, b]));
     const groupMap = Object.fromEntries(groups.map(g => [g.id, g]));
 
-    const headers = ['Date', 'Description', 'Category', 'Bucket', 'Group', 'Payment Method', 'Amount', 'Currency', 'Converted Amount'];
+    const headers = ['Date', 'Description', 'Category', 'Bucket', 'Group', 'Payment Method', 'Amount', 'Currency', 'Converted Amount', 'Recurring'];
     const rows = transactions.map(tx => {
         const converted = tx.converted_amount || convertAmount(Number(tx.amount), tx.currency || 'USD');
         const bucket = tx.bucket_id ? bucketMap[tx.bucket_id] : null;
@@ -151,7 +152,8 @@ export const generateCSV = (
             tx.payment_method || '-',
             tx.amount,
             tx.currency || 'USD',
-            converted.toFixed(2)
+            converted.toFixed(2),
+            tx.is_recurring ? 'Yes' : 'No'
         ].join(',');
     });
 
@@ -344,7 +346,12 @@ export const generatePDF = async (
         const y = 195 + (i * 9);
         doc.setFontSize(8);
         doc.setTextColor(80, 80, 80);
-        doc.text(tx.description.length > 30 ? tx.description.substring(0, 28) + '..' : tx.description, 110, y);
+
+        const description = tx.is_recurring
+            ? `${tx.description} (Rec)`
+            : tx.description;
+
+        doc.text(description.length > 25 ? description.substring(0, 23) + '..' : description, 110, y);
         doc.setTextColor(138, 43, 226);
         doc.text(formatForPDF(tx.converted, currency), pageWidth - 14, y, { align: 'right' });
         doc.setDrawColor(245, 245, 245);
@@ -402,15 +409,17 @@ export const generatePDF = async (
     doc.setTextColor(50, 50, 50);
     doc.text('Transaction Details', 14, bucketY + 10);
 
-    const tableColumn = ["Date", "Description", "Category", "Payment", "Group", "Amount"];
+    const tableColumn = ["Date", "Description", "Category", "Payment", "Group", "Rec", "Amount"];
     const tableRows = sortedTx.map(tx => {
         const group = tx.group_id ? groupMap[tx.group_id] : null;
+
         return [
             format(new Date(tx.date), 'MMM d, yy'),
             tx.description.length > 25 ? tx.description.substring(0, 23) + '..' : tx.description,
             tx.category,
             tx.payment_method || '-',
             group?.name || '-',
+            tx.is_recurring ? 'Yes' : 'No',
             formatForPDF(tx.converted_amount || convertAmount(Number(tx.amount), tx.currency || 'USD'), currency)
         ]
     });

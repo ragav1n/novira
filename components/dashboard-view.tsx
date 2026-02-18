@@ -4,7 +4,7 @@ import { useUserPreferences } from '@/components/providers/user-preferences-prov
 import { BudgetAlertManager } from '@/components/budget-alert-manager';
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, Utensils, Car, Zap, ShoppingBag, HeartPulse, Clapperboard, CircleDollarSign, ArrowUpRight, ArrowDownLeft, Users, MoreVertical, Pencil, Trash2, X, History, Clock, HelpCircle, Tag, Plane, Home, Gift, ShoppingCart, Stethoscope, Gamepad2, School, Laptop, Music, Heart } from 'lucide-react';
+import { Plus, Utensils, Car, Zap, ShoppingBag, HeartPulse, Clapperboard, CircleDollarSign, ArrowUpRight, ArrowDownLeft, Users, MoreVertical, Pencil, Trash2, X, History, Clock, HelpCircle, Tag, Plane, Home, Gift, ShoppingCart, Stethoscope, Gamepad2, School, Laptop, Music, Heart, RefreshCcw } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Pie, PieChart, Cell } from 'recharts';
@@ -79,6 +79,7 @@ type Transaction = {
     exchange_rate?: number;
     base_currency?: string;
     converted_amount?: number;
+    is_recurring?: boolean;
     bucket_id?: string;
     splits?: {
         user_id: string;
@@ -128,6 +129,29 @@ export function DashboardView() {
 
     // Modal Sequencing State
     const [activeModal, setActiveModal] = useState<'welcome' | 'announcement' | null>(null);
+
+    useEffect(() => {
+        if (!providerUserId) return;
+
+        const channel = supabase
+            .channel('db-changes')
+            .on(
+                'postgres_changes',
+                {
+                    event: '*',
+                    schema: 'public',
+                    table: 'transactions',
+                },
+                () => {
+                    loadTransactions(providerUserId);
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [providerUserId]);
 
     // Sync provider userId and handle modal sequencing
     useEffect(() => {
@@ -599,15 +623,26 @@ export function DashboardView() {
                                                                     {tx.user_id === userId ? 'You paid' : `Paid by ${tx.profile?.full_name?.split(' ')[0] || 'Unknown'}`}
                                                                 </span>
                                                                 <span className="shrink-0">• {format(new Date(tx.date), 'MMM d, yyyy')}</span>
-                                                                {tx.bucket_id && buckets.find(b => b.id === tx.bucket_id) && (
-                                                                    <span className="px-1.5 py-0.5 rounded bg-amber-500/10 text-[10px] text-amber-500 border border-amber-500/10 font-bold flex items-center gap-1 shrink-0">
-                                                                        <div className="w-2.5 h-2.5">
-                                                                            {getBucketIcon(buckets.find(b => b.id === tx.bucket_id)?.icon)}
-                                                                        </div>
-                                                                        {buckets.find(b => b.id === tx.bucket_id)?.name}
-                                                                    </span>
-                                                                )}
                                                             </div>
+
+                                                            {(tx.bucket_id || tx.is_recurring) && (
+                                                                <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                                                                    {tx.bucket_id && buckets.find(b => b.id === tx.bucket_id) && (
+                                                                        <span className="px-1.5 py-0.5 rounded bg-amber-500/10 text-[10px] text-amber-500 border border-amber-500/10 font-bold flex items-center gap-1 shrink-0">
+                                                                            <div className="w-2.5 h-2.5">
+                                                                                {getBucketIcon(buckets.find(b => b.id === tx.bucket_id)?.icon)}
+                                                                            </div>
+                                                                            {buckets.find(b => b.id === tx.bucket_id)?.name}
+                                                                        </span>
+                                                                    )}
+                                                                    {tx.is_recurring && (
+                                                                        <span className="px-1.5 py-0.5 rounded bg-sky-500/10 text-[10px] text-sky-500 border border-sky-500/10 font-bold flex items-center gap-1 shrink-0">
+                                                                            <RefreshCcw className="w-2.5 h-2.5" />
+                                                                            Recurring
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     </div>
                                                     <div className="flex items-center gap-2 shrink-0 ml-2">
@@ -695,15 +730,25 @@ export function DashboardView() {
                                                     {tx.user_id === userId ? 'You paid' : `Paid by ${tx.profile?.full_name?.split(' ')[0] || 'Unknown'}`}
                                                 </span>
                                                 <span className="shrink-0">• {format(new Date(tx.date), 'MMM d')}</span>
-                                                {tx.bucket_id && buckets.find(b => b.id === tx.bucket_id) && (
-                                                    <span className="px-1.5 py-0.5 rounded bg-amber-500/10 text-[10px] text-amber-500 border border-amber-500/10 font-bold flex items-center gap-1 shrink-0">
-                                                        <div className="w-2.5 h-2.5">
-                                                            {getBucketIcon(buckets.find(b => b.id === tx.bucket_id)?.icon)}
-                                                        </div>
-                                                        {buckets.find(b => b.id === tx.bucket_id)?.name}
-                                                    </span>
-                                                )}
                                             </div>
+                                            {(tx.bucket_id || tx.is_recurring) && (
+                                                <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                                                    {tx.bucket_id && buckets.find(b => b.id === tx.bucket_id) && (
+                                                        <span className="px-1.5 py-0.5 rounded bg-amber-500/10 text-[10px] text-amber-500 border border-amber-500/10 font-bold flex items-center gap-1 shrink-0">
+                                                            <div className="w-2.5 h-2.5">
+                                                                {getBucketIcon(buckets.find(b => b.id === tx.bucket_id)?.icon)}
+                                                            </div>
+                                                            {buckets.find(b => b.id === tx.bucket_id)?.name}
+                                                        </span>
+                                                    )}
+                                                    {tx.is_recurring && (
+                                                        <span className="px-1.5 py-0.5 rounded bg-sky-500/10 text-[10px] text-sky-500 border border-sky-500/10 font-bold flex items-center gap-1 shrink-0">
+                                                            <RefreshCcw className="w-2.5 h-2.5" />
+                                                            Recurring
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-2 shrink-0 ml-2">

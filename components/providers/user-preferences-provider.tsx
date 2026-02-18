@@ -129,6 +129,20 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
 
         initializeAuth();
 
+        // Efficient trigger for recurring expenses:
+        // Checks when the user returns to the tab or opens it.
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible') {
+                supabase.auth.getSession().then(({ data: { session } }) => {
+                    if (session?.user?.id) {
+                        processRecurringExpenses(session.user.id);
+                    }
+                });
+            }
+        };
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
         const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
             if (mounted) {
                 handleSession(session);
@@ -139,6 +153,7 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
         return () => {
             mounted = false;
             subscription.unsubscribe();
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
         };
     }, []);
 

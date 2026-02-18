@@ -123,7 +123,8 @@ export function AddExpenseView() {
                 bucket_id: selectedBucketId,
                 exchange_rate: exchangeRate,
                 base_currency: currency,
-                converted_amount: convertedAmount
+                converted_amount: convertedAmount,
+                is_recurring: isRecurring
             }).select().single();
 
             if (txError) throw txError;
