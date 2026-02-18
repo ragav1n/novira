@@ -21,6 +21,8 @@ import { DeleteAccountDialog } from '@/components/delete-account-dialog';
 import { ExportDateRangeModal } from '@/components/export-date-range-modal';
 import { DateRange } from 'react-day-picker';
 import { format } from 'date-fns';
+import { useBuckets } from '@/components/providers/buckets-provider';
+import { useGroups } from '@/components/providers/groups-provider';
 
 export function SettingsView() {
     const router = useRouter();
@@ -50,6 +52,9 @@ export function SettingsView() {
         user,
         setAvatarUrl: setAvatarUrlProvider
     } = useUserPreferences();
+
+    const { buckets } = useBuckets();
+    const { groups } = useGroups();
 
     // Local state for budget input to allow typing before saving
     const [localBudget, setLocalBudget] = useState(monthlyBudget.toString());
@@ -212,16 +217,23 @@ export function SettingsView() {
             }
 
             if (exportType === 'csv') {
-                generateCSV(transactions, currency, convertAmount, formatCurrency);
+                generateCSV(transactions, currency, convertAmount, formatCurrency, buckets, groups);
                 toast.success('CSV Exported successfully');
             } else {
-                generatePDF(transactions, currency, convertAmount, formatCurrency);
+                generatePDF(transactions, currency, convertAmount, formatCurrency, buckets, groups, dateRange || undefined);
                 toast.success('PDF Exported successfully');
             }
             setExportModalOpen(false);
         } catch (error: any) {
-            console.error('Export failed:', error);
-            toast.error('Failed to export data');
+            console.error('Export failed details:', {
+                message: error.message,
+                details: error.details,
+                hint: error.hint,
+                code: error.code,
+                stack: error.stack,
+                error
+            });
+            toast.error('Failed to export data: ' + (error.message || 'Unknown error'));
         } finally {
             setLoadingExport(false);
         }

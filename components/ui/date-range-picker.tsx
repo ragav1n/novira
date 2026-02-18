@@ -36,6 +36,19 @@ export function DateRangePicker({
     const monthsToShow = numberOfMonths ?? (isMobile ? 1 : 2);
     const [open, setOpen] = useState(false);
 
+    const dateDisplay = date?.from ? (
+        date.to ? (
+            <>
+                <span className="hidden sm:inline">{format(date.from, 'LLL dd, y')} - {format(date.to, 'LLL dd, y')}</span>
+                <span className="sm:hidden">{format(date.from, 'MMM d')} - {format(date.to, 'MMM d')}</span>
+            </>
+        ) : (
+            format(date.from, 'LLL dd, y')
+        )
+    ) : (
+        <span>Pick a date range</span>
+    );
+
     return (
         <div className={cn('grid gap-2', className)}>
             <Popover modal={true} open={open} onOpenChange={setOpen}>
@@ -44,26 +57,21 @@ export function DateRangePicker({
                         id="date"
                         variant={'outline'}
                         className={cn(
-                            'w-full justify-start text-left font-normal bg-secondary/10 border-white/10 hover:bg-secondary/20 h-12 rounded-xl',
+                            'w-full justify-start text-left font-normal bg-secondary/10 border-white/10 hover:bg-secondary/20 h-12 rounded-xl px-3',
                             !date && 'text-muted-foreground'
                         )}
                     >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {date?.from ? (
-                            date.to ? (
-                                <>
-                                    {format(date.from, 'LLL dd, y')} -{' '}
-                                    {format(date.to, 'LLL dd, y')}
-                                </>
-                            ) : (
-                                format(date.from, 'LLL dd, y')
-                            )
-                        ) : (
-                            <span>Pick a date range</span>
-                        )}
+                        <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
+                        <div className="flex-1 truncate text-xs sm:text-sm">
+                            {dateDisplay}
+                        </div>
                     </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align={align}>
+                <PopoverContent
+                    className="w-auto p-0 rounded-2xl border-white/10 overflow-hidden shadow-2xl"
+                    align={isMobile ? 'center' : align}
+                    sideOffset={8}
+                >
                     <Calendar
                         initialFocus
                         mode="range"
@@ -71,7 +79,7 @@ export function DateRangePicker({
                         selected={date}
                         onSelect={setDate}
                         numberOfMonths={monthsToShow}
-                        className="bg-card border-white/10"
+                        className="bg-card"
                     />
                 </PopoverContent>
             </Popover>

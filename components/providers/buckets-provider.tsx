@@ -15,6 +15,8 @@ export interface Bucket {
     color: string;
     is_archived: boolean;
     created_at: string;
+    start_date?: string;
+    end_date?: string;
 }
 
 interface BucketsContextType {

@@ -15,7 +15,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { useGroups } from './providers/groups-provider';
 import { useUserPreferences } from './providers/user-preferences-provider';
-import { useBuckets } from './providers/buckets-provider';
+import { useBuckets, Bucket } from './providers/buckets-provider';
 import {
     Dialog,
     DialogContent,
@@ -32,7 +32,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { toast } from 'sonner';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
 import { DateRange } from 'react-day-picker';
-import { format } from 'date-fns';
+import { format, differenceInDays } from 'date-fns';
 import { NoviraQrCode } from '@/components/ui/qr-code';
 import { QrScanner } from '@/components/ui/qr-scanner';
 
@@ -41,7 +41,7 @@ export function GroupsView() {
     const { groups, friends, friendRequests, balances, pendingSplits, createGroup, addFriendByEmail, addFriendById, addMemberToGroup, settleSplit, acceptFriendRequest, declineFriendRequest, leaveGroup, removeFriend } = useGroups();
     const { formatCurrency, userId, currency, convertAmount } = useUserPreferences();
 
-    const { buckets, createBucket, archiveBucket, deleteBucket, bucketSpending, loading: bucketsLoading } = useBuckets();
+    const { buckets, createBucket, updateBucket, archiveBucket, deleteBucket, bucketSpending, loading: bucketsLoading } = useBuckets();
 
     const [isAddGroupOpen, setIsAddGroupOpen] = useState(false);
     const [creationStep, setCreationStep] = useState<'type' | 'details'>('type');
@@ -54,9 +54,12 @@ export function GroupsView() {
 
     // Bucket management state
     const [isAddBucketOpen, setIsAddBucketOpen] = useState(false);
+    const [isEditBucketOpen, setIsEditBucketOpen] = useState(false);
+    const [editingBucket, setEditingBucket] = useState<Bucket | null>(null);
     const [newBucketName, setNewBucketName] = useState('');
     const [newBucketTarget, setNewBucketTarget] = useState('');
     const [newBucketIcon, setNewBucketIcon] = useState('Tag');
+    const [bucketDateRange, setBucketDateRange] = useState<DateRange | undefined>();
 
     // Member management state
     const [isManageMembersOpen, setIsManageMembersOpen] = useState(false);
@@ -117,14 +120,38 @@ export function GroupsView() {
                 name: newBucketName,
                 budget: parseFloat(newBucketTarget) || 0,
                 icon: newBucketIcon,
-                type: 'trip' // Default for now
+                type: 'trip',
+                start_date: bucketDateRange?.from?.toISOString(),
+                end_date: bucketDateRange?.to?.toISOString()
             });
             setIsAddBucketOpen(false);
             setNewBucketName('');
             setNewBucketTarget('');
             setNewBucketIcon('Tag');
+            setBucketDateRange(undefined);
         } catch (error: any) {
             toast.error(error.message || 'Failed to create bucket');
+        } finally {
+            setIsProcessing(false);
+        }
+    };
+
+    const handleUpdateBucket = async () => {
+        if (!editingBucket || !newBucketName.trim()) return;
+
+        setIsProcessing(true);
+        try {
+            await updateBucket(editingBucket.id, {
+                name: newBucketName,
+                budget: parseFloat(newBucketTarget) || 0,
+                icon: newBucketIcon,
+                start_date: bucketDateRange?.from?.toISOString(),
+                end_date: bucketDateRange?.to?.toISOString()
+            });
+            setIsEditBucketOpen(false);
+            setEditingBucket(null);
+        } catch (error: any) {
+            toast.error(error.message || 'Failed to update bucket');
         } finally {
             setIsProcessing(false);
         }
@@ -303,19 +330,24 @@ export function GroupsView() {
                     </Dialog>
 
                     <Dialog
-                        open={isAddBucketOpen}
-                        onOpenChange={setIsAddBucketOpen}
+                        open={isAddBucketOpen || isEditBucketOpen}
+                        onOpenChange={(open) => {
+                            if (!open) {
+                                setIsAddBucketOpen(false);
+                                setIsEditBucketOpen(false);
+                                setEditingBucket(null);
+                                setNewBucketName('');
+                                setNewBucketTarget('');
+                                setNewBucketIcon('Tag');
+                                setBucketDateRange(undefined);
+                            }
+                        }}
                     >
-                        <DialogTrigger asChild>
-                            <button className="p-2 rounded-full bg-amber-500/20 hover:bg-amber-500/30 text-amber-500 transition-colors border border-amber-500/20" title="Create Bucket">
-                                <Tag className="w-5 h-5" />
-                            </button>
-                        </DialogTrigger>
                         <DialogContent className="max-w-[400px] w-[95vw] rounded-3xl border-white/10 bg-card/95 backdrop-blur-xl p-0 overflow-hidden shadow-2xl">
                             <div className="p-6 space-y-4 w-full max-w-full overflow-hidden flex flex-col box-border">
                                 <DialogHeader className="text-left px-0">
-                                    <DialogTitle>Create Bucket</DialogTitle>
-                                    <DialogDescription>Organize your private spending.</DialogDescription>
+                                    <DialogTitle>{isEditBucketOpen ? 'Edit Bucket' : 'Create Bucket'}</DialogTitle>
+                                    <DialogDescription>{isEditBucketOpen ? 'Modify your bucket details.' : 'Organize your private spending.'}</DialogDescription>
                                 </DialogHeader>
                                 <div className="space-y-4 py-4">
                                     <div className="space-y-3 w-full overflow-hidden">
@@ -363,27 +395,42 @@ export function GroupsView() {
                                             className="bg-secondary/20 border-white/5 h-12 rounded-2xl focus-visible:ring-amber-500/50 w-full"
                                         />
                                     </div>
-                                    <div className="space-y-2 text-left w-full">
-                                        <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest pl-1">Monthly Budget (Optional)</label>
-                                        <div className="relative w-full">
-                                            <Input
-                                                type="number"
-                                                placeholder="0.00"
-                                                value={newBucketTarget}
-                                                onChange={(e) => setNewBucketTarget(e.target.value)}
-                                                className="bg-secondary/20 border-white/5 h-12 rounded-2xl pl-8 focus-visible:ring-amber-500/50 w-full"
+
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <div className="space-y-2 text-left w-full">
+                                            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest pl-1">Total Budget</label>
+                                            <div className="relative w-full">
+                                                <Input
+                                                    type="number"
+                                                    placeholder="0.00"
+                                                    value={newBucketTarget}
+                                                    onChange={(e) => setNewBucketTarget(e.target.value)}
+                                                    className="bg-secondary/20 border-white/5 h-12 rounded-2xl pl-8 focus-visible:ring-amber-500/50 w-full"
+                                                />
+                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-bold">
+                                                    {currency === 'EUR' ? '€' : currency === 'INR' ? '₹' : '$'}
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-2 text-left w-full">
+                                            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest pl-1">Dates</label>
+                                            <DateRangePicker
+                                                date={bucketDateRange}
+                                                setDate={setBucketDateRange}
+                                                className="h-12"
+                                                numberOfMonths={1}
+                                                align="center"
                                             />
-                                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-bold">
-                                                {currency === 'EUR' ? '€' : currency === 'INR' ? '₹' : '$'}
-                                            </span>
                                         </div>
                                     </div>
+
                                     <Button
-                                        onClick={handleCreateBucket}
+                                        onClick={isEditBucketOpen ? handleUpdateBucket : handleCreateBucket}
                                         disabled={isProcessing}
                                         className="w-full h-12 rounded-2xl bg-amber-500 hover:bg-amber-600 text-white font-bold shadow-lg shadow-amber-500/20 mt-4 text-sm"
                                     >
-                                        {isProcessing ? 'Creating...' : 'Create Bucket'}
+                                        {isProcessing ? 'Processing...' : isEditBucketOpen ? 'Save Changes' : 'Create Bucket'}
                                     </Button>
                                 </div>
                             </div>
@@ -539,10 +586,31 @@ export function GroupsView() {
                                                     </div>
                                                     <div>
                                                         <h4 className="font-bold text-base">{bucket.name}</h4>
-                                                        <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-bold">Active Bucket</p>
+                                                        <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-bold">
+                                                            {bucket.start_date && bucket.end_date ? (
+                                                                `${format(new Date(bucket.start_date), 'MMM d')} - ${format(new Date(bucket.end_date), 'MMM d, yy')}`
+                                                            ) : 'Active Bucket'}
+                                                        </p>
                                                     </div>
                                                 </div>
                                                 <div className="flex items-center gap-1">
+                                                    <button
+                                                        onClick={() => {
+                                                            setEditingBucket(bucket);
+                                                            setNewBucketName(bucket.name);
+                                                            setNewBucketTarget(bucket.budget.toString());
+                                                            setNewBucketIcon(bucket.icon || 'Tag');
+                                                            setBucketDateRange({
+                                                                from: bucket.start_date ? new Date(bucket.start_date) : undefined,
+                                                                to: bucket.end_date ? new Date(bucket.end_date) : undefined
+                                                            });
+                                                            setIsEditBucketOpen(true);
+                                                        }}
+                                                        className="p-2 rounded-full hover:bg-secondary/30 transition-colors"
+                                                        title="Edit Bucket"
+                                                    >
+                                                        <Settings2 className="w-4 h-4 text-muted-foreground" />
+                                                    </button>
                                                     <button
                                                         onClick={() => archiveBucket(bucket.id, true)}
                                                         className="p-2 rounded-full hover:bg-secondary/30 transition-colors"
@@ -571,9 +639,17 @@ export function GroupsView() {
                                             {budget > 0 && (
                                                 <div className="space-y-2">
                                                     <div className="flex justify-between text-[10px] font-bold uppercase tracking-tighter">
-                                                        <span className="text-muted-foreground">Spent: {formatCurrency(spent)}</span>
-                                                        <span className={cn(remaining < 0 ? "text-rose-500" : "text-amber-500")}>
-                                                            {remaining < 0 ? "Over budget by " : "Remaining: "}{formatCurrency(Math.abs(remaining))}
+                                                        <div className="flex flex-col">
+                                                            <span className="text-muted-foreground">Spent: {formatCurrency(spent)} / {formatCurrency(budget)}</span>
+                                                            {bucket.start_date && bucket.end_date && (
+                                                                <span className="text-primary/60 lowercase italic font-normal">
+                                                                    ~{formatCurrency(budget / Math.max(1, differenceInDays(new Date(bucket.end_date), new Date(bucket.start_date)) / 30))} / mo
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <span className={cn("flex flex-col items-end", remaining < 0 ? "text-rose-500" : "text-amber-500")}>
+                                                            <span>{remaining < 0 ? "Over budget by " : "Remaining: "}</span>
+                                                            <span>{formatCurrency(Math.abs(remaining))}</span>
                                                         </span>
                                                     </div>
                                                     <div className="h-1.5 w-full bg-secondary/20 rounded-full overflow-hidden">
