@@ -381,10 +381,12 @@ export function DashboardView() {
     };
 
 
-    // Filter transactions to only show relevant ones (where user has a share or paid)
+    // Filter transactions to only show relevant ones (where user has a share, paid, or it's a settlement for them)
     const displayTransactions = transactions.filter(tx => {
-        if (tx.user_id === userId) return true; // I paid
+        if (tx.user_id === userId) return true; // I paid or created the settlement
         if (tx.splits && tx.splits.some(s => s.user_id === userId)) return true; // I'm in splits
+        // If it's a settlement transaction created by someone else for me
+        if (tx.is_settlement && tx.user_id === userId) return true; // Already covered by tx.user_id === userId
         return false;
     });
 

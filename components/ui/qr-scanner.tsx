@@ -1,8 +1,28 @@
-'use client';
-
-import { Scanner } from '@yudiel/react-qr-scanner';
+import dynamic from 'next/dynamic';
 import { cn } from '@/lib/utils';
 import { Loader2, CameraOff } from 'lucide-react';
+import { setZXingModuleOverrides } from 'barcode-detector';
+
+// Set WASM overrides before component loads
+if (typeof window !== 'undefined') {
+    setZXingModuleOverrides({
+        locateFile: (path: string, prefix: string) => {
+            if (path.endsWith('.wasm')) {
+                return `/wasm/${path}`;
+            }
+            return prefix + path;
+        }
+    });
+}
+
+const Scanner = dynamic(() => import('@yudiel/react-qr-scanner').then(mod => mod.Scanner), {
+    ssr: false,
+    loading: () => (
+        <div className="w-full h-full flex items-center justify-center bg-black/50">
+            <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+    )
+});
 
 interface QrScannerProps {
     onScan: (result: string) => void;

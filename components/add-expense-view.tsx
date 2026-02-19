@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { ChevronLeft, CreditCard, Utensils, Car, Zap, ShoppingBag, HeartPulse, Clapperboard, Wallet, Banknote, HelpCircle, RefreshCcw, Calendar as CalendarIcon, Users, User, CheckCircle2, X, Tag, Plane, Home, Gift, ShoppingCart, Gamepad2, School, Laptop, Music, Heart } from 'lucide-react';
+import { ChevronLeft, CreditCard, Utensils, Car, Zap, ShoppingBag, HeartPulse, Clapperboard, Wallet, Banknote, HelpCircle, RefreshCcw, Calendar as CalendarIcon, Users, User, CheckCircle2, X, Tag, Plane, Home, Gift, ShoppingCart, Gamepad2, School, Laptop, Music, Heart, Smartphone } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -39,7 +39,7 @@ export function AddExpenseView() {
     const [description, setDescription] = useState('');
     const [notes, setNotes] = useState('');
     const [date, setDate] = useState<Date | undefined>(new Date());
-    const [paymentMethod, setPaymentMethod] = useState<'Cash' | 'Debit Card' | 'Credit Card'>('Cash');
+    const [paymentMethod, setPaymentMethod] = useState<'Cash' | 'Debit Card' | 'Credit Card' | 'UPI'>('Cash');
     const [loading, setLoading] = useState(false);
     const { currency, userId, formatCurrency, convertAmount } = useUserPreferences();
     const [txCurrency, setTxCurrency] = useState(currency);
@@ -350,20 +350,25 @@ export function AddExpenseView() {
                 </div>
                 <div className="space-y-2">
                     <label className="text-sm font-medium">Payment Method</label>
-                    <div className="grid grid-cols-3 gap-2">
-                        {(['Cash', 'Debit Card', 'Credit Card'] as const).map((method) => (
+                    <div className="grid grid-cols-2 gap-2">
+                        {(['Cash', 'UPI', 'Debit Card', 'Credit Card'] as const).map((method) => (
                             <div
                                 key={method}
                                 onClick={() => setPaymentMethod(method)}
                                 className={cn(
-                                    "flex flex-col items-center justify-center gap-1 p-3 rounded-xl border cursor-pointer transition-all",
+                                    "flex items-center justify-start gap-3 p-3 rounded-xl border cursor-pointer transition-all",
                                     paymentMethod === method
                                         ? "bg-primary/20 border-primary text-primary"
                                         : "bg-secondary/10 border-white/10 hover:bg-secondary/20"
                                 )}
                             >
-                                {method === 'Cash' ? <Banknote className="w-5 h-5" /> : method === 'Debit Card' ? <CreditCard className="w-5 h-5" /> : <Wallet className="w-5 h-5" />}
-                                <span className="text-xs">{method.split(' ')[0]}</span>
+                                <div className="w-8 h-8 rounded-full bg-secondary/20 flex items-center justify-center shrink-0">
+                                    {method === 'Cash' ? <Banknote className="w-4 h-4" /> :
+                                        method === 'UPI' ? <Smartphone className="w-4 h-4" /> :
+                                            method === 'Debit Card' ? <CreditCard className="w-4 h-4" /> :
+                                                <Wallet className="w-4 h-4" />}
+                                </div>
+                                <span className="text-sm font-medium">{method}</span>
                             </div>
                         ))}
                     </div>

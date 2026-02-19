@@ -7,11 +7,14 @@ export async function proxy(request: NextRequest) {
 
     const csp = [
         "default-src 'self'",
-        `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' ${isDev ? "'unsafe-eval'" : ''}`,
+        `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' 'wasm-unsafe-eval' blob: https://unpkg.com https://cdn.jsdelivr.net ${isDev ? "'unsafe-eval'" : ''}`,
         `style-src 'self' 'unsafe-inline'`,
         "img-src 'self' blob: data: https://*.supabase.co",
+        "media-src 'self' blob: data:",
         "font-src 'self'",
-        "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.frankfurter.dev",
+        "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.frankfurter.dev https://unpkg.com https://cdn.jsdelivr.net https://*.gstatic.com https://cdnjs.cloudflare.com",
+        "worker-src 'self' blob: https://unpkg.com https://cdn.jsdelivr.net",
+        "child-src 'self' blob: https://unpkg.com https://cdn.jsdelivr.net",
         "frame-ancestors 'none'",
         "object-src 'none'",
         "base-uri 'self'",
@@ -37,7 +40,7 @@ export async function proxy(request: NextRequest) {
 export const config = {
     matcher: [
         {
-            source: '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+            source: '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|wasm)$).*)',
             missing: [
                 { type: 'header', key: 'next-router-prefetch' },
                 { type: 'header', key: 'purpose', value: 'prefetch' },

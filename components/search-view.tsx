@@ -60,7 +60,7 @@ const categories = [
     { id: 'uncategorized', label: 'Uncategorized', icon: HelpCircle },
 ];
 
-const paymentMethods = ['Cash', 'Debit Card', 'Credit Card'];
+const paymentMethods = ['Cash', 'UPI', 'Debit Card', 'Credit Card'];
 
 type DateRange = {
     from: Date | undefined;

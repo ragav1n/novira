@@ -641,13 +641,15 @@ export function Component({ isSignUp = false }: { isSignUp?: boolean }) {
                 </motion.div>
 
                 {/* Remember me & Forgot password */}
-                <div className="flex items-center justify-between pt-1 relative z-10">
-                  <div className="flex items-center justify-between">
-                    <Link href="/forgot-password" className="text-xs text-foreground/60 hover:text-foreground transition-colors duration-200">
-                      Forgot password?
-                    </Link>
+                {!isSignUp && (
+                  <div className="flex items-center justify-between pt-1 relative z-10">
+                    <div className="flex items-center justify-between">
+                      <Link href="/forgot-password" className="text-xs text-foreground/60 hover:text-foreground transition-colors duration-200">
+                        Forgot password?
+                      </Link>
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {/* Sign in button */}
                 <motion.button
@@ -778,7 +780,7 @@ export function Component({ isSignUp = false }: { isSignUp?: boolean }) {
                   transition={{ delay: 0.8 }}
                   className="text-center text-xs text-foreground/60 mt-4"
                 >
-                  Don't have an account?{" "}
+                  {isSignUp ? "Have an account?" : "Don't have an account?"}{" "}
                   <Link
                     href={isSignUp ? "/signin" : "/signup"}
                     className="relative inline-block group/signup"

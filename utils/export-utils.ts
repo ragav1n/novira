@@ -40,6 +40,7 @@ const METHOD_COLORS: Record<string, [number, number, number]> = {
     other: [156, 163, 175],    // Gray
     'credit card': [96, 165, 250],
     'debit card': [129, 140, 248],
+    upi: [138, 43, 226],       // Purple
 };
 
 const getMethodColor = (method: string): [number, number, number] => {

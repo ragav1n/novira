@@ -197,7 +197,7 @@ export function GroupsProvider({ children }: { children: React.ReactNode }) {
                     amount,
                     transaction:transactions!inner(user_id, currency, exchange_rate, base_currency)
                 `)
-                .eq('transaction.user_id', userId)
+                .eq('transactions.user_id', userId)
                 .eq('is_paid', false);
 
             if (owedToMeError) throw owedToMeError;
@@ -234,7 +234,7 @@ export function GroupsProvider({ children }: { children: React.ReactNode }) {
                     profile:profiles(full_name),
                     transaction:transactions!inner(description, date, user_id, currency, exchange_rate, base_currency, profile:profiles(full_name))
                 `)
-                .eq('transaction.user_id', userId)
+                .eq('transactions.user_id', userId)
                 .eq('is_paid', false);
 
             if (creditError) throw creditError;
@@ -246,17 +246,22 @@ export function GroupsProvider({ children }: { children: React.ReactNode }) {
                 const formatted = uniquePending.map((s: any) => {
                     const isCreditor = s.transaction?.user_id === userId;
                     const payerName = isCreditor
-                        ? (s.profile?.full_name || 'Unknown')
-                        : (s.transaction?.profile?.full_name || 'Unknown');
+                        ? (s.profile?.full_name || 'Friend')
+                        : (s.transaction?.profile?.full_name || s.transaction?.payer_name || 'Friend');
 
                     return {
                         ...s,
-                        transaction: {
+                        transaction: s.transaction ? {
                             ...s.transaction,
+                            payer_name: payerName
+                        } : {
+                            description: 'Unknown Transaction',
+                            date: s.created_at,
                             payer_name: payerName
                         }
                     };
                 });
+
                 formatted.sort((a, b) => new Date(b.transaction.date).getTime() - new Date(a.transaction.date).getTime());
                 setPendingSplits(formatted);
             } else {
@@ -265,6 +270,7 @@ export function GroupsProvider({ children }: { children: React.ReactNode }) {
 
         } catch (error: any) {
             console.error('CRITICAL: Groups/Friends fetch failed!', error);
+            toast.error('Failed to sync financial data. Please check your connection.');
         } finally {
             setLoading(false);
         }
@@ -283,6 +289,10 @@ export function GroupsProvider({ children }: { children: React.ReactNode }) {
             channel = supabase.channel(`realtime-groups-${userId}`)
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'splits' }, () => {
                     // Realtime: Splits updated
+                    refreshData();
+                })
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' }, () => {
+                    // Realtime: Transactions updated (important for settlements)
                     refreshData();
                 })
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'groups' }, () => {
