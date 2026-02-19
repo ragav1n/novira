@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, AlertTriangle } from 'lucide-react';
+import { X, AlertTriangle, Eye, EyeClosed, Lock } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from "@/lib/utils";
 import { Dialog, DialogContent, DialogTrigger, DialogTitle, DialogDescription } from '@/components/ui/dialog';
@@ -33,19 +33,54 @@ interface DeleteAccountDialogProps {
 export function DeleteAccountDialog({ trigger }: DeleteAccountDialogProps) {
     const [open, setOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
+    const [password, setPassword] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
     const { user } = useUserPreferences();
+
+    const isGoogleUser = user?.app_metadata?.provider === 'google' ||
+        user?.identities?.some(id => id.provider === 'google');
 
     const handleSubmit = async () => {
         setIsLoading(true);
         try {
-            const { error } = await supabase.auth.signInWithOAuth({
-                provider: 'google',
-                options: {
-                    queryParams: { prompt: 'select_account' },
-                    redirectTo: `${window.location.origin}/confirm-delete`
+            if (isGoogleUser) {
+                const { error } = await supabase.auth.signInWithOAuth({
+                    provider: 'google',
+                    options: {
+                        queryParams: { prompt: 'select_account' },
+                        redirectTo: `${window.location.origin}/confirm-delete`
+                    }
+                });
+                if (error) throw error;
+            } else {
+                // Email/Password verification
+                if (!password) {
+                    throw new Error('Please enter your password to confirm deletion');
                 }
-            });
-            if (error) throw error;
+
+                // Verify password by re-signing in
+                const { error: signInError } = await supabase.auth.signInWithPassword({
+                    email: user?.email || '',
+                    password: password,
+                });
+
+                if (signInError) {
+                    throw new Error('Incorrect password. Please try again.');
+                }
+
+                // If password is correct, call the delete action
+                const { deleteAccount } = await import('@/app/actions/delete-account');
+                const result = await deleteAccount(user?.email || '');
+
+                if (result.error) {
+                    throw new Error(result.error);
+                }
+
+                // Success
+                await supabase.auth.signOut();
+                toast.success('Account deleted successfully');
+                window.location.href = '/signin?message=Account+deleted';
+            }
         } catch (error: any) {
             toast.error(error.message || 'Failed to initiate deletion');
             setIsLoading(false);
@@ -97,9 +132,37 @@ export function DeleteAccountDialog({ trigger }: DeleteAccountDialogProps) {
                         <div className="space-y-4">
                             <div className="bg-primary/5 rounded-xl p-4 border border-primary/20">
                                 <p className="text-xs text-primary/80 leading-relaxed font-medium">
-                                    To securely delete your account, we need to verify your identity. Click below to continue with Google.
+                                    {isGoogleUser
+                                        ? "To securely delete your account, we need to verify your identity with Google."
+                                        : "To securely delete your account, please enter your password for verification."}
                                 </p>
                             </div>
+
+                            {!isGoogleUser && (
+                                <div className="space-y-2">
+                                    <div className="relative flex items-center overflow-hidden rounded-lg group/input">
+                                        <Lock className="absolute left-3 w-4 h-4 text-foreground/40 group-focus-within/input:text-primary transition-colors" />
+                                        <Input
+                                            type={showPassword ? "text" : "password"}
+                                            placeholder="Enter your password"
+                                            value={password}
+                                            onChange={(e) => setPassword(e.target.value)}
+                                            className="w-full bg-primary/10 border-transparent focus:border-primary/40 text-foreground placeholder:text-foreground/30 h-10 transition-all duration-300 pl-10 pr-10 focus:bg-primary/15"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowPassword(!showPassword)}
+                                            className="absolute right-3 cursor-pointer p-1 rounded-md hover:bg-white/5 transition-colors"
+                                        >
+                                            {showPassword ? (
+                                                <Eye className="w-4 h-4 text-foreground/40 hover:text-primary transition-colors" />
+                                            ) : (
+                                                <EyeClosed className="w-4 h-4 text-foreground/40 hover:text-primary transition-colors" />
+                                            )}
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
 
                             <motion.button
                                 whileHover={{ scale: 1.02 }}
@@ -129,7 +192,7 @@ export function DeleteAccountDialog({ trigger }: DeleteAccountDialogProps) {
                                                 exit={{ opacity: 0 }}
                                                 className="flex items-center justify-center gap-2 text-sm font-bold"
                                             >
-                                                Continue with Google
+                                                {isGoogleUser ? "Continue with Google" : "Confirm Deletion"}
                                             </motion.span>
                                         )}
                                     </AnimatePresence>

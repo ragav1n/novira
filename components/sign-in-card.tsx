@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-motion';
 import { Mail, Lock, Eye, EyeClosed, ArrowRight } from 'lucide-react';
 
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { cn } from "@/lib/utils"
 import { FallingPattern } from './ui/falling-pattern';
 import { supabase } from '@/lib/supabase';
@@ -30,6 +30,8 @@ function Input({ className, type, ...props }: React.ComponentProps<"input">) {
 
 export function Component({ isSignUp = false }: { isSignUp?: boolean }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const message = searchParams.get('message');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [email, setEmail] = useState("");
@@ -61,6 +63,17 @@ export function Component({ isSignUp = false }: { isSignUp?: boolean }) {
 
   // Submission Lock to prevent double-firing
   const isSubmittingRef = React.useRef(false);
+
+  // Show success toast if message exists in URL
+  React.useEffect(() => {
+    if (message === 'Account deleted') {
+      import('sonner').then(({ toast }) => {
+        toast.success('Account deleted successfully');
+      });
+      // Clear message from URL
+      router.replace('/signin');
+    }
+  }, [message, router]);
 
   // Rate Limiter Import (Dynamic import not needed if standard, but good to know context)
   // We'll use the imported utility

@@ -56,7 +56,7 @@ export function FeatureAnnouncementModal({ showAnnouncement = false, userId, onC
                             damping: 30,
                             mass: 0.8
                         }}
-                        className="relative w-full max-w-sm bg-[#0D0D0F]/80 backdrop-blur-2xl border border-white/10 rounded-[2.5rem] shadow-[0_0_80px_-15px_rgba(138,43,226,0.4)] overflow-hidden z-[70] mx-4"
+                        className="relative w-full max-w-sm bg-[#0D0D0F]/80 backdrop-blur-2xl border border-white/10 rounded-[2.5rem] shadow-[0_0_80px_-15px_rgba(138,43,226,0.4)] overflow-hidden z-[70] mx-4 flex flex-col max-h-[90dvh]"
                     >
                         {/* More Dynamic Glass Glows */}
                         <div className="absolute -top-24 -left-24 w-56 h-56 bg-primary/30 rounded-full blur-[70px] opacity-40 animate-pulse" />
@@ -72,7 +72,7 @@ export function FeatureAnnouncementModal({ showAnnouncement = false, userId, onC
                         </button>
 
                         {/* Content */}
-                        <div className="p-8 text-center space-y-6 relative z-10 flex flex-col items-center">
+                        <div className="flex-1 overflow-y-auto p-8 pt-10 text-center space-y-6 relative z-10 flex flex-col items-center custom-scrollbar">
                             <div className="space-y-2">
                                 <motion.h1
                                     initial={{ y: 10, opacity: 0 }}
@@ -132,7 +132,7 @@ export function FeatureAnnouncementModal({ showAnnouncement = false, userId, onC
                                 initial={{ y: 10, opacity: 0 }}
                                 animate={{ y: 0, opacity: 1 }}
                                 transition={{ delay: 0.6 }}
-                                className="w-full pt-2"
+                                className="w-full pt-2 pb-2"
                             >
                                 <Button
                                     onClick={handleClose}
@@ -146,6 +146,23 @@ export function FeatureAnnouncementModal({ showAnnouncement = false, userId, onC
                         {/* Subtle Top Shine */}
                         <div className="absolute top-0 left-0 w-full h-[1px] bg-white/20" />
                         <div className="absolute top-0 left-1/4 w-1/2 h-[2px] bg-gradient-to-r from-transparent via-white/40 to-transparent" />
+
+                        {/* Custom scrollbar styles */}
+                        <style jsx global>{`
+                            .custom-scrollbar::-webkit-scrollbar {
+                                width: 4px;
+                            }
+                            .custom-scrollbar::-webkit-scrollbar-track {
+                                background: transparent;
+                            }
+                            .custom-scrollbar::-webkit-scrollbar-thumb {
+                                background: rgba(255, 255, 255, 0.1);
+                                border-radius: 10px;
+                            }
+                            .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+                                background: rgba(255, 255, 255, 0.2);
+                            }
+                        `}</style>
 
                     </motion.div>
                 </div>
