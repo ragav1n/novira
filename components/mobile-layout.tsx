@@ -58,7 +58,7 @@ export function MobileLayout({ children }: { children: React.ReactNode }) {
 
             {/* Main Content Area */}
             <main className={cn(
-                "flex-1 w-full overflow-y-auto no-scrollbar relative z-10 flex flex-col",
+                "flex-1 w-full overflow-y-auto no-scrollbar relative flex flex-col",
                 showNav ? "pb-24" : "pb-0"
             )}>
                 {children}
@@ -85,7 +85,7 @@ export function MobileLayout({ children }: { children: React.ReactNode }) {
                         exit={{ opacity: 0 }}
                         className="fixed inset-0 z-[9999] flex items-center justify-center bg-background/40 backdrop-blur-md"
                     >
-                        <WaveLoader bars={5} message="Loading..." />
+                        <WaveLoader bars={5} />
                     </motion.div>
                 )}
             </AnimatePresence>

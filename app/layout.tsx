@@ -26,6 +26,19 @@ export const metadata: Metadata = {
     apple: '/Novira.png',
   },
   manifest: '/manifest.json',
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'),
+  openGraph: {
+    title: 'Novira - Finance Tracker',
+    description: 'Track spending, manage budgets, split expenses, and visualize your financial universe.',
+    type: 'website',
+    images: [{ url: '/Novira.png', width: 512, height: 512, alt: 'Novira Logo' }],
+  },
+  twitter: {
+    card: 'summary',
+    title: 'Novira - Finance Tracker',
+    description: 'Track spending, manage budgets, split expenses, and visualize your financial universe.',
+    images: ['/Novira.png'],
+  },
 }
 
 export const viewport = {
@@ -54,6 +67,17 @@ export default function RootLayout({
           </MobileLayout>
         </UserPreferencesProvider>
         <Analytics />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              if ('serviceWorker' in navigator) {
+                window.addEventListener('load', function() {
+                  navigator.serviceWorker.register('/sw.js');
+                });
+              }
+            `,
+          }}
+        />
       </body>
     </html>
   )

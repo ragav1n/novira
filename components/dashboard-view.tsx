@@ -2,7 +2,7 @@
 
 import { useUserPreferences } from '@/components/providers/user-preferences-provider';
 import { BudgetAlertManager } from '@/components/budget-alert-manager';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Plus, Utensils, Car, Zap, ShoppingBag, HeartPulse, Clapperboard, CircleDollarSign, ArrowUpRight, ArrowDownLeft, Users, MoreVertical, Pencil, Trash2, X, History, Clock, HelpCircle, Tag, Plane, Home, Gift, ShoppingCart, Stethoscope, Gamepad2, School, Laptop, Music, Heart, RefreshCcw } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
@@ -129,6 +129,21 @@ export function DashboardView() {
     // Modal Sequencing State
     const [activeModal, setActiveModal] = useState<'welcome' | 'announcement' | null>(null);
 
+    // Debounced realtime refresh for transaction changes
+    const txDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const debouncedLoadTx = useCallback((uid: string) => {
+        if (txDebounceRef.current) clearTimeout(txDebounceRef.current);
+        txDebounceRef.current = setTimeout(() => {
+            loadTransactions(uid);
+        }, 300);
+    }, []);
+
+    useEffect(() => {
+        return () => {
+            if (txDebounceRef.current) clearTimeout(txDebounceRef.current);
+        };
+    }, []);
+
     useEffect(() => {
         if (!userId) return;
 
@@ -142,7 +157,7 @@ export function DashboardView() {
                     table: 'transactions',
                 },
                 () => {
-                    loadTransactions(userId);
+                    debouncedLoadTx(userId);
                 }
             )
             .subscribe();
@@ -150,7 +165,7 @@ export function DashboardView() {
         return () => {
             supabase.removeChannel(channel);
         };
-    }, [userId]);
+    }, [userId, debouncedLoadTx]);
 
     // Handle modal sequencing and initial data load
     useEffect(() => {
@@ -209,6 +224,11 @@ export function DashboardView() {
     };
 
     const handleDeleteTransaction = async (txId: string) => {
+        // Optimistic: remove from UI immediately
+        const previousTransactions = [...transactions];
+        setTransactions(prev => prev.filter(tx => tx.id !== txId));
+        toast.success('Transaction deleted');
+
         try {
             const { error } = await supabase
                 .from('transactions')
@@ -216,9 +236,9 @@ export function DashboardView() {
                 .eq('id', txId);
 
             if (error) throw error;
-            toast.success('Transaction deleted');
-            if (userId) loadTransactions(userId);
         } catch (error: any) {
+            // Rollback on failure
+            setTransactions(previousTransactions);
             toast.error('Failed to delete: ' + error.message);
         }
     };
@@ -227,23 +247,33 @@ export function DashboardView() {
         e.preventDefault();
         if (!editingTransaction) return;
 
+        // Optimistic: update in UI immediately
+        const previousTransactions = [...transactions];
+        setTransactions(prev => prev.map(tx =>
+            tx.id === editingTransaction.id
+                ? { ...tx, ...editingTransaction }
+                : tx
+        ));
+        toast.success('Transaction updated');
+        setIsEditOpen(false);
+        const savedEditingTx = editingTransaction;
+        setEditingTransaction(null);
+
         try {
             const { error } = await supabase
                 .from('transactions')
                 .update({
-                    description: editingTransaction.description,
-                    category: editingTransaction.category,
-                    amount: editingTransaction.amount,
-                    bucket_id: editingTransaction.bucket_id || null,
+                    description: savedEditingTx.description,
+                    category: savedEditingTx.category,
+                    amount: savedEditingTx.amount,
+                    bucket_id: savedEditingTx.bucket_id || null,
                 })
-                .eq('id', editingTransaction.id);
+                .eq('id', savedEditingTx.id);
 
             if (error) throw error;
-            toast.success('Transaction updated');
-            setIsEditOpen(false);
-            setEditingTransaction(null);
-            if (userId) loadTransactions(userId);
         } catch (error: any) {
+            // Rollback on failure
+            setTransactions(previousTransactions);
             toast.error('Failed to update: ' + error.message);
         }
     };

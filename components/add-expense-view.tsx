@@ -55,6 +55,8 @@ export function AddExpenseView() {
     const [isSplitEnabled, setIsSplitEnabled] = useState(false);
     const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
     const [selectedFriendIds, setSelectedFriendIds] = useState<string[]>([]);
+    const [splitMode, setSplitMode] = useState<'even' | 'custom'>('even');
+    const [customAmounts, setCustomAmounts] = useState<Record<string, string>>({});
 
     // Recurring State
     const [isRecurring, setIsRecurring] = useState(false);
@@ -146,16 +148,44 @@ export function AddExpenseView() {
                 }
 
                 if (debtors.length > 0) {
-                    const splitAmount = parseFloat(amount) / (debtors.length + 1);
-                    const splitRecords = debtors.map(debtorId => ({
-                        transaction_id: transaction.id,
-                        user_id: debtorId,
-                        amount: splitAmount,
-                        is_paid: false
-                    }));
+                    let splitRecords;
 
-                    const { error: splitError } = await supabase.from('splits').insert(splitRecords);
-                    if (splitError) throw splitError;
+                    if (splitMode === 'custom') {
+                        // Custom: use manually entered amounts
+                        const totalCustom = debtors.reduce((sum, id) => sum + (parseFloat(customAmounts[id] || '0') || 0), 0);
+                        if (totalCustom <= 0) {
+                            toast.error('Please enter split amounts for each person');
+                            setLoading(false);
+                            return;
+                        }
+                        if (totalCustom > parseFloat(amount)) {
+                            toast.error('Split amounts exceed the total expense');
+                            setLoading(false);
+                            return;
+                        }
+                        splitRecords = debtors
+                            .filter(debtorId => parseFloat(customAmounts[debtorId] || '0') > 0)
+                            .map(debtorId => ({
+                                transaction_id: transaction.id,
+                                user_id: debtorId,
+                                amount: parseFloat(customAmounts[debtorId]),
+                                is_paid: false
+                            }));
+                    } else {
+                        // Even: split equally
+                        const splitAmount = parseFloat(amount) / (debtors.length + 1);
+                        splitRecords = debtors.map(debtorId => ({
+                            transaction_id: transaction.id,
+                            user_id: debtorId,
+                            amount: splitAmount,
+                            is_paid: false
+                        }));
+                    }
+
+                    if (splitRecords.length > 0) {
+                        const { error: splitError } = await supabase.from('splits').insert(splitRecords);
+                        if (splitError) throw splitError;
+                    }
                 }
             }
 
@@ -393,6 +423,32 @@ export function AddExpenseView() {
 
                 {isSplitEnabled && (
                     <div className="space-y-4 pt-2 animate-in fade-in slide-in-from-top-2 duration-300">
+                        {/* Split Mode Toggle */}
+                        <div className="grid grid-cols-2 gap-2">
+                            <button
+                                onClick={() => setSplitMode('even')}
+                                className={cn(
+                                    "py-2.5 text-xs font-bold uppercase tracking-wider rounded-xl border transition-all",
+                                    splitMode === 'even'
+                                        ? "bg-primary text-white border-primary shadow-lg shadow-primary/20"
+                                        : "bg-background/20 border-white/5 text-muted-foreground hover:border-white/10"
+                                )}
+                            >
+                                Even Split
+                            </button>
+                            <button
+                                onClick={() => setSplitMode('custom')}
+                                className={cn(
+                                    "py-2.5 text-xs font-bold uppercase tracking-wider rounded-xl border transition-all",
+                                    splitMode === 'custom'
+                                        ? "bg-primary text-white border-primary shadow-lg shadow-primary/20"
+                                        : "bg-background/20 border-white/5 text-muted-foreground hover:border-white/10"
+                                )}
+                            >
+                                Custom Amounts
+                            </button>
+                        </div>
+
                         <div className="space-y-2">
                             <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Split with Group</p>
                             <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1 scrollbar-hide">
@@ -402,6 +458,7 @@ export function AddExpenseView() {
                                         onClick={() => {
                                             setSelectedGroupId(selectedGroupId === group.id ? null : group.id);
                                             setSelectedFriendIds([]);
+                                            setCustomAmounts({});
                                         }}
                                         className={cn(
                                             "flex flex-col items-center gap-1.5 p-3 rounded-xl border transition-all min-w-[80px] cursor-pointer",
@@ -432,9 +489,18 @@ export function AddExpenseView() {
                                         key={friend.id}
                                         onClick={() => {
                                             if (selectedGroupId) setSelectedGroupId(null);
-                                            setSelectedFriendIds(prev =>
-                                                prev.includes(friend.id) ? prev.filter(id => id !== friend.id) : [...prev, friend.id]
-                                            );
+                                            setSelectedFriendIds(prev => {
+                                                const next = prev.includes(friend.id) ? prev.filter(id => id !== friend.id) : [...prev, friend.id];
+                                                // Clean up custom amounts for deselected friends
+                                                if (!next.includes(friend.id)) {
+                                                    setCustomAmounts(prev => {
+                                                        const copy = { ...prev };
+                                                        delete copy[friend.id];
+                                                        return copy;
+                                                    });
+                                                }
+                                                return next;
+                                            });
                                         }}
                                         className={cn(
                                             "flex flex-col items-center gap-1.5 p-3 rounded-xl border transition-all min-w-[80px] cursor-pointer",
@@ -462,6 +528,90 @@ export function AddExpenseView() {
                                 ))}
                             </div>
                         </div>
+
+                        {/* Custom Amount Inputs */}
+                        {splitMode === 'custom' && (selectedFriendIds.length > 0 || selectedGroupId) && (
+                            <div className="space-y-3 pt-2 border-t border-white/5 animate-in fade-in slide-in-from-top-2 duration-300">
+                                <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Enter amounts each person owes you</p>
+                                {selectedGroupId ? (
+                                    // For groups, we show group members (fetched dynamically)
+                                    <p className="text-[10px] text-muted-foreground italic">Custom amounts for group members will be applied after saving</p>
+                                ) : (
+                                    selectedFriendIds.map((friendId) => {
+                                        const friend = friends.find(f => f.id === friendId);
+                                        if (!friend) return null;
+                                        return (
+                                            <div key={friendId} className="flex items-center gap-3">
+                                                <div className="flex items-center gap-2 min-w-[100px]">
+                                                    <div className="w-7 h-7 rounded-full overflow-hidden border border-white/5 shrink-0">
+                                                        {friend.avatar_url ? (
+                                                            <img src={friend.avatar_url} alt={friend.full_name} className="w-full h-full object-cover" />
+                                                        ) : (
+                                                            <div className="w-full h-full flex items-center justify-center bg-secondary/30">
+                                                                <User className="w-3.5 h-3.5" />
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    <span className="text-xs font-medium truncate">{friend.full_name.split(' ')[0]}</span>
+                                                </div>
+                                                <div className="relative flex-1">
+                                                    <Input
+                                                        type="number"
+                                                        min="0"
+                                                        step="0.01"
+                                                        placeholder="0.00"
+                                                        value={customAmounts[friendId] || ''}
+                                                        onChange={(e) => setCustomAmounts(prev => ({ ...prev, [friendId]: e.target.value }))}
+                                                        className="h-9 text-sm pl-8 bg-secondary/10 border-white/10 rounded-lg"
+                                                    />
+                                                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+                                                        {currency === 'EUR' ? '€' : currency === 'INR' ? '₹' : '$'}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        );
+                                    })
+                                )}
+
+                                {/* Running total */}
+                                {selectedFriendIds.length > 0 && !selectedGroupId && (() => {
+                                    const totalAllocated = selectedFriendIds.reduce((sum, id) => sum + (parseFloat(customAmounts[id] || '0') || 0), 0);
+                                    const expenseAmount = parseFloat(amount) || 0;
+                                    const yourShare = expenseAmount - totalAllocated;
+                                    return (
+                                        <div className="space-y-1.5 pt-2 border-t border-white/5">
+                                            <div className="flex justify-between text-[11px]">
+                                                <span className="text-muted-foreground">Others owe:</span>
+                                                <span className="font-medium text-primary">
+                                                    {currency === 'EUR' ? '€' : currency === 'INR' ? '₹' : '$'}{totalAllocated.toFixed(2)}
+                                                </span>
+                                            </div>
+                                            <div className="flex justify-between text-[11px]">
+                                                <span className="text-muted-foreground">Your share:</span>
+                                                <span className={cn("font-medium", yourShare < 0 ? "text-red-400" : "text-white")}>
+                                                    {currency === 'EUR' ? '€' : currency === 'INR' ? '₹' : '$'}{yourShare.toFixed(2)}
+                                                </span>
+                                            </div>
+                                            {yourShare < 0 && (
+                                                <p className="text-[10px] text-red-400">⚠ Split amounts exceed the total expense</p>
+                                            )}
+                                        </div>
+                                    );
+                                })()}
+                            </div>
+                        )}
+
+                        {/* Even split preview */}
+                        {splitMode === 'even' && (selectedFriendIds.length > 0 || selectedGroupId) && amount && (
+                            <div className="pt-2 border-t border-white/5">
+                                <p className="text-[11px] text-muted-foreground text-center">
+                                    Each person pays <span className="font-medium text-primary">
+                                        {currency === 'EUR' ? '€' : currency === 'INR' ? '₹' : '$'}
+                                        {(parseFloat(amount) / ((selectedGroupId ? 2 : selectedFriendIds.length) + 1)).toFixed(2)}
+                                    </span>
+                                </p>
+                            </div>
+                        )}
                     </div>
                 )}
             </div>

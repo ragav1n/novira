@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { useUserPreferences } from './user-preferences-provider';
@@ -276,6 +276,22 @@ export function GroupsProvider({ children }: { children: React.ReactNode }) {
         }
     }, [userId, userCurrency, convertAmount]);
 
+    // Debounced refresh to batch rapid realtime events
+    const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const debouncedRefresh = useCallback(() => {
+        if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+        debounceTimerRef.current = setTimeout(() => {
+            refreshData();
+        }, 300);
+    }, [refreshData]);
+
+    // Clean up debounce timer on unmount
+    useEffect(() => {
+        return () => {
+            if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+        };
+    }, []);
+
     useEffect(() => {
         if (!userId) return;
 
@@ -288,38 +304,31 @@ export function GroupsProvider({ children }: { children: React.ReactNode }) {
         const timer = setTimeout(() => {
             channel = supabase.channel(`realtime-groups-${userId}`)
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'splits' }, () => {
-                    // Realtime: Splits updated
-                    refreshData();
+                    debouncedRefresh();
                 })
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' }, () => {
-                    // Realtime: Transactions updated (important for settlements)
-                    refreshData();
+                    debouncedRefresh();
                 })
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'groups' }, () => {
-                    // Realtime: Groups updated
-                    refreshData();
+                    debouncedRefresh();
                 })
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'group_members' }, () => {
-                    // Realtime: Group Members updated
-                    refreshData();
+                    debouncedRefresh();
                 })
-                .on('postgres_changes', { event: '*', schema: 'public', table: 'friendships' }, (payload) => {
-                    // Realtime: Friendships updated
-                    refreshData();
+                .on('postgres_changes', {
+                    event: '*',
+                    schema: 'public',
+                    table: 'friendships',
+                    filter: `or(user_id.eq.${userId},friend_id.eq.${userId})`
+                }, () => {
+                    debouncedRefresh();
                 })
                 .subscribe((status, err) => {
-                    // Realtime Subscription Status
-                    if (status === 'SUBSCRIBED') {
-                        // Connected successfully
-                    }
                     if (status === 'CHANNEL_ERROR') {
                         console.error('Realtime Channel Error:', err);
-                        // Suppress toast to avoid startling users on minor bugs/network blips
-                        // toast.error(`Realtime Error: ${err?.message || 'Unknown'}`);
                     }
                     if (status === 'TIMED_OUT') {
                         console.error('Realtime Connection Timed Out');
-                        // toast.error('Realtime Connection Timed Out. Retrying...');
                     }
                 });
         }, 500);
@@ -327,11 +336,10 @@ export function GroupsProvider({ children }: { children: React.ReactNode }) {
         return () => {
             clearTimeout(timer);
             if (channel) {
-                // Cleaning up Realtime subscription...
                 supabase.removeChannel(channel);
             }
         };
-    }, [userId, userCurrency, convertAmount, refreshData]);
+    }, [userId, userCurrency, convertAmount, refreshData, debouncedRefresh]);
 
     // ... (keep createGroup, addFriendByEmail, etc. methods, but remove getSession calls if they use userId from closure or check context, though some methods might still need separate checks or can use userId from context safely)
     // Actually, for helper methods called by UI, we can use `userId` from context.

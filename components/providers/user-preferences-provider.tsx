@@ -158,16 +158,53 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
         };
     }, [handleSession, processRecurringExpenses]);
 
-    // Fetch Exchange Rates when currency changes
+    // Fetch Exchange Rates when currency changes (with localStorage caching)
     useEffect(() => {
+        const CACHE_TTL = 60 * 60 * 1000; // 1 hour
+        const cacheKey = `novira_rates_${currency}`;
+
         const fetchRates = async () => {
+            // Check cache first
+            try {
+                const cached = localStorage.getItem(cacheKey);
+                if (cached) {
+                    const { rates, timestamp } = JSON.parse(cached);
+                    if (Date.now() - timestamp < CACHE_TTL) {
+                        setExchangeRates(rates);
+                        return; // Cache is fresh, skip network request
+                    }
+                }
+            } catch {
+                // Cache read failed, proceed with fetch
+            }
+
             try {
                 const response = await fetch(`https://api.frankfurter.dev/v1/latest?base=${currency}`);
                 if (!response.ok) throw new Error('Failed to fetch rates');
                 const data = await response.json();
                 setExchangeRates(data.rates);
+
+                // Update cache
+                try {
+                    localStorage.setItem(cacheKey, JSON.stringify({
+                        rates: data.rates,
+                        timestamp: Date.now()
+                    }));
+                } catch {
+                    // localStorage full or unavailable
+                }
             } catch (error) {
-                console.error('Error fetching exchange rates:', error);
+                console.warn('Exchange rate fetch failed, using cached rates if available:', error);
+                // Try to use stale cache as fallback
+                try {
+                    const cached = localStorage.getItem(cacheKey);
+                    if (cached) {
+                        const { rates } = JSON.parse(cached);
+                        setExchangeRates(rates);
+                    }
+                } catch {
+                    // No fallback available
+                }
             }
         };
 
