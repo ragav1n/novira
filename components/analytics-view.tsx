@@ -408,7 +408,7 @@ export function AnalyticsView() {
                             zIndex: 50
                         }}
                     >
-                        <WaveLoader bars={5} message="Loading analytics..." />
+                        <WaveLoader bars={5} message="" />
                     </motion.div>
                 )}
             </AnimatePresence>
