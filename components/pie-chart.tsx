@@ -118,22 +118,24 @@ function ChartTooltipContent({
   return (
     <div
       className={cn(
-        'border-border/50 bg-background grid min-w-[8rem] items-start gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs shadow-xl',
+        'border-border/50 bg-background/95 backdrop-blur-md grid min-w-[10rem] items-start gap-1.5 rounded-xl border px-3 py-2 text-xs shadow-2xl',
         className
       )}
     >
-      <div className="grid gap-1.5">
+      <div className="grid gap-2">
         {payload.map((item) => (
-          <div key={item.dataKey} className="flex items-center justify-between gap-2">
-            <div
-              className="h-2 w-2 shrink-0 rounded-[2px]"
-              style={{
-                backgroundColor: item.color,
-              }}
-            />
-            <span className="text-muted-foreground">{item.name}</span>
-            <span className="text-foreground font-mono font-medium">
-              ${item.value?.toLocaleString()}
+          <div key={item.dataKey} className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-2">
+              <div
+                className="h-2 w-2 shrink-0 rounded-[2px]"
+                style={{
+                  backgroundColor: item.color,
+                }}
+              />
+              <span className="text-muted-foreground whitespace-nowrap">{item.name}</span>
+            </div>
+            <span className="text-foreground font-mono font-bold">
+              {Number(item.value).toLocaleString(undefined, { maximumFractionDigits: 0 })}
             </span>
           </div>
         ))}

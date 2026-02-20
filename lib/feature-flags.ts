@@ -1,21 +1,16 @@
 export const LATEST_FEATURE_ANNOUNCEMENT = {
-    id: 'personal-buckets-&-updated-pdf-report-launch', // New ID to trigger the modal again
+    id: 'recurring-expenses-&-payment-analytics-launch', // New ID to trigger the modal again
     title: 'New Updates!',
     features: [
         {
-            title: 'Sign in with Google!',
-            description: 'We have just added support for Google Sign-In. Access your account faster and more securely. If you already have an account, you can link it by simply signing in with the same email.',
-            icon: 'google'
+            title: 'Recurring Expenses',
+            description: 'Automate your finances! Set up recurring transactions and manage them easily from your settings. We even check for duplicates automatically.',
+            icon: 'zap'
         },
         {
-            title: 'Personal Buckets',
-            description: 'Organize your private spending with buckets. Set monthly budgets, choose unique icons, and track your progress with analytics.',
-            icon: 'bucket'
-        },
-        {
-            title: 'Professional PDF Reports',
-            description: 'Your expense reports now include your profile identity and beautifully formatted data. Export your private buckets or global spending with a touch of class.',
-            icon: 'export'
+            title: 'Payment Analytics',
+            description: 'See exactly where your money goes. New interactive pie charts show your spending breakdown by payment method (Cash, UPI, Card, and more).',
+            icon: 'chart'
         },
     ],
     buttonText: 'Awesome!',

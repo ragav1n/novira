@@ -27,14 +27,14 @@ import {
 
 // Constants for consistent coloring
 const CATEGORY_COLORS: Record<string, string> = {
-    food: '#8A2BE2',      // Electric Purple
-    transport: '#FF6B6B', // Coral
-    bills: '#4ECDC4',     // Teal
-    shopping: '#F9C74F',  // Yellow
-    healthcare: '#FF9F1C', // Orange
-    entertainment: '#FF1493', // Deep Pink
-    others: '#C7F464',    // Lime
-    uncategorized: '#6366F1', // Indigo-500
+    food: '#8B5CF6',      // Violet
+    transport: '#3B82F6', // Blue
+    bills: '#06B6D4',     // Cyan
+    shopping: '#F59E0B',  // Amber
+    healthcare: '#EF4444', // Red
+    entertainment: '#EC4899', // Pink
+    others: '#10B981',    // Emerald
+    uncategorized: '#6366F1', // Indigo
 };
 
 const chartConfig: ChartConfig = {
@@ -46,6 +46,24 @@ const chartConfig: ChartConfig = {
     entertainment: { label: "Entertainment", color: CATEGORY_COLORS.entertainment },
     others: { label: "Others", color: CATEGORY_COLORS.others },
     uncategorized: { label: "Uncategorized", color: CATEGORY_COLORS.uncategorized },
+};
+
+const PAYMENT_COLORS: Record<string, string> = {
+    cash: '#22C55E',      // Vibrant Green
+    card: '#3B82F6',      // Bright Blue
+    online: '#A855F7',    // Vivid Purple
+    upi: '#F59E0B',       // Bright Amber
+    bank: '#06B6D4',      // Bright Cyan
+    other: '#EC4899',     // Hot Pink
+};
+
+const paymentChartConfig: ChartConfig = {
+    cash: { label: "Cash", color: PAYMENT_COLORS.cash },
+    card: { label: "Card", color: PAYMENT_COLORS.card },
+    online: { label: "Online", color: PAYMENT_COLORS.online },
+    upi: { label: "UPI", color: PAYMENT_COLORS.upi },
+    bank: { label: "Bank Transfer", color: PAYMENT_COLORS.bank },
+    other: { label: "Other", color: PAYMENT_COLORS.other },
 };
 
 // Custom Tooltip Component
@@ -74,7 +92,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
                                 style={{ backgroundColor: entry.stroke || entry.color || entry.fill }}
                             />
                             <span className="text-muted-foreground capitalize">{entry.name}:</span>
-                            <span className="font-mono font-medium">{formatCurrency(Number(entry.value))}</span>
+                            <span className="font-mono font-medium">{formatCurrency(Math.round(Number(entry.value)))}</span>
                         </div>
                     ))}
                 </div>
@@ -91,6 +109,7 @@ export function AnalyticsView() {
     const [loading, setLoading] = useState(true);
     const [categoryTrendData, setCategoryTrendData] = useState<any[]>([]);
     const [categoryBreakdown, setCategoryBreakdown] = useState<any[]>([]);
+    const [paymentBreakdown, setPaymentBreakdown] = useState<any[]>([]);
     const [totalSpentInRange, setTotalSpentInRange] = useState(0);
     const [dateRange, setDateRange] = useState<DateRange>('1M');
     const [selectedBucketId, setSelectedBucketId] = useState<string | 'all'>('all');
@@ -320,6 +339,49 @@ export function AnalyticsView() {
         }).sort((a, b) => b.amount - a.amount);
 
         setCategoryBreakdown(breakdownData);
+
+        // 3. Process Payment breakdown
+        const paymentMap: Record<string, number> = {};
+        transactions.forEach(tx => {
+            const method = (tx.payment_method || 'Other').toLowerCase();
+
+            let myShare = Number(tx.amount);
+            if (tx.splits && tx.splits.length > 0) {
+                if (tx.user_id === currentUserId) {
+                    const othersOwe = tx.splits.reduce((sum: number, s: any) => sum + Number(s.amount), 0);
+                    myShare = Number(tx.amount) - othersOwe;
+                } else {
+                    const mySplit = tx.splits.find((s: any) => s.user_id === currentUserId);
+                    myShare = mySplit ? Number(mySplit.amount) : 0;
+                }
+            } else if (tx.user_id !== currentUserId) {
+                myShare = 0;
+            }
+
+            if (myShare > 0) {
+                let amount = 0;
+                if (tx.exchange_rate && tx.base_currency === currency) {
+                    amount = (myShare * Number(tx.exchange_rate));
+                } else {
+                    amount = convertAmount(myShare, tx.currency || 'USD');
+                }
+                paymentMap[method] = (paymentMap[method] || 0) + amount;
+            }
+        });
+
+        const paymentData = Object.entries(paymentMap).map(([name, amount]) => {
+            const percentage = total > 0 ? (amount / total) * 100 : 0;
+            return {
+                name: name.charAt(0).toUpperCase() + name.slice(1),
+                amount,
+                value: percentage,
+                color: PAYMENT_COLORS[name] || PAYMENT_COLORS.other,
+                fill: PAYMENT_COLORS[name] || PAYMENT_COLORS.other,
+                stroke: PAYMENT_COLORS[name] || PAYMENT_COLORS.other,
+            };
+        }).sort((a, b) => b.amount - a.amount);
+
+        setPaymentBreakdown(paymentData);
     };
 
 
@@ -547,7 +609,68 @@ export function AnalyticsView() {
                         )}
                     </div>
                 </div>
+
+                {/* Payment Methods Breakdown */}
+                <div className="space-y-4 pt-4 border-t border-white/5">
+                    <h3 className="font-semibold text-sm text-amber-500">Payment Methods Breakdown</h3>
+
+                    <div className="h-[250px] w-full">
+                        {paymentBreakdown.length > 0 ? (
+                            <ChartContainer
+                                config={paymentChartConfig}
+                                className="mx-auto aspect-square max-h-[250px]"
+                            >
+                                <PieChart>
+                                    <ChartTooltip
+                                        cursor={false}
+                                        content={<ChartTooltipContent hideLabel />}
+                                    />
+                                    <Pie
+                                        data={paymentBreakdown}
+                                        dataKey="amount"
+                                        nameKey="name"
+                                        innerRadius={60}
+                                        strokeWidth={0}
+                                        paddingAngle={5}
+                                        cornerRadius={5}
+                                    >
+                                        {paymentBreakdown.map((entry, index) => (
+                                            <Cell key={`cell-${index}`} fill={entry.color} />
+                                        ))}
+                                    </Pie>
+                                </PieChart>
+                            </ChartContainer>
+                        ) : (
+                            <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
+                                No payment data for this period
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        {paymentBreakdown.map((pay) => (
+                            <div key={pay.name} className="flex flex-col p-4 rounded-3xl bg-secondary/5 border border-white/5 hover:bg-secondary/10 transition-colors group">
+                                <span className="flex items-center gap-2 text-[10px] text-muted-foreground uppercase tracking-widest font-bold">
+                                    <div className="w-2 h-2 rounded-full shadow-[0_0_8px_rgba(255,255,255,0.2)]" style={{ backgroundColor: pay.fill }} />
+                                    {pay.name}
+                                </span>
+                                <div className="flex items-baseline gap-1 mt-2">
+                                    <span className="text-base font-bold text-foreground">{formatCurrency(pay.amount)}</span>
+                                </div>
+                                <div className="flex items-center justify-between mt-1">
+                                    <span className="text-[10px] text-muted-foreground font-medium">{pay.value.toFixed(0)}%</span>
+                                    <div className="h-1 flex-1 mx-2 bg-secondary/20 rounded-full overflow-hidden">
+                                        <div
+                                            className="h-full rounded-full transition-all duration-1000"
+                                            style={{ width: `${pay.value}%`, backgroundColor: pay.fill }}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
             </div>
         </div>
     );
-}
+};

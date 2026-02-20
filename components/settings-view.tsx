@@ -433,6 +433,7 @@ export function SettingsView() {
                                             <p className="text-sm font-medium truncate max-w-[150px]">{template.description}</p>
                                             <p className="text-[10px] text-muted-foreground">
                                                 {formatCurrency(template.amount, template.currency)} • {template.frequency}
+                                                {template.created_at && ` • Started ${format(new Date(template.created_at), 'MMM d, yyyy')}`}
                                             </p>
                                         </div>
                                     </div>
