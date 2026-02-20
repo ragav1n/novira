@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { ChevronLeft, User, Download, AlertTriangle, Shield, Lock, ChevronRight, SlidersHorizontal, LogOut, Banknote, FileSpreadsheet, ShieldCheck } from 'lucide-react';
+import { ChevronLeft, User, Download, AlertTriangle, Shield, Lock, ChevronRight, SlidersHorizontal, LogOut, Banknote, FileSpreadsheet, ShieldCheck, RefreshCcw, Camera, Trash2, Plus, Save, Wallet, Bell, Mail, Moon, Sun, Smartphone, Globe, CreditCard } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
@@ -16,13 +16,22 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { generateCSV, generatePDF } from '@/utils/export-utils';
 import { ChangePasswordDialog } from '@/components/change-password-dialog';
 import { FileTriggerButton } from '@/components/ui/file-trigger';
-import { Camera, Trash2 } from 'lucide-react';
 import { DeleteAccountDialog } from '@/components/delete-account-dialog';
 import { ExportDateRangeModal } from '@/components/export-date-range-modal';
 import { DateRange } from 'react-day-picker';
 import { format } from 'date-fns';
 import { useBuckets } from '@/components/providers/buckets-provider';
 import { useGroups } from '@/components/providers/groups-provider';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export function SettingsView() {
     const router = useRouter();
@@ -61,6 +70,9 @@ export function SettingsView() {
 
     const [hasPassword, setHasPassword] = useState(false);
     const [hasGoogleIdentity, setHasGoogleIdentity] = useState(false);
+    const [recurringTemplates, setRecurringTemplates] = useState<any[]>([]);
+    const [loadingTemplates, setLoadingTemplates] = useState(false);
+    const [templateToDelete, setTemplateToDelete] = useState<any | null>(null);
 
     useEffect(() => {
         setLocalBudget(monthlyBudget.toString());
@@ -68,6 +80,7 @@ export function SettingsView() {
 
     useEffect(() => {
         getProfile();
+        if (userId) loadRecurringTemplates();
     }, [userId]);
 
     const getProfile = async () => {
@@ -104,6 +117,41 @@ export function SettingsView() {
             console.error('Error loading user data:', error);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const loadRecurringTemplates = async () => {
+        if (!userId) return;
+        setLoadingTemplates(true);
+        try {
+            const { data, error } = await supabase
+                .from('recurring_templates')
+                .select('*')
+                .eq('user_id', userId)
+                .eq('is_active', true)
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+            setRecurringTemplates(data || []);
+        } catch (error) {
+            console.error('Error loading recurring templates:', error);
+        } finally {
+            setLoadingTemplates(false);
+        }
+    };
+
+    const deleteRecurringTemplate = async (templateId: string) => {
+        try {
+            const { error } = await supabase
+                .from('recurring_templates')
+                .delete()
+                .eq('id', templateId);
+
+            if (error) throw error;
+            setRecurringTemplates(prev => prev.filter(t => t.id !== templateId));
+            toast.success('Recurring expense stopped');
+        } catch (error: any) {
+            toast.error('Failed to stop recurring expense: ' + error.message);
         }
     };
 
@@ -365,6 +413,48 @@ export function SettingsView() {
                     </div>
                 </div>
 
+                {/* Recurring Expenses Management */}
+                <div className="space-y-3 pt-2">
+                    <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
+                        <RefreshCcw className="w-4 h-4" />
+                        <span>Recurring Expenses</span>
+                    </div>
+                    <div className="bg-secondary/5 rounded-xl border border-white/5 divide-y divide-white/5">
+                        {loadingTemplates ? (
+                            <div className="p-4 text-center text-xs text-muted-foreground">Loading...</div>
+                        ) : recurringTemplates.length > 0 ? (
+                            recurringTemplates.map((template) => (
+                                <div key={template.id} className="flex items-center justify-between p-3">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                                            <RefreshCcw className="w-4 h-4 text-primary" />
+                                        </div>
+                                        <div>
+                                            <p className="text-sm font-medium truncate max-w-[150px]">{template.description}</p>
+                                            <p className="text-[10px] text-muted-foreground">
+                                                {formatCurrency(template.amount, template.currency)} • {template.frequency}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                                        onClick={() => setTemplateToDelete(template)}
+                                    >
+                                        <Trash2 className="w-4 h-4" />
+                                    </Button>
+                                </div>
+                            ))
+                        ) : (
+                            <div className="p-4 text-center text-xs text-muted-foreground italic">
+                                No active recurring expenses
+                            </div>
+                        )}
+                    </div>
+                    <p className="text-[10px] text-muted-foreground">Manage your automated recurring transactions.</p>
+                </div>
+
                 {/* Data Management */}
                 <div className="space-y-3 pt-2">
                     <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
@@ -619,6 +709,31 @@ export function SettingsView() {
                     loading={loadingExport}
                     title={exportType === 'csv' ? 'Export CSV' : 'Export PDF'}
                 />
+
+                <AlertDialog open={!!templateToDelete} onOpenChange={(open) => !open && setTemplateToDelete(null)}>
+                    <AlertDialogContent className="bg-card/95 backdrop-blur-xl border-white/10 rounded-3xl">
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>Stop this recurring expense?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                                Future transactions for "{templateToDelete?.description}" will not be created automatically.
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter className="gap-2 sm:gap-0 mt-4">
+                            <AlertDialogCancel className="rounded-xl border-white/10">Cancel</AlertDialogCancel>
+                            <AlertDialogAction
+                                className="bg-destructive hover:bg-destructive/90 text-white rounded-xl"
+                                onClick={() => {
+                                    if (templateToDelete) {
+                                        deleteRecurringTemplate(templateToDelete.id);
+                                        setTemplateToDelete(null);
+                                    }
+                                }}
+                            >
+                                Stop Series
+                            </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
             </div>
         </div>
     );

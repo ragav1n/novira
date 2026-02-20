@@ -223,19 +223,47 @@ export function DashboardView() {
         }
     };
 
-    const handleDeleteTransaction = async (txId: string) => {
+    const handleDeleteTransaction = async (tx: Transaction) => {
         // Optimistic: remove from UI immediately
         const previousTransactions = [...transactions];
-        setTransactions(prev => prev.filter(tx => tx.id !== txId));
+        setTransactions(prev => prev.filter(t => t.id !== tx.id));
         toast.success('Transaction deleted');
 
         try {
             const { error } = await supabase
                 .from('transactions')
                 .delete()
-                .eq('id', txId);
+                .eq('id', tx.id);
 
             if (error) throw error;
+
+            // If recurring, ask if user wants to stop future ones
+            if (tx.is_recurring) {
+                // We use a small delay to not collide with the previous toast
+                setTimeout(() => {
+                    toast('This was a recurring expense.', {
+                        description: 'Stop future occurrences too?',
+                        action: {
+                            label: 'Stop Series',
+                            onClick: async () => {
+                                try {
+                                    const { error } = await supabase
+                                        .from('recurring_templates')
+                                        .delete()
+                                        .eq('user_id', userId)
+                                        .eq('description', tx.description)
+                                        .eq('amount', tx.amount);
+
+                                    if (error) throw error;
+                                    toast.success('Recurring series stopped');
+                                } catch (err: any) {
+                                    toast.error('Failed to stop series: ' + err.message);
+                                }
+                            }
+                        }
+                    });
+                }, 1000);
+            }
         } catch (error: any) {
             // Rollback on failure
             setTransactions(previousTransactions);
@@ -699,7 +727,7 @@ export function DashboardView() {
                                                                         toast('Delete transaction?', {
                                                                             action: {
                                                                                 label: 'Delete',
-                                                                                onClick: () => handleDeleteTransaction(tx.id)
+                                                                                onClick: () => handleDeleteTransaction(tx)
                                                                             }
                                                                         });
                                                                     }}>
@@ -818,7 +846,7 @@ export function DashboardView() {
                                                             toast('Delete transaction?', {
                                                                 action: {
                                                                     label: 'Delete',
-                                                                    onClick: () => handleDeleteTransaction(tx.id)
+                                                                    onClick: () => handleDeleteTransaction(tx)
                                                                 }
                                                             });
                                                         }}>
