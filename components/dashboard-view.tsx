@@ -164,7 +164,9 @@ const VirtualizedTransactionList = ({
     setEditingTransaction,
     setIsEditOpen,
     handleDeleteTransaction,
-    getBucketIcon
+    getBucketIcon,
+    loadAuditLogs,
+    canEditTransaction
 }: any) => {
     const parentRef = useRef<HTMLDivElement>(null);
 
@@ -265,35 +267,47 @@ const VirtualizedTransactionList = ({
                                             </span>
                                         )}
                                     </div>
-                                    {isRecentUserTransaction(tx) && !tx.is_settlement && (!tx.splits || tx.splits.length === 0) && (
-                                        <DropdownMenu>
-                                            <DropdownMenuTrigger asChild>
-                                                <button className="p-1 rounded-full hover:bg-white/10 transition-opacity">
-                                                    <MoreVertical className="w-4 h-4 text-muted-foreground" />
-                                                </button>
-                                            </DropdownMenuTrigger>
-                                            <DropdownMenuContent align="end">
-                                                <DropdownMenuItem onClick={() => {
-                                                    setEditingTransaction(tx);
-                                                    setIsEditOpen(true);
-                                                }}>
-                                                    <Pencil className="w-4 h-4 mr-2" />
-                                                    Edit
-                                                </DropdownMenuItem>
-                                                <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => {
-                                                    toast('Delete transaction?', {
-                                                        action: {
-                                                            label: 'Delete',
-                                                            onClick: () => handleDeleteTransaction(tx)
-                                                        }
-                                                    });
-                                                }}>
-                                                    <Trash2 className="w-4 h-4 mr-2" />
-                                                    Delete
-                                                </DropdownMenuItem>
-                                            </DropdownMenuContent>
-                                        </DropdownMenu>
-                                    )}
+                                    <div className="w-[56px] flex items-center justify-start gap-1.5 transition-opacity">
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                loadAuditLogs(tx);
+                                            }}
+                                            className="p-1.5 rounded-full hover:bg-white/10 transition-colors text-muted-foreground hover:text-primary"
+                                            title="View History"
+                                        >
+                                            <History className="w-3.5 h-3.5" />
+                                        </button>
+                                        {canEditTransaction(tx) && !tx.is_settlement && (!tx.splits || tx.splits.length === 0) && (
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <button className="p-1 rounded-full hover:bg-white/10 transition-opacity">
+                                                        <MoreVertical className="w-4 h-4 text-muted-foreground" />
+                                                    </button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent align="end">
+                                                    <DropdownMenuItem onClick={() => {
+                                                        setEditingTransaction(tx);
+                                                        setIsEditOpen(true);
+                                                    }}>
+                                                        <Pencil className="w-4 h-4 mr-2" />
+                                                        Edit
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => {
+                                                        toast('Delete transaction?', {
+                                                            action: {
+                                                                label: 'Delete',
+                                                                onClick: () => handleDeleteTransaction(tx)
+                                                            }
+                                                        });
+                                                    }}>
+                                                        <Trash2 className="w-4 h-4 mr-2" />
+                                                        Delete
+                                                    </DropdownMenuItem>
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -568,13 +582,10 @@ export function DashboardView() {
         }
     };
 
-    const isRecentUserTransaction = useCallback((tx: Transaction) => {
+    const canEditTransaction = useCallback((tx: Transaction) => {
         if (tx.user_id !== userId) return false;
-        // Get all transactions by this user, assuming 'transactions' is already sorted by date desc
-        const userTxs = transactions.filter(t => t.user_id === userId);
-        // Check if this tx is in the top 3
-        return userTxs.slice(0, 3).some(t => t.id === tx.id);
-    }, [userId, transactions]);
+        return isSameMonth(parseISO(tx.date), new Date());
+    }, [userId]);
 
     const calculateUserShare = useCallback((tx: Transaction, currentUserId: string | null) => {
         if (!currentUserId) return 0;
@@ -746,11 +757,14 @@ export function DashboardView() {
                 )}
             </AnimatePresence>
 
-            <div className={cn(
-                "p-5 space-y-6 max-w-md mx-auto relative transition-opacity duration-300 z-10",
-                loading ? "opacity-40 blur-[1px] pointer-events-none" : "opacity-100 blur-0",
-                isAnyModalOpen ? "pointer-events-none overflow-hidden" : "overflow-x-hidden"
-            )}>
+            <div 
+                className={cn(
+                    "p-5 space-y-6 max-w-md mx-auto relative transition-opacity duration-300 z-10",
+                    loading ? "opacity-40 blur-[1px] pointer-events-none" : "opacity-100 blur-0",
+                    isAnyModalOpen ? "pointer-events-none overflow-hidden" : "overflow-x-hidden"
+                )}
+                inert={isAnyModalOpen}
+            >
                 {/* Header */}
                 <div className="flex justify-between items-center pt-2 gap-2">
                     <div className="flex items-center gap-2 min-w-0">
@@ -1142,13 +1156,11 @@ export function DashboardView() {
                     <DrawerTrigger asChild>
                         <button className="text-xs text-primary font-bold hover:text-primary/80 transition-colors uppercase tracking-wider px-2 py-1">View All</button>
                     </DrawerTrigger>
-                    <DrawerContent className="h-[88vh] flex flex-col pt-0 bg-background/98 backdrop-blur-xl border-white/10 rounded-t-[40px]">
-                        <div className="w-12 h-1.5 bg-white/10 rounded-full mx-auto mt-4 mb-2 shrink-0" />
+                    <DrawerContent className="h-[88vh] flex flex-col bg-background/98 backdrop-blur-xl border-white/10 rounded-t-[40px]">
                         <DrawerHeader className="pb-4 shrink-0">
                             <DrawerTitle className="text-2xl font-bold text-center">All Transactions</DrawerTitle>
                             <DrawerDescription className="text-center">History of all your expenses.</DrawerDescription>
                         </DrawerHeader>
-                        
                         <div className="flex-1 px-4 min-h-0 relative flex flex-col">
                             <div className="absolute inset-x-0 top-0 h-4 bg-gradient-to-b from-background/95 to-transparent z-10 pointer-events-none" />
                             <VirtualizedTransactionList
@@ -1160,15 +1172,20 @@ export function DashboardView() {
                                 getIconForCategory={getIconForCategory}
                                 formatCurrency={formatCurrency}
                                 convertAmount={convertAmount}
-                                isRecentUserTransaction={isRecentUserTransaction}
                                 setEditingTransaction={setEditingTransaction}
                                 setIsEditOpen={setIsEditOpen}
                                 handleDeleteTransaction={handleDeleteTransaction}
                                 getBucketIcon={getBucketIcon}
+                                loadAuditLogs={loadAuditLogs}
+                                canEditTransaction={canEditTransaction}
                             />
                             <div className="absolute inset-x-0 bottom-0 h-4 bg-gradient-to-t from-background/95 to-transparent z-10 pointer-events-none" />
                         </div>
-                        <div className="h-4 shrink-0" />
+                        <DrawerFooter className="pt-2">
+                            <DrawerClose asChild>
+                                <Button variant="outline" className="w-full rounded-2xl border-white/10" autoFocus>Close</Button>
+                            </DrawerClose>
+                        </DrawerFooter>
                     </DrawerContent>
                 </Drawer>
                     </div>
@@ -1250,7 +1267,7 @@ export function DashboardView() {
                                             >
                                                 <History className="w-3.5 h-3.5" />
                                             </button>
-                                            {isRecentUserTransaction(tx) && !tx.is_settlement && (!tx.splits || tx.splits.length === 0) && (
+                                            {canEditTransaction(tx) && !tx.is_settlement && (!tx.splits || tx.splits.length === 0) && (
                                                 <DropdownMenu>
                                                     <DropdownMenuTrigger asChild>
                                                         <button className="p-1 rounded-full hover:bg-white/10 transition-opacity">
