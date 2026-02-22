@@ -559,7 +559,16 @@ export function SearchView() {
                                             )}
                                         </div>
                                     </div>
-                                    <span className="font-bold text-sm shrink-0 ml-2 whitespace-nowrap">-{formatCurrency(Number(tx.amount), tx.currency)}</span>
+                                    <div className="flex flex-col items-end shrink-0 ml-2">
+                                        <span className="font-bold text-sm whitespace-nowrap">
+                                            -{formatCurrency(Number(tx.amount), tx.currency)}
+                                        </span>
+                                        {tx.currency && tx.currency !== currency && (
+                                            <div className="text-[10px] text-emerald-500 font-bold leading-none bg-emerald-500/5 px-1 rounded-sm mt-1">
+                                                ≈ {formatCurrency(convertAmount(Number(tx.amount), tx.currency), currency)}
+                                            </div>
+                                        )}
+                                    </div>
                                 </motion.div>
                             ))
                         ) : (
