@@ -22,13 +22,7 @@ import { useGroups } from '@/components/providers/groups-provider';
 import { useBuckets } from '@/components/providers/buckets-provider';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select";
+import { CurrencyDropdown } from '@/components/ui/currency-dropdown';
 
 const dropdownCategories: Category[] = [
     { id: 'food', label: 'Food & Dining', icon: Utensils, color: '#FF6B6B' },
@@ -275,7 +269,12 @@ export function AddExpenseView() {
     };
 
     return (
-        <div className="p-5 space-y-6 max-w-md mx-auto pt-4 relative min-h-full">
+        <div className={cn(
+            "p-5 space-y-6 max-w-md mx-auto pt-4 relative min-h-full transition-all duration-700 ease-in-out",
+            selectedBucketId 
+                ? "bg-gradient-to-br from-cyan-950/40 via-background to-teal-950/40" 
+                : "bg-gradient-to-br from-purple-950/20 via-background to-background"
+        )}>
             {/* Header */}
             <div className="flex items-center justify-between relative min-h-[40px]">
                 <button
@@ -288,7 +287,12 @@ export function AddExpenseView() {
                     <ChevronLeft className="w-5 h-5" />
                 </button>
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                    <h2 className="text-lg font-semibold truncate px-12 text-center leading-tight">Add Expense</h2>
+                    <h2 className={cn(
+                        "text-lg font-bold truncate px-12 text-center leading-tight transition-colors duration-500",
+                        selectedBucketId ? "text-cyan-400" : "text-foreground"
+                    )}>
+                        {selectedBucketId ? buckets.find(b => b.id === selectedBucketId)?.name : "Add Expense"}
+                    </h2>
                 </div>
                 <button
                     onClick={() => {
@@ -320,26 +324,7 @@ export function AddExpenseView() {
                     </span>
                 </div>
                 <div className="mt-2">
-                    <Select value={txCurrency} onValueChange={(val) => setTxCurrency(val as any)}>
-                        <SelectTrigger className="h-11 w-full bg-secondary/10 border-white/5 rounded-xl px-4">
-                            <div className="flex items-center gap-2">
-                                <span className="text-primary font-bold w-12 text-left">{CURRENCY_DETAILS[txCurrency as keyof typeof CURRENCY_DETAILS].symbol}</span>
-                                <span className="text-sm font-semibold w-12 text-left">{txCurrency}</span>
-                                <span className="text-xs text-muted-foreground ml-2 truncate">{CURRENCY_DETAILS[txCurrency as keyof typeof CURRENCY_DETAILS].name}</span>
-                            </div>
-                        </SelectTrigger>
-                        <SelectContent className="bg-card border-white/10 rounded-xl max-h-[300px]">
-                            {Object.entries(CURRENCY_DETAILS).map(([code, detail]) => (
-                                <SelectItem key={code} value={code} className="py-2.5 px-3 focus:bg-primary/20 rounded-lg">
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-primary font-bold w-12 text-left">{detail.symbol}</span>
-                                        <span className="text-sm font-semibold w-12">{code}</span>
-                                        <span className="text-xs text-muted-foreground ml-2">{detail.name}</span>
-                                    </div>
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
+                    <CurrencyDropdown value={txCurrency} onValueChange={(val) => setTxCurrency(val as any)} />
                 </div>
             </div>
 

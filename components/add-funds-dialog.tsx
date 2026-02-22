@@ -15,13 +15,7 @@ import {
 import { supabase } from '@/lib/supabase';
 import { format } from 'date-fns';
 import { toast } from '@/utils/haptics';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select";
+import { CurrencyDropdown } from '@/components/ui/currency-dropdown';
 import { useUserPreferences, CURRENCY_DETAILS } from '@/components/providers/user-preferences-provider';
 
 type AddFundsDialogProps = {
@@ -164,26 +158,7 @@ export function AddFundsDialog({ isOpen, onClose, userId, defaultBucketId, onSuc
                             </span>
                         </div>
                         <div className="mt-2">
-                            <Select value={txCurrency} onValueChange={(val) => setTxCurrency(val as any)}>
-                                <SelectTrigger className="h-11 w-full bg-secondary/10 border-white/5 rounded-xl px-4">
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-primary font-bold w-12 text-left">{CURRENCY_DETAILS[txCurrency as keyof typeof CURRENCY_DETAILS]?.symbol}</span>
-                                        <span className="text-sm font-semibold w-12 text-left">{txCurrency}</span>
-                                        <span className="text-xs text-muted-foreground ml-2 truncate">{CURRENCY_DETAILS[txCurrency as keyof typeof CURRENCY_DETAILS]?.name}</span>
-                                    </div>
-                                </SelectTrigger>
-                                <SelectContent className="bg-card border-white/10 rounded-xl max-h-[300px]">
-                                    {Object.entries(CURRENCY_DETAILS).map(([code, detail]) => (
-                                        <SelectItem key={code} value={code} className="py-2.5 px-3 focus:bg-primary/20 rounded-lg">
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-primary font-bold w-12 text-left">{detail.symbol}</span>
-                                                <span className="text-sm font-semibold w-12">{code}</span>
-                                                <span className="text-xs text-muted-foreground ml-2">{detail.name}</span>
-                                            </div>
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
+                            <CurrencyDropdown value={txCurrency} onValueChange={(val) => setTxCurrency(val as any)} />
                         </div>
                     </div>
                     <div className="space-y-2">

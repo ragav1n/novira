@@ -58,6 +58,30 @@ const CATEGORY_COLORS: Record<string, string> = {
     uncategorized: '#6366F1', // Indigo-500 for Uncategorized
 };
 
+// Animation variants
+const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+        opacity: 1,
+        transition: {
+            when: "beforeChildren",
+            staggerChildren: 0.05,
+        },
+    },
+};
+
+const itemVariants = {
+    hidden: { opacity: 0, y: -10 },
+    visible: {
+        opacity: 1,
+        y: 0,
+        transition: {
+            duration: 0.4,
+            ease: [0.32, 0.725, 0.32, 1],
+        },
+    },
+};
+
 const chartConfig: ChartConfig = {
     food: { label: "Food & Dining", color: CATEGORY_COLORS.food },
     transport: { label: "Transportation", color: CATEGORY_COLORS.transport },
@@ -137,6 +161,9 @@ export function DashboardView() {
 
     // Modal Sequencing State
     const [activeModal, setActiveModal] = useState<'welcome' | 'announcement' | null>(null);
+    const [isFocusMenuOpen, setIsFocusMenuOpen] = useState(false);
+    const focusSelectorRef = useRef<HTMLDivElement>(null);
+    const [hoveredFocusId, setHoveredFocusId] = useState<string | null>(null);
 
     // Debounced realtime refresh for transaction changes
     const txDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -215,6 +242,16 @@ export function DashboardView() {
             setLoading(false);
         }
     }, [userId, loading]);
+
+    useEffect(() => {
+        function handleClickOutside(event: MouseEvent) {
+            if (focusSelectorRef.current && !focusSelectorRef.current.contains(event.target as Node)) {
+                setIsFocusMenuOpen(false);
+            }
+        }
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
 
     const loadTransactions = async (currentUserId: string) => {
         try {
@@ -557,62 +594,143 @@ export function DashboardView() {
                 )}
 
                 {/* Project Focus Selector (The Pill) */}
-                <div className="flex justify-center mb-4">
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <button className={cn(
-                                "flex items-center gap-2 px-5 py-2 rounded-full text-sm font-bold transition-all shadow-lg active:scale-95",
-                                isBucketFocused 
-                                    ? "bg-cyan-500 text-white shadow-cyan-500/30" 
-                                    : "bg-secondary/50 backdrop-blur-md text-foreground shadow-black/5 border border-white/5"
-                            )}>
-                                {isBucketFocused ? (
-                                    <>
-                                        {focusedBucket.name} Focus
-                                    </>
-                                ) : (
-                                    <>
-                                        Monthly Allowance
-                                    </>
-                                )}
-                                <ChevronRight className="w-3.5 h-3.5 rotate-90 ml-1 opacity-70" />
-                            </button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="center" className="w-64 bg-card/95 backdrop-blur-xl border-white/10 rounded-2xl p-1.5 shadow-2xl">
-                            <DropdownMenuItem 
-                                onClick={() => setDashboardFocus('allowance')}
-                                className={cn("rounded-xl py-3 cursor-pointer", !isBucketFocused && "bg-primary/20 text-primary focus:bg-primary/20")}
+                <div className="flex justify-center mb-4 relative z-[60]" ref={focusSelectorRef}>
+                    <button 
+                        onClick={() => setIsFocusMenuOpen(!isFocusMenuOpen)}
+                        className={cn(
+                            "flex items-center gap-2 px-5 py-2 rounded-full text-sm font-bold transition-all shadow-lg active:scale-95",
+                            isBucketFocused 
+                                ? "bg-cyan-500 text-white shadow-cyan-500/30" 
+                                : "bg-white/10 backdrop-blur-md text-foreground shadow-black/5 border border-white/5"
+                        )}
+                    >
+                        {isBucketFocused ? (
+                            <>
+                                {focusedBucket.name} Focus
+                            </>
+                        ) : (
+                            <>
+                                Monthly Allowance
+                            </>
+                        )}
+                        <motion.div
+                            animate={{ rotate: isFocusMenuOpen ? 180 : 0 }}
+                            transition={{ duration: 0.2 }}
+                            className="flex items-center justify-center"
+                        >
+                            <ChevronRight className="w-3.5 h-3.5 rotate-90 ml-1 opacity-70" />
+                        </motion.div>
+                    </button>
+
+                    <AnimatePresence>
+                        {isFocusMenuOpen && (
+                            <motion.div
+                                initial={{ opacity: 0, y: -10, height: 0, scale: 0.95 }}
+                                animate={{
+                                    opacity: 1,
+                                    y: 0,
+                                    height: "auto",
+                                    scale: 1,
+                                    transition: {
+                                        duration: 0.4,
+                                        ease: [0.32, 0.725, 0.32, 1],
+                                    },
+                                }}
+                                exit={{
+                                    opacity: 0,
+                                    y: -10,
+                                    height: 0,
+                                    scale: 0.95,
+                                    transition: {
+                                        duration: 0.3,
+                                        ease: [0.32, 0.725, 0.32, 1],
+                                    },
+                                }}
+                                className="absolute top-[110%] left-1/2 -translate-x-1/2 w-64 z-[70] overflow-hidden"
                             >
-                                <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center mr-3">
-                                    <Wallet className="w-4 h-4 text-primary" />
+                                <div className="bg-card/95 backdrop-blur-xl border border-white/10 rounded-2xl p-1.5 shadow-2xl">
+                                    <motion.div
+                                        variants={containerVariants}
+                                        initial="hidden"
+                                        animate="visible"
+                                        className="space-y-1"
+                                    >
+                                        <motion.button 
+                                            variants={itemVariants}
+                                            onHoverStart={() => setHoveredFocusId('allowance')}
+                                            onHoverEnd={() => setHoveredFocusId(null)}
+                                            onClick={() => {
+                                                setDashboardFocus('allowance');
+                                                setIsFocusMenuOpen(false);
+                                            }}
+                                            className={cn(
+                                                "relative flex w-full items-center rounded-xl py-3 px-3 transition-colors duration-200",
+                                                !isBucketFocused ? "text-primary" : "text-muted-foreground hover:text-foreground"
+                                            )}
+                                        >
+                                            {(dashboardFocus === 'allowance' || hoveredFocusId === 'allowance') && (
+                                                <motion.div
+                                                    layoutId="focus-highlight"
+                                                    className="absolute inset-0 bg-primary/20 rounded-xl -z-0"
+                                                    transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                                                />
+                                            )}
+                                            <div className="relative z-10 flex items-center w-full">
+                                                <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center mr-3">
+                                                    <Wallet className="w-4 h-4 text-primary" />
+                                                </div>
+                                                <span className="font-bold flex-1 text-left">Monthly Allowance</span>
+                                                {!isBucketFocused && <Check className="w-4 h-4 text-primary ml-2" />}
+                                            </div>
+                                        </motion.button>
+                                        
+                                        {buckets.filter(b => !b.is_archived).length > 0 && (
+                                            <motion.div variants={itemVariants} className="px-3 py-1.5 border-t border-white/5">
+                                                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Active Missions</p>
+                                            </motion.div>
+                                        )}
+            
+                                        {buckets.filter(b => !b.is_archived).map(bucket => (
+                                            <motion.button 
+                                                key={bucket.id}
+                                                variants={itemVariants}
+                                                onHoverStart={() => setHoveredFocusId(bucket.id)}
+                                                onHoverEnd={() => setHoveredFocusId(null)}
+                                                onClick={() => {
+                                                    setDashboardFocus(bucket.id);
+                                                    setIsFocusMenuOpen(false);
+                                                }}
+                                                className={cn(
+                                                    "relative flex w-full items-center rounded-xl py-3 px-3 transition-colors duration-200",
+                                                    dashboardFocus === bucket.id ? "text-cyan-400" : "text-muted-foreground hover:text-foreground"
+                                                )}
+                                            >
+                                                {(dashboardFocus === bucket.id || hoveredFocusId === bucket.id) && (
+                                                    <motion.div
+                                                        layoutId="focus-highlight"
+                                                        className={cn(
+                                                            "absolute inset-0 rounded-xl -z-0",
+                                                            bucket.id === dashboardFocus ? "bg-cyan-500/20" : "bg-white/5"
+                                                        )}
+                                                        transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                                                    />
+                                                )}
+                                                <div className="relative z-10 flex items-center w-full">
+                                                    <div className="w-7 h-7 rounded-full bg-cyan-500/20 flex items-center justify-center mr-3 text-cyan-500">
+                                                        <div className="w-4 h-4">
+                                                            {getBucketIcon(bucket.icon)}
+                                                        </div>
+                                                    </div>
+                                                    <span className="font-bold flex-1 text-left">{bucket.name}</span>
+                                                    {dashboardFocus === bucket.id && <Check className="w-4 h-4 text-cyan-500 ml-2" />}
+                                                </div>
+                                            </motion.button>
+                                        ))}
+                                    </motion.div>
                                 </div>
-                                <span className={cn("font-bold flex-1", !isBucketFocused && "text-primary")}>Monthly Allowance</span>
-                                {!isBucketFocused && <Check className="w-4 h-4 text-primary ml-2" />}
-                            </DropdownMenuItem>
-                            
-                            {buckets.filter(b => !b.is_archived).length > 0 && (
-                                <div className="px-2 py-1.5 mt-1 border-t border-white/5">
-                                    <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Active Missions</p>
-                                </div>
-                            )}
- 
-                            {buckets.filter(b => !b.is_archived).map(bucket => (
-                                <DropdownMenuItem 
-                                    key={bucket.id}
-                                    onClick={() => setDashboardFocus(bucket.id)}
-                                    className={cn("rounded-xl py-3 cursor-pointer", dashboardFocus === bucket.id && "bg-cyan-500/20 text-cyan-500 focus:bg-cyan-500/20")}
-                                >
-                                    <div className="w-7 h-7 rounded-full bg-cyan-500/20 flex items-center justify-center mr-3 text-cyan-500">
-                                        <div className="w-4 h-4">
-                                            {getBucketIcon(bucket.icon)}
-                                        </div>
-                                    </div>
-                                    <span className={cn("font-bold flex-1", dashboardFocus === bucket.id && "text-cyan-500")}>{bucket.name}</span>
-                                    {dashboardFocus === bucket.id && <Check className="w-4 h-4 text-cyan-500 ml-2" />}
-                                </DropdownMenuItem>
-                            ))}
-                        </DropdownMenuContent>
-                    </DropdownMenu>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
                 </div>
 
                 {/* Total Spent Card */}
