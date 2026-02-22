@@ -65,7 +65,7 @@ export function HowToUseDialog({ isOpen, onClose }: HowToUseDialogProps) {
         {
             icon: <FileDown className="w-6 h-6 text-pink-400" />,
             title: "Professional PDF Reports",
-            desc: "Take your data anywhere. Export beautiful, multi-page PDF reports that include monthly recaps, charts, and detailed transaction logs. Perfect for taxes, reimbursement claims, or just personal archiving. If you prefer raw numbers, export to CSV for use in any spreadsheet application like Excel or Google Sheets.",
+            desc: "Need to submit taxes or a reimbursement claim? Export professional, multi-page PDF reports that include your charts, monthly recaps, and detailed transaction logs. You can also export raw CSV data for custom analysis in Excel or Google Sheets.",
             subPoints: [
                 "CFO-grade PDF reports with charts & summaries",
                 "Raw CSV data backups for custom analysis",

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Zap, Tag, PieChart, Users, QrCode, Upload, Bell, Globe, FileDown, RefreshCcw, Shield, Search, Sparkles, Moon, CreditCard, Wallet, Lock, SlidersHorizontal, Star, Fingerprint, BarChart2, Receipt, Layers, MessageSquare, Link, Smartphone } from 'lucide-react';
 import { LATEST_FEATURE_ANNOUNCEMENT } from '@/lib/feature-flags';
@@ -14,6 +15,11 @@ interface FeatureAnnouncementModalProps {
 
 export function FeatureAnnouncementModal({ showAnnouncement = false, userId, onClose }: FeatureAnnouncementModalProps) {
     const [isOpen, setIsOpen] = useState(false);
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => {
+        setMounted(true);
+    }, []);
 
     useEffect(() => {
         if (showAnnouncement) {
@@ -32,10 +38,12 @@ export function FeatureAnnouncementModal({ showAnnouncement = false, userId, onC
         if (onClose) onClose();
     };
 
-    return (
+    if (!mounted) return null;
+
+    return createPortal(
         <AnimatePresence>
             {isOpen && (
-                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 sm:p-0">
+                <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 sm:p-0">
                     {/* Backdrop */}
                     <motion.div
                         initial={{ opacity: 0 }}
@@ -56,7 +64,7 @@ export function FeatureAnnouncementModal({ showAnnouncement = false, userId, onC
                             damping: 30,
                             mass: 0.8
                         }}
-                        className="relative w-full max-w-sm bg-[#0D0D0F]/98 backdrop-blur-xl border border-white/10 rounded-[2.5rem] shadow-[0_0_80px_-15px_rgba(138,43,226,0.4)] overflow-hidden z-[70] mx-4 flex flex-col max-h-[90dvh]"
+                        className="relative w-full max-w-sm bg-[#0D0D0F]/98 backdrop-blur-xl border border-white/10 rounded-[2.5rem] shadow-[0_0_80px_-15px_rgba(138,43,226,0.4)] overflow-hidden z-[1100] mx-4 flex flex-col max-h-[90dvh]"
                     >
                         {/* More Dynamic Glass Glows */}
                         <div className="absolute -top-24 -left-24 w-56 h-56 bg-primary/30 rounded-full blur-[70px] opacity-40 animate-pulse" />
@@ -213,6 +221,7 @@ export function FeatureAnnouncementModal({ showAnnouncement = false, userId, onC
                     </motion.div>
                 </div>
             )}
-        </AnimatePresence>
+        </AnimatePresence>,
+        document.body
     );
 }

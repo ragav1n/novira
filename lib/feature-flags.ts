@@ -1,16 +1,11 @@
 export const LATEST_FEATURE_ANNOUNCEMENT = {
-    id: 'monthly-allowance-multi-currency-v2', // New ID to trigger the modal again
-    title: 'Major New Updates!',
+    id: 'groceries-fashion-payment-v4', // New ID to trigger the modal
+    title: 'New Styles & Insights!',
     features: [
         {
-            title: 'Mission Focus & Allowances',
-            description: 'Swap between your standard Monthly Allowance and specific Travel/Project missions directly on your Dashboard! Use the new Exclude toggle for big ticket items.',
+            title: 'Fashion & Groceries',
+            description: 'New Emerald Green for Groceries and Pink for Fashion categories! We\'ve also refined auto-categorization for these new styles.',
             icon: 'star'
-        },
-        {
-            title: 'Multi-Currency Support',
-            description: 'Spend globally. Automatically track expenses in foreign currencies with real-time exchange rate conversions.',
-            icon: 'globe'
         },
         {
             title: 'Add Funds & Income',
@@ -18,12 +13,27 @@ export const LATEST_FEATURE_ANNOUNCEMENT = {
             icon: 'wallet'
         },
         {
-            title: 'Advanced PDF Exports',
-            description: 'Exported PDFs now include dedicated Monthly Recaps for long-term reports and explicitly flag excluded expenses.',
+            title: 'Multi-Currency Support',
+            description: 'Spend globally. Automatically track expenses in foreign currencies with real-time exchange rate conversions.',
+            icon: 'globe'
+        },
+        {
+            title: 'Payment Method Analytics',
+            description: 'Dive deep into your habits with new interactive pie charts for Credit Card vs Cash vs Debit spending in Analytics.',
+            icon: 'chart'
+        },
+        {
+            title: 'Mission Focus & Currencies',
+            description: 'Allocate specific currencies (like EUR for a trip) to separate Mission Buckets and track them independently from your main budget.',
+            icon: 'globe'
+        },
+        {
+            title: 'Advanced PDF Recaps',
+            description: 'Professional multi-page PDF reports now feature cleaner summaries and explicit "Excluded from Budget" transaction flagging.',
             icon: 'export'
         }
     ],
-    buttonText: 'Awesome!',
+    buttonText: 'Got it!',
 };
 
 export const WELCOME_FEATURES = [
