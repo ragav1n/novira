@@ -3,6 +3,7 @@
 import { useUserPreferences, CURRENCY_SYMBOLS, type Currency } from '@/components/providers/user-preferences-provider';
 import { BudgetAlertManager } from '@/components/budget-alert-manager';
 import React, { useEffect, useState, useRef, useCallback } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { useRouter } from 'next/navigation';
 import { Plus, Utensils, Car, Zap, ShoppingBag, HeartPulse, Clapperboard, CircleDollarSign, ArrowUpRight, ArrowDownLeft, Users, MoreVertical, Pencil, Trash2, X, History, Clock, HelpCircle, Tag, Plane, Home, Gift, ShoppingCart, Stethoscope, Gamepad2, School, Laptop, Music, Heart, RefreshCcw, Wallet, ChevronRight, Check } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
@@ -136,6 +137,162 @@ type AuditLog = {
     };
 };
 
+const VirtualizedTransactionList = ({ 
+    transactions, 
+    userId, 
+    currency, 
+    buckets,
+    calculateUserShare,
+    getIconForCategory,
+    formatCurrency,
+    convertAmount,
+    isRecentUserTransaction,
+    setEditingTransaction,
+    setIsEditOpen,
+    handleDeleteTransaction,
+    getBucketIcon
+}: any) => {
+    const parentRef = useRef<HTMLDivElement>(null);
+
+    const rowVirtualizer = useVirtualizer({
+        count: transactions.length,
+        getScrollElement: () => parentRef.current,
+        estimateSize: () => 92,
+        overscan: 5,
+    });
+
+    return (
+        <div className="flex-1 overflow-y-auto sm:-mr-4 sm:pr-4 min-h-0 px-1 sm:px-0" ref={parentRef}>
+            <div 
+                style={{
+                    height: `${rowVirtualizer.getTotalSize()}px`,
+                    width: '100%',
+                    position: 'relative',
+                }}
+                className="pt-4"
+            >
+                {rowVirtualizer.getVirtualItems().map((virtualItem) => {
+                    const tx = transactions[virtualItem.index];
+                    const myShare = calculateUserShare(tx, userId);
+                    return (
+                        <div 
+                            key={tx.id} 
+                            style={{
+                                position: 'absolute',
+                                top: 0,
+                                left: 0,
+                                width: '100%',
+                                height: `${virtualItem.size}px`,
+                                transform: `translateY(${virtualItem.start}px)`,
+                            }}
+                            className="pb-3"
+                        >
+                            <div className="flex items-center justify-between p-3 rounded-2xl bg-card/20 border border-white/5 hover:bg-card/40 transition-colors group h-full">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-full bg-secondary/20 flex items-center justify-center border border-white/5 relative">
+                                        {getIconForCategory(tx.category)}
+                                        {tx.splits && tx.splits.length > 0 && (
+                                            <div className="absolute -bottom-1 -right-1 bg-primary rounded-full p-0.5 border border-background">
+                                                <Users className="w-2.5 h-2.5 text-white" />
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                        <p className="font-medium text-sm truncate" title={tx.description}>{tx.description}</p>
+                                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5 whitespace-nowrap overflow-hidden">
+                                            <span className="px-1.5 py-0.5 rounded bg-primary/10 text-[10px] text-primary border border-primary/10 capitalize shrink-0">{tx.category}</span>
+                                            <span className="font-medium text-[10px] text-primary/80 shrink-0">
+                                                {tx.user_id === userId ? 'You paid' : `Paid by ${tx.profile?.full_name?.split(' ')[0] || 'Unknown'}`}
+                                            </span>
+                                            <span className="shrink-0 text-[10px] select-none text-muted-foreground/50">•</span>
+                                            <span className="shrink-0 text-[10px]">{format(new Date(tx.date), 'MMM d, yyyy')}</span>
+                                        </div>
+
+                                        {(tx.bucket_id || tx.is_recurring) && (
+                                            <div className="flex items-center gap-1.5 mt-1.5 overflow-hidden">
+                                                {(() => {
+                                                    const txBucket = buckets.find((b: any) => b.id === tx.bucket_id); return tx.bucket_id && txBucket ? (
+                                                        <span className="px-1.5 py-0.5 rounded bg-cyan-500/10 text-[10px] text-cyan-500 border border-cyan-500/10 font-bold flex items-center gap-1 shrink-0 truncate max-w-[120px]">
+                                                            <div className="w-2.5 h-2.5 shrink-0">
+                                                                {getBucketIcon(txBucket.icon)}
+                                                            </div>
+                                                            <span className="truncate">{txBucket.name}</span>
+                                                        </span>
+                                                    ) : null;
+                                                })()}
+                                                {tx.is_recurring && (
+                                                    <span className="px-1.5 py-0.5 rounded bg-sky-500/10 text-[10px] text-sky-500 border border-sky-500/10 font-bold flex items-center gap-1 shrink-0">
+                                                        <RefreshCcw className="w-2.5 h-2.5 shrink-0" />
+                                                        Recurring
+                                                    </span>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2 shrink-0 ml-2">
+                                    <div className="flex flex-col items-end shrink-0">
+                                        <span className={cn(
+                                            "font-bold text-sm whitespace-nowrap",
+                                            myShare < 0 ? "text-emerald-500" : ""
+                                        )}>
+                                            {myShare < 0 ? '+' : '-'}{formatCurrency(Math.abs(myShare), tx.currency)}
+                                        </span>
+                                        {(tx.currency !== currency) && (
+                                            <div className="text-[10px] text-muted-foreground flex flex-col items-end mt-0.5">
+                                                <span className="font-medium text-emerald-500">
+                                                    ≈ {formatCurrency(convertAmount(Math.abs(myShare), tx.currency || 'USD'), currency)}
+                                                </span>
+                                            </div>
+                                        )}
+                                        {tx.splits && tx.splits.length > 0 && (
+                                            <span className="text-[9px] text-muted-foreground mt-0.5">
+                                                My Share
+                                            </span>
+                                        )}
+                                    </div>
+                                    {isRecentUserTransaction(tx) && !tx.is_settlement && (!tx.splits || tx.splits.length === 0) && (
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <button className="p-1 rounded-full hover:bg-white/10 transition-opacity">
+                                                    <MoreVertical className="w-4 h-4 text-muted-foreground" />
+                                                </button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent align="end">
+                                                <DropdownMenuItem onClick={() => {
+                                                    setEditingTransaction(tx);
+                                                    setIsEditOpen(true);
+                                                }}>
+                                                    <Pencil className="w-4 h-4 mr-2" />
+                                                    Edit
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => {
+                                                    toast('Delete transaction?', {
+                                                        action: {
+                                                            label: 'Delete',
+                                                            onClick: () => handleDeleteTransaction(tx)
+                                                        }
+                                                    });
+                                                }}>
+                                                    <Trash2 className="w-4 h-4 mr-2" />
+                                                    Delete
+                                                </DropdownMenuItem>
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    );
+                })}
+                {transactions.length === 0 && (
+                    <div className="text-center py-8 text-muted-foreground">No transactions found.</div>
+                )}
+            </div>
+        </div>
+    );
+};
+
 export function DashboardView() {
     const router = useRouter();
     const [userName, setUserName] = useState<string>('User');
@@ -164,6 +321,9 @@ export function DashboardView() {
     const [isFocusMenuOpen, setIsFocusMenuOpen] = useState(false);
     const focusSelectorRef = useRef<HTMLDivElement>(null);
     const [hoveredFocusId, setHoveredFocusId] = useState<string | null>(null);
+    
+    // Virtualization parent ref for "View All" modal
+    const parentRef = useRef<HTMLDivElement>(null);
 
     // Debounced realtime refresh for transaction changes
     const txDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -910,117 +1070,27 @@ export function DashboardView() {
                             <DialogTrigger asChild>
                                 <button className="text-xs text-primary hover:text-primary/80">View All</button>
                             </DialogTrigger>
-                            <DialogContent className="max-w-md max-h-[80vh] flex flex-col">
-                                <DialogHeader>
+                            <DialogContent className="sm:max-w-md max-h-[90vh] sm:max-h-[80vh] flex flex-col max-sm:fixed max-sm:bottom-0 max-sm:top-auto max-sm:translate-y-0 max-sm:rounded-b-none max-sm:rounded-t-[2.5rem] max-sm:border-x-0 max-sm:border-b-0 max-sm:pb-10 [&>button]:max-sm:hidden">
+                                <div className="hidden max-sm:block w-12 h-1.5 bg-white/10 rounded-full mx-auto mt-2 mb-4" />
+                                <DialogHeader className="max-sm:text-center">
                                     <DialogTitle>All Transactions</DialogTitle>
                                     <DialogDescription>History of all your expenses.</DialogDescription>
                                 </DialogHeader>
-                                <div className="flex-1 overflow-y-auto -mr-4 pr-4 min-h-0">
-                                    <div className="space-y-3 pt-4">
-                                        {displayTransactions.map((tx) => {
-                                            const myShare = calculateUserShare(tx, userId);
-                                            return (
-                                                <div key={tx.id} className="flex items-center justify-between p-3 rounded-2xl bg-card/20 border border-white/5 hover:bg-card/40 transition-colors group">
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="w-10 h-10 rounded-full bg-secondary/20 flex items-center justify-center border border-white/5 relative">
-                                                            {getIconForCategory(tx.category)}
-                                                            {tx.splits && tx.splits.length > 0 && (
-                                                                <div className="absolute -bottom-1 -right-1 bg-primary rounded-full p-0.5 border border-background">
-                                                                    <Users className="w-2.5 h-2.5 text-white" />
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                        <div className="min-w-0 flex-1">
-                                                            <p className="font-medium text-sm truncate" title={tx.description}>{tx.description}</p>
-                                                            <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
-                                                                <span className="px-1.5 py-0.5 rounded bg-primary/10 text-[10px] text-primary border border-primary/10 capitalize shrink-0">{tx.category}</span>
-                                                                <span className="font-medium text-[10px] text-primary/80 shrink-0">
-                                                                    {tx.user_id === userId ? 'You paid' : `Paid by ${tx.profile?.full_name?.split(' ')[0] || 'Unknown'}`}
-                                                                </span>
-                                                                <span className="shrink-0">• {format(new Date(tx.date), 'MMM d, yyyy')}</span>
-                                                            </div>
-
-                                                            {(tx.bucket_id || tx.is_recurring) && (
-                                                                <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
-                                                                    {(() => {
-                                                                        const txBucket = buckets.find(b => b.id === tx.bucket_id); return tx.bucket_id && txBucket ? (
-                                                                            <span className="px-1.5 py-0.5 rounded bg-cyan-500/10 text-[10px] text-cyan-500 border border-cyan-500/10 font-bold flex items-center gap-1 shrink-0">
-                                                                                <div className="w-2.5 h-2.5">
-                                                                                    {getBucketIcon(txBucket.icon)}
-                                                                                </div>
-                                                                                {txBucket.name}
-                                                                            </span>
-                                                                        ) : null;
-                                                                    })()}
-                                                                    {tx.is_recurring && (
-                                                                        <span className="px-1.5 py-0.5 rounded bg-sky-500/10 text-[10px] text-sky-500 border border-sky-500/10 font-bold flex items-center gap-1 shrink-0">
-                                                                            <RefreshCcw className="w-2.5 h-2.5" />
-                                                                            Recurring
-                                                                        </span>
-                                                                    )}
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                    <div className="flex items-center gap-2 shrink-0 ml-2">
-                                                        <div className="flex flex-col items-end shrink-0">
-                                                            <span className={cn(
-                                                                "font-bold text-sm whitespace-nowrap",
-                                                                myShare < 0 ? "text-emerald-500" : ""
-                                                            )}>
-                                                                {myShare < 0 ? '+' : '-'}{formatCurrency(Math.abs(myShare), tx.currency)}
-                                                            </span>
-                                                            {(tx.currency !== currency) && (
-                                                                <div className="text-[10px] text-muted-foreground flex flex-col items-end mt-0.5">
-                                                                    <span className="font-medium text-emerald-500">
-                                                                        ≈ {formatCurrency(convertAmount(Math.abs(myShare), tx.currency || 'USD'), currency)}
-                                                                    </span>
-                                                                </div>
-                                                            )}
-                                                            {tx.splits && tx.splits.length > 0 && (
-                                                                <span className="text-[9px] text-muted-foreground mt-0.5">
-                                                                    My Share
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                        {isRecentUserTransaction(tx) && !tx.is_settlement && (!tx.splits || tx.splits.length === 0) && (
-                                                            <DropdownMenu>
-                                                                <DropdownMenuTrigger asChild>
-                                                                    <button className="p-1 rounded-full hover:bg-white/10 transition-opacity">
-                                                                        <MoreVertical className="w-4 h-4 text-muted-foreground" />
-                                                                    </button>
-                                                                </DropdownMenuTrigger>
-                                                                <DropdownMenuContent align="end">
-                                                                    <DropdownMenuItem onClick={() => {
-                                                                        setEditingTransaction(tx);
-                                                                        setIsEditOpen(true);
-                                                                    }}>
-                                                                        <Pencil className="w-4 h-4 mr-2" />
-                                                                        Edit
-                                                                    </DropdownMenuItem>
-                                                                    <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => {
-                                                                        toast('Delete transaction?', {
-                                                                            action: {
-                                                                                label: 'Delete',
-                                                                                onClick: () => handleDeleteTransaction(tx)
-                                                                            }
-                                                                        });
-                                                                    }}>
-                                                                        <Trash2 className="w-4 h-4 mr-2" />
-                                                                        Delete
-                                                                    </DropdownMenuItem>
-                                                                </DropdownMenuContent>
-                                                            </DropdownMenu>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
-                                        {displayTransactions.length === 0 && (
-                                            <div className="text-center py-8 text-muted-foreground">No transactions found.</div>
-                                        )}
-                                    </div>
-                                </div>
+                                <VirtualizedTransactionList 
+                                    transactions={displayTransactions}
+                                    userId={userId}
+                                    currency={currency}
+                                    buckets={buckets}
+                                    calculateUserShare={calculateUserShare}
+                                    getIconForCategory={getIconForCategory}
+                                    formatCurrency={formatCurrency}
+                                    convertAmount={convertAmount}
+                                    isRecentUserTransaction={isRecentUserTransaction}
+                                    setEditingTransaction={setEditingTransaction}
+                                    setIsEditOpen={setIsEditOpen}
+                                    handleDeleteTransaction={handleDeleteTransaction}
+                                    getBucketIcon={getBucketIcon}
+                                />
                             </DialogContent>
                         </Dialog>
                     </div>
