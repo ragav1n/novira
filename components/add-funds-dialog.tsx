@@ -133,7 +133,7 @@ export function AddFundsDialog({ isOpen, onClose, userId, defaultBucketId, onSuc
 
     return (
         <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-            <DialogContent className="max-w-md rounded-3xl border-white/10 bg-card/95 backdrop-blur-xl">
+            <DialogContent className="max-w-md rounded-3xl border-white/10 bg-card/98 backdrop-blur-xl">
                 <DialogHeader>
                     <DialogTitle>Add Funds / Income</DialogTitle>
                     <DialogDescription>

@@ -45,7 +45,7 @@ export function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
                         animate={{ opacity: 1, scale: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.95, y: 20 }}
                         transition={{ type: "spring", duration: 0.6, bounce: 0.3 }}
-                        className="relative w-full max-w-2xl bg-[#0A0A0B]/60 backdrop-blur-3xl border border-white/10 rounded-[2.5rem] shadow-[0_0_50px_-12px_rgba(138,43,226,0.3)] overflow-hidden z-[70]"
+                        className="relative w-full max-w-2xl bg-[#0A0A0B]/98 backdrop-blur-xl border border-white/10 rounded-[2.5rem] shadow-[0_0_50px_-12px_rgba(138,43,226,0.3)] overflow-hidden z-[70]"
                     >
                         {/* Decorative Background Elements */}
                         <div className="absolute -top-32 -left-32 w-80 h-80 bg-primary/20 rounded-full blur-[100px] opacity-40 animate-pulse" />
@@ -104,7 +104,7 @@ export function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
                             </div>
 
                             {/* Sticky/Fixed Footer Action */}
-                            <div className="p-5 sm:p-8 pt-4 border-t border-white/5 bg-black/20 backdrop-blur-md">
+                            <div className="p-5 sm:p-8 pt-4 border-t border-white/5 bg-black/98 backdrop-blur-xl">
                                 <Button
                                     onClick={handleClose}
                                     className="w-full bg-white text-black hover:bg-white/90 font-black h-12 rounded-2xl shadow-[0_0_30px_-5px_rgba(255,255,255,0.3)] transition-all duration-300 hover:scale-[1.01] active:scale-[0.99] text-sm uppercase tracking-widest"

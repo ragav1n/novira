@@ -708,10 +708,10 @@ export function DashboardView() {
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         transition={{ duration: 0.8 }}
-                        className="fixed inset-0 pointer-events-none z-0 overflow-hidden"
+                        className="fixed inset-0 pointer-events-none z-0 overflow-hidden will-change-transform"
                     >
-                        <div className="absolute -top-[10%] -left-[10%] w-[70%] h-[70%] rounded-full blur-[120px] bg-cyan-500 opacity-[0.25]" />
-                        <div className="absolute -bottom-[10%] -right-[10%] w-[60%] h-[60%] rounded-full blur-[100px] bg-teal-500 opacity-15" />
+                        <div className="absolute -top-[10%] -left-[10%] w-[70%] h-[70%] rounded-full blur-[120px] bg-cyan-500 opacity-[0.25] will-change-transform" />
+                        <div className="absolute -bottom-[10%] -right-[10%] w-[60%] h-[60%] rounded-full blur-[100px] bg-teal-500 opacity-15 will-change-transform" />
                         <div className="absolute inset-0 bg-gradient-to-br from-cyan-950/20 via-transparent to-teal-950/20" />
                     </motion.div>
                 ) : (
@@ -721,10 +721,10 @@ export function DashboardView() {
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         transition={{ duration: 0.8 }}
-                        className="fixed inset-0 pointer-events-none z-0 overflow-hidden"
+                        className="fixed inset-0 pointer-events-none z-0 overflow-hidden will-change-transform"
                     >
-                        <div className="absolute top-[20%] -right-[10%] w-[60%] h-[60%] rounded-full blur-[110px] bg-primary opacity-20" />
-                        <div className="absolute bottom-[20%] -left-[10%] w-[50%] h-[50%] rounded-full blur-[90px] bg-primary/40 opacity-10" />
+                        <div className="absolute top-[20%] -right-[10%] w-[60%] h-[60%] rounded-full blur-[110px] bg-primary opacity-20 will-change-transform" />
+                        <div className="absolute bottom-[20%] -left-[10%] w-[50%] h-[50%] rounded-full blur-[90px] bg-primary/40 opacity-10 will-change-transform" />
                     </motion.div>
                 )}
             </AnimatePresence>
@@ -747,22 +747,22 @@ export function DashboardView() {
                 loading ? "opacity-40 blur-[1px] pointer-events-none" : "opacity-100 blur-0"
             )}>
                 {/* Header */}
-                <div className="flex justify-between items-center pt-2 gap-3">
-                    <div className="flex items-center gap-3 min-w-0">
+                <div className="flex justify-between items-center pt-2 gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
                         <div className="w-10 h-10 relative shrink-0">
                             <img src="/Novira.png" alt="Novira" className="w-full h-full object-contain drop-shadow-[0_0_8px_rgba(138,43,226,0.5)]" />
                         </div>
                         <div className="min-w-0">
-                            <h1 className="text-xl font-bold flex items-center gap-2">
-                                <span className="bg-clip-text text-transparent bg-gradient-to-r from-white to-white/80 whitespace-nowrap truncate">
-                                    Hello, {userName.split(' ')[0]}!
+                            <h1 className="text-xl font-bold flex items-center gap-1.5 min-w-0">
+                                <span className="bg-clip-text text-transparent bg-gradient-to-r from-white to-white/80 truncate">
+                                    Hi, {userName.split(' ')[0]}!
                                 </span>
                                 <span className="shrink-0">👋</span>
                             </h1>
                             <p className="text-[11px] text-muted-foreground font-medium truncate">Track your expenses with Novira</p>
                         </div>
                     </div>
-                    <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex items-center gap-1.5 shrink-0">
                         <div
                             onClick={() => router.push('/settings')}
                             className="w-10 h-10 rounded-full bg-secondary/20 border border-white/5 overflow-hidden flex items-center justify-center text-xs font-bold text-muted-foreground uppercase shrink-0 cursor-pointer hover:border-primary/50 transition-colors"
@@ -1137,7 +1137,7 @@ export function DashboardView() {
                     <DrawerTrigger asChild>
                         <button className="text-xs text-primary font-bold hover:text-primary/80 transition-colors uppercase tracking-wider px-2 py-1">View All</button>
                     </DrawerTrigger>
-                    <DrawerContent className="h-[88vh] flex flex-col pt-0 bg-background/95 backdrop-blur-2xl border-white/10 rounded-t-[40px]">
+                    <DrawerContent className="h-[88vh] flex flex-col pt-0 bg-background/98 backdrop-blur-xl border-white/10 rounded-t-[40px]">
                         <div className="w-12 h-1.5 bg-white/10 rounded-full mx-auto mt-4 mb-2 shrink-0" />
                         <DrawerHeader className="pb-4 shrink-0">
                             <DrawerTitle className="text-2xl font-bold text-center">All Transactions</DrawerTitle>
@@ -1286,7 +1286,7 @@ export function DashboardView() {
 
                     {/* Audit Log Dialog */}
                     <Dialog open={!!selectedAuditTx} onOpenChange={(open) => !open && setSelectedAuditTx(null)}>
-                        <DialogContent className="max-w-[340px] max-h-[80vh] flex flex-col rounded-3xl border-white/10 bg-card/90 backdrop-blur-xl">
+                        <DialogContent className="max-w-[340px] max-h-[80vh] flex flex-col rounded-3xl border-white/10 bg-card/98 backdrop-blur-xl">
                             <DialogHeader>
                                 <DialogTitle className="flex items-center gap-2">
                                     <History className="w-5 h-5 text-primary" />
