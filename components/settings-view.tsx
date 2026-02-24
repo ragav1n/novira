@@ -328,7 +328,7 @@ export function SettingsView() {
                             zIndex: 50
                         }}
                     >
-                        <WaveLoader bars={5} message="Loading settings..." />
+                        <WaveLoader bars={5} message="" />
                     </motion.div>
                 )}
             </AnimatePresence>

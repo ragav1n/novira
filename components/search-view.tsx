@@ -518,7 +518,7 @@ export function SearchView() {
                                 zIndex: 50
                             }}
                         >
-                            <WaveLoader bars={5} message="Loading transactions..." />
+                            <WaveLoader bars={5} message="" />
                         </motion.div>
                     )}
                 </AnimatePresence>
