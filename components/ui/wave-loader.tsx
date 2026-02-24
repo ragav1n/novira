@@ -45,13 +45,6 @@ export function WaveLoader({
     return (
         <div
             className={cn(waveLoaderVariants({ messagePlacement }), className)}
-            style={{
-                display: 'flex',
-                flexDirection: (messagePlacement || 'bottom') === 'bottom' ? 'column' : (messagePlacement === 'left' ? 'row-reverse' : 'row'),
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '0.5rem'
-            }}
         >
             <div className={cn("flex gap-1 items-center justify-center")}>
                 {Array(bars)
@@ -59,12 +52,12 @@ export function WaveLoader({
                     .map((_, index) => (
                         <motion.div
                             key={index}
-                            className={cn("w-1.5 h-4 bg-primary rounded-full origin-bottom")}
-                            animate={{ scaleY: [1, 1.5, 1], opacity: [0.5, 1, 0.5] }}
+                            className={cn("w-1.5 h-4 bg-primary rounded-full origin-center")}
+                            animate={{ scaleY: [1, 1.8, 1], opacity: [0.5, 1, 0.5] }}
                             transition={{
-                                duration: 1,
+                                duration: 0.6,
                                 repeat: Number.POSITIVE_INFINITY,
-                                delay: index * 0.1,
+                                delay: index * 0.08,
                                 ease: "easeInOut"
                             }}
                             {...props}
@@ -73,8 +66,7 @@ export function WaveLoader({
             </div>
             {message && (
                 <div
-                    className="text-xs text-muted-foreground animate-pulse mt-4"
-                    style={{ marginTop: '1rem' }}
+                    className="text-[11px] font-bold uppercase tracking-widest text-primary/60 animate-pulse mt-4 ml-1"
                 >
                     {message}
                 </div>
