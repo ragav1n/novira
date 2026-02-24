@@ -21,12 +21,17 @@ interface ExportTransaction {
 
 const CATEGORY_COLORS: Record<string, [number, number, number]> = {
     food: [138, 43, 226],      // Electric Purple
+    groceries: [16, 185, 129],  // Emerald
     transport: [255, 107, 107], // Coral
-    bills: [78, 205, 196],     // Teal
-    shopping: [249, 199, 79],  // Yellow
-    healthcare: [255, 159, 28], // Orange
+    fashion: [244, 114, 182],   // Pink
+    bills: [78, 205, 196],      // Teal
+    shopping: [249, 199, 79],   // Yellow
+    healthcare: [255, 159, 28],  // Orange
     entertainment: [255, 20, 147], // Deep Pink
-    others: [199, 244, 100],    // Lime
+    rent: [99, 102, 241],       // Indigo
+    education: [132, 204, 22],  // Lime
+    income: [16, 185, 129],     // Emerald
+    others: [45, 212, 191],     // Turquoise
     uncategorized: [99, 102, 241], // Indigo
 };
 
@@ -41,6 +46,7 @@ const METHOD_COLORS: Record<string, [number, number, number]> = {
     other: [156, 163, 175],    // Gray
     'credit card': [96, 165, 250],
     'debit card': [129, 140, 248],
+    'bank transfer': [6, 182, 212], // Cyan
     upi: [138, 43, 226],       // Purple
 };
 
@@ -209,7 +215,18 @@ export const generatePDF = async (
     const sortedTx = [...transactions].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
     // Calculations
-    const totalSpent = transactions.reduce((acc, tx) => acc + (tx.converted_amount || convertAmount(Number(tx.amount), tx.currency || 'USD')), 0);
+    let totalExpenses = 0;
+    let totalIncome = 0;
+
+    transactions.forEach(tx => {
+        const amount = tx.converted_amount || convertAmount(Number(tx.amount), tx.currency || 'USD');
+        if (amount < 0) {
+            totalIncome += Math.abs(amount);
+        } else {
+            totalExpenses += amount;
+        }
+    });
+    const netCashFlow = totalIncome - totalExpenses;
 
     const categoryTotals: Record<string, number> = {};
     const methodTotals: Record<string, number> = {};
@@ -218,13 +235,15 @@ export const generatePDF = async (
     const monthlyTotals: Record<string, number> = {};
 
     transactions.forEach(tx => {
-        const amount = tx.converted_amount || convertAmount(Number(tx.amount), tx.currency || 'USD');
+        const rawAmount = tx.converted_amount || convertAmount(Number(tx.amount), tx.currency || 'USD');
+        const isIncome = rawAmount < 0 || tx.category === 'income';
+        const amount = Math.abs(rawAmount); 
         const bucket = tx.bucket_id ? bucketMap[tx.bucket_id] : null;
 
         categoryTotals[tx.category] = (categoryTotals[tx.category] || 0) + amount;
         methodTotals[tx.payment_method || 'Other'] = (methodTotals[tx.payment_method || 'Other'] || 0) + amount;
 
-        if (bucket) {
+        if (bucket && !isIncome) {
             // Calculate budget for this bucket
             let effectiveBudget = bucket.budget;
 
@@ -259,14 +278,17 @@ export const generatePDF = async (
             bucketTotals[bucket.name].spent += amount;
         }
 
-        const dateKey = format(new Date(tx.date), 'MMM d');
-        dailyTotals[dateKey] = (dailyTotals[dateKey] || 0) + amount;
+        if (!isIncome) {
+            const dateKey = format(new Date(tx.date), 'MMM d');
+            dailyTotals[dateKey] = (dailyTotals[dateKey] || 0) + amount;
 
-        const monthKey = format(new Date(tx.date), 'MMM yyyy');
-        monthlyTotals[monthKey] = (monthlyTotals[monthKey] || 0) + amount;
+            const monthKey = format(new Date(tx.date), 'MMM yyyy');
+            monthlyTotals[monthKey] = (monthlyTotals[monthKey] || 0) + amount;
+        }
     });
 
     const topExpenses = [...transactions]
+        .filter(tx => (tx.converted_amount || convertAmount(Number(tx.amount), tx.currency || 'USD')) > 0)
         .map(tx => ({ ...tx, converted: tx.converted_amount || convertAmount(Number(tx.amount), tx.currency || 'USD') }))
         .sort((a, b) => b.converted - a.converted)
         .slice(0, 5);
@@ -332,19 +354,20 @@ export const generatePDF = async (
     doc.setFontSize(8);
     doc.setTextColor(100, 100, 100);
     doc.text('TOTAL SPENT', 18, 68);
-    doc.text('DAILY AVERAGE', 83, 68);
-    doc.text('TRANSACTIONS', 148, 68);
+    doc.text('TOTAL INCOME', 83, 68);
+    doc.text('NET CASH FLOW', 148, 68);
 
     doc.setFontSize(12);
     doc.setTextColor(138, 43, 226);
     doc.setFont('helvetica', 'bold');
-    doc.text(formatForPDF(totalSpent, currency), 18, 80);
+    doc.text(formatForPDF(totalExpenses, currency), 18, 80);
 
-    const days = sortedTx.length > 0
-        ? Math.max(1, differenceInDays(new Date(sortedTx[sortedTx.length - 1].date), new Date(sortedTx[0].date)) + 1)
-        : 1;
-    doc.text(formatForPDF(totalSpent / days, currency), 83, 80);
-    doc.text(transactions.length.toString(), 148, 80);
+    doc.setTextColor(16, 185, 129); // Emerald for income
+    doc.text(formatForPDF(totalIncome, currency), 83, 80);
+
+    const [r, g, b] = netCashFlow >= 0 ? [16, 185, 129] : [255, 107, 107];
+    doc.setTextColor(r, g, b);
+    doc.text(formatForPDF(netCashFlow, currency), 148, 80);
     doc.setFont('helvetica', 'normal');
 
     // Pie Charts Row
@@ -466,6 +489,11 @@ export const generatePDF = async (
     const tableColumn = ["Date", "Description", "Category", "Payment", "Group", "Rec", "Exc", "Amount"];
     const tableRows = sortedTx.map(tx => {
         const group = tx.group_id ? groupMap[tx.group_id] : null;
+        const rawAmount = tx.converted_amount || convertAmount(Number(tx.amount), tx.currency || 'USD');
+        const isIncome = rawAmount < 0 || tx.category === 'income';
+        const displayAmount = isIncome 
+            ? `+ ${formatForPDF(Math.abs(rawAmount), currency)}` 
+            : formatForPDF(rawAmount, currency);
 
         return [
             format(new Date(tx.date), 'MMM d, yy'),
@@ -475,7 +503,7 @@ export const generatePDF = async (
             group?.name || '-',
             tx.is_recurring ? 'Yes' : 'No',
             tx.exclude_from_allowance ? 'Yes' : 'No',
-            formatForPDF(tx.converted_amount || convertAmount(Number(tx.amount), tx.currency || 'USD'), currency)
+            displayAmount
         ]
     });
 
