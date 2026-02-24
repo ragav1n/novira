@@ -2,7 +2,7 @@
 
 import React, { memo } from 'react';
 import { format } from 'date-fns';
-import { History, MoreVertical, Users, RefreshCcw } from 'lucide-react';
+import { History, MoreVertical, Users, RefreshCcw, Ban } from 'lucide-react';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
@@ -145,14 +145,20 @@ export const TransactionRow = memo(function TransactionRow({
           </div>
         </div>
 
-        {/* Row 3: Bucket + Recurring badges */}
-        {(tx.bucket_id || tx.is_recurring) && (
+        {/* Row 3: Bucket + Recurring + Excluded badges */}
+        {(tx.bucket_id || tx.is_recurring || tx.exclude_from_allowance) && (
           <div className="flex items-center gap-2 mt-2 flex-wrap min-h-[14px]">
             {bucketChip}
             {tx.is_recurring && (
               <span className="px-1.5 py-0.5 rounded-md bg-cyan-500/10 text-[10px] text-cyan-400 border border-cyan-500/10 font-bold flex items-center gap-1 shrink-0">
                 <RefreshCcw className="w-2.5 h-2.5 shrink-0 opacity-80" />
                 Recurring
+              </span>
+            )}
+            {tx.exclude_from_allowance && (
+              <span className="px-1.5 py-0.5 rounded-md bg-rose-500/10 text-[10px] text-rose-400 border border-rose-500/10 font-bold flex items-center gap-1 shrink-0">
+                <Ban className="w-2.5 h-2.5 shrink-0 opacity-80" />
+                Excluded
               </span>
             )}
           </div>

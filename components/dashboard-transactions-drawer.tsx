@@ -26,7 +26,7 @@ export const DashboardTransactionsDrawer = React.memo(function DashboardTransact
 }: DashboardTransactionsDrawerProps) {
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent className="fixed inset-0 top-0 left-0 right-0 bottom-0 max-w-none w-full h-full bg-background border-none rounded-none p-0 overflow-hidden flex flex-col z-[9999]">
+            <DialogContent showCloseButton={false} className="fixed inset-0 top-0 left-0 right-0 bottom-0 max-w-none w-full h-full bg-background border-none rounded-none p-0 overflow-hidden flex flex-col z-[9999] translate-x-0 translate-y-0">
                 <DialogHeader className="p-6 pt-12 pb-4 border-b border-white/5 shrink-0">
                     <div className="flex items-center justify-between">
                         <div>

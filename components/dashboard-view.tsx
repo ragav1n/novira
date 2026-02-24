@@ -902,7 +902,7 @@ export function DashboardView() {
                         <div className="flex justify-between items-start">
                             <div className="min-w-0 flex-1">
                                 <p className="text-white/80 text-sm font-medium">
-                                    {isBucketFocused ? "Total Mission Spent" : "Spent this Month"}
+                                    {isBucketFocused ? "Total Mission Spent" : `Spent in ${format(new Date(), 'MMMM')}`}
                                 </p>
                                 <h2 className="text-4xl font-bold text-white mt-1 truncate">
                                     {isRatesLoading ? "..." : formatCurrency(totalSpent, bucketCurrency)}
@@ -1007,7 +1007,7 @@ export function DashboardView() {
                 <div className="space-y-4">
                     <div className="flex flex-wrap justify-between items-center gap-2">
                         <h3 className="text-lg font-bold">Spending by Category</h3>
-                        <span className="text-[11px] bg-secondary/50 backdrop-blur-md px-3 py-1 rounded-full text-primary border border-primary/20 font-bold uppercase tracking-wider whitespace-nowrap">Current Month</span>
+                        <span className="text-[11px] bg-secondary/50 backdrop-blur-md px-3 py-1 rounded-full text-primary border border-primary/20 font-bold uppercase tracking-wider whitespace-nowrap">{format(new Date(), 'MMMM')} Overview</span>
                     </div>
                     <Card className="border-none bg-card/40 backdrop-blur-md shadow-none">
                         <CardContent className="p-4 flex flex-col sm:flex-row items-center justify-between gap-6">
@@ -1059,8 +1059,9 @@ export function DashboardView() {
                                     </div>
                                 </>
                             ) : (
-                                <div className="w-full text-center py-8 text-muted-foreground text-sm">
-                                    No personal expenses yet.
+                                <div className="w-full text-center py-8 text-muted-foreground space-y-2">
+                                    <p className="text-sm">No expenses found for {format(new Date(), 'MMMM')}.</p>
+                                    <p className="text-[11px] opacity-70">Check if your transactions are from a different month or marked as "Excluded".</p>
                                 </div>
                             )}
                         </CardContent>
