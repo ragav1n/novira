@@ -1,5 +1,6 @@
 'use client';
 
+import React, { memo } from 'react';
 import { format } from 'date-fns';
 import { History, MoreVertical, Users, RefreshCcw } from 'lucide-react';
 import {
@@ -22,7 +23,7 @@ interface TransactionRowProps {
   onDelete: () => void;
 }
 
-export function TransactionRow({
+export const TransactionRow = memo(function TransactionRow({
   tx,
   userId,
   myShare,
@@ -145,4 +146,4 @@ export function TransactionRow({
       </div>
     </div>
   );
-}
+});

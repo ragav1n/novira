@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { ChevronLeft, MoreHorizontal, Filter, Shirt } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -110,15 +110,28 @@ const CustomTooltip = ({ active, payload, label }: any) => {
     return null;
 };
 
+type Transaction = {
+    amount: number;
+    category: string;
+    date: string;
+    payment_method?: string;
+    currency?: string;
+    exchange_rate?: number;
+    base_currency?: string;
+    user_id: string;
+    bucket_id?: string;
+    splits?: {
+        user_id: string;
+        amount: number;
+    }[];
+};
+
 type DateRange = '1M' | 'LM' | '3M' | '6M' | '1Y' | 'ALL';
 
 export function AnalyticsView() {
     const router = useRouter();
     const [loading, setLoading] = useState(true);
-    const [categoryTrendData, setCategoryTrendData] = useState<any[]>([]);
-    const [categoryBreakdown, setCategoryBreakdown] = useState<any[]>([]);
-    const [paymentBreakdown, setPaymentBreakdown] = useState<any[]>([]);
-    const [totalSpentInRange, setTotalSpentInRange] = useState(0);
+    const [transactions, setTransactions] = useState<Transaction[]>([]);
     const [dateRange, setDateRange] = useState<DateRange>('1M');
     const [selectedBucketId, setSelectedBucketId] = useState<string | 'all'>('all');
     const { formatCurrency, currency, convertAmount, userId } = useUserPreferences();
@@ -148,11 +161,10 @@ export function AnalyticsView() {
             let query = supabase
                 .from('transactions')
                 .select(`
-                    *,
+                    amount, category, date, payment_method, currency, exchange_rate, base_currency, user_id, bucket_id,
                     splits (
                         user_id,
-                        amount,
-                        is_paid
+                        amount
                     )
                 `)
                 .order('date', { ascending: true });
@@ -180,10 +192,15 @@ export function AnalyticsView() {
                 query = query.gte('date', startDate.toISOString());
             }
 
-            const { data: transactions } = await query;
+            const { data } = await query;
 
-            if (transactions) {
-                processTransactions(transactions, dateRange, userId);
+            if (data) {
+                // Flatten splits if they are arrays
+                const formatted = data.map(tx => ({
+                    ...tx,
+                    splits: tx.splits || []
+                }));
+                setTransactions(formatted);
             }
         } catch (error) {
             console.error("Error fetching analytics:", error);
@@ -192,131 +209,71 @@ export function AnalyticsView() {
         }
     };
 
-    const processTransactions = (transactions: any[], range: DateRange, currentUserId: string | null) => {
-        const now = new Date();
+    const { categoryTrendData, categoryBreakdown, paymentBreakdown, totalSpentInRange } = useMemo(() => {
+        if (!transactions.length || !userId) return {
+            categoryTrendData: [],
+            categoryBreakdown: [],
+            paymentBreakdown: [],
+            totalSpentInRange: 0
+        };
 
-        // 1. Process Trend Data
+        const now = new Date();
         const monthsMap: Record<string, any> = {};
 
-        // Determine number of months to display on X-axis
-        let monthsBack = 5; // Default 6M (0 to 5)
-        if (dateRange === '1M' || dateRange === 'LM') {
-            // For single month views, we might want daily breakdown? 
-            // The current UI puts 'month' on XAxis. 
-            // If we want daily trend for 1M/LM, we need to change XAxis to Day.
-            // For now, to keep it consistent with the "Spending Trend" chart which seems to be monthly,
-            // showing just one dot for the whole month might be boring. 
-            // Let's implement DAILY trend for 1M/LM.
-            monthsBack = -2; // Special flag for Daily
-        }
-        else if (range === '3M') monthsBack = 2;
-        else if (range === '1Y') monthsBack = 11;
-        else if (range === 'ALL') {
-            // For ALL, we don't pre-fill months, we just take what's in the data
-            monthsBack = -1;
-        }
+        // 1. Process Trend Data Initialization
+        let monthsBack = 5;
+        if (dateRange === '1M' || dateRange === 'LM') monthsBack = -2;
+        else if (dateRange === '3M') monthsBack = 2;
+        else if (dateRange === '6M') monthsBack = 5;
+        else if (dateRange === '1Y') monthsBack = 11;
+        else if (dateRange === 'ALL') monthsBack = -1;
 
-        // Initialize months if not ALL
         if (monthsBack !== -1 && monthsBack !== -2) {
             for (let i = monthsBack; i >= 0; i--) {
                 const d = subMonths(now, i);
-                const monthKey = format(d, 'MMM yyyy'); // Use Year too to avoid collisions in 1Y view
+                const monthKey = format(d, 'MMM yyyy');
                 monthsMap[monthKey] = { month: monthKey, rawDate: d };
                 Object.keys(CATEGORY_COLORS).forEach(cat => monthsMap[monthKey][cat] = 0);
             }
         }
 
-        // If Daily (1M or LM)
         if (monthsBack === -2) {
-            const start = range === 'LM' ? startOfMonth(subMonths(now, 1)) : startOfMonth(now);
-            const end = range === 'LM' ? endOfMonth(subMonths(now, 1)) : (now > endOfMonth(now) ? endOfMonth(now) : now);
-            // Actually just go to end of month for 1M so chart doesn't cut off if today is 15th? 
-            // Or just up to today? Up to end of month is better for XAxis stability.
+            const start = dateRange === 'LM' ? startOfMonth(subMonths(now, 1)) : startOfMonth(now);
             const endRange = endOfMonth(start);
-
-            let current = start;
+            let current = new Date(start);
             while (current <= endRange) {
                 const dayKey = format(current, 'd MMM');
                 monthsMap[dayKey] = { month: dayKey, rawDate: new Date(current) };
                 Object.keys(CATEGORY_COLORS).forEach(cat => monthsMap[dayKey][cat] = 0);
-                current = new Date(current.setDate(current.getDate() + 1));
+                current.setDate(current.getDate() + 1);
             }
         }
 
-        // Aggregate Data
-        transactions.forEach(tx => {
-            const date = parseISO(tx.date);
-            let timeKey = '';
-
-            if (monthsBack === -2) {
-                timeKey = format(date, 'd MMM');
-            } else {
-                timeKey = format(date, 'MMM yyyy');
-            }
-
-            // If ALL, create entry if missing
-            if (monthsBack === -1 && !monthsMap[timeKey]) {
-                monthsMap[timeKey] = { month: timeKey, rawDate: date };
-                Object.keys(CATEGORY_COLORS).forEach(cat => monthsMap[timeKey][cat] = 0);
-            }
-
-            if (monthsMap[timeKey]) {
-                const cat = tx.category.toLowerCase();
-                if (!monthsMap[timeKey][cat]) monthsMap[timeKey][cat] = 0; // Init if category new
-
-                let myShare = Number(tx.amount);
-                if (tx.splits && tx.splits.length > 0) {
-                    if (tx.user_id === userId) {
-                        const othersOwe = tx.splits.reduce((sum: number, s: any) => sum + Number(s.amount), 0);
-                        myShare = Number(tx.amount) - othersOwe;
-                    } else {
-                        const mySplit = tx.splits.find((s: any) => s.user_id === userId);
-                        myShare = mySplit ? Number(mySplit.amount) : 0;
-                    }
-                } else if (tx.user_id !== userId) {
-                    myShare = 0;
-                }
-
-                // Conversion Logic
-                if (tx.exchange_rate && tx.base_currency === currency) {
-                    monthsMap[timeKey][cat] += (myShare * Number(tx.exchange_rate));
-                } else {
-                    monthsMap[timeKey][cat] += convertAmount(myShare, tx.currency || 'USD');
-                }
-            }
-        });
-
-        // Convert map to array and Sort by date
-        const sortedTrendData = Object.values(monthsMap).sort((a: any, b: any) => a.rawDate - b.rawDate);
-
-        // Format month label back to short format for display if needed, or keep MMM yyyy
-        const displayData = sortedTrendData.map((item: any) => ({
-            ...item,
-            month: range === '1Y' || range === 'ALL'
-                ? format(item.rawDate, 'MMM yy')
-                : (range === '1M' || range === 'LM' ? format(item.rawDate, 'MMM d') : format(item.rawDate, 'MMM'))
-        }));
-
-        setCategoryTrendData(displayData);
-
-
-        // 2. Process Breakdown (Aggregate of Selected Range)
+        // 2. Aggregate Data and Breakdown
         const breakdownMap: Record<string, number> = {};
+        const paymentMap: Record<string, number> = {};
         let total = 0;
 
-        transactions.forEach(tx => {
+        transactions.forEach((tx: Transaction) => {
+            const date = parseISO(tx.date);
+            const timeKey = monthsBack === -2 ? format(date, 'd MMM') : format(date, 'MMM yyyy');
             const cat = tx.category.toLowerCase();
+
+            if (monthsBack === -1 && !monthsMap[timeKey]) {
+                monthsMap[timeKey] = { month: timeKey, rawDate: date };
+                Object.keys(CATEGORY_COLORS).forEach(c => monthsMap[timeKey][c] = 0);
+            }
 
             let myShare = Number(tx.amount);
             if (tx.splits && tx.splits.length > 0) {
-                if (tx.user_id === currentUserId) {
+                if (tx.user_id === userId) {
                     const othersOwe = tx.splits.reduce((sum: number, s: any) => sum + Number(s.amount), 0);
                     myShare = Number(tx.amount) - othersOwe;
                 } else {
-                    const mySplit = tx.splits.find((s: any) => s.user_id === currentUserId);
+                    const mySplit = tx.splits.find((s: any) => s.user_id === userId);
                     myShare = mySplit ? Number(mySplit.amount) : 0;
                 }
-            } else if (tx.user_id !== currentUserId) {
+            } else if (tx.user_id !== userId) {
                 myShare = 0;
             }
 
@@ -327,70 +284,54 @@ export function AnalyticsView() {
                 } else {
                     amount = convertAmount(myShare, tx.currency || 'USD');
                 }
+
+                if (monthsMap[timeKey]) {
+                    if (!monthsMap[timeKey][cat]) monthsMap[timeKey][cat] = 0;
+                    monthsMap[timeKey][cat] += amount;
+                }
+
                 breakdownMap[cat] = (breakdownMap[cat] || 0) + amount;
+                const method = (tx.payment_method || 'Other').toLowerCase();
+                paymentMap[method] = (paymentMap[method] || 0) + amount;
                 total += amount;
             }
         });
 
-        setTotalSpentInRange(total);
+        // 3. Finalize Trend Data
+        const sortedTrendData = Object.values(monthsMap).sort((a: any, b: any) => a.rawDate - b.rawDate);
+        const displayTrendData = sortedTrendData.map((item: any) => ({
+            ...item,
+            month: dateRange === '1Y' || dateRange === 'ALL'
+                ? format(item.rawDate, 'MMM yy')
+                : (dateRange === '1M' || dateRange === 'LM' ? format(item.rawDate, 'MMM d') : format(item.rawDate, 'MMM'))
+        }));
 
-        const breakdownData = Object.entries(breakdownMap).map(([name, amount]) => {
-            const percentage = total > 0 ? (amount / total) * 100 : 0;
-            return {
-                name: name.charAt(0).toUpperCase() + name.slice(1),
-                amount,
-                value: percentage,
-                color: CATEGORY_COLORS[name] || CATEGORY_COLORS.others,
-                fill: CATEGORY_COLORS[name] || CATEGORY_COLORS.others,
-                stroke: CATEGORY_COLORS[name] || CATEGORY_COLORS.others,
-            };
-        }).sort((a, b) => b.amount - a.amount);
+        // 4. Finalize Breakdowns
+        const breakdownData = Object.entries(breakdownMap).map(([name, amount]: [string, number]) => ({
+            name: name.charAt(0).toUpperCase() + name.slice(1),
+            amount,
+            value: total > 0 ? (amount / total) * 100 : 0,
+            color: CATEGORY_COLORS[name] || CATEGORY_COLORS.others,
+            fill: CATEGORY_COLORS[name] || CATEGORY_COLORS.others,
+            stroke: CATEGORY_COLORS[name] || CATEGORY_COLORS.others,
+        })).sort((a, b) => b.amount - a.amount);
 
-        setCategoryBreakdown(breakdownData);
+        const paymentData = Object.entries(paymentMap).map(([name, amount]: [string, number]) => ({
+            name: name.charAt(0).toUpperCase() + name.slice(1),
+            amount,
+            value: total > 0 ? (amount / total) * 100 : 0,
+            color: PAYMENT_COLORS[name] || PAYMENT_COLORS.other,
+            fill: PAYMENT_COLORS[name] || PAYMENT_COLORS.other,
+            stroke: PAYMENT_COLORS[name] || PAYMENT_COLORS.other,
+        })).sort((a, b) => b.amount - a.amount);
 
-        // 3. Process Payment breakdown
-        const paymentMap: Record<string, number> = {};
-        transactions.forEach(tx => {
-            const method = (tx.payment_method || 'Other').toLowerCase();
-
-            let myShare = Number(tx.amount);
-            if (tx.splits && tx.splits.length > 0) {
-                if (tx.user_id === currentUserId) {
-                    const othersOwe = tx.splits.reduce((sum: number, s: any) => sum + Number(s.amount), 0);
-                    myShare = Number(tx.amount) - othersOwe;
-                } else {
-                    const mySplit = tx.splits.find((s: any) => s.user_id === currentUserId);
-                    myShare = mySplit ? Number(mySplit.amount) : 0;
-                }
-            } else if (tx.user_id !== currentUserId) {
-                myShare = 0;
-            }
-
-            if (myShare > 0) {
-                let amount = 0;
-                if (tx.exchange_rate && tx.base_currency === currency) {
-                    amount = (myShare * Number(tx.exchange_rate));
-                } else {
-                    amount = convertAmount(myShare, tx.currency || 'USD');
-                }
-                paymentMap[method] = (paymentMap[method] || 0) + amount;
-            }
-        });
-
-        const paymentData = Object.entries(paymentMap).map(([name, amount]) => {
-            const percentage = total > 0 ? (amount / total) * 100 : 0;
-            return {
-                name: name.charAt(0).toUpperCase() + name.slice(1),
-                amount,
-                value: percentage,
-                color: PAYMENT_COLORS[name] || PAYMENT_COLORS.other,
-                fill: PAYMENT_COLORS[name] || PAYMENT_COLORS.other,
-                stroke: PAYMENT_COLORS[name] || PAYMENT_COLORS.other,
-            };
-        }).sort((a, b) => b.amount - a.amount);
-
-        setPaymentBreakdown(paymentData);
-    };
+        return {
+            categoryTrendData: displayTrendData,
+            categoryBreakdown: breakdownData,
+            paymentBreakdown: paymentData,
+            totalSpentInRange: total
+        };
+    }, [transactions, userId, dateRange, currency, convertAmount]);
 
 
     return (
@@ -524,7 +465,7 @@ export function AnalyticsView() {
                                         }}
                                     />
                                     <Tooltip content={<CustomTooltip />} />
-                                    {Object.keys(CATEGORY_COLORS).map((cat) => (
+                                    {Object.keys(CATEGORY_COLORS).map((cat: string) => (
                                         <Line
                                             key={cat}
                                             type="monotone"
@@ -573,7 +514,7 @@ export function AnalyticsView() {
                                         paddingAngle={5}
                                         cornerRadius={5}
                                     >
-                                        {categoryBreakdown.map((entry, index) => (
+                                        {categoryBreakdown.map((entry: any, index: number) => (
                                             <Cell key={`cell-${index}`} fill={entry.color} />
                                         ))}
                                     </Pie>
@@ -587,7 +528,7 @@ export function AnalyticsView() {
                     </div>
 
                     <div className="space-y-4">
-                        {categoryBreakdown.map((cat) => (
+                        {categoryBreakdown.map((cat: any) => (
                             <div key={cat.name} className="space-y-2">
                                 <div className="flex justify-between text-sm">
                                     <span className="flex items-center gap-2">
@@ -642,7 +583,7 @@ export function AnalyticsView() {
                                         paddingAngle={5}
                                         cornerRadius={5}
                                     >
-                                        {paymentBreakdown.map((entry, index) => (
+                                        {paymentBreakdown.map((entry: any, index: number) => (
                                             <Cell key={`cell-${index}`} fill={entry.color} />
                                         ))}
                                     </Pie>
@@ -659,7 +600,7 @@ export function AnalyticsView() {
                         "grid gap-4",
                         paymentBreakdown.length === 1 ? "grid-cols-1" : "grid-cols-2"
                     )}>
-                        {paymentBreakdown.map((pay) => (
+                        {paymentBreakdown.map((pay: any) => (
                             <div key={pay.name} className="flex flex-col p-4 rounded-3xl bg-secondary/5 border border-white/5 hover:bg-secondary/10 transition-colors group">
                                 <span className="flex items-center gap-2 text-[11px] text-muted-foreground uppercase tracking-widest font-bold">
                                     <div className="w-2 h-2 rounded-full shadow-[0_0_8px_rgba(255,255,255,0.2)]" style={{ backgroundColor: pay.fill }} />
