@@ -2,7 +2,7 @@
 
 import { useUserPreferences, CURRENCY_SYMBOLS, type Currency } from '@/components/providers/user-preferences-provider';
 import { BudgetAlertManager } from '@/components/budget-alert-manager';
-import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useRef, useCallback, useMemo, startTransition, lazy, Suspense } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { useRouter } from 'next/navigation';
 import { Plus, Utensils, Car, Zap, ShoppingBag, HeartPulse, Clapperboard, CircleDollarSign, ArrowUpRight, ArrowDownLeft, Users, MoreVertical, Pencil, Trash2, X, History, Clock, HelpCircle, Tag, Plane, Home, Gift, ShoppingCart, Stethoscope, Gamepad2, School, Laptop, Music, Heart, RefreshCcw, Wallet, ChevronRight, Check, Shirt, LayoutGrid } from 'lucide-react';
@@ -43,9 +43,13 @@ import { cn } from '@/lib/utils';
 import { FeatureAnnouncementModal } from '@/components/feature-announcement-modal';
 import { WelcomeModal } from '@/components/welcome-modal';
 import { LATEST_FEATURE_ANNOUNCEMENT } from '@/lib/feature-flags';
-import { AddFundsDialog } from '@/components/add-funds-dialog';
-import { HowToUseDialog } from '@/components/how-to-use-dialog';
 import { TransactionRow } from '@/components/transaction-row';
+import { DashboardTransactionsDrawer } from '@/components/dashboard-transactions-drawer';
+import { TransactionHistoryDialog } from '@/components/transaction-history-dialog';
+
+// Lazy load non-critical dialogs
+const AddFundsDialog = lazy(() => import('@/components/add-funds-dialog').then(module => ({ default: module.AddFundsDialog })));
+const HowToUseDialog = lazy(() => import('@/components/how-to-use-dialog').then(module => ({ default: module.HowToUseDialog })));
 
 // Constants
 const CATEGORY_COLORS: Record<string, string> = {
@@ -319,28 +323,29 @@ export function DashboardView() {
                 setTimeout(() => setActiveModal('announcement'), 1500);
             }
 
-            // Fetch Profile
-            const fetchProfile = async () => {
+            // Parallel Data Fetching
+            const fetchData = async () => {
                 try {
-                    const { data: profile } = await supabase
-                        .from('profiles')
-                        .select('full_name, avatar_url')
-                        .eq('id', userId)
-                        .single();
+                    const [profileResult, transactionsResult] = await Promise.all([
+                        supabase
+                            .from('profiles')
+                            .select('full_name, avatar_url')
+                            .eq('id', userId)
+                            .single(),
+                        loadTransactions(userId)
+                    ]);
 
-                    if (profile) {
-                        setUserName(profile.full_name || 'User');
-                        setAvatarUrl(profile.avatar_url);
+                    if (profileResult.data) {
+                        setUserName(profileResult.data.full_name || 'User');
+                        setAvatarUrl(profileResult.data.avatar_url);
                     }
-
-                    await loadTransactions(userId);
                 } catch (error) {
                     console.error("Error fetching data:", error);
                 } finally {
                     setLoading(false);
                 }
             };
-            fetchProfile();
+            fetchData();
         } else if (!loading) {
             setLoading(false);
         }
@@ -368,12 +373,18 @@ export function DashboardView() {
         try {
             const { data: txs } = await supabase
                 .from('transactions')
-                .select('*, profile:profiles(full_name), splits(*)')
+                .select('id, description, amount, category, date, created_at, user_id, currency, exchange_rate, base_currency, bucket_id, exclude_from_allowance, is_recurring, profile:profiles(full_name), splits(user_id, amount, is_paid)')
                 .order('date', { ascending: false })
                 .order('created_at', { ascending: false });
 
             if (txs) {
-                setTransactions(txs);
+                // Flatten profile and splits if they are arrays (Supabase dynamic returns)
+                const formattedTxs = txs.map(tx => ({
+                    ...tx,
+                    profile: Array.isArray(tx.profile) ? tx.profile[0] : tx.profile,
+                    splits: tx.splits || []
+                })) as Transaction[];
+                setTransactions(formattedTxs);
             }
         } catch (error) {
             console.error("Error loading transactions:", error);
@@ -678,7 +689,7 @@ export function DashboardView() {
                         exit={{ opacity: 0 }}
                         className="fixed inset-0 z-50 flex items-center justify-center bg-background/20 backdrop-blur-[2px]"
                     >
-                        <WaveLoader bars={5} message="Loading dashboard..." />
+                        <WaveLoader bars={5} message="" />
                     </motion.div>
                 )}
             </AnimatePresence>
@@ -832,7 +843,9 @@ export function DashboardView() {
                                             onHoverStart={() => setHoveredFocusId('allowance')}
                                             onHoverEnd={() => setHoveredFocusId(null)}
                                             onClick={() => {
-                                                setDashboardFocus('allowance');
+                                                startTransition(() => {
+                                                    setDashboardFocus('allowance');
+                                                });
                                                 setIsFocusMenuOpen(false);
                                             }}
                                             className={cn(
@@ -869,7 +882,9 @@ export function DashboardView() {
                                                 onHoverStart={() => setHoveredFocusId(bucket.id)}
                                                 onHoverEnd={() => setHoveredFocusId(null)}
                                                 onClick={() => {
-                                                    setDashboardFocus(bucket.id);
+                                                    startTransition(() => {
+                                                        setDashboardFocus(bucket.id);
+                                                    });
                                                     setIsFocusMenuOpen(false);
                                                 }}
                                                 className={cn(
@@ -1058,7 +1073,7 @@ export function DashboardView() {
                                                     startAngle={90}
                                                     endAngle={450}
                                                 >
-                                                    {spendingData.map((entry, index) => (
+                                                    {spendingData.map((entry: any, index: number) => (
                                                         <Cell key={`cell-${index}`} fill={entry.color} />
                                                     ))}
                                                 </Pie>
@@ -1066,7 +1081,7 @@ export function DashboardView() {
                                         </ChartContainer>
                                     </motion.div>
                                     <div className="w-full flex-1 space-y-3">
-                                        {spendingData.map((item) => (
+                                        {spendingData.map((item: any) => (
                                             <div key={item.name} className="flex items-center justify-between text-[11px]">
                                                 <div className="flex items-center gap-2">
                                                     <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
@@ -1090,36 +1105,12 @@ export function DashboardView() {
                 <div className="space-y-4">
                     <div className="flex justify-between items-center">
                         <h3 className="text-lg font-bold">Recent Transactions</h3>
-                <Dialog open={isViewAllOpen} onOpenChange={setIsViewAllOpen}>
-                    <DialogTrigger asChild>
-                        <button className="text-xs text-primary font-bold hover:text-primary/80 transition-colors uppercase tracking-wider px-2 py-1">View All</button>
-                    </DialogTrigger>
-                    <DialogContent className="max-w-xl p-0 gap-0 rounded-3xl overflow-hidden bg-background/98 backdrop-blur-2xl border-white/10 shadow-2xl h-[85vh] flex flex-col">
-                        <DialogHeader className="px-5 pt-5 pb-3 shrink-0">
-                            <DialogTitle className="text-2xl font-bold">All Transactions</DialogTitle>
-                            <DialogDescription>History of all your expenses.</DialogDescription>
-                        </DialogHeader>
-                        <div className="flex-1 px-2 pb-2 min-h-0 relative flex flex-col">
-                            <VirtualizedTransactionList
-                                transactions={displayTransactions}
-                                userId={userId}
-                                currency={currency}
-                                buckets={buckets}
-                                calculateUserShare={calculateUserShare}
-                                getIconForCategory={getIconForCategory}
-                                formatCurrency={formatCurrency}
-                                convertAmount={convertAmount}
-                                setEditingTransaction={setEditingTransaction}
-                                setIsEditOpen={setIsEditOpen}
-                                handleDeleteTransaction={handleDeleteTransaction}
-                                getBucketChip={getBucketChip}
-                                loadAuditLogs={loadAuditLogs}
-                                canEditTransaction={canEditTransaction}
-                                toast={toast}
-                            />
-                        </div>
-                    </DialogContent>
-                </Dialog>
+                <button 
+                    onClick={() => setIsViewAllOpen(true)}
+                    className="text-xs text-primary font-bold hover:text-primary/80 transition-colors uppercase tracking-wider px-2 py-1"
+                >
+                    View All
+                </button>
                     </div>
 
                     <div className="space-y-1">
@@ -1159,72 +1150,37 @@ export function DashboardView() {
                         )}
                     </div>
 
-                    {/* Audit Log Dialog */}
-                    <Dialog open={!!selectedAuditTx} onOpenChange={(open) => !open && setSelectedAuditTx(null)}>
-                        <DialogContent className="max-w-[340px] max-h-[80vh] flex flex-col rounded-3xl border-white/10 bg-card/98 backdrop-blur-xl">
-                            <DialogHeader>
-                                <DialogTitle className="flex items-center gap-2">
-                                    <History className="w-5 h-5 text-primary" />
-                                    Transaction History
-                                </DialogTitle>
-                                <DialogDescription>
-                                    Timeline of changes for "{selectedAuditTx?.description}"
-                                </DialogDescription>
-                            </DialogHeader>
-                            <ScrollArea className="flex-1 -mr-4 pr-4">
-                                {loadingAudit ? (
-                                    <div className="py-20 flex justify-center">
-                                        <WaveLoader bars={3} />
-                                    </div>
-                                ) : auditLogs.length > 0 ? (
-                                    <div className="space-y-6 relative before:absolute before:left-4 before:top-2 before:bottom-2 before:w-0.5 before:bg-white/5 pt-4">
-                                        {auditLogs.map((log) => (
-                                            <div key={log.id} className="relative pl-10">
-                                                <div className="absolute left-2.5 top-1 w-3.5 h-3.5 rounded-full bg-background border-2 border-primary z-10" />
-                                                <div className="bg-secondary/10 rounded-2xl p-4 border border-white/5 space-y-2">
-                                                    <div className="flex justify-between items-start">
-                                                        <span className={cn(
-                                                            "text-[11px] font-bold uppercase py-0.5 px-2 rounded",
-                                                            log.action === 'INSERT' ? "bg-emerald-500/20 text-emerald-500" :
-                                                                log.action === 'UPDATE' ? "bg-blue-500/20 text-blue-500" : "bg-rose-500/20 text-rose-500"
-                                                        )}>
-                                                            {log.action}
-                                                        </span>
-                                                        <span className="text-[11px] text-muted-foreground flex items-center gap-1">
-                                                            <Clock className="w-3 h-3" />
-                                                            {format(new Date(log.created_at), 'MMM d, h:mm a')}
-                                                        </span>
-                                                    </div>
-                                                    <p className="text-xs font-medium">
-                                                        {log.changed_by_profile?.full_name || 'System'} {log.action === 'INSERT' ? 'created this transaction' : log.action === 'UPDATE' ? 'updated this transaction' : 'deleted this transaction'}
-                                                    </p>
-                                                    {log.action === 'UPDATE' && log.old_data && log.new_data && (
-                                                        <div className="text-[11px] space-y-1 pt-1 opacity-80">
-                                                            {Object.keys(log.new_data).map(key => {
-                                                                if (log.old_data[key] !== log.new_data[key] && !['updated_at', 'created_at'].includes(key)) {
-                                                                    return (
-                                                                        <div key={key} className="flex flex-wrap gap-1">
-                                                                            <span className="font-bold text-muted-foreground">{key}:</span>
-                                                                            <span className="line-through text-rose-500/70">{JSON.stringify(log.old_data[key])}</span>
-                                                                            <span>→</span>
-                                                                            <span className="text-emerald-500">{JSON.stringify(log.new_data[key])}</span>
-                                                                        </div>
-                                                                    );
-                                                                }
-                                                                return null;
-                                                            })}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                ) : (
-                                    <div className="text-center py-10 text-muted-foreground text-sm">No history found.</div>
-                                )}
-                            </ScrollArea>
-                        </DialogContent>
-                    </Dialog>
+                    {/* Extracted Modular Components */}
+                    <DashboardTransactionsDrawer
+                        isOpen={isViewAllOpen}
+                        onOpenChange={setIsViewAllOpen}
+                    >
+                        <VirtualizedTransactionList
+                            transactions={displayTransactions}
+                            userId={userId}
+                            currency={currency}
+                            buckets={buckets}
+                            calculateUserShare={calculateUserShare}
+                            getIconForCategory={getIconForCategory}
+                            formatCurrency={formatCurrency}
+                            convertAmount={convertAmount}
+                            setEditingTransaction={setEditingTransaction}
+                            setIsEditOpen={setIsEditOpen}
+                            handleDeleteTransaction={handleDeleteTransaction}
+                            getBucketChip={getBucketChip}
+                            loadAuditLogs={loadAuditLogs}
+                            canEditTransaction={canEditTransaction}
+                            toast={toast}
+                        />
+                    </DashboardTransactionsDrawer>
+
+                    <TransactionHistoryDialog
+                        isOpen={!!selectedAuditTx}
+                        onOpenChange={(open) => !open && setSelectedAuditTx(null)}
+                        transaction={selectedAuditTx}
+                        auditLogs={auditLogs}
+                        isLoading={loadingAudit}
+                    />
                 </div>
 
                 {/* Edit Transaction Dialog */}
@@ -1362,18 +1318,21 @@ export function DashboardView() {
                     onClose={() => setActiveModal(null)}
                 />
 
-                <AddFundsDialog
-                    isOpen={isAddFundsOpen}
-                    onClose={() => setIsAddFundsOpen(false)}
-                    userId={userId}
-                    defaultBucketId={isBucketFocused ? dashboardFocus : undefined}
-                    onSuccess={() => userId && loadTransactions(userId)}
-                />
-                
-                <HowToUseDialog
-                    isOpen={isHowToUseOpen}
-                    onClose={() => setIsHowToUseOpen(false)}
-                />
+                {/* Suspense for lazy loaded dialogs */}
+                <Suspense fallback={null}>
+                    <AddFundsDialog
+                        isOpen={isAddFundsOpen}
+                        onClose={() => setIsAddFundsOpen(false)}
+                        userId={userId}
+                        defaultBucketId={isBucketFocused ? dashboardFocus : undefined}
+                        onSuccess={() => userId && loadTransactions(userId)}
+                    />
+                    
+                    <HowToUseDialog
+                        isOpen={isHowToUseOpen}
+                        onClose={() => setIsHowToUseOpen(false)}
+                    />
+                </Suspense>
             </div>
         </div>
     );
