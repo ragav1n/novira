@@ -1,7 +1,13 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { ChevronLeft, Search, SlidersHorizontal, Utensils, Car, Zap, ShoppingBag, HeartPulse, Clapperboard, Wallet, Banknote, CreditCard, CircleDollarSign, HelpCircle, Tag, Plane, Home, Gift, ShoppingCart, Stethoscope, Gamepad2, School, Laptop, Music, Heart, RefreshCcw, Shirt, Plus, LayoutGrid } from 'lucide-react';
+import { 
+    ChevronLeft, Search, SlidersHorizontal, CircleDollarSign, Tag, Plane, Home, Gift, 
+    Car, Utensils, ShoppingCart, Heart, Gamepad2, School, Laptop, Music, RefreshCcw, 
+    X, Check, Zap, ShoppingBag, HeartPulse, Clapperboard, LayoutGrid, HelpCircle, 
+    Calendar as CalendarIcon, Filter, Shirt 
+} from "lucide-react";
+import { CATEGORY_COLORS, getIconForCategory } from '@/lib/categories';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { Input } from '@/components/ui/input';
@@ -26,7 +32,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar as CalendarIcon, X, Check, Filter } from "lucide-react";
 import {
     Select,
     SelectContent,
@@ -50,18 +55,18 @@ type Transaction = {
 };
 
 const categories = [
-    { id: 'food', label: 'Food', icon: Utensils },
-    { id: 'groceries', label: 'Groceries', icon: ShoppingCart },
-    { id: 'fashion', label: 'Fashion', icon: Shirt },
-    { id: 'transport', label: 'Transport', icon: Car },
-    { id: 'bills', label: 'Bills', icon: Zap },
-    { id: 'shopping', label: 'Shopping', icon: ShoppingBag },
-    { id: 'healthcare', label: 'Healthcare', icon: HeartPulse },
-    { id: 'entertainment', label: 'Entertainment', icon: Clapperboard },
-    { id: 'rent', label: 'Rent', icon: Home },
-    { id: 'education', label: 'Education', icon: School },
-    { id: 'others', label: 'Others', icon: LayoutGrid },
-    { id: 'uncategorized', label: 'Uncategorized', icon: HelpCircle },
+    { id: 'food', label: 'Food' },
+    { id: 'groceries', label: 'Groceries' },
+    { id: 'fashion', label: 'Fashion' },
+    { id: 'transport', label: 'Transport' },
+    { id: 'bills', label: 'Bills' },
+    { id: 'shopping', label: 'Shopping' },
+    { id: 'healthcare', label: 'Healthcare' },
+    { id: 'entertainment', label: 'Entertainment' },
+    { id: 'rent', label: 'Rent' },
+    { id: 'education', label: 'Education' },
+    { id: 'others', label: 'Others' },
+    { id: 'uncategorized', label: 'Uncategorized' },
 ];
 
 const paymentMethods = ['Cash', 'UPI', 'Debit Card', 'Credit Card', 'Bank Transfer'];
@@ -204,11 +209,7 @@ export function SearchView() {
         return count;
     };
 
-    const getIconForCategory = (category: string) => {
-        const cat = categories.find(c => c.id === category.toLowerCase());
-        if (cat) return <cat.icon className="w-5 h-5 text-white" />;
-        return <CircleDollarSign className="w-5 h-5 text-white" />;
-    };
+    // Unified icon getter with color support is now handled in return
 
     const totalFilteredAmount = filteredTransactions.reduce((sum, tx) => sum + convertAmount(Number(tx.amount), tx.currency || 'USD'), 0);
 
@@ -393,8 +394,16 @@ export function SearchView() {
                                             }}
                                         >
                                             <div className="flex items-center gap-3">
-                                                <div className="w-8 h-8 rounded-full bg-secondary/20 flex items-center justify-center">
-                                                    <cat.icon className="w-4 h-4 text-white" />
+                                                <div 
+                                                    className="w-8 h-8 rounded-full flex items-center justify-center border"
+                                                    style={{ 
+                                                        backgroundColor: `${CATEGORY_COLORS[cat.id] || '#8A2BE2'}20`,
+                                                        borderColor: `${CATEGORY_COLORS[cat.id] || '#8A2BE2'}40`
+                                                    }}
+                                                >
+                                                    {React.cloneElement(getIconForCategory(cat.id) as React.ReactElement<any>, {
+                                                        style: { color: CATEGORY_COLORS[cat.id] || '#8A2BE2' }
+                                                    } as any)}
                                                 </div>
                                                 <span className="text-xs font-medium">{cat.label}</span>
                                             </div>
@@ -530,8 +539,16 @@ export function SearchView() {
                                     className="flex items-center justify-between p-3 rounded-2xl bg-card/20 border border-white/5 hover:bg-card/40 transition-colors"
                                 >
                                     <div className="flex items-center gap-3 min-w-0 flex-1">
-                                        <div className="w-10 h-10 rounded-full bg-secondary/20 flex items-center justify-center border border-white/5 shrink-0">
-                                            {getIconForCategory(tx.category)}
+                                        <div
+                                            className="w-10 h-10 rounded-full flex items-center justify-center border shrink-0 transition-colors"
+                                            style={{
+                                                backgroundColor: `${CATEGORY_COLORS[tx.category.toLowerCase()] || CATEGORY_COLORS.uncategorized}20`,
+                                                borderColor: `${CATEGORY_COLORS[tx.category.toLowerCase()] || CATEGORY_COLORS.uncategorized}40`
+                                            }}
+                                        >
+                                            {React.cloneElement(getIconForCategory(tx.category.toLowerCase()) as React.ReactElement<any>, {
+                                                style: { color: CATEGORY_COLORS[tx.category.toLowerCase()] || CATEGORY_COLORS.uncategorized }
+                                            } as any)}
                                         </div>
                                         <div className="min-w-0">
                                             <p className="font-medium text-sm truncate">{tx.description}</p>

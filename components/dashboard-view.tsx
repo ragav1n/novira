@@ -6,6 +6,7 @@ import React, { useEffect, useState, useRef, useCallback, useMemo, startTransiti
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { useRouter } from 'next/navigation';
 import { Plus, Utensils, Car, Zap, ShoppingBag, HeartPulse, Clapperboard, CircleDollarSign, ArrowUpRight, ArrowDownLeft, Users, MoreVertical, Pencil, Trash2, X, History, Clock, HelpCircle, Tag, Plane, Home, Gift, ShoppingCart, Stethoscope, Gamepad2, School, Laptop, Music, Heart, RefreshCcw, Wallet, ChevronRight, Check, Shirt, LayoutGrid } from 'lucide-react';
+import { CATEGORY_COLORS, getIconForCategory } from '@/lib/categories';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Pie, PieChart, Cell } from 'recharts';
@@ -51,23 +52,6 @@ import { TransactionHistoryDialog } from '@/components/transaction-history-dialo
 const AddFundsDialog = lazy(() => import('@/components/add-funds-dialog').then(module => ({ default: module.AddFundsDialog })));
 const HowToUseDialog = lazy(() => import('@/components/how-to-use-dialog').then(module => ({ default: module.HowToUseDialog })));
 
-// Constants
-const CATEGORY_COLORS: Record<string, string> = {
-    food: '#8A2BE2',      // Electric Purple
-    groceries: '#10B981', // Emerald
-    fashion: '#F472B6',   // Hot Pink
-    transport: '#FF6B6B', // Coral
-    bills: '#4ECDC4',     // Teal
-    shopping: '#F9C74F',  // Yellow
-    healthcare: '#FF9F1C', // Orange
-    entertainment: '#FF1493', // Deep Pink
-    rent: '#6366F1',       // Bright Indigo
-    education: '#84CC16',  // Bright Lime
-    others: '#2DD4BF',    // Mint
-    settlement: '#10B981', // Emerald for settlement
-    uncategorized: '#6366F1', // Indigo-500 for Uncategorized
-};
-
 // Animation variants
 const containerVariants = {
     hidden: { opacity: 0 },
@@ -92,19 +76,20 @@ const itemVariants = {
     },
 };
 
-const chartConfig: ChartConfig = {
-    food: { label: "Food & Dining", color: CATEGORY_COLORS.food },
-    groceries: { label: "Groceries", color: CATEGORY_COLORS.groceries },
-    fashion: { label: "Fashion", color: CATEGORY_COLORS.fashion },
-    transport: { label: "Transportation", color: CATEGORY_COLORS.transport },
-    bills: { label: "Bills & Utilities", color: CATEGORY_COLORS.bills },
-    shopping: { label: "Shopping", color: CATEGORY_COLORS.shopping },
-    healthcare: { label: "Healthcare", color: CATEGORY_COLORS.healthcare },
-    entertainment: { label: "Entertainment", color: CATEGORY_COLORS.entertainment },
-    rent: { label: "Rent", color: CATEGORY_COLORS.rent },
-    education: { label: "Education", color: CATEGORY_COLORS.education },
-    others: { label: "Others", color: CATEGORY_COLORS.others },
-    uncategorized: { label: "Uncategorized", color: CATEGORY_COLORS.uncategorized },
+// Chart config remains for label mapping, but colors are centralized
+const chartConfig: any = {
+    food: { label: "Food" },
+    groceries: { label: "Groceries" },
+    fashion: { label: "Fashion" },
+    transport: { label: "Transport" },
+    bills: { label: "Bills" },
+    shopping: { label: "Shopping" },
+    healthcare: { label: "Healthcare" },
+    entertainment: { label: "Entertainment" },
+    rent: { label: "Rent" },
+    education: { label: "Education" },
+    others: { label: "Others" },
+    uncategorized: { label: "Uncategorized" },
 };
 
 type Transaction = {
@@ -200,7 +185,8 @@ const VirtualizedTransactionList = ({
                 }
                 showConverted={showConverted}
                 canEdit={canEditTransaction(tx)}
-                icon={getIconForCategory(tx.category, 'w-4 h-4 text-white/90')}
+                icon={getIconForCategory(tx.category, 'w-4 h-4')}
+                color={CATEGORY_COLORS[tx.category.toLowerCase()] || CATEGORY_COLORS.uncategorized}
                 bucketChip={getBucketChip(tx)}
                 onHistory={() => loadAuditLogs(tx)}
                 onEdit={() => {
@@ -620,26 +606,6 @@ export function DashboardView() {
         color: CATEGORY_COLORS[cat] || CATEGORY_COLORS.others,
         fill: CATEGORY_COLORS[cat] || CATEGORY_COLORS.others,
     })), [spendingByCategory]);
-
-
-    const getIconForCategory = (category: string, className: string = "w-5 h-5 text-white") => {
-    switch (category.toLowerCase()) {
-        case 'food': return <Utensils className={className} />;
-        case 'groceries': return <ShoppingCart className={className} />;
-        case 'fashion': return <Shirt className={className} />;
-        case 'transport': return <Car className={className} />;
-        case 'bills': return <Zap className={className} />;
-        case 'shopping': return <ShoppingBag className={className} />;
-        case 'healthcare': return <HeartPulse className={className} />;
-        case 'entertainment': return <Clapperboard className={className} />;
-        case 'rent': return <Home className={className} />;
-        case 'education': return <School className={className} />;
-        case 'others': return <LayoutGrid className={className} />;
-        case 'settlement': return <ArrowUpRight className={className} />;
-        case 'uncategorized': return <HelpCircle className={className} />;
-        default: return <CircleDollarSign className={className} />;
-    }
-};
 
 
     // Filter transactions to only show relevant ones (where user has a share, paid, or it's a settlement for them)
@@ -1131,7 +1097,8 @@ export function DashboardView() {
                                     }
                                     showConverted={!!showConverted}
                                     canEdit={canEditTransaction(tx)}
-                                    icon={getIconForCategory(tx.category, 'w-4 h-4 text-white/90')}
+                                    icon={getIconForCategory(tx.category, 'w-4 h-4')}
+                                    color={CATEGORY_COLORS[tx.category.toLowerCase()] || CATEGORY_COLORS.uncategorized}
                                     bucketChip={getBucketChip(tx)}
                                     onHistory={() => loadAuditLogs(tx)}
                                     onEdit={() => { setEditingTransaction(tx); setIsEditOpen(true); }}

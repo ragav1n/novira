@@ -20,26 +20,7 @@ import {
 } from "@/components/ui/select"
 import { useUserPreferences } from '@/components/providers/user-preferences-provider';
 import { useBuckets } from '@/components/providers/buckets-provider';
-import {
-    Tag, Plane, Home, Gift, Car, Utensils, ShoppingCart,
-    Heart, Gamepad2, School, Laptop, Music
-} from 'lucide-react';
-
-// Constants for consistent coloring
-const CATEGORY_COLORS: Record<string, string> = {
-    food: '#8B5CF6',      // Violet
-    groceries: '#10B981', // Emerald
-    fashion: '#F472B6',   // Hot Pink
-    transport: '#3B82F6', // Blue
-    bills: '#06B6D4',     // Cyan
-    shopping: '#F59E0B',  // Amber
-    healthcare: '#EF4444', // Red
-    entertainment: '#EC4899', // Pink
-    rent: '#6366F1',       // Bright Indigo
-    education: '#84CC16',  // Bright Lime
-    others: '#2DD4BF',    // Mint
-    uncategorized: '#6366F1', // Indigo
-};
+import { CATEGORY_COLORS, getIconForCategory } from '@/lib/categories';
 
 const chartConfig: ChartConfig = {
     food: { label: "Food", color: CATEGORY_COLORS.food },
@@ -136,13 +117,10 @@ export function AnalyticsView() {
     const [selectedBucketId, setSelectedBucketId] = useState<string | 'all'>('all');
     const { formatCurrency, currency, convertAmount, userId } = useUserPreferences();
 
+    // getIconForCategory is now imported from lib/categories.ts
     const getBucketIcon = (iconName?: string) => {
-        const icons: Record<string, any> = {
-            Tag, Plane, Home, Gift, Car, Utensils, ShoppingCart,
-            Heart, Gamepad2, School, Laptop, Music, Shirt
-        };
-        const Icon = icons[iconName || 'Tag'] || Tag;
-        return <Icon className="w-full h-full" />;
+        const iconElement = getIconForCategory(iconName || 'Tag');
+        return React.cloneElement(iconElement as React.ReactElement<any>, { className: "w-full h-full" });
     };
 
     const { buckets } = useBuckets();

@@ -9,18 +9,19 @@ import {
 import { cn } from '@/lib/utils';
 
 interface TransactionRowProps {
-  tx: any;
-  userId: string | null;
+  tx: any; // Assuming 'Transaction' type is not available in the original context, keeping 'any'
+  userId: string | null; // Keeping original type
   myShare: number;
   formattedAmount: string;
   formattedConverted?: string;
-  showConverted: boolean;
+  showConverted: boolean; // Keeping original type
   canEdit: boolean;
   icon: React.ReactNode;
-  bucketChip: React.ReactNode | null;
-  onHistory: () => void;
-  onEdit: () => void;
-  onDelete: () => void;
+  color?: string; // New color prop
+  bucketChip: React.ReactNode | null; // Keeping original type
+  onHistory: () => void; // Keeping original type
+  onEdit: () => void; // Keeping original type
+  onDelete: () => void; // Keeping original type
 }
 
 export const TransactionRow = memo(function TransactionRow({
@@ -32,6 +33,7 @@ export const TransactionRow = memo(function TransactionRow({
   showConverted,
   canEdit,
   icon,
+  color = '#8A2BE2', // Default to Electric Purple
   bucketChip,
   onHistory,
   onEdit,
@@ -45,8 +47,20 @@ export const TransactionRow = memo(function TransactionRow({
     <div className="flex items-start gap-4 p-4.5 rounded-2xl bg-card/30 border border-white/5 hover:bg-card/50 transition-all duration-300 group shadow-md relative mt-2 first:mt-0">
       {/* Icon */}
       <div className="relative shrink-0 mt-0.5">
-        <div className="w-10 h-10 rounded-full bg-secondary/20 flex items-center justify-center border border-white/10 shadow-inner">
-          {icon}
+        <div
+          className="w-10 h-10 rounded-full flex items-center justify-center border shadow-inner transition-colors duration-300"
+          style={{
+            backgroundColor: `${color}20`, // 20% opacity background
+            borderColor: `${color}40`,     // 40% opacity border
+          }}
+        >
+          {React.isValidElement(icon)
+            ? React.cloneElement(icon as React.ReactElement<any>, {
+                style: { color: color },
+                className: cn((icon as React.ReactElement<any>).props.className, "transition-colors duration-300")
+              })
+            : icon
+          }
         </div>
         {hasSplits && (
           <div className="absolute -bottom-1 -right-1 w-4.5 h-4.5 rounded-full bg-primary flex items-center justify-center border border-background shadow-sm">
