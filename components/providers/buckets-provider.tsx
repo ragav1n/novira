@@ -39,59 +39,54 @@ export function BucketsProvider({ children }: { children: React.ReactNode }) {
     const [bucketSpending, setBucketSpending] = useState<Record<string, number>>({});
     const [loading, setLoading] = useState(true);
 
-    const fetchBucketSpending = useCallback(async (bucketList: Bucket[]) => {
-        if (!userId) return;
-        try {
-            const { data, error } = await supabase
-                .from('transactions')
-                .select('amount, currency, bucket_id, exchange_rate, base_currency')
-                .not('bucket_id', 'is', null);
-
-            if (error) throw error;
-
-            const spending: Record<string, number> = {};
-            data?.forEach(tx => {
-                const bId = tx.bucket_id;
-                if (!bId) return;
-
-                const bucketConfig = bucketList.find(b => b.id === bId);
-                const bucketCurrency = (bucketConfig?.currency || currency).toUpperCase();
-
-                let amountInBucketCurrency = 0;
-                if (tx.currency === bucketCurrency) {
-                    amountInBucketCurrency = Number(tx.amount);
-                } else if (tx.exchange_rate && tx.base_currency === bucketCurrency) {
-                    amountInBucketCurrency = Number(tx.amount) * Number(tx.exchange_rate);
-                } else {
-                    amountInBucketCurrency = convertAmount(Number(tx.amount), tx.currency || 'USD', bucketCurrency);
-                }
-
-                spending[bId] = (spending[bId] || 0) + amountInBucketCurrency;
-            });
-            setBucketSpending(spending);
-        } catch (error) {
-            console.error('Error fetching bucket spending:', error);
-        }
-    }, [userId, currency, convertAmount]);
-
     const fetchBuckets = useCallback(async () => {
         if (!userId) return;
         try {
-            const { data, error } = await supabase
-                .from('buckets')
-                .select('*')
-                .order('created_at', { ascending: false });
+            // Fire both queries in parallel
+            const [bucketsResult, spendingResult] = await Promise.all([
+                supabase
+                    .from('buckets')
+                    .select('*')
+                    .order('created_at', { ascending: false }),
+                supabase
+                    .from('transactions')
+                    .select('amount, currency, bucket_id, exchange_rate, base_currency')
+                    .not('bucket_id', 'is', null)
+            ]);
 
-            if (error) throw error;
-            const fetchedBuckets = data || [];
+            if (bucketsResult.error) throw bucketsResult.error;
+            const fetchedBuckets = bucketsResult.data || [];
             setBuckets(fetchedBuckets);
-            await fetchBucketSpending(fetchedBuckets);
+
+            // Process spending with the fetched buckets
+            if (!spendingResult.error && spendingResult.data) {
+                const spending: Record<string, number> = {};
+                spendingResult.data.forEach(tx => {
+                    const bId = tx.bucket_id;
+                    if (!bId) return;
+
+                    const bucketConfig = fetchedBuckets.find(b => b.id === bId);
+                    const bucketCurrency = (bucketConfig?.currency || currency).toUpperCase();
+
+                    let amountInBucketCurrency = 0;
+                    if (tx.currency === bucketCurrency) {
+                        amountInBucketCurrency = Number(tx.amount);
+                    } else if (tx.exchange_rate && tx.base_currency === bucketCurrency) {
+                        amountInBucketCurrency = Number(tx.amount) * Number(tx.exchange_rate);
+                    } else {
+                        amountInBucketCurrency = convertAmount(Number(tx.amount), tx.currency || 'USD', bucketCurrency);
+                    }
+
+                    spending[bId] = (spending[bId] || 0) + amountInBucketCurrency;
+                });
+                setBucketSpending(spending);
+            }
         } catch (error) {
             console.error('Error fetching buckets:', error);
         } finally {
             setLoading(false);
         }
-    }, [userId, fetchBucketSpending]);
+    }, [userId, currency, convertAmount]);
 
     useEffect(() => {
         if (userId) {

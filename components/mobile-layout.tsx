@@ -185,7 +185,7 @@ export function MobileLayout({ children }: { children: React.ReactNode }) {
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-[9999] flex items-center justify-center bg-background/40 backdrop-blur-md"
+                        className="fixed inset-0 z-[9999] flex items-center justify-center bg-background/80"
                     >
                         <WaveLoader bars={5} />
                     </motion.div>

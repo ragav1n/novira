@@ -86,11 +86,11 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
-    // Navigation requests: network-first with cache fallback (for the app shell)
+    // Navigation requests: stale-while-revalidate (serve cache instantly, update in background)
     if (request.mode === 'navigate') {
         event.respondWith(
-            fetch(request)
-                .then((response) => {
+            caches.match(request).then((cachedResponse) => {
+                const fetchPromise = fetch(request).then((response) => {
                     if (response.ok) {
                         const responseClone = response.clone();
                         caches.open(CACHE_NAME).then((cache) => {
@@ -98,12 +98,14 @@ self.addEventListener('fetch', (event) => {
                         });
                     }
                     return response;
-                })
-                .catch(() => {
-                    return caches.match(request).then((cachedResponse) => {
-                        return cachedResponse || caches.match('/');
-                    });
-                })
+                }).catch(() => {
+                    // Network failed, cachedResponse will be used (or fallback to root)
+                    return cachedResponse || caches.match('/');
+                });
+
+                // Return cached response immediately if available, otherwise wait for network
+                return cachedResponse || fetchPromise;
+            })
         );
         return;
     }

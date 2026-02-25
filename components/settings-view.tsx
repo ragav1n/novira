@@ -82,8 +82,11 @@ export function SettingsView() {
     }, [monthlyBudget]);
 
     useEffect(() => {
-        getProfile();
-        if (userId) loadRecurringTemplates();
+        if (userId) {
+            Promise.all([getProfile(), loadRecurringTemplates()]);
+        } else {
+            getProfile();
+        }
     }, [userId]);
 
     const getProfile = async () => {
