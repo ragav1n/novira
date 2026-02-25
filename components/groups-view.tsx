@@ -7,7 +7,7 @@ import {
     Search, Mail, Check, X, Shield, MoreVertical, LogOut, ArrowRight, UserMinus,
     Home, Plane, Heart, FileText, Calendar as CalendarIcon, Copy, Scan, QrCode,
     Tag, Archive, Trash2, Settings2, Target, History, Gift, Car, Utensils, ShoppingCart,
-    Stethoscope, Gamepad2, School, Laptop, Music, RotateCcw
+    Stethoscope, Gamepad2, School, Laptop, Music, RotateCcw, Sparkles, Zap
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -46,7 +46,7 @@ import {
 
 export function GroupsView() {
     const router = useRouter();
-    const { groups, friends, friendRequests, balances, pendingSplits, createGroup, addFriendByEmail, addFriendById, addMemberToGroup, settleSplit, acceptFriendRequest, declineFriendRequest, leaveGroup, removeFriend } = useGroups();
+    const { groups, friends, friendRequests, balances, pendingSplits, simplifiedDebts, createGroup, addFriendByEmail, addFriendById, addMemberToGroup, settleSplit, acceptFriendRequest, declineFriendRequest, leaveGroup, removeFriend } = useGroups();
     const { formatCurrency, userId, currency, convertAmount } = useUserPreferences();
 
     const { buckets, createBucket, updateBucket, archiveBucket, deleteBucket, bucketSpending, loading: bucketsLoading } = useBuckets();
@@ -74,6 +74,7 @@ export function GroupsView() {
     const [isManageMembersOpen, setIsManageMembersOpen] = useState(false);
     const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
     const [isProcessing, setIsProcessing] = useState(false);
+    const [settlingPaymentIndex, setSettlingPaymentIndex] = useState<number | null>(null);
 
     const handleCreateGroup = async () => {
         if (!newGroupName.trim()) return;
@@ -1110,6 +1111,80 @@ export function GroupsView() {
                     )}
                 </TabsContent>
                 <TabsContent value="settlements" className="mt-6 space-y-4">
+                    {/* Smart Settle Section */}
+                    {simplifiedDebts.length > 0 && pendingSplits.length >= 2 && (
+                        <div className="space-y-3">
+                            <div className="flex items-center gap-2 px-1">
+                                <div className="w-5 h-5 rounded-full bg-amber-500/20 flex items-center justify-center">
+                                    <Sparkles className="w-3 h-3 text-amber-500" />
+                                </div>
+                                <div>
+                                    <h3 className="text-xs font-bold text-amber-500 uppercase tracking-widest">Smart Settle</h3>
+                                </div>
+                                <Badge variant="outline" className="text-[9px] border-amber-500/30 text-amber-500/80 ml-auto">
+                                    {simplifiedDebts.length} payment{simplifiedDebts.length !== 1 ? 's' : ''} instead of {pendingSplits.length}
+                                </Badge>
+                            </div>
+                            <p className="text-[11px] text-muted-foreground px-1 -mt-1">
+                                Settle with fewer payments — we simplified your debts.
+                            </p>
+                            {simplifiedDebts.map((payment, index) => {
+                                const isMyPayment = payment.from === userId;
+                                const isSettling = settlingPaymentIndex === index;
+                                return (
+                                    <div key={`${payment.from}-${payment.to}-${index}`} className="p-3.5 rounded-2xl bg-gradient-to-r from-amber-500/5 to-orange-500/5 border border-amber-500/15">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-3 min-w-0">
+                                                <div className="w-10 h-10 rounded-full bg-amber-500/15 flex items-center justify-center shrink-0">
+                                                    <Zap className="w-5 h-5 text-amber-500" />
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <p className="text-sm font-bold truncate">
+                                                        {payment.fromName} <ArrowRight className="w-3.5 h-3.5 inline mx-1 text-muted-foreground" /> {payment.toName}
+                                                    </p>
+                                                    <p className="text-[11px] text-muted-foreground">
+                                                        {payment.splitIds.length} split{payment.splitIds.length !== 1 ? 's' : ''} combined
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <div className="flex flex-col items-end gap-1.5 shrink-0 ml-3">
+                                                <span className="font-bold text-sm text-amber-500">
+                                                    {formatCurrency(payment.amount)}
+                                                </span>
+                                                {isMyPayment && (
+                                                    <Button
+                                                        size="sm"
+                                                        disabled={isSettling}
+                                                        className="h-7 text-[11px] rounded-full bg-amber-500/20 text-amber-500 border border-amber-500/30 hover:bg-amber-500/30 gap-1"
+                                                        onClick={async () => {
+                                                            setSettlingPaymentIndex(index);
+                                                            try {
+                                                                for (const splitId of payment.splitIds) {
+                                                                    await settleSplit(splitId);
+                                                                }
+                                                                toast.success(`Settled ${payment.splitIds.length} split${payment.splitIds.length !== 1 ? 's' : ''} with ${payment.toName}!`);
+                                                            } catch (error: any) {
+                                                                toast.error(error.message || 'Failed to settle');
+                                                            } finally {
+                                                                setSettlingPaymentIndex(null);
+                                                            }
+                                                        }}
+                                                    >
+                                                        <Zap className="w-3 h-3" />
+                                                        {isSettling ? 'Settling...' : 'Settle All'}
+                                                    </Button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                            {pendingSplits.length >= 2 && (
+                                <div className="h-px bg-white/5 my-2" />
+                            )}
+                        </div>
+                    )}
+
                     {pendingSplits.length > 0 ? (
                         pendingSplits.map((split) => {
                             const isDebtor = split.user_id === userId;

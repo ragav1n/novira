@@ -4,6 +4,7 @@ import React, { createContext, useContext, useEffect, useState, useCallback, use
 import { supabase } from '@/lib/supabase';
 import { toast } from '@/utils/haptics';
 import { useUserPreferences } from './user-preferences-provider';
+import { simplifyDebts, type SimplifiedPayment } from '@/utils/simplify-debts';
 
 interface Group {
     id: string;
@@ -69,6 +70,7 @@ interface GroupsContextType {
     declineFriendRequest: (requestId: string) => Promise<void>;
     leaveGroup: (groupId: string) => Promise<void>;
     removeFriend: (friendshipId: string) => Promise<void>;
+    simplifiedDebts: SimplifiedPayment[];
 }
 
 const GroupsContext = createContext<GroupsContextType | undefined>(undefined);
@@ -513,14 +515,21 @@ export function GroupsProvider({ children }: { children: React.ReactNode }) {
         return true;
     }, [userId, refreshData]);
 
+    const computedSimplifiedDebts = useMemo(() => {
+        if (!userId || pendingSplits.length === 0) return [];
+        return simplifyDebts(pendingSplits, userId, convertAmount, userCurrency);
+    }, [pendingSplits, userId, convertAmount, userCurrency]);
+
     const contextValue = useMemo(() => ({
         groups, friends, friendRequests, balances, pendingSplits, loading,
         refreshData, createGroup, addFriendByEmail, addFriendById, addMemberToGroup, settleSplit,
-        acceptFriendRequest, declineFriendRequest, leaveGroup, removeFriend
+        acceptFriendRequest, declineFriendRequest, leaveGroup, removeFriend,
+        simplifiedDebts: computedSimplifiedDebts
     }), [
         groups, friends, friendRequests, balances, pendingSplits, loading,
         refreshData, createGroup, addFriendByEmail, addFriendById, addMemberToGroup, settleSplit,
-        acceptFriendRequest, declineFriendRequest, leaveGroup, removeFriend
+        acceptFriendRequest, declineFriendRequest, leaveGroup, removeFriend,
+        computedSimplifiedDebts
     ]);
 
     return (
