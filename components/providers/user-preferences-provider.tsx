@@ -113,18 +113,33 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
 
     const loadPreferences = useCallback(async (uid: string) => {
         try {
+            // First, hydrate from localStorage for instant UI feedback
+            const cacheKey = `novira_profile_${uid}`;
+            const cached = localStorage.getItem(cacheKey);
+            if (cached) {
+                const parsed = JSON.parse(cached);
+                if (parsed.currency) setCurrencyState(parsed.currency);
+                if (parsed.budget_alerts !== null) setBudgetAlertsEnabledState(parsed.budget_alerts);
+                if (parsed.monthly_budget) setMonthlyBudgetState(parsed.monthly_budget);
+                if (parsed.avatar_url) setAvatarUrl(parsed.avatar_url);
+                if (parsed.budgets) setBudgets(parsed.budgets);
+            }
+
             const { data, error } = await supabase
                 .from('profiles')
                 .select('currency, budget_alerts, monthly_budget, budgets, avatar_url')
                 .eq('id', uid)
                 .single();
-
+ 
             if (data) {
                 if (data.currency) setCurrencyState(data.currency as Currency);
                 if (data.budget_alerts !== null) setBudgetAlertsEnabledState(data.budget_alerts);
                 if (data.monthly_budget) setMonthlyBudgetState(data.monthly_budget);
                 if (data.avatar_url) setAvatarUrl(data.avatar_url);
                 if (data.budgets) setBudgets(data.budgets as Record<string, number>);
+
+                // Update cache with fresh data
+                localStorage.setItem(cacheKey, JSON.stringify(data));
             }
             if (error && error.code !== 'PGRST116') {
                 console.error('Error fetching preferences:', error);
@@ -140,10 +155,10 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
         setUserId(currentUser?.id ?? null);
 
         if (currentUser) {
-            await Promise.all([
-                loadPreferences(currentUser.id),
-                processRecurringExpenses(currentUser.id)
-            ]);
+            // Load preferences immediately (hydrates from cache first)
+            loadPreferences(currentUser.id);
+            // Process recurring expenses in the background
+            setTimeout(() => processRecurringExpenses(currentUser.id), 1000);
         } else {
             // Reset preferences on logout
             setCurrencyState('INR');
