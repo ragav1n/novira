@@ -4,6 +4,7 @@ import { headers } from 'next/headers'
 import { Analytics } from '@vercel/analytics/next'
 import './globals.css'
 import { MobileLayout } from '@/components/mobile-layout'
+import { PWAUpdater } from '@/components/pwa-updater'
 import { UserPreferencesProvider } from '@/components/providers/user-preferences-provider'
 import { GroupsProvider } from '@/components/providers/groups-provider'
 import { BucketsProvider } from '@/components/providers/buckets-provider'
@@ -60,6 +61,7 @@ export default async function RootLayout({
   return (
     <html lang="en" className="dark">
       <body suppressHydrationWarning className={`${geist.variable} ${geistMono.variable} font-sans antialiased`}>
+        <PWAUpdater />
         <UserPreferencesProvider>
           <MobileLayout>
             <GroupsProvider>

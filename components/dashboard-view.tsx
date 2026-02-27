@@ -121,6 +121,7 @@ type Transaction = {
     }[];
     profile?: {
         full_name: string;
+        avatar_url?: string;
     };
 };
 
@@ -363,7 +364,7 @@ export function DashboardView() {
         try {
             const { data: txs } = await supabase
                 .from('transactions')
-                .select('id, description, amount, category, date, created_at, user_id, currency, exchange_rate, base_currency, bucket_id, exclude_from_allowance, is_recurring, place_name, place_address, place_lat, place_lng, profile:profiles(full_name), splits(user_id, amount, is_paid)')
+                .select('id, description, amount, category, date, created_at, user_id, currency, exchange_rate, base_currency, bucket_id, exclude_from_allowance, is_recurring, place_name, place_address, place_lat, place_lng, profile:profiles(full_name, avatar_url), splits(user_id, amount, is_paid)')
                 .order('date', { ascending: false })
                 .order('created_at', { ascending: false })
                 .limit(200);
