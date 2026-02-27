@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Zap, Users, Tag, PieChart, FileDown, Plus, Wallet, Globe, X, CheckCircle2 } from 'lucide-react';
+import { Zap, Users, Tag, PieChart, FileDown, Plus, Wallet, Globe, X, CheckCircle2, MapPin } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 type HowToUseDialogProps = {
@@ -26,7 +26,17 @@ export function HowToUseDialog({ isOpen, onClose }: HowToUseDialogProps) {
             subPoints: [
                 "Intelligent categorization (Food, Transport, etc.)",
                 "Real-time FX conversions for 160+ currencies",
-                "Receipt attachment for digital records"
+                "Location tagging with smart place search"
+            ]
+        },
+        {
+            icon: <MapPin className="w-6 h-6 text-rose-400" />,
+            title: "Map Your Spending journey",
+            desc: "Location is everything. When adding an expense, use the 'Location' field to search for specific shops, cafes, or landmarks. Once tagged, you can view your entire financial history geographically using the Expense Map. Switch to 'Heatmap' mode to see where your money concentrates, or turn on 'Trip Trails' to see the path you took across a city during a vacation.",
+            subPoints: [
+                "Interactive floating Map with category filters",
+                "Density heatmaps for spending 'hotspots'",
+                "Spending Trails (Trip Mode) for travel stories"
             ]
         },
         {

@@ -5,7 +5,7 @@ import { BudgetAlertManager } from '@/components/budget-alert-manager';
 import React, { useEffect, useState, useRef, useCallback, useMemo, startTransition, lazy, Suspense } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { useRouter } from 'next/navigation';
-import { Plus, Utensils, Car, Zap, ShoppingBag, HeartPulse, Clapperboard, CircleDollarSign, ArrowUpRight, ArrowDownLeft, Users, MoreVertical, Pencil, Trash2, X, History, Clock, HelpCircle, Tag, Plane, Home, Gift, ShoppingCart, Stethoscope, Gamepad2, School, Laptop, Music, Heart, RefreshCcw, Wallet, ChevronRight, Check, Shirt, LayoutGrid } from 'lucide-react';
+import { Plus, Utensils, Car, Zap, ShoppingBag, HeartPulse, Clapperboard, CircleDollarSign, ArrowUpRight, ArrowDownLeft, Users, MoreVertical, Pencil, Trash2, X, History, Clock, HelpCircle, Tag, Plane, Home, Gift, ShoppingCart, Stethoscope, Gamepad2, School, Laptop, Music, Heart, RefreshCcw, Wallet, ChevronRight, Check, Shirt, LayoutGrid, MapPin } from 'lucide-react';
 import { CATEGORY_COLORS, getIconForCategory } from '@/lib/categories';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -47,6 +47,8 @@ import { LATEST_FEATURE_ANNOUNCEMENT } from '@/lib/feature-flags';
 import { TransactionRow } from '@/components/transaction-row';
 import { DashboardTransactionsDrawer } from '@/components/dashboard-transactions-drawer';
 import { TransactionHistoryDialog } from '@/components/transaction-history-dialog';
+import { LocationPicker } from '@/components/ui/location-picker';
+import { ExpenseMapView } from '@/components/expense-map-view';
 
 // Lazy load non-critical dialogs
 const AddFundsDialog = lazy(() => import('@/components/add-funds-dialog').then(module => ({ default: module.AddFundsDialog })));
@@ -108,6 +110,10 @@ type Transaction = {
     is_recurring?: boolean;
     bucket_id?: string;
     exclude_from_allowance?: boolean;
+    place_name?: string;
+    place_address?: string;
+    place_lat?: number;
+    place_lng?: number;
     splits?: {
         user_id: string;
         amount: number;
@@ -247,6 +253,7 @@ export function DashboardView() {
 
     // Modal Interaction State
     const [isViewAllOpen, setIsViewAllOpen] = useState(false);
+    const [isMapOpen, setIsMapOpen] = useState(false);
     const isAnyModalOpen = isViewAllOpen || activeModal !== null || isAddFundsOpen || isHowToUseOpen || isEditOpen;
 
     // Debounced realtime refresh for transaction changes
@@ -356,7 +363,7 @@ export function DashboardView() {
         try {
             const { data: txs } = await supabase
                 .from('transactions')
-                .select('id, description, amount, category, date, created_at, user_id, currency, exchange_rate, base_currency, bucket_id, exclude_from_allowance, is_recurring, profile:profiles(full_name), splits(user_id, amount, is_paid)')
+                .select('id, description, amount, category, date, created_at, user_id, currency, exchange_rate, base_currency, bucket_id, exclude_from_allowance, is_recurring, place_name, place_address, place_lat, place_lng, profile:profiles(full_name), splits(user_id, amount, is_paid)')
                 .order('date', { ascending: false })
                 .order('created_at', { ascending: false })
                 .limit(200);
@@ -448,6 +455,10 @@ export function DashboardView() {
                     amount: savedEditingTx.amount,
                     bucket_id: savedEditingTx.bucket_id || null,
                     exclude_from_allowance: savedEditingTx.exclude_from_allowance || false,
+                    place_name: savedEditingTx.place_name || null,
+                    place_address: savedEditingTx.place_address || null,
+                    place_lat: savedEditingTx.place_lat || null,
+                    place_lng: savedEditingTx.place_lng || null,
                 })
                 .eq('id', savedEditingTx.id);
 
@@ -1073,12 +1084,23 @@ export function DashboardView() {
                 <div className="space-y-4">
                     <div className="flex justify-between items-center">
                         <h3 className="text-lg font-bold">Recent Transactions</h3>
-                <button 
-                    onClick={() => setIsViewAllOpen(true)}
-                    className="text-xs text-primary font-bold hover:text-primary/80 transition-colors uppercase tracking-wider px-2 py-1"
-                >
-                    View All
-                </button>
+                        <div className="flex items-center gap-2">
+                            {transactions.some(tx => tx.place_lat && tx.place_lng) && (
+                                <button
+                                    onClick={() => setIsMapOpen(true)}
+                                    className="text-xs text-emerald-400 font-bold hover:text-emerald-300 transition-colors uppercase tracking-wider px-2 py-1 flex items-center gap-1"
+                                >
+                                    <MapPin className="w-3 h-3" />
+                                    Map
+                                </button>
+                            )}
+                            <button
+                                onClick={() => setIsViewAllOpen(true)}
+                                className="text-xs text-primary font-bold hover:text-primary/80 transition-colors uppercase tracking-wider px-2 py-1"
+                            >
+                                View All
+                            </button>
+                        </div>
                     </div>
 
                     <div className="space-y-1">
@@ -1154,7 +1176,7 @@ export function DashboardView() {
 
                 {/* Edit Transaction Dialog */}
                 <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-                    <DialogContent className="max-w-md rounded-3xl border-white/10 bg-card/95 backdrop-blur-xl">
+                    <DialogContent className="max-w-md rounded-3xl border-white/10 bg-card/95 backdrop-blur-xl max-h-[90vh] overflow-y-auto overflow-x-hidden no-scrollbar">
                         <DialogHeader>
                             <DialogTitle>Edit Transaction</DialogTitle>
                             <DialogDescription>Update your transaction details.</DialogDescription>
@@ -1250,6 +1272,20 @@ export function DashboardView() {
                                         />
                                     </div>
                                 </div>
+                                {/* Location in Edit Mode */}
+                                <LocationPicker
+                                    placeName={editingTransaction.place_name || null}
+                                    placeAddress={editingTransaction.place_address || null}
+                                    placeLat={editingTransaction.place_lat || null}
+                                    placeLng={editingTransaction.place_lng || null}
+                                    onChange={(loc) => setEditingTransaction({
+                                        ...editingTransaction,
+                                        place_name: loc.place_name || undefined,
+                                        place_address: loc.place_address || undefined,
+                                        place_lat: loc.place_lat || undefined,
+                                        place_lng: loc.place_lng || undefined,
+                                    })}
+                                />
                                 <DialogFooter className="pt-4 gap-2 sm:gap-0">
                                     <DialogClose asChild>
                                         <Button type="button" variant="outline" className="rounded-xl">Cancel</Button>
@@ -1261,7 +1297,15 @@ export function DashboardView() {
                     </DialogContent>
                 </Dialog>
 
-                {/* Feature Modals */}
+                {/* Expense Map View */}
+            <ExpenseMapView 
+                isOpen={isMapOpen}
+                onClose={() => setIsMapOpen(false)}
+                transactions={transactions}
+                formatCurrency={formatCurrency}
+            />
+
+            {/* Quick Record Modal */}
                 <WelcomeModal
                     isOpen={activeModal === 'welcome'}
                     onClose={() => {

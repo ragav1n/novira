@@ -1,39 +1,34 @@
 export const LATEST_FEATURE_ANNOUNCEMENT = {
-    id: 'groceries-fashion-payment-v4', // New ID to trigger the modal
-    title: 'New Styles & Insights!',
+    id: 'location-maps-v5', // New ID to trigger the modal
+    title: 'Maps, Trails & Insights!',
     features: [
         {
-            title: 'Fashion & Groceries',
-            description: 'New Emerald Green for Groceries and Pink for Fashion categories! We\'ve also refined auto-categorization for these new styles.',
-            icon: 'star'
+            title: 'Location Tagging',
+            description: 'Tag your expenses with physical locations using our new smart search. Never forget where you spent your money.',
+            icon: 'map'
         },
         {
-            title: 'Add Funds & Income',
-            description: 'Manually add funds or log income directly from the Dashboard to accurately boost your remaining allowance.',
-            icon: 'wallet'
+            title: 'Interactive Expense Map',
+            description: 'Visualize your spending globally on a premium floating map with real-time category filtering.',
+            icon: 'globe'
+        },
+        {
+            title: 'Trip Mode & Trails',
+            description: 'Chronologically connect your spending to see your "Spending Path" through a city or on a vacation.',
+            icon: 'zap'
+        },
+        {
+            title: 'Spending Heatmaps',
+            description: 'Identify spending "hotspots" with our new density-based heatmaps. See where your money concentrates most.',
+            icon: 'ai'
         },
         {
             title: 'Multi-Currency Support',
             description: 'Spend globally. Automatically track expenses in foreign currencies with real-time exchange rate conversions.',
             icon: 'globe'
-        },
-        {
-            title: 'Payment Method Analytics',
-            description: 'Dive deep into your habits with new interactive pie charts for Credit Card vs Cash vs Debit spending in Analytics.',
-            icon: 'chart'
-        },
-        {
-            title: 'Mission Focus & Currencies',
-            description: 'Allocate specific currencies (like EUR for a trip) to separate Mission Buckets and track them independently from your main budget.',
-            icon: 'globe'
-        },
-        {
-            title: 'Advanced PDF Recaps',
-            description: 'Professional multi-page PDF reports now feature cleaner summaries and explicit "Excluded from Budget" transaction flagging.',
-            icon: 'export'
         }
     ],
-    buttonText: 'Got it!',
+    buttonText: 'Let\'s Go!!',
 };
 
 export const WELCOME_FEATURES = [
@@ -71,6 +66,11 @@ export const WELCOME_FEATURES = [
         title: 'Multi-Currency',
         description: 'Spend globally with automatic conversions and historical exchange rates.',
         icon: 'globe'
+    },
+    {
+        title: 'Map & Location Tracking',
+        description: 'Tag expenses with locations and visualize your spending journey on an interactive map.',
+        icon: 'map'
     },
     {
         title: 'Flexible Exports',

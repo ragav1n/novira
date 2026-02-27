@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { ChevronLeft, CreditCard, Utensils, Car, Zap, ShoppingBag, HeartPulse, Clapperboard, Wallet, Banknote, HelpCircle, RefreshCcw, Calendar as CalendarIcon, Users, User, CheckCircle2, X, Tag, Plane, Home, Gift, ShoppingCart, Gamepad2, School, Laptop, Music, Heart, Smartphone, Shirt, LayoutGrid, Building2 } from 'lucide-react';
+import { ChevronLeft, CreditCard, Utensils, Car, Zap, ShoppingBag, HeartPulse, Clapperboard, Wallet, Banknote, HelpCircle, RefreshCcw, Calendar as CalendarIcon, Users, User, CheckCircle2, X, Tag, Plane, Home, Gift, ShoppingCart, Gamepad2, School, Laptop, Music, Heart, Smartphone, Shirt, LayoutGrid, Building2, MapPin } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -24,6 +24,7 @@ import { useBuckets } from '@/components/providers/buckets-provider';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { CurrencyDropdown } from '@/components/ui/currency-dropdown';
+import { LocationPicker } from '@/components/ui/location-picker';
 
 const dropdownCategories: Category[] = [
     { id: 'food', label: 'Food & Dining', icon: Utensils, color: '#FF6B6B' },
@@ -68,6 +69,7 @@ export function AddExpenseView() {
         setTxCurrency(currency);
     }, [currency]);
 
+
     // Splitting State
     const [isSplitEnabled, setIsSplitEnabled] = useState(false);
     const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
@@ -81,6 +83,51 @@ export function AddExpenseView() {
 
     // Exclusion State
     const [excludeFromAllowance, setExcludeFromAllowance] = useState(false);
+
+    // Location State
+    const [placeName, setPlaceName] = useState<string | null>(null);
+    const [placeAddress, setPlaceAddress] = useState<string | null>(null);
+    const [placeLat, setPlaceLat] = useState<number | null>(null);
+    const [placeLng, setPlaceLng] = useState<number | null>(null);
+    const [suggestedLocation, setSuggestedLocation] = useState<{ name: string, address: string, lat: number, lng: number } | null>(null);
+
+    // Smart Location Memory: Suggest location from previous transactions with same description
+    useEffect(() => {
+        if (!description || description.length < 3 || !userId) {
+            setSuggestedLocation(null);
+            return;
+        }
+
+        const timer = setTimeout(async () => {
+            const { data, error } = await supabase
+                .from('transactions')
+                .select('place_name, place_address, place_lat, place_lng')
+                .eq('user_id', userId)
+                .ilike('description', description)
+                .not('place_name', 'is', null)
+                .order('created_at', { ascending: false })
+                .limit(1);
+
+            if (data && data[0]) {
+                const loc = data[0];
+                // Only suggest if it's different from the current location
+                if (loc.place_name !== placeName) {
+                    setSuggestedLocation({
+                        name: loc.place_name!,
+                        address: loc.place_address!,
+                        lat: loc.place_lat!,
+                        lng: loc.place_lng!
+                    });
+                } else {
+                    setSuggestedLocation(null);
+                }
+            } else {
+                setSuggestedLocation(null);
+            }
+        }, 500);
+
+        return () => clearTimeout(timer);
+    }, [description, userId, placeName, setPlaceName, setPlaceAddress, setPlaceLat, setPlaceLng]);
 
     const getBucketIcon = (iconName?: string) => {
         const icons: Record<string, any> = {
@@ -173,7 +220,13 @@ export function AddExpenseView() {
                 base_currency: currency,
                 converted_amount: convertedAmount,
                 is_recurring: isRecurring,
-                exclude_from_allowance: excludeFromAllowance
+                exclude_from_allowance: excludeFromAllowance,
+                ...(placeName ? {
+                    place_name: placeName,
+                    place_address: placeAddress,
+                    place_lat: placeLat,
+                    place_lng: placeLng,
+                } : {})
             }).select().single();
 
             if (txError) throw txError;
@@ -270,6 +323,29 @@ export function AddExpenseView() {
                 Haptics.notification({ type: NotificationType.Success }).catch(() => { });
             }
             toast.success('Expense added successfully!');
+
+            // Reset all form fields before navigating
+            setAmount('');
+            setDescription('');
+            setNotes('');
+            setSelectedCategory('food');
+            setDate(new Date());
+            setPaymentMethod('Cash');
+            setTxCurrency(currency);
+            setSelectedBucketId(null);
+            setIsSplitEnabled(false);
+            setSelectedGroupId(null);
+            setSelectedFriendIds([]);
+            setSplitMode('even');
+            setCustomAmounts({});
+            setIsRecurring(false);
+            setFrequency('monthly');
+            setExcludeFromAllowance(false);
+            setPlaceName(null);
+            setPlaceAddress(null);
+            setPlaceLat(null);
+            setPlaceLng(null);
+
             router.push('/');
         } catch (error: any) {
             if (isNative) {
@@ -378,6 +454,47 @@ export function AddExpenseView() {
                     className="bg-secondary/10 border-white/10 h-14"
                 />
             </div>
+
+            {/* Smart Location Suggestion */}
+            <AnimatePresence>
+                {suggestedLocation && (
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.95, y: -10 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.95, y: -10 }}
+                        className="flex justify-start"
+                    >
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setPlaceName(suggestedLocation.name);
+                                setPlaceAddress(suggestedLocation.address);
+                                setPlaceLat(suggestedLocation.lat);
+                                setPlaceLng(suggestedLocation.lng);
+                                setSuggestedLocation(null);
+                            }}
+                            className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/20 text-primary hover:bg-primary/20 transition-all text-[11px] font-bold"
+                        >
+                            <MapPin className="w-3 h-3" />
+                            Use last location: {suggestedLocation.name}
+                        </button>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Location Picker */}
+            <LocationPicker
+                placeName={placeName}
+                placeAddress={placeAddress}
+                placeLat={placeLat}
+                placeLng={placeLng}
+                onChange={(loc) => {
+                    setPlaceName(loc.place_name);
+                    setPlaceAddress(loc.place_address);
+                    setPlaceLat(loc.place_lat);
+                    setPlaceLng(loc.place_lng);
+                }}
+            />
 
             {/* Category Selection */}
             <div className="space-y-2">

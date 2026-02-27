@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Zap, Tag, PieChart, Users, QrCode, Upload, Bell, Globe, FileDown, RefreshCcw, Shield, Search, Sparkles, Moon, CreditCard, Wallet, Lock, SlidersHorizontal, Star, Fingerprint, BarChart2, Receipt, Layers, MessageSquare, Link, Smartphone } from 'lucide-react';
+import { X, Zap, Tag, PieChart, Users, QrCode, Upload, Bell, Globe, FileDown, RefreshCcw, Shield, Search, Sparkles, Moon, CreditCard, Wallet, Lock, SlidersHorizontal, Star, Fingerprint, BarChart2, Receipt, Layers, MessageSquare, Link, Smartphone, MapPin } from 'lucide-react';
 import { LATEST_FEATURE_ANNOUNCEMENT } from '@/lib/feature-flags';
 import { Button } from '@/components/ui/button';
 
@@ -170,6 +170,8 @@ export function FeatureAnnouncementModal({ showAnnouncement = false, userId, onC
                                                 <Bell className="w-6 h-6 text-orange-400 fill-orange-400/20" />
                                             ) : feature.icon === 'globe' ? (
                                                 <Globe className="w-6 h-6 text-teal-400" />
+                                            ) : feature.icon === 'map' ? (
+                                                <MapPin className="w-6 h-6 text-rose-400 fill-rose-400/20" />
                                             ) : (
                                                 <Zap className="w-6 h-6 text-primary fill-primary/20" />
                                             )}
