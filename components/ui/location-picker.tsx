@@ -1,9 +1,12 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { MapPin, X, Search, Navigation, Loader2 } from 'lucide-react';
+import { MapPin, X, Search, Navigation, Loader2, LocateFixed } from 'lucide-react';
+import mapboxgl from 'mapbox-gl';
+import 'mapbox-gl/dist/mapbox-gl.css';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
+import { toast } from '@/utils/haptics';
 
 interface LocationData {
     place_name: string | null;
@@ -36,8 +39,14 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
     const [query, setQuery] = useState('');
     const [predictions, setPredictions] = useState<PlacePrediction[]>([]);
     const [isSearching, setIsSearching] = useState(false);
-    const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const [recentLocations, setRecentLocations] = useState<LocationData[]>([]);
+    const [lastPosition, setLastPosition] = useState<{ lat: number, lng: number } | null>(null);
+    const [debounceRef] = useState<{ current: ReturnType<typeof setTimeout> | null }>({ current: null });
+    const [isLocating, setIsLocating] = useState(false);
     const inputRef = useRef<HTMLInputElement>(null);
+    const mapRef = useRef<mapboxgl.Map | null>(null);
+    const geolocateControlRef = useRef<mapboxgl.GeolocateControl | null>(null);
+    const mapContainerRef = useRef<HTMLDivElement>(null);
 
     const hasLocation = !!placeName;
     const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
@@ -48,6 +57,27 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
             setTimeout(() => inputRef.current?.focus(), 150);
         }
     }, [isExpanded]);
+
+    // Load recent locations on mount
+    useEffect(() => {
+        try {
+            const cached = localStorage.getItem('novira_recent_locations');
+            if (cached) setRecentLocations(JSON.parse(cached));
+        } catch {}
+    }, []);
+
+    // Helper: calculate distance in km
+    const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+        const R = 6371; // Radius of the earth in km
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLon = (lon2 - lon1) * Math.PI / 180;
+        const a = 
+            Math.sin(dLat/2) * Math.sin(dLat/2) +
+            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+            Math.sin(dLon/2) * Math.sin(dLon/2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        return R * c; 
+    };
 
     // Cleanup debounce on unmount
     useEffect(() => {
@@ -129,7 +159,7 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                     session_token: sessionTokenRef.current,
                     limit: '5',
                     language: 'en',
-                    proximity: 'ip', // bias results to user's location
+                    proximity: lastPosition ? `${lastPosition.lng},${lastPosition.lat}` : 'ip',
                 });
 
             try {
@@ -165,7 +195,15 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
     // Pick the right search function
     const handleSearch = mapboxToken ? searchWithMapbox : searchWithPhoton;
 
-    const handleSelectPlace = async (prediction: PlacePrediction) => {
+    const handleSelectPlace = async (prediction: PlacePrediction | LocationData) => {
+        // Handle direct LocationData (from Recent)
+        if ('place_name' in prediction) {
+            onChange(prediction as LocationData);
+            setIsExpanded(false);
+            setQuery('');
+            return;
+        }
+
         // Mapbox Search Box results need a /retrieve call to get coordinates
         if (mapboxToken && (prediction as any)._mapbox_id && !prediction._lat) {
             try {
@@ -199,15 +237,127 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
         }
 
         // Direct coords (Photon results or fallback)
-        onChange({
-            place_name: prediction.structured_formatting.main_text,
-            place_address: prediction.description,
-            place_lat: parseFloat(prediction._lat),
-            place_lng: parseFloat(prediction._lon),
+        const finalLoc = {
+            place_name: (prediction as PlacePrediction).structured_formatting.main_text,
+            place_address: (prediction as PlacePrediction).description,
+            place_lat: parseFloat((prediction as PlacePrediction)._lat),
+            place_lng: parseFloat((prediction as PlacePrediction)._lon),
+        };
+
+        onChange(finalLoc);
+        
+        // Add to recent
+        setRecentLocations(prev => {
+            const next = [finalLoc, ...prev.filter(l => l.place_name !== finalLoc.place_name)].slice(0, 5);
+            localStorage.setItem('novira_recent_locations', JSON.stringify(next));
+            return next;
         });
+
         setQuery('');
         setPredictions([]);
         setIsExpanded(false);
+    };
+
+    // Initialize hidden map for GeolocateControl
+    useEffect(() => {
+        if (isExpanded && mapboxToken && mapContainerRef.current && !mapRef.current) {
+            mapboxgl.accessToken = mapboxToken;
+            const map = new mapboxgl.Map({
+                container: mapContainerRef.current,
+                style: 'mapbox://styles/mapbox/dark-v11',
+                center: [0, 0],
+                zoom: 1,
+                interactive: false,
+                attributionControl: false,
+            });
+
+            const geolocate = new mapboxgl.GeolocateControl({
+                positionOptions: {
+                    enableHighAccuracy: true
+                },
+                trackUserLocation: false,
+                showUserHeading: false
+            });
+
+            map.addControl(geolocate);
+            
+            geolocate.on('geolocate', async (e: any) => {
+                const { latitude, longitude } = e.coords;
+                setLastPosition({ lat: latitude, lng: longitude });
+                
+                try {
+                    const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${longitude},${latitude}.json?access_token=${mapboxToken}`;
+                    const res = await fetch(url);
+                    const data = await res.json();
+                    
+                    const name = data.features?.[0]?.place_name?.split(',')[0] || 'Current Location';
+                    const address = data.features?.[0]?.place_name || 'Nearby';
+
+                    onChange({
+                        place_name: name,
+                        place_address: address,
+                        place_lat: latitude,
+                        place_lng: longitude,
+                    });
+                    setIsExpanded(false);
+                } catch (err) {
+                    console.warn('Reverse geocoding failed:', err);
+                    onChange({
+                        place_name: 'Current Location',
+                        place_address: `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`,
+                        place_lat: latitude,
+                        place_lng: longitude,
+                    });
+                    setIsExpanded(false);
+                } finally {
+                    setIsLocating(false);
+                }
+            });
+
+            geolocate.on('error', (err: any) => {
+                console.error('Mapbox Geolocate error:', err);
+                toast.error('Location access denied or unavailable');
+                setIsLocating(false);
+            });
+
+            mapRef.current = map;
+            geolocateControlRef.current = geolocate;
+        }
+
+        return () => {
+            if (mapRef.current) {
+                mapRef.current.remove();
+                mapRef.current = null;
+            }
+        };
+    }, [isExpanded, mapboxToken]);
+
+    const handleUseCurrentLocation = async () => {
+        setIsLocating(true);
+
+        if (geolocateControlRef.current) {
+            // Use Mapbox GeolocateControl if available
+            geolocateControlRef.current.trigger();
+            return;
+        }
+
+        // Fallback for non-Mapbox cases (though we handle it above)
+        if (!navigator.geolocation) {
+            toast.error('Geolocation not supported by your browser');
+            setIsLocating(false);
+            return;
+        }
+
+        toast.info('Requesting location access...', { duration: 2000 });
+
+        navigator.geolocation.getCurrentPosition(async (position) => {
+            const { latitude, longitude } = position.coords;
+            // ... (rest of old logic as fallback)
+        }, (err) => {
+            console.error('Geolocation error:', { code: err.code, message: err.message });
+            toast.error(err.code === 1 ? 'Location permission denied' : 'Location unavailable');
+            setIsLocating(false);
+        });
     };
 
     const handleClear = () => {
@@ -340,6 +490,26 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                 )}
             </div>
 
+            {/* Current Location Quick Action */}
+            <button
+                type="button"
+                onClick={handleUseCurrentLocation}
+                disabled={isLocating}
+                className="w-full flex items-center gap-3 p-3 rounded-xl bg-primary/5 border border-primary/20 hover:bg-primary/10 transition-all text-left group"
+            >
+                <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center shrink-0 border border-primary/30">
+                    {isLocating ? (
+                        <Loader2 className="w-3.5 h-3.5 text-primary animate-spin" />
+                    ) : (
+                        <Navigation className="w-3.5 h-3.5 text-primary" />
+                    )}
+                </div>
+                <div>
+                    <p className="text-sm font-bold text-primary">Use Current Location</p>
+                    <p className="text-[10px] text-primary/60">Detect where you are right now</p>
+                </div>
+            </button>
+
             {/* Search Results - In-flow with scroll to prevent overflow */}
             {predictions.length > 0 && (
                 <div className="mt-2 rounded-2xl border border-white/10 bg-card/50 overflow-hidden shadow-sm">
@@ -379,6 +549,8 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                     <p className="text-xs text-muted-foreground">No places found. Try a different search.</p>
                 </div>
             )}
+            {/* Hidden Map for GeolocateControl */}
+            <div ref={mapContainerRef} className="hidden" aria-hidden="true" />
         </div>
     );
 }

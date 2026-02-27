@@ -9,10 +9,10 @@ export async function proxy(request: NextRequest) {
         "default-src 'self'",
         `script-src 'self' 'nonce-${nonce}' 'wasm-unsafe-eval' blob: https://unpkg.com https://cdn.jsdelivr.net https://va.vercel-scripts.com ${isDev ? "'unsafe-eval'" : ''}`,
         `style-src 'self' 'unsafe-inline'`,
-        "img-src 'self' blob: data: https://*.supabase.co https://*.mapbox.com https://staticmap.openstreetmap.de",
+        "img-src 'self' blob: data: https://*.supabase.co https://*.mapbox.com",
         "media-src 'self' blob: data:",
         "font-src 'self'",
-        "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.frankfurter.dev https://unpkg.com https://cdn.jsdelivr.net https://*.gstatic.com https://cdnjs.cloudflare.com https://va.vercel-scripts.com https://*.mapbox.com https://photon.komoot.io",
+        "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.frankfurter.dev https://unpkg.com https://cdn.jsdelivr.net https://*.gstatic.com https://cdnjs.cloudflare.com https://va.vercel-scripts.com https://*.mapbox.com",
         "worker-src 'self' blob: https://unpkg.com https://cdn.jsdelivr.net",
         "child-src 'self' blob: https://unpkg.com https://cdn.jsdelivr.net",
         "frame-ancestors 'none'",
@@ -35,7 +35,7 @@ export async function proxy(request: NextRequest) {
     response.headers.set('Cross-Origin-Resource-Policy', 'cross-origin')
     response.headers.set('X-Content-Type-Options', 'nosniff')
     response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin')
-    response.headers.set('Permissions-Policy', 'camera=(self), microphone=(), geolocation=()')
+    response.headers.set('Permissions-Policy', 'camera=(self), microphone=(), geolocation=*')
 
     return response
 }
