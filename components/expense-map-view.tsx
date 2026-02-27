@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { cn } from '@/lib/utils';
-import { CATEGORY_COLORS } from '@/lib/categories';
+import { CATEGORY_COLORS, getIconSvgForCategory } from '@/lib/categories';
 
 interface Transaction {
     id: string;
@@ -21,6 +21,10 @@ interface Transaction {
     place_lat?: number;
     place_lng?: number;
     currency?: string;
+    profile?: {
+        full_name: string;
+        avatar_url?: string;
+    };
 }
 
 interface ExpenseMapViewProps {
@@ -102,6 +106,8 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency }
 
             map.on('load', () => {
                 setIsInitialLoad(false);
+                // Ensure initial pitch is set if 3D is already on (though usually off at start)
+                if (show3D) map.setPitch(60);
 
                 // Add sources for Heatmap and Trails
                 map.addSource('expenses', {
@@ -262,85 +268,106 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency }
             features
         });
 
-        // Update 3D Source (Towers need Polygon geometry, but we can simulate with small circles/hexes or just use cylinders)
-        // Actually, Mapbox fill-extrusion works on polygons. We'll convert points to small octagons.
-        const towerFeatures = filteredTransactions.map(tx => {
-            const center = [tx.place_lng!, tx.place_lat!];
-            const radius = 0.001; // ~100 meters
-            const sides = 8;
-            const coordinates = [];
-            for (let i = 0; i < sides; i++) {
-                const angle = (i * 360) / sides;
-                const rad = (angle * Math.PI) / 180;
-                coordinates.push([
-                    center[0] + (radius / Math.cos(center[1] * Math.PI / 180)) * Math.cos(rad),
-                    center[1] + radius * Math.sin(rad)
-                ]);
-            }
-            coordinates.push(coordinates[0]);
+        // 1. Group by Location first
+        const locationGroups = new Map<string, {
+            lat: number,
+            lng: number,
+            transactions: Transaction[],
+            latestTx: Transaction,
+            totalAmount: number,
+            categories: Map<string, number>
+        }>();
 
-            return {
-                type: 'Feature' as const,
-                geometry: {
-                    type: 'Polygon' as const,
-                    coordinates: [coordinates]
-                },
-                properties: { id: tx.id, amount: tx.amount, category: tx.category }
-            };
+        filteredTransactions.forEach(tx => {
+            const key = `${tx.place_lat?.toFixed(5)},${tx.place_lng?.toFixed(5)}`;
+            if (!locationGroups.has(key)) {
+                locationGroups.set(key, {
+                    lat: tx.place_lat!,
+                    lng: tx.place_lng!,
+                    transactions: [],
+                    latestTx: tx,
+                    totalAmount: 0,
+                    categories: new Map()
+                });
+            }
+            const group = locationGroups.get(key)!;
+            group.transactions.push(tx);
+            group.totalAmount += tx.amount;
+            group.categories.set(tx.category, (group.categories.get(tx.category) || 0) + tx.amount);
+            
+            if (new Date(tx.date) > new Date(group.latestTx.date)) {
+                group.latestTx = tx;
+            }
         });
 
-        if (map.getSource('towers')) {
-            (map.getSource('towers') as mapboxgl.GeoJSONSource).setData({
-                type: 'FeatureCollection',
-                features: towerFeatures
+        // Helper for radial offsets (approx meters to degrees)
+        const getOffsetCoords = (lng: number, lat: number, distanceMeters: number, bearingDegrees: number) => {
+            const radiusEarth = 6378137;
+            const dLat = (distanceMeters * Math.cos(bearingDegrees * Math.PI / 180)) / radiusEarth;
+            const dLng = (distanceMeters * Math.sin(bearingDegrees * Math.PI / 180)) / (radiusEarth * Math.cos(lat * Math.PI / 180));
+            return [lng + (dLng * 180 / Math.PI), lat + (dLat * 180 / Math.PI)];
+        };
+
+        // 2. Generate 3D Tower Features with Clusters
+        const towerFeatures: any[] = [];
+        locationGroups.forEach(group => {
+            const cats = Array.from(group.categories.entries());
+            const count = cats.length;
+            
+            cats.forEach(([category, amount], idx) => {
+                let center = [group.lng, group.lat];
+                
+                // If multiple categories, apply offset ring
+                if (count > 1) {
+                    const angle = (idx * 360) / count;
+                    center = getOffsetCoords(group.lng, group.lat, 6, angle); // 6 meter offset ring
+                }
+
+                const radius = count > 1 ? 0.0006 : 0.001; // Smaller towers for clusters
+                const sides = 8;
+                const coordinates = [];
+                for (let i = 0; i < sides; i++) {
+                    const ang = (i * 360) / sides;
+                    const rad = (ang * Math.PI) / 180;
+                    coordinates.push([
+                        center[0] + (radius / Math.cos(center[1] * Math.PI / 180)) * Math.cos(rad),
+                        center[1] + radius * Math.sin(rad)
+                    ]);
+                }
+                coordinates.push(coordinates[0]);
+
+                towerFeatures.push({
+                    type: 'Feature',
+                    geometry: { type: 'Polygon', coordinates: [coordinates] },
+                    properties: { amount, category: category.toLowerCase() }
+                });
             });
-        } else {
-            map.addSource('towers', {
-                type: 'geojson',
-                data: { type: 'FeatureCollection', features: towerFeatures }
-            });
-        }
+        });
+
+        (map.getSource('towers') as mapboxgl.GeoJSONSource)?.setData({
+            type: 'FeatureCollection',
+            features: towerFeatures
+        });
 
         // Update Trails
         if (filteredTransactions.length > 1) {
-            // Group by User ID for separate trails
             const userTrails: Record<string, Transaction[]> = {};
             filteredTransactions.forEach(tx => {
                 const uid = tx.user_id;
                 if (!userTrails[uid]) userTrails[uid] = [];
                 userTrails[uid].push(tx);
             });
-
-            // Premium color palette for group members
             const userColors = ['#00ffff', '#F472B6', '#F9C74F', '#10B981', '#6366F1', '#A855F7'];
-            
             const trailFeatures = Object.entries(userTrails).map(([uid, txs], index) => {
-                const sorted = [...txs].sort((a, b) => 
-                    new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-                );
-                
+                const sorted = [...txs].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
                 if (sorted.length < 2) return null;
-
                 return {
                     type: 'Feature' as const,
-                    geometry: {
-                        type: 'LineString' as const,
-                        coordinates: sorted.map(tx => [tx.place_lng!, tx.place_lat!])
-                    },
-                    properties: {
-                        user_id: uid,
-                        color: userColors[index % userColors.length],
-                        halo: userColors[index % userColors.length] + '80'
-                    }
+                    geometry: { type: 'LineString' as const, coordinates: sorted.map(tx => [tx.place_lng!, tx.place_lat!]) },
+                    properties: { user_id: uid, color: userColors[index % userColors.length], halo: userColors[index % userColors.length] + '80' }
                 };
             }).filter(Boolean);
-
-            (map.getSource('trails') as mapboxgl.GeoJSONSource)?.setData({
-                type: 'FeatureCollection',
-                features: trailFeatures as any
-            });
-
-            // Use data-driven styling for user colors
+            (map.getSource('trails') as mapboxgl.GeoJSONSource)?.setData({ type: 'FeatureCollection', features: trailFeatures as any });
             if (map.getLayer('trail-blur')) map.setPaintProperty('trail-blur', 'line-color', ['get', 'color']);
             if (map.getLayer('trail-core')) map.setPaintProperty('trail-core', 'line-color', ['get', 'color']);
             if (map.getLayer('trail-arrows')) {
@@ -349,32 +376,73 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency }
             }
         }
 
-        // Update HTML Markers
+        // Update Aggregated HTML Markers
         markersRef.current.forEach(m => m.remove());
         markersRef.current = [];
 
         if (viewMode !== 'heatmap') {
-            filteredTransactions.forEach(tx => {
-                const color = CATEGORY_COLORS[tx.category] || CATEGORY_COLORS.others;
+            locationGroups.forEach(group => {
+                const tx = group.latestTx;
+                const mainCategory = Array.from(group.categories.entries()).sort((a, b) => b[1] - a[1])[0][0];
+                const color = CATEGORY_COLORS[mainCategory.toLowerCase()] || CATEGORY_COLORS.others;
+                const iconSvg = getIconSvgForCategory(mainCategory);
+                const abbr = tx.profile?.full_name ? tx.profile.full_name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : '?';
+                const avatarImg = tx.profile?.avatar_url;
+                const count = group.transactions.length;
+
                 const el = document.createElement('div');
                 el.className = 'expense-marker';
                 el.style.cssText = `
-                    width: 32px; height: 32px; border-radius: 50%;
+                    width: 34px; height: 34px; border-radius: 50%;
                     background: ${color}; border: 3px solid rgba(255,255,255,0.9);
-                    box-shadow: 0 2px 12px ${color}80, 0 0 0 2px ${color}40;
+                    box-shadow: 0 4px 15px ${color}80, 0 0 0 2px ${color}40;
                     cursor: pointer; display: flex; align-items: center; justify-content: center;
-                    transition: transform 0.2s, box-shadow 0.2s;
+                    transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+                    position: relative;
                 `;
-                el.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>`;
+                
+                el.innerHTML = `<span style="color: white;">${iconSvg}</span>`;
+
+                if (count > 1) {
+                    const countBadge = document.createElement('div');
+                    countBadge.style.cssText = `
+                        position: absolute; top: -6px; right: -6px;
+                        background: #f43f5e; color: white; border-radius: 10px;
+                        padding: 1px 4px; font-size: 8px; font-weight: 900;
+                        border: 1.5px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+                    `;
+                    countBadge.innerText = count.toString();
+                    el.appendChild(countBadge);
+                }
+
+                const badge = document.createElement('div');
+                badge.style.cssText = `
+                    position: absolute; bottom: -4px; right: -4px;
+                    width: 14px; height: 14px; border-radius: 50%;
+                    background: #1e293b; border: 1.5px solid white;
+                    display: flex; align-items: center; justify-content: center;
+                    font-size: 6px; font-weight: 900; color: white;
+                    overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+                `;
+
+                if (avatarImg) {
+                    badge.innerHTML = `<img src="${avatarImg}" style="width: 100%; height: 100%; object-fit: cover;" />`;
+                } else {
+                    badge.innerText = abbr;
+                }
+                el.appendChild(badge);
 
                 el.onclick = (e) => {
                     e.stopPropagation();
                     setSelectedTx(tx);
-                    map.flyTo({ center: [tx.place_lng!, tx.place_lat!], zoom: 15, duration: 800 });
+                    map.flyTo({ center: [group.lng, group.lat], zoom: 15, duration: 800 });
                 };
 
+                el.onmouseenter = () => { el.style.transform = 'scale(1.15) translateY(-4px)'; };
+                el.onmouseleave = () => { el.style.transform = 'scale(1) translateY(0px)'; };
+
                 const marker = new mapboxgl.Marker({ element: el })
-                    .setLngLat([tx.place_lng!, tx.place_lat!])
+                    .setLngLat([group.lng, group.lat])
                     .addTo(map);
 
                 markersRef.current.push(marker);
@@ -422,22 +490,32 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency }
             >
                 <div className="relative w-full h-full max-w-5xl bg-background rounded-[32px] overflow-hidden shadow-2xl border border-white/10 flex flex-col">
 
-                {/* Header */}
-                    <div className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between p-6 bg-gradient-to-b from-background/90 via-background/40 to-transparent">
-                        <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center border border-primary/30 backdrop-blur-md">
-                                <MapPin className="w-5 h-5 text-primary" />
+                {/* Header Overlay */}
+                    <div className="absolute top-0 left-0 right-0 z-20 flex flex-col sm:flex-row items-center justify-between p-4 sm:p-6 bg-gradient-to-b from-background/90 via-background/40 to-transparent pointer-events-none">
+                        <div className="w-full sm:w-auto flex items-center justify-between gap-3 pointer-events-auto">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center border border-primary/30 backdrop-blur-md shrink-0">
+                                    <MapPin className="w-5 h-5 text-primary" />
+                                </div>
+                                <div className="min-w-0">
+                                    <h2 className="text-lg font-black tracking-tight truncate">Expense Map</h2>
+                                    <p className="text-[11px] text-muted-foreground font-medium">
+                                        {geoTransactions.length} location{geoTransactions.length !== 1 ? 's' : ''} tagged
+                                    </p>
+                                </div>
                             </div>
-                            <div>
-                                <h2 className="text-lg font-black tracking-tight">Expense Map</h2>
-                                <p className="text-[11px] text-muted-foreground font-medium">
-                                    {geoTransactions.length} location{geoTransactions.length !== 1 ? 's' : ''} tagged
-                                </p>
-                            </div>
+                            
+                            {/* Mobile-only Close */}
+                            <button
+                                onClick={onClose}
+                                className="sm:hidden w-10 h-10 rounded-full bg-card/60 backdrop-blur-md flex items-center justify-center border border-white/10 hover:bg-white/10 transition-colors pointer-events-auto shrink-0"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
                         </div>
 
                         {/* View Content Controls */}
-                        <div className="flex items-center gap-2 mr-12 sm:mr-0">
+                        <div className="flex items-center gap-2 mt-2 sm:mt-0 pointer-events-auto">
                             <div className="flex p-1 rounded-full bg-card/60 backdrop-blur-md border border-white/10 shadow-lg">
                                 <button
                                     onClick={() => setViewMode('pins')}
@@ -490,7 +568,7 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency }
 
                         <button
                             onClick={onClose}
-                            className="w-10 h-10 rounded-full bg-card/60 backdrop-blur-md flex items-center justify-center border border-white/10 hover:bg-white/10 transition-colors"
+                            className="hidden sm:flex w-10 h-10 rounded-full bg-card/60 backdrop-blur-md items-center justify-center border border-white/10 hover:bg-white/10 transition-colors pointer-events-auto shrink-0"
                         >
                             <X className="w-5 h-5" />
                         </button>
@@ -498,7 +576,20 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency }
 
                 {/* Map Container */}
                 {geoTransactions.length > 0 ? (
-                    <div ref={mapContainerRef} className="w-full h-full" />
+                    <div className="relative w-full h-full min-h-[400px]">
+                        {!mapboxToken && (
+                            <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-background/80 backdrop-blur-md p-6 text-center">
+                                <div className="w-16 h-16 rounded-full bg-rose-500/20 flex items-center justify-center mb-4 border border-rose-500/40">
+                                    <X className="w-8 h-8 text-rose-500" />
+                                </div>
+                                <h3 className="text-lg font-black">Map Connection Missing</h3>
+                                <p className="text-sm text-muted-foreground mt-2 max-w-xs">
+                                    Mapbox token not found. Please add `NEXT_PUBLIC_MAPBOX_TOKEN` to your environment variables.
+                                </p>
+                            </div>
+                        )}
+                        <div ref={mapContainerRef} className="w-full h-full" />
+                    </div>
                 ) : (
                     <div className="w-full h-full flex flex-col items-center justify-center gap-4">
                         <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20">
