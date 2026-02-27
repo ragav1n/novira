@@ -279,7 +279,7 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency }
         }>();
 
         filteredTransactions.forEach(tx => {
-            const key = `${tx.place_lat?.toFixed(5)},${tx.place_lng?.toFixed(5)}`;
+            const key = `${tx.place_lat?.toFixed(4)},${tx.place_lng?.toFixed(4)}`;
             if (!locationGroups.has(key)) {
                 locationGroups.set(key, {
                     lat: tx.place_lat!,
@@ -382,70 +382,85 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency }
 
         if (viewMode !== 'heatmap') {
             locationGroups.forEach(group => {
-                const tx = group.latestTx;
-                const mainCategory = Array.from(group.categories.entries()).sort((a, b) => b[1] - a[1])[0][0];
-                const color = CATEGORY_COLORS[mainCategory.toLowerCase()] || CATEGORY_COLORS.others;
-                const iconSvg = getIconSvgForCategory(mainCategory);
-                const abbr = tx.profile?.full_name ? tx.profile.full_name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : '?';
-                const avatarImg = tx.profile?.avatar_url;
-                const count = group.transactions.length;
+                const categoryEntries = Array.from(group.categories.entries());
+                const catCount = categoryEntries.length;
 
-                const el = document.createElement('div');
-                el.className = 'expense-marker';
-                el.style.cssText = `
-                    width: 34px; height: 34px; border-radius: 50%;
-                    background: ${color}; border: 3px solid rgba(255,255,255,0.9);
-                    box-shadow: 0 4px 15px ${color}80, 0 0 0 2px ${color}40;
-                    cursor: pointer; display: flex; align-items: center; justify-content: center;
-                    transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
-                    position: relative;
-                `;
-                
-                el.innerHTML = `<span style="color: white;">${iconSvg}</span>`;
+                categoryEntries.forEach(([category, totalAmount], idx) => {
+                    const txs = group.transactions.filter(t => t.category === category);
+                    const latestTx = txs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
+                    const color = CATEGORY_COLORS[category.toLowerCase() as keyof typeof CATEGORY_COLORS] || CATEGORY_COLORS.others;
+                    const iconSvg = getIconSvgForCategory(category);
+                    const abbr = latestTx.profile?.full_name ? latestTx.profile.full_name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : '?';
+                    const avatarImg = latestTx.profile?.avatar_url;
+                    const count = txs.length;
 
-                if (count > 1) {
-                    const countBadge = document.createElement('div');
-                    countBadge.style.cssText = `
-                        position: absolute; top: -6px; right: -6px;
-                        background: #f43f5e; color: white; border-radius: 10px;
-                        padding: 1px 4px; font-size: 8px; font-weight: 900;
-                        border: 1.5px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+                    // Apply the same offset as the towers
+                    let markerPos = [group.lng, group.lat];
+                    if (catCount > 1) {
+                        const angle = (idx * 360) / catCount;
+                        markerPos = getOffsetCoords(group.lng, group.lat, 6, angle);
+                    }
+
+                    const el = document.createElement('div');
+                    el.className = 'expense-marker-root';
+
+                    const wrapper = document.createElement('div');
+                    wrapper.style.cssText = `
+                        width: 34px; height: 34px; border-radius: 50%;
+                        background: ${color}; border: 3px solid rgba(255,255,255,0.9);
+                        box-shadow: 0 4px 15px ${color}80, 0 0 0 2px ${color}40;
+                        cursor: pointer; display: flex; align-items: center; justify-content: center;
+                        transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+                        position: relative;
                     `;
-                    countBadge.innerText = count.toString();
-                    el.appendChild(countBadge);
-                }
+                    el.appendChild(wrapper);
+                    
+                    wrapper.innerHTML = `<span style="color: white;">${iconSvg}</span>`;
 
-                const badge = document.createElement('div');
-                badge.style.cssText = `
-                    position: absolute; bottom: -4px; right: -4px;
-                    width: 14px; height: 14px; border-radius: 50%;
-                    background: #1e293b; border: 1.5px solid white;
-                    display: flex; align-items: center; justify-content: center;
-                    font-size: 6px; font-weight: 900; color: white;
-                    overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-                `;
+                    if (count > 1) {
+                        const countBadge = document.createElement('div');
+                        countBadge.style.cssText = `
+                            position: absolute; top: -6px; right: -6px;
+                            background: #f43f5e; color: white; border-radius: 10px;
+                            padding: 1px 4px; font-size: 8px; font-weight: 900;
+                            border: 1.5px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+                        `;
+                        countBadge.innerText = count.toString();
+                        wrapper.appendChild(countBadge);
+                    }
 
-                if (avatarImg) {
-                    badge.innerHTML = `<img src="${avatarImg}" style="width: 100%; height: 100%; object-fit: cover;" />`;
-                } else {
-                    badge.innerText = abbr;
-                }
-                el.appendChild(badge);
+                    const badge = document.createElement('div');
+                    badge.style.cssText = `
+                        position: absolute; bottom: -4px; right: -4px;
+                        width: 14px; height: 14px; border-radius: 50%;
+                        background: #1e293b; border: 1.5px solid white;
+                        display: flex; align-items: center; justify-content: center;
+                        font-size: 6px; font-weight: 900; color: white;
+                        overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+                    `;
 
-                el.onclick = (e) => {
-                    e.stopPropagation();
-                    setSelectedTx(tx);
-                    map.flyTo({ center: [group.lng, group.lat], zoom: 15, duration: 800 });
-                };
+                    if (avatarImg) {
+                        badge.innerHTML = `<img src="${avatarImg}" style="width: 100%; height: 100%; object-fit: cover;" />`;
+                    } else {
+                        badge.innerText = abbr;
+                    }
+                    wrapper.appendChild(badge);
 
-                el.onmouseenter = () => { el.style.transform = 'scale(1.15) translateY(-4px)'; };
-                el.onmouseleave = () => { el.style.transform = 'scale(1) translateY(0px)'; };
+                    wrapper.onclick = (e) => {
+                        e.stopPropagation();
+                        setSelectedTx(latestTx);
+                        map.flyTo({ center: [markerPos[0], markerPos[1]], zoom: 15, duration: 800 });
+                    };
 
-                const marker = new mapboxgl.Marker({ element: el })
-                    .setLngLat([group.lng, group.lat])
-                    .addTo(map);
+                    wrapper.onmouseenter = () => { wrapper.style.transform = 'scale(1.15) translateY(-4px)'; };
+                    wrapper.onmouseleave = () => { wrapper.style.transform = 'scale(1) translateY(0px)'; };
 
-                markersRef.current.push(marker);
+                    const marker = new mapboxgl.Marker({ element: el })
+                        .setLngLat([markerPos[0], markerPos[1]] as [number, number])
+                        .addTo(map);
+
+                    markersRef.current.push(marker);
+                });
             });
         }
 

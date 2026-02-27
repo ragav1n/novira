@@ -131,8 +131,8 @@ export function GroupsProvider({ children }: { children: React.ReactNode }) {
                     .from('splits')
                     .select(`
                         *,
-                        profile:profiles(full_name),
-                        transaction:transactions(description, date, user_id, currency, exchange_rate, base_currency, profile:profiles(full_name))
+                        profile:profiles(full_name, avatar_url),
+                        transaction:transactions(description, date, user_id, currency, exchange_rate, base_currency, profile:profiles(full_name, avatar_url))
                     `)
                     .eq('user_id', userId)
                     .eq('is_paid', false),
@@ -141,8 +141,8 @@ export function GroupsProvider({ children }: { children: React.ReactNode }) {
                     .from('splits')
                     .select(`
                         *,
-                        profile:profiles(full_name),
-                        transaction:transactions!inner(description, date, user_id, currency, exchange_rate, base_currency, profile:profiles(full_name))
+                        profile:profiles(full_name, avatar_url),
+                        transaction:transactions!inner(description, date, user_id, currency, exchange_rate, base_currency, profile:profiles(full_name, avatar_url))
                     `)
                     .eq('transactions.user_id', userId)
                     .eq('is_paid', false)
