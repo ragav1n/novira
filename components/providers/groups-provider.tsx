@@ -97,12 +97,10 @@ export function GroupsProvider({ children }: { children: React.ReactNode }) {
         }
 
         try {
-            // Fire all 6 queries in parallel instead of sequentially
+            // Fire all 4 queries in parallel (balances computed from pending splits)
             const [
                 groupsResult,
                 friendshipsResult,
-                splitsIOweResult,
-                splitsOwedToMeResult,
                 myDebtsResult,
                 myCreditsResult
             ] = await Promise.all([
@@ -128,25 +126,7 @@ export function GroupsProvider({ children }: { children: React.ReactNode }) {
                         user:profiles!user_id(id, full_name, avatar_url, email)
                     `)
                     .or(`user_id.eq.${userId},friend_id.eq.${userId}`),
-                // 3. Splits I owe
-                supabase
-                    .from('splits')
-                    .select(`
-                        amount,
-                        transaction:transactions(currency, exchange_rate, base_currency)
-                    `)
-                    .eq('user_id', userId)
-                    .eq('is_paid', false),
-                // 4. Splits owed to me
-                supabase
-                    .from('splits')
-                    .select(`
-                        amount,
-                        transaction:transactions!inner(user_id, currency, exchange_rate, base_currency)
-                    `)
-                    .eq('transactions.user_id', userId)
-                    .eq('is_paid', false),
-                // 5. My debts (pending splits I owe)
+                // 3. My debts (pending splits I owe)
                 supabase
                     .from('splits')
                     .select(`
@@ -156,7 +136,7 @@ export function GroupsProvider({ children }: { children: React.ReactNode }) {
                     `)
                     .eq('user_id', userId)
                     .eq('is_paid', false),
-                // 6. My credits (pending splits owed to me)
+                // 4. My credits (pending splits owed to me)
                 supabase
                     .from('splits')
                     .select(`
@@ -218,31 +198,29 @@ export function GroupsProvider({ children }: { children: React.ReactNode }) {
                 setFriendRequests(incomingRequests);
             }
 
-            // Process Balances
-            if (splitsIOweResult.error) throw splitsIOweResult.error;
-            const totalOwed = splitsIOweResult.data?.reduce((acc, s: any) => {
-                const amount = Number(s.amount);
-                const tx = s.transaction;
-                if (!tx) return acc + amount;
-                if (tx.currency === userCurrency) return acc + amount;
-                return acc + convertAmount(amount, tx.currency);
-            }, 0) || 0;
+            // Compute Balances from pending splits (no extra queries needed)
+            if (myDebtsResult.error) throw myDebtsResult.error;
+            if (myCreditsResult.error) throw myCreditsResult.error;
 
-            if (splitsOwedToMeResult.error) throw splitsOwedToMeResult.error;
-            const totalOwedToMe = splitsOwedToMeResult.data?.reduce((acc, s: any) => {
+            const totalOwed = (myDebtsResult.data || []).reduce((acc: number, s: any) => {
                 const amount = Number(s.amount);
                 const tx = s.transaction;
                 if (!tx) return acc + amount;
                 if (tx.currency === userCurrency) return acc + amount;
                 return acc + convertAmount(amount, tx.currency);
-            }, 0) || 0;
+            }, 0);
+
+            const totalOwedToMe = (myCreditsResult.data || []).reduce((acc: number, s: any) => {
+                const amount = Number(s.amount);
+                const tx = s.transaction;
+                if (!tx) return acc + amount;
+                if (tx.currency === userCurrency) return acc + amount;
+                return acc + convertAmount(amount, tx.currency);
+            }, 0);
 
             setBalances({ totalOwed, totalOwedToMe });
 
             // Process Pending Splits
-            if (myDebtsResult.error) throw myDebtsResult.error;
-            if (myCreditsResult.error) throw myCreditsResult.error;
-
             const allPending = [...(myDebtsResult.data || []), ...(myCreditsResult.data || [])];
             const uniquePending = Array.from(new Map(allPending.map(item => [item.id, item])).values());
 

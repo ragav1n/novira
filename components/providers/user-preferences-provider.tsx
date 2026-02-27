@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { toast } from '@/utils/haptics';
 import { User, Session } from '@supabase/supabase-js';
@@ -289,6 +289,9 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
         }
     }, [userId, loadPreferences]);
 
+    // Cache Intl.NumberFormat instances to avoid re-creating on every call
+    const formatterCache = useRef<Map<string, Intl.NumberFormat>>(new Map());
+
     const formatCurrency = useCallback((amount: number, currencyOverride?: string) => {
         const targetCurrency = currencyOverride || currency;
 
@@ -315,12 +318,16 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
         const zeroDecimalCurrencies = ['VND', 'IDR', 'JPY', 'KRW', 'INR', 'TWD', 'THB', 'PHP'];
         const symbol = CURRENCY_SYMBOLS[targetCurrency as Currency] || '$';
 
-        const formattedNumber = new Intl.NumberFormat(locales[targetCurrency] || 'en-US', {
-            minimumFractionDigits: zeroDecimalCurrencies.includes(targetCurrency) ? 0 : 2,
-            maximumFractionDigits: zeroDecimalCurrencies.includes(targetCurrency) ? 0 : 2
-        }).format(amount);
+        let formatter = formatterCache.current.get(targetCurrency);
+        if (!formatter) {
+            formatter = new Intl.NumberFormat(locales[targetCurrency] || 'en-US', {
+                minimumFractionDigits: zeroDecimalCurrencies.includes(targetCurrency) ? 0 : 2,
+                maximumFractionDigits: zeroDecimalCurrencies.includes(targetCurrency) ? 0 : 2
+            });
+            formatterCache.current.set(targetCurrency, formatter);
+        }
 
-        return `${symbol}${formattedNumber}`;
+        return `${symbol}${formatter.format(amount)}`;
     }, [currency]);
 
     const convertAmount = useCallback((amount: number, fromCurrency: string, toCurrency?: string): number => {

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useUserPreferences } from './user-preferences-provider';
 import { toast } from '@/utils/haptics';
@@ -88,11 +88,25 @@ export function BucketsProvider({ children }: { children: React.ReactNode }) {
         }
     }, [userId, currency, convertAmount]);
 
+    // Debounced refresh to batch rapid realtime events
+    const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const debouncedFetchBuckets = useCallback(() => {
+        if (debounceRef.current) clearTimeout(debounceRef.current);
+        debounceRef.current = setTimeout(() => fetchBuckets(), 300);
+    }, [fetchBuckets]);
+
+    // Clean up debounce timer on unmount
+    useEffect(() => {
+        return () => {
+            if (debounceRef.current) clearTimeout(debounceRef.current);
+        };
+    }, []);
+
     useEffect(() => {
         if (userId) {
             fetchBuckets();
 
-            // Realtime subscription
+            // Realtime subscription with debounce
             const channel = supabase
                 .channel('buckets-changes')
                 .on('postgres_changes', {
@@ -101,8 +115,7 @@ export function BucketsProvider({ children }: { children: React.ReactNode }) {
                     table: 'buckets',
                     filter: `user_id=eq.${userId}`
                 }, () => {
-                    // Refetch with current state buckets, but since it's real-time, maybe we can just call fetchBuckets which fetches both
-                    fetchBuckets();
+                    debouncedFetchBuckets();
                 })
                 .subscribe();
 
@@ -113,7 +126,7 @@ export function BucketsProvider({ children }: { children: React.ReactNode }) {
             setBuckets([]);
             setLoading(false);
         }
-    }, [userId, fetchBuckets]);
+    }, [userId, fetchBuckets, debouncedFetchBuckets]);
 
     const createBucket = async (data: Partial<Bucket>) => {
         if (!userId) {

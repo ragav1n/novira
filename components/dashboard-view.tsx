@@ -135,13 +135,13 @@ type AuditLog = {
     };
 };
 
-const VirtualizedTransactionList = ({
+const VirtualizedTransactionList = React.memo(function VirtualizedTransactionList({
   transactions, userId, currency, buckets,
   calculateUserShare, getIconForCategory, formatCurrency,
   convertAmount, setEditingTransaction, setIsEditOpen,
   handleDeleteTransaction, getBucketChip, loadAuditLogs,
   canEditTransaction, toast
-}: any) => {
+}: any) {
   const parentRef = useRef<HTMLDivElement>(null);
 
   const rowVirtualizer = useVirtualizer({
@@ -211,16 +211,15 @@ const VirtualizedTransactionList = ({
       </div>
     </div>
   );
-};
+});
 
 export function DashboardView() {
     const router = useRouter();
     const [userName, setUserName] = useState<string>('User');
-    const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
     const [transactions, setTransactions] = useState<Transaction[]>([]);
 
     const [loading, setLoading] = useState(true);
-    const { formatCurrency, currency, convertAmount, monthlyBudget, userId, isRatesLoading } = useUserPreferences();
+    const { formatCurrency, currency, convertAmount, monthlyBudget, userId, isRatesLoading, avatarUrl } = useUserPreferences();
     const { balances, groups, friends } = useGroups();
     const { buckets } = useBuckets();
 
@@ -312,19 +311,17 @@ export function DashboardView() {
             // Parallel Data Fetching
             const fetchData = async () => {
                 try {
-                    const [profileResult, transactionsResult] = await Promise.all([
-                        supabase
-                            .from('profiles')
-                            .select('full_name, avatar_url')
-                            .eq('id', userId)
-                            .single(),
-                        loadTransactions(userId)
-                    ]);
+                    const { data } = await supabase
+                        .from('profiles')
+                        .select('full_name')
+                        .eq('id', userId)
+                        .single();
 
-                    if (profileResult.data) {
-                        setUserName(profileResult.data.full_name || 'User');
-                        setAvatarUrl(profileResult.data.avatar_url);
+                    if (data) {
+                        setUserName(data.full_name || 'User');
                     }
+
+                    await loadTransactions(userId);
                 } catch (error) {
                     console.error("Error fetching data:", error);
                 } finally {
@@ -361,7 +358,8 @@ export function DashboardView() {
                 .from('transactions')
                 .select('id, description, amount, category, date, created_at, user_id, currency, exchange_rate, base_currency, bucket_id, exclude_from_allowance, is_recurring, profile:profiles(full_name), splits(user_id, amount, is_paid)')
                 .order('date', { ascending: false })
-                .order('created_at', { ascending: false });
+                .order('created_at', { ascending: false })
+                .limit(200);
 
             if (txs) {
                 // Flatten profile and splits if they are arrays (Supabase dynamic returns)
@@ -531,6 +529,9 @@ export function DashboardView() {
     const isBucketFocused = effectiveFocus !== 'allowance';
     const bucketCurrency = (focusedBucket?.currency || currency).toUpperCase() as Currency;
     const displayBudget = isBucketFocused && focusedBucket ? Number(focusedBucket.budget) : monthlyBudget;
+
+    // Memoize active (non-archived) buckets to avoid repeated filtering in JSX
+    const activeBuckets = useMemo(() => buckets.filter(b => !b.is_archived), [buckets]);
 
     // Calculate personal share for budget tracking
     const totalSpent = useMemo(() => transactions.reduce((acc, tx) => {
@@ -835,13 +836,13 @@ export function DashboardView() {
                                             </div>
                                         </motion.button>
                                         
-                                        {buckets.filter(b => !b.is_archived).length > 0 && (
+                                        {activeBuckets.length > 0 && (
                                             <motion.div variants={itemVariants} className="px-3 py-1.5 border-t border-white/5">
                                                 <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">Active Missions</p>
                                             </motion.div>
                                         )}
             
-                                        {buckets.filter(b => !b.is_archived).map(bucket => (
+                                        {activeBuckets.map(bucket => (
                                             <motion.button 
                                                 key={bucket.id}
                                                 variants={itemVariants}
@@ -1212,7 +1213,7 @@ export function DashboardView() {
                                             </div>
                                             <span className="text-[9px] font-medium truncate w-14 text-center">None</span>
                                         </div>
-                                        {buckets.filter(b => !b.is_archived).map((bucket) => (
+                                        {activeBuckets.map((bucket) => (
                                             <div
                                                 key={bucket.id}
                                                 onClick={() => setEditingTransaction({ ...editingTransaction, bucket_id: bucket.id })}
