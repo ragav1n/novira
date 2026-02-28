@@ -676,7 +676,7 @@ export function SettingsView() {
 
                 {/* Footer Info */}
                 <div className="text-center py-4 space-y-2">
-                    <p className="text-xs text-muted-foreground font-medium">Novira v2.1</p>
+                    <p className="text-xs text-muted-foreground font-medium">Novira v2.5.2</p>
                     <div className="flex justify-center items-center gap-3 text-[11px] text-muted-foreground">
                         <Link href="/privacy" className="hover:text-primary transition-colors">Privacy Policy</Link>
                         <span className="w-1 h-1 rounded-full bg-white/10" />

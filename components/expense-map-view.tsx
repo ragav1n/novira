@@ -44,6 +44,14 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency }
     const [showTrails, setShowTrails] = useState(false);
     const [show3D, setShow3D] = useState(false);
     const [isInitialLoad, setIsInitialLoad] = useState(true);
+    const [hoveredTower, setHoveredTower] = useState<{
+        x: number;
+        y: number;
+        category: string;
+        amount: number;
+        topMerchant: string;
+        count: number;
+    } | null>(null);
 
     const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 
@@ -148,6 +156,7 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency }
                 // Add Trails Layer (Glowing Line)
                 map.addSource('trails', {
                     type: 'geojson',
+                    lineMetrics: true, // Required for line-gradient
                     data: { type: 'FeatureCollection', features: [] }
                 });
 
@@ -174,7 +183,8 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency }
                     paint: {
                         'line-color': '#00ffff',
                         'line-width': 2,
-                        'line-opacity': 0.8
+                        'line-opacity': 0.8,
+                        // Gradient will be updated dynamically
                     }
                 });
 
@@ -213,6 +223,34 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency }
                     }
                 });
 
+                // Start Trail Animation Loop
+                let step = 0;
+                function animateTrails() {
+                    const map = mapRef.current;
+                    if (!map || !map.getLayer('trail-core')) return;
+                    
+                    step = (step + 0.005) % 1;
+                    
+                    // Strictly ascending: 0 < s1 < s2 < s3 < 1 (with 0.02 buffer)
+                    const s1 = 0.1 + (step * 0.7); // 0.1 to 0.8
+                    const s2 = s1 + 0.05;          // 0.15 to 0.85
+                    const s3 = s2 + 0.05;          // 0.2 to 0.9
+                    
+                    map.setPaintProperty('trail-core', 'line-gradient', [
+                        'interpolate',
+                        ['linear'],
+                        ['line-progress'],
+                        0, 'rgba(0, 255, 255, 0.05)',
+                        s1, 'rgba(0, 255, 255, 0.05)',
+                        s2, 'rgba(0, 255, 255, 1)',
+                        s3, 'rgba(0, 255, 255, 0.05)',
+                        1, 'rgba(0, 255, 255, 0.05)'
+                    ]);
+                    
+                    requestAnimationFrame(animateTrails);
+                }
+                animateTrails();
+
                 // Directional arrows
                 map.addLayer({
                     id: 'trail-arrows',
@@ -233,6 +271,39 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency }
                         'text-halo-color': 'rgba(0, 255, 255, 0.8)',
                         'text-halo-width': 1
                     }
+                });
+
+                // Add Hover Listeners for 3D Towers
+                map.on('mousemove', 'expense-3d', (e: mapboxgl.MapMouseEvent & { features?: mapboxgl.MapboxGeoJSONFeature[] }) => {
+                    if (e.features && e.features.length > 0) {
+                        const feature = e.features[0];
+                        const props = feature.properties;
+                        if (!props) return;
+
+                        map.getCanvas().style.cursor = 'pointer';
+
+                        // Find all transactions for this location/category to get insights
+                        // Note: In a larger app, we'd pre-calculate this, but for this scale we can find it
+                        const category = props.category;
+                        // Use a small epsilon for coordinate matching
+                        const lng = (feature.geometry as any).coordinates[0][0][0]; 
+                        const lat = (feature.geometry as any).coordinates[0][0][1];
+
+                        // Set tooltip State
+                        setHoveredTower({
+                            x: e.point.x,
+                            y: e.point.y,
+                            category: props.category,
+                            amount: props.amount,
+                            topMerchant: props.topMerchant || 'Multiple',
+                            count: props.count || 1
+                        });
+                    }
+                });
+
+                map.on('mouseleave', 'expense-3d', () => {
+                    map.getCanvas().style.cursor = '';
+                    setHoveredTower(null);
                 });
             });
         }, 100);
@@ -279,7 +350,8 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency }
         }>();
 
         filteredTransactions.forEach(tx => {
-            const key = `${tx.place_lat?.toFixed(4)},${tx.place_lng?.toFixed(4)}`;
+            // Coarser grouping (~22m) to prevent overlapping pins from nearby venues
+            const key = `${(Math.round(tx.place_lat! * 5000) / 5000).toFixed(4)},${(Math.round(tx.place_lng! * 5000) / 5000).toFixed(4)}`;
             if (!locationGroups.has(key)) {
                 locationGroups.set(key, {
                     lat: tx.place_lat!,
@@ -308,22 +380,36 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency }
             return [lng + (dLng * 180 / Math.PI), lat + (dLat * 180 / Math.PI)];
         };
 
+        const getGridOffsetCoords = (lng: number, lat: number, offsetX: number, offsetY: number) => {
+            const radiusEarth = 6378137;
+            const dLat = offsetY / radiusEarth;
+            const dLng = offsetX / (radiusEarth * Math.cos(lat * Math.PI / 180));
+            return [lng + (dLng * 180 / Math.PI), lat + (dLat * 180 / Math.PI)];
+        };
+
         // 2. Generate 3D Tower Features with Clusters
         const towerFeatures: any[] = [];
         locationGroups.forEach(group => {
-            const cats = Array.from(group.categories.entries());
+            // Sort categories by amount (ASC) so shorter pillars are in front
+            const cats = Array.from(group.categories.entries()).sort((a, b) => a[1] - b[1]);
             const count = cats.length;
+            const gridSpacing = 15; // 15 meters spacing
+            const cols = 2; // 2 columns for the grid
             
             cats.forEach(([category, amount], idx) => {
                 let center = [group.lng, group.lat];
                 
-                // If multiple categories, apply offset ring
-                if (count > 1) {
-                    const angle = (idx * 360) / count;
-                    center = getOffsetCoords(group.lng, group.lat, 6, angle); // 6 meter offset ring
-                }
+                // Always use grid layout even for single items to prevent overlap between adjacent groups
+                const row = Math.floor(idx / cols);
+                const col = idx % cols;
+                
+                // Front Row (row 0) is South (negative offsetY) so it's closer to camera
+                const offsetX = (col - (cols - 1) / 2) * gridSpacing;
+                const offsetY = -row * gridSpacing; 
+                
+                center = getGridOffsetCoords(group.lng, group.lat, offsetX, offsetY);
 
-                const radius = count > 1 ? 0.0006 : 0.001; // Smaller towers for clusters
+                const radius = 0.00003; // Even skinnier pillars (~3m)
                 const sides = 8;
                 const coordinates = [];
                 for (let i = 0; i < sides; i++) {
@@ -336,10 +422,18 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency }
                 }
                 coordinates.push(coordinates[0]);
 
+                const txsInCategory = group.transactions.filter(t => t.category === category);
+                const count = txsInCategory.length;
+                
+                // Find top merchant (description with highest total amount)
+                const merchantMap = new Map<string, number>();
+                txsInCategory.forEach(t => merchantMap.set(t.description, (merchantMap.get(t.description) || 0) + t.amount));
+                const topMerchant = Array.from(merchantMap.entries()).sort((a, b) => b[1] - a[1])[0]?.[0] || 'Unknown';
+
                 towerFeatures.push({
                     type: 'Feature',
                     geometry: { type: 'Polygon', coordinates: [coordinates] },
-                    properties: { amount, category: category.toLowerCase() }
+                    properties: { amount, category: category.toLowerCase(), topMerchant, count }
                 });
             });
         });
@@ -361,10 +455,24 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency }
             const trailFeatures = Object.entries(userTrails).map(([uid, txs], index) => {
                 const sorted = [...txs].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
                 if (sorted.length < 2) return null;
+                const color = userColors[index % userColors.length];
+                
+                // Convert hex to rgba for Mapbox stability
+                const hexToRgba = (hex: string, alpha: number) => {
+                    const r = parseInt(hex.slice(1, 3), 16);
+                    const g = parseInt(hex.slice(3, 5), 16);
+                    const b = parseInt(hex.slice(5, 7), 16);
+                    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+                };
+
                 return {
                     type: 'Feature' as const,
                     geometry: { type: 'LineString' as const, coordinates: sorted.map(tx => [tx.place_lng!, tx.place_lat!]) },
-                    properties: { user_id: uid, color: userColors[index % userColors.length], halo: userColors[index % userColors.length] + '80' }
+                    properties: { 
+                        user_id: uid, 
+                        color: color, 
+                        halo: hexToRgba(color, 0.5) 
+                    }
                 };
             }).filter(Boolean);
             (map.getSource('trails') as mapboxgl.GeoJSONSource)?.setData({ type: 'FeatureCollection', features: trailFeatures as any });
@@ -382,8 +490,11 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency }
 
         if (viewMode !== 'heatmap') {
             locationGroups.forEach(group => {
-                const categoryEntries = Array.from(group.categories.entries());
+                // Same sorting logic for markers
+                const categoryEntries = Array.from(group.categories.entries()).sort((a, b) => a[1] - b[1]);
                 const catCount = categoryEntries.length;
+                const gridSpacing = 15;
+                const cols = 2;
 
                 categoryEntries.forEach(([category, totalAmount], idx) => {
                     const txs = group.transactions.filter(t => t.category === category);
@@ -394,12 +505,16 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency }
                     const avatarImg = latestTx.profile?.avatar_url;
                     const count = txs.length;
 
-                    // Apply the same offset as the towers
-                    let markerPos = [group.lng, group.lat];
-                    if (catCount > 1) {
-                        const angle = (idx * 360) / catCount;
-                        markerPos = getOffsetCoords(group.lng, group.lat, 6, angle);
-                    }
+                    // Apply the same grid logic
+                    const row = Math.floor(idx / cols);
+                    const col = idx % cols;
+                    const offsetX = (col - (cols - 1) / 2) * gridSpacing;
+                    const offsetY = -row * gridSpacing;
+                    const pillarPos = getGridOffsetCoords(group.lng, group.lat, offsetX, offsetY);
+
+                    // Shift marker slightly SOUTH (additional 5m) of the pillar base
+                    // so it appears in front of the 3D tower
+                    const markerPos = getGridOffsetCoords(pillarPos[0], pillarPos[1], 0, -5);
 
                     const el = document.createElement('div');
                     el.className = 'expense-marker-root';
@@ -722,6 +837,66 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency }
                     )}
                 </AnimatePresence>
                 </div>
+
+                {/* Glassmorphic Hover Insight Bubble */}
+                <AnimatePresence>
+                    {hoveredTower && !selectedTx && (
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.9, y: 10 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.9, y: 10 }}
+                            className="absolute z-[110] pointer-events-none"
+                            style={{
+                                left: hoveredTower.x,
+                                top: hoveredTower.y - 120, // offset above cursor
+                                transform: 'translateX(-50%)'
+                            }}
+                        >
+                            <div className="bg-card/40 backdrop-blur-xl border border-white/20 rounded-2xl p-4 shadow-2xl min-w-[200px]">
+                                <div className="flex items-center gap-2 mb-3">
+                                    <div 
+                                        className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 border border-white/20"
+                                        style={{ backgroundColor: `${CATEGORY_COLORS[hoveredTower.category as keyof typeof CATEGORY_COLORS] || CATEGORY_COLORS.others}40` }}
+                                    >
+                                        <span className="scale-75 text-white">
+                                            {getIconSvgForCategory(hoveredTower.category)}
+                                        </span>
+                                    </div>
+                                    <div>
+                                        <p className="text-[10px] uppercase font-black tracking-widest text-muted-foreground opacity-70">
+                                            {hoveredTower.category}
+                                        </p>
+                                        <p className="text-sm font-black text-white">
+                                            {formatCurrency(hoveredTower.amount)}
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="space-y-2 pt-2 border-t border-white/10">
+                                    <div className="flex items-center justify-between text-[11px]">
+                                        <span className="text-muted-foreground font-medium">Top Merchant</span>
+                                        <span className="text-white font-black truncate max-w-[100px] text-right">{hoveredTower.topMerchant}</span>
+                                    </div>
+                                    <div className="flex items-center justify-between text-[11px]">
+                                        <span className="text-muted-foreground font-medium">Transactions</span>
+                                        <span className="text-white font-black">{hoveredTower.count}</span>
+                                    </div>
+                                    {/* Mock Sparkline Visual */}
+                                    <div className="h-6 w-full flex items-end gap-0.5 mt-2 bg-white/5 rounded px-1.5 py-1">
+                                        {[40, 70, 45, 90, 65, 85, 30].map((h, i) => (
+                                            <div 
+                                                key={i} 
+                                                className="flex-1 bg-primary/40 rounded-t-[1px]" 
+                                                style={{ height: `${h}%`, opacity: 0.4 + (i * 0.1) }}
+                                            />
+                                        ))}
+                                    </div>
+                                </div>
+                                {/* Triangular notch */}
+                                <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-4 h-4 bg-card/40 backdrop-blur-xl border-r border-b border-white/20 rotate-45" />
+                            </div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
             </motion.div>
         </AnimatePresence>
     );

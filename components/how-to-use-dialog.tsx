@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Zap, Users, Tag, PieChart, FileDown, Plus, Wallet, Globe, X, CheckCircle2, MapPin } from 'lucide-react';
+import { Zap, Users, Tag, PieChart, Plus, Wallet, Globe, X, CheckCircle2, MapPin, RefreshCcw, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 type HowToUseDialogProps = {
@@ -21,72 +21,82 @@ export function HowToUseDialog({ isOpen, onClose }: HowToUseDialogProps) {
     const steps = [
         {
             icon: <Plus className="w-6 h-6 text-emerald-400" />,
-            title: "Log & Categorize Transactions ",
-            desc: "The core of Novira is simple: hit the floating (+) button anywhere to record a spend. We'll automatically categorize common merchants for you. Travelling? Select a different currency from the dropdown and we'll instantly convert the amount to your base currency using real-time foreign exchange rates. You can even attach receipts directly for digital proof.",
+            title: "Precision Recording",
+            desc: "Hit the floating (+) button anywhere to record a spend. Our Smart Location Memory learns where you spend and automatically suggests locations for recurring descriptions. Travelling? Select a different currency from the dropdown and we'll instantly convert the amount to your base currency using real-time rates.",
             subPoints: [
-                "Intelligent categorization (Food, Transport, etc.)",
-                "Real-time FX conversions for 160+ currencies",
-                "Location tagging with smart place search"
-            ]
-        },
-        {
-            icon: <MapPin className="w-6 h-6 text-rose-400" />,
-            title: "Map Your Spending journey",
-            desc: "Location is everything. When adding an expense, use the 'Location' field to search for specific shops, cafes, or landmarks. Once tagged, you can view your entire financial history geographically using the Expense Map. Switch to 'Heatmap' mode to see where your money concentrates, or turn on 'Trip Trails' to see the path you took across a city during a vacation.",
-            subPoints: [
-                "Interactive floating Map with category filters",
-                "Density heatmaps for spending 'hotspots'",
-                "Spending Trails (Trip Mode) for travel stories"
+                "Smart Location & Merchant memory",
+                "Real-time FX for 160+ currencies",
+                "Optional notes for paperless tracking"
             ]
         },
         {
             icon: <Users className="w-6 h-6 text-blue-400" />,
-            title: "Manage Friends, Groups & Splitting",
-            desc: "Money shouldn't be awkward. Add friends by email or scan their unique QR codes to connect instantly. Create shared Groups for trips, rent, or dinners. You can split bills equally, by exact percentages, or by custom shares. Settle up with a single tap, keeping a clear history of every payment made between you and your friends.",
+            title: "Social Connectivity",
+            desc: "Money shouldn't be awkward. Add friends by scanning their unique QR codes or via email. Create shared Groups for trips, rent, or dinner parties. Split bills by percentage, exact amounts, or shares. Settle up with a single tap, keeping a clear history of every settlement.",
             subPoints: [
                 "Scan-to-add friend QR codes",
-                "Granular bill splitting rules",
+                "Advanced bill splitting rules",
                 "One-tap debt settlement tracking"
             ]
         },
         {
-            icon: <Tag className="w-6 h-6 text-cyan-500" />,
-            title: "Missions, Buckets & Focus",
-            desc: "Stop mixing your 'Life' money with your 'Goal' money. Create a Mission Bucket for a specific trip (e.g. 'Germany 2024') or a big purchase. Use the Dashboard Focus pill to swap your entire screen to view ONLY that mission's localized budget and pacing. This helps you stay perfectly on track for big goals without cluttering your daily habit tracking.",
+            icon: <MapPin className="w-6 h-6 text-rose-400" />,
+            title: "Spatial Intelligence",
+            desc: "Location is everything. Use the 'Expense Map' to visualize your finances in 3D. Our Clear-Sight Grid prevents occlusion, while Hover Insights reveal top merchants at a glance. Enable 'Heatmap' mode for density hotspots or 'Trip Trails' to see your spending pulse flow through the city.",
             subPoints: [
-                "Isolated dashboard views for specific Missions",
-                "Localized currency and budget targets per goal",
-                "Exclude mission spending from regular daily tracking"
+                "Clear-Sight 3D visualization",
+                "Animated Flow Trails & Hover Insights",
+                "Spending Density Heatmaps"
+            ]
+        },
+        {
+            icon: <Tag className="w-6 h-6 text-cyan-500" />,
+            title: "Mission Buckets & Focus",
+            desc: "Stop mixing your 'Life' money with your 'Goal' money. Create a Mission Bucket for specific travel or big purchases. Use the Dashboard Focus pill to isolate your entire view to ONLY that mission's localized budget and pacing. Stay perfectly on track for big goals without the clutter.",
+            subPoints: [
+                "Isolated goal-based Mission views",
+                "Localized currency and budget targets",
+                "Archive completed & settled missions"
             ]
         },
         {
             icon: <Wallet className="w-6 h-6 text-primary" />,
-            title: "Monthly Allowance & Funding",
-            desc: "Master your pacing by setting a Universal Monthly Allowance in Settings. This gives you a clear 'Safe to Spend' limit every month. If you have extra income, a refund, or a salary bonus, use 'Add Funds' to safely boost your remaining allowance. Our pacing calculator constantly monitors your burn rate to tell you exactly how much you can spend per day.",
+            title: "Predictive Guardrails",
+            desc: "Set a Monthly Allowance in Settings to see your 'Safe to Spend' limit. We'll send smart alerts when you hit 80% of your budget. Use 'Add Funds' for income, bonuses, or refunds without skewing your expense reports. Our calculator tracks your burn rate in real-time.",
             subPoints: [
-                "Personalized monthly allowance tracking",
-                "Add Income/Refunds without skewing expense data",
-                "Predictive pacing (Daily Safe to Spend indicator)"
+                "Monthly allowance & pacing tracker",
+                "80% overspend safety alerts",
+                "Income/Refund tracking via Add Funds"
+            ]
+        },
+        {
+            icon: <RefreshCcw className="w-6 h-6 text-orange-400" />,
+            title: "Automation & Imports",
+            desc: "Save hours of manual entry. Set up Recurring Expense templates for your subscriptions. Scale your tracking by importing bank statements (CSV/Excel) with smart keyword-to-category mapping. Plus, our proactive PWA technology ensures you're always on the newest, fastest version.",
+            subPoints: [
+                "Recurring expense automation",
+                "Smart Bank Statement Import",
+                "Proactive background app updates"
+            ]
+        },
+        {
+            icon: <Search className="w-6 h-6 text-amber-400" />,
+            title: "Advanced Discovery",
+            desc: "Find anything instantly. Search transactions by description, category, or bucket. Use powerful filters to narrow down by price range, payment method, or specific dates. Get a 'Total Filtered' summary to audit specific clusters of your spending life.",
+            subPoints: [
+                "Multi-criteria advanced filtering",
+                "Unified global transaction search",
+                "Total Filtered amount summaries"
             ]
         },
         {
             icon: <PieChart className="w-6 h-6 text-violet-400" />,
-            title: "Deep Spending Analytics",
-            desc: "Knowledge is power. The Analytics tab breaks down your spending into interactive, clickable pie charts. See exactly which categories eat your budget and which payment methods you use most. Switch between category and payment views to get a 360-degree view of your financial health, or use trend lines to spot spending spikes.",
+            title: "CFO-Grade Analytics",
+            desc: "Knowledge is power. The Analytics tab breaks down spending into interactive pie charts and trend lines. Switch between category and payment views for a 360-degree audit. Export professional multi-page PDF reports with full summaries for tax or reimbursement.",
             subPoints: [
-                "Interactive pie charts for Categories & Methods",
-                "Historical trend analysis through line graphs",
-                "Date-range filtering for deep audits"
-            ]
-        },
-        {
-            icon: <FileDown className="w-6 h-6 text-pink-400" />,
-            title: "Professional PDF Reports",
-            desc: "Need to submit taxes or a reimbursement claim? Export professional, multi-page PDF reports that include your charts, monthly recaps, and detailed transaction logs. You can also export raw CSV data for custom analysis in Excel or Google Sheets.",
-            subPoints: [
-                "CFO-grade PDF reports with charts & summaries",
-                "Raw CSV data backups for custom analysis",
-                "Automatic flagging of 'Excluded' transaction types"
+                "Interactive Pie & Trend analytics",
+                "Professional PDF recaps with charts",
+                "Raw CSV data backups & exports"
             ]
         }
     ];
@@ -129,10 +139,10 @@ export function HowToUseDialog({ isOpen, onClose }: HowToUseDialogProps) {
                                     <Zap className="w-8 h-8 text-primary drop-shadow-[0_0_12px_rgba(138,43,226,0.8)]" />
                                 </motion.div>
                                 <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight leading-tight px-4">
-                                    How to Use <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-purple-400">Novira</span>
+                                    Master Your <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-purple-400">Financial Flow</span>
                                 </h1>
                                 <p className="text-white/50 text-xs sm:text-sm max-w-[360px] mx-auto leading-relaxed mt-3">
-                                    Master these 6 core mechanics to unlock the full potential of your financial journey.
+                                    Novira is a living pulse of your finances. Explore these 8 core mechanics to master your financial universe.
                                 </p>
                                 
                                 <button 

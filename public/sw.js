@@ -1,4 +1,4 @@
-const CACHE_NAME = 'novira-v2.3';
+const CACHE_NAME = 'novira-v2.5.2';
 const STATIC_ASSETS = [
     '/',
     '/Novira.png',
