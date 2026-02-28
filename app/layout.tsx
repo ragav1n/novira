@@ -61,8 +61,8 @@ export default async function RootLayout({
   return (
     <html lang="en" className="dark">
       <body suppressHydrationWarning className={`${geist.variable} ${geistMono.variable} font-sans antialiased`}>
-        <PWAUpdater />
         <UserPreferencesProvider>
+          <PWAUpdater />
           <MobileLayout>
             <GroupsProvider>
               <BucketsProvider>
