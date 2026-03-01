@@ -233,12 +233,31 @@ export function AnalyticsView() {
         let total = 0;
 
         transactions.forEach((tx: Transaction) => {
-            const date = parseISO(tx.date);
-            const timeKey = monthsBack === -2 ? format(date, 'd MMM') : format(date, 'MMM yyyy');
+            // Use string slicing instead of parseISO for grouping dates
+            // tx.date is ISO string: "2026-03-01T14:30:00Z"
+            // slice(0, 10) gives "YYYY-MM-DD"
+            // slice(0, 7) gives "YYYY-MM"
+            let timeKey = '';
+            
+            if (dateRange === '1M' || dateRange === 'LM') {
+                // We need day-level groupings for short ranges
+                // Reconstruct to 'd MMM' (e.g., "1 Mar") using lightweight Date just for the matched string
+                const d = new Date(tx.date.slice(0, 10));
+                timeKey = format(d, 'd MMM');
+            } else {
+                // For long ranges, group by month
+                const yyyymm = tx.date.slice(0, 7);
+                // Convert "2026-03" to "Mar 2026" safely
+                const m = parseInt(yyyymm.slice(5, 7), 10);
+                const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                timeKey = `${monthNames[m - 1]} ${yyyymm.slice(0, 4)}`;
+            }
+            
             const cat = tx.category.toLowerCase();
 
             if (monthsBack === -1 && !monthsMap[timeKey]) {
-                monthsMap[timeKey] = { month: timeKey, rawDate: date };
+                // Create dummy date for sorting purposes if all time
+                monthsMap[timeKey] = { month: timeKey, rawDate: new Date(tx.date.slice(0, 10)) };
                 Object.keys(CATEGORY_COLORS).forEach(c => monthsMap[timeKey][c] = 0);
             }
 
@@ -314,31 +333,7 @@ export function AnalyticsView() {
 
     return (
         <div className="relative min-h-screen">
-            <AnimatePresence>
-                {loading && (
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-50 flex items-center justify-center bg-background/20 backdrop-blur-[2px]"
-                        style={{
-                            position: 'fixed',
-                            top: 0,
-                            left: 0,
-                            right: 0,
-                            bottom: 0,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            backgroundColor: 'rgba(12, 8, 30, 0.2)',
-                            backdropFilter: 'blur(2px)',
-                            zIndex: 50
-                        }}
-                    >
-                        <WaveLoader bars={5} message="" />
-                    </motion.div>
-                )}
-            </AnimatePresence>
+
 
             <div className={cn(
                 "p-5 space-y-6 max-w-md mx-auto relative transition-all duration-300",

@@ -164,12 +164,14 @@ export function SearchView() {
             result = result.filter(tx => selectedPayments.includes(tx.payment_method));
         }
 
-        // 5. Date Range
+        // 5. Date Range (using string comparison on YYYY-MM-DD instead of Date parsing)
         if (dateRange.from) {
-            result = result.filter(tx => isAfter(parseISO(tx.date), startOfDay(dateRange.from!)) || format(parseISO(tx.date), 'yyyy-MM-dd') === format(dateRange.from!, 'yyyy-MM-dd'));
+            const fromStr = format(dateRange.from, 'yyyy-MM-dd');
+            result = result.filter(tx => tx.date.slice(0, 10) >= fromStr);
         }
         if (dateRange.to) {
-            result = result.filter(tx => isBefore(parseISO(tx.date), endOfDay(dateRange.to!)) || format(parseISO(tx.date), 'yyyy-MM-dd') === format(dateRange.to!, 'yyyy-MM-dd'));
+            const toStr = format(dateRange.to, 'yyyy-MM-dd');
+            result = result.filter(tx => tx.date.slice(0, 10) <= toStr);
         }
 
         // 6. Buckets
@@ -497,31 +499,7 @@ export function SearchView() {
             )}
 
             <div className="relative flex-1 min-h-[400px]">
-                <AnimatePresence>
-                    {loading && (
-                        <motion.div
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            className="fixed inset-0 z-50 flex items-center justify-center bg-background/20 backdrop-blur-[2px]"
-                            style={{
-                                position: 'fixed',
-                                top: 0,
-                                left: 0,
-                                right: 0,
-                                bottom: 0,
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                backgroundColor: 'rgba(12, 8, 30, 0.2)',
-                                backdropFilter: 'blur(2px)',
-                                zIndex: 50
-                            }}
-                        >
-                            <WaveLoader bars={5} message="" />
-                        </motion.div>
-                    )}
-                </AnimatePresence>
+
 
                 <div className={cn(
                     "space-y-3 overflow-y-auto pr-1 -mr-1 h-full transition-all duration-300",
