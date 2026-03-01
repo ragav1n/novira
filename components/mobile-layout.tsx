@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { Home, Plus, BarChart2, Search, Settings, Users } from 'lucide-react';
 import { ExpandableTabs } from '@/components/ui/expandable-tabs';
@@ -12,6 +12,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { useIsNative } from '@/hooks/use-native';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { App } from '@capacitor/app';
+import { PWAUpdater } from '@/components/pwa-updater';
 
 export function MobileLayout({ children }: { children: React.ReactNode }) {
     const router = useRouter();
@@ -124,7 +125,7 @@ export function MobileLayout({ children }: { children: React.ReactNode }) {
     };
 
     // Navigation Loading State with slight delay to prevent flashing
-    const [showLoader, setShowLoader] = React.useState(false);
+    const [showLoader, setShowLoader] = useState(false);
 
     useEffect(() => {
         let timer: NodeJS.Timeout;
@@ -165,17 +166,20 @@ export function MobileLayout({ children }: { children: React.ReactNode }) {
 
             {/* Bottom Navigation */}
             {showNav && (
-                <div className={cn(
-                    "fixed bottom-6 left-0 right-0 z-50 flex justify-center px-4",
-                    isNative && "bottom-[calc(1.5rem+env(safe-area-inset-bottom))]"
-                )}>
-                    <ExpandableTabs
-                        tabs={tabs}
-                        className="bg-background/80 backdrop-blur-xl border-white/10 shadow-2xl shadow-primary/20"
-                        activeColor="text-primary bg-primary/10"
-                        onChange={handleTabChange}
-                    />
-                </div>
+                <>
+                    <PWAUpdater />
+                    <div className={cn(
+                        "fixed bottom-6 left-0 right-0 z-50 flex justify-center px-4",
+                        isNative && "bottom-[calc(1.5rem+env(safe-area-inset-bottom))]"
+                    )}>
+                        <ExpandableTabs
+                            tabs={tabs}
+                            className="bg-background/80 backdrop-blur-xl border-white/10 shadow-2xl shadow-primary/20"
+                            activeColor="text-primary bg-primary/10"
+                            onChange={handleTabChange}
+                        />
+                    </div>
+                </>
             )}
 
             {/* Navigation Loading Overlay */}

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'novira-v2.5.2';
+const CACHE_NAME = 'novira-v2.6.0'; // Updated version
 const STATIC_ASSETS = [
     '/',
     '/Novira.png',
@@ -12,6 +12,7 @@ self.addEventListener('install', (event) => {
             return cache.addAll(STATIC_ASSETS);
         })
     );
+    self.skipWaiting();
 });
 
 // Listen for the "SKIP_WAITING" message to trigger the update
@@ -35,7 +36,18 @@ self.addEventListener('activate', (event) => {
     self.clients.claim();
 });
 
-// Fetch: network-first for API/Supabase, cache-first for static assets
+// Helper function to add a custom header to a cached response
+function addXFromCacheHeader(response) {
+    const newHeaders = new Headers(response.headers);
+    newHeaders.set('X-From-Cache', 'true');
+    return new Response(response.body, {
+        status: response.status,
+        statusText: response.statusText,
+        headers: newHeaders,
+    });
+}
+
+// Fetch: network-first for auth, stale-while-revalidate for data, cache-first for static assets
 self.addEventListener('fetch', (event) => {
     const { request } = event;
     const url = new URL(request.url);
@@ -46,29 +58,44 @@ self.addEventListener('fetch', (event) => {
     // Skip Supabase realtime WebSocket connections
     if (url.protocol === 'wss:' || url.protocol === 'ws:') return;
 
-    // Network-first for API calls (Supabase, exchange rates)
-    if (url.hostname.includes('supabase.co') || url.hostname.includes('frankfurter')) {
+    // --- 1. Supabase Auth Layer (Must always be Network-First) ---
+    if (url.hostname.includes('supabase.co') && url.pathname.includes('/auth/v1/')) {
         event.respondWith(
-            fetch(request)
-                .then((response) => {
-                    // Cache successful GET API responses for offline fallback
-                    if (response.ok) {
-                        const responseClone = response.clone();
-                        caches.open(CACHE_NAME).then((cache) => {
-                            cache.put(request, responseClone);
-                        });
-                    }
-                    return response;
-                })
-                .catch(() => {
-                    // Offline: try to serve from cache
-                    return caches.match(request);
-                })
+            fetch(request).catch(() => caches.match(request))
         );
         return;
     }
 
-    // Cache-first for static assets (JS, CSS, images, fonts)
+    // --- 2. API Data Layer (Stale-While-Revalidate) ---
+    if (url.hostname.includes('supabase.co') || url.hostname.includes('frankfurter')) {
+         event.respondWith(
+            caches.open(CACHE_NAME).then((cache) => {
+                return cache.match(request).then((cachedResponse) => {
+                    const fetchPromise = fetch(request).then((networkResponse) => {
+                        if (networkResponse.ok) {
+                            cache.put(request, networkResponse.clone());
+                        }
+                        return networkResponse;
+                    }).catch(() => {
+                         // Network failed, silently fail over to cached if available
+                         return cachedResponse;
+                    });
+                    
+                    if (cachedResponse) {
+                        // Return the cached response immediately, but flagged
+                        // The network promise will still run in the background
+                        return addXFromCacheHeader(cachedResponse.clone());
+                    }
+                    
+                    // If no cache, wait for the network
+                    return fetchPromise;
+                });
+            })
+        );
+        return;
+    }
+
+    // --- 3. Static Assets (Cache-First) ---
     if (
         url.pathname.startsWith('/_next/static/') ||
         url.pathname.startsWith('/_next/image') ||
@@ -92,7 +119,7 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
-    // Navigation requests: stale-while-revalidate (serve cache instantly, update in background)
+    // --- 4. Navigation requests (Stale-While-Revalidate as before) ---
     if (request.mode === 'navigate') {
         event.respondWith(
             caches.match(request).then((cachedResponse) => {
@@ -109,7 +136,6 @@ self.addEventListener('fetch', (event) => {
                     return cachedResponse || caches.match('/');
                 });
 
-                // Return cached response immediately if available, otherwise wait for network
                 return cachedResponse || fetchPromise;
             })
         );

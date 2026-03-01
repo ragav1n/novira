@@ -4,10 +4,10 @@ import { headers } from 'next/headers'
 import { Analytics } from '@vercel/analytics/next'
 import './globals.css'
 import { MobileLayout } from '@/components/mobile-layout'
-import { PWAUpdater } from '@/components/pwa-updater'
 import { UserPreferencesProvider } from '@/components/providers/user-preferences-provider'
 import { GroupsProvider } from '@/components/providers/groups-provider'
 import { BucketsProvider } from '@/components/providers/buckets-provider'
+import { SyncIndicator } from '@/components/pwa-sync-indicator'
 
 const geist = Geist({
   subsets: ["latin"],
@@ -60,9 +60,13 @@ export default async function RootLayout({
 
   return (
     <html lang="en" className="dark">
+      <head>
+        <link rel="preconnect" href={process.env.NEXT_PUBLIC_SUPABASE_URL} crossOrigin="anonymous" />
+        <link rel="dns-prefetch" href={process.env.NEXT_PUBLIC_SUPABASE_URL} />
+      </head>
       <body suppressHydrationWarning className={`${geist.variable} ${geistMono.variable} font-sans antialiased`}>
         <UserPreferencesProvider>
-          <PWAUpdater />
+          <SyncIndicator />
           <MobileLayout>
             <GroupsProvider>
               <BucketsProvider>

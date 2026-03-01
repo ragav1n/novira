@@ -120,7 +120,7 @@ export function SearchView() {
         try {
             const { data } = await supabase
                 .from('transactions')
-                .select('*')
+                .select('id, description, amount, category, date, payment_method, created_at, currency, is_recurring, bucket_id')
                 .order('date', { ascending: false });
 
             if (data) {

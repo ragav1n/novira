@@ -46,7 +46,7 @@ export function BucketsProvider({ children }: { children: React.ReactNode }) {
             const [bucketsResult, spendingResult] = await Promise.all([
                 supabase
                     .from('buckets')
-                    .select('*')
+                    .select('id, user_id, name, type, icon, color, budget, currency, is_archived, start_date, end_date, created_at')
                     .order('created_at', { ascending: false }),
                 supabase
                     .from('transactions')

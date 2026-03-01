@@ -132,7 +132,7 @@ export function SettingsView() {
         try {
             const { data, error } = await supabase
                 .from('recurring_templates')
-                .select('*')
+                .select('id, description, amount, currency, frequency, created_at')
                 .eq('user_id', userId)
                 .eq('is_active', true)
                 .order('created_at', { ascending: false });
@@ -252,7 +252,7 @@ export function SettingsView() {
 
             let query = supabase
                 .from('transactions')
-                .select('*')
+                .select('id, description, amount, category, date, payment_method, created_at, currency, bucket_id, notes, type, is_recurring')
                 .order('date', { ascending: false });
 
             if (dateRange?.from) {
