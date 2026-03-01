@@ -124,19 +124,6 @@ export function MobileLayout({ children }: { children: React.ReactNode }) {
         }
     };
 
-    // Navigation Loading State with slight delay to prevent flashing
-    const [showLoader, setShowLoader] = useState(false);
-
-    useEffect(() => {
-        let timer: NodeJS.Timeout;
-        if (isNavigating) {
-            timer = setTimeout(() => setShowLoader(true), 200);
-        } else {
-            setShowLoader(false);
-        }
-        return () => clearTimeout(timer);
-    }, [isNavigating]);
-
     const showNav = !isAuthPage && !isPublicPage && isAuthenticated;
 
     if (isLoading && !isPublicPage && !isAuthPage) {
@@ -182,19 +169,7 @@ export function MobileLayout({ children }: { children: React.ReactNode }) {
                 </>
             )}
 
-            {/* Navigation Loading Overlay */}
-            <AnimatePresence>
-                {(isNavigating && showLoader) && (
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-[9999] flex items-center justify-center bg-background/80"
-                    >
-                        <WaveLoader bars={5} />
-                    </motion.div>
-                )}
-            </AnimatePresence>
+
 
             <Toaster />
         </div>

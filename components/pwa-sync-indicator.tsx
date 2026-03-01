@@ -83,6 +83,7 @@ export function SyncIndicator() {
                         "fixed top-safe left-1/2 -translate-x-1/2 z-50",
                         "mt-2 flex items-center justify-center pointer-events-none"
                     )}
+                    style={{ willChange: "transform, opacity" }}
                 >
                     <div className="bg-background/80 backdrop-blur-md border border-white/10 shadow-lg rounded-full px-3 py-1.5 flex items-center gap-2">
                         <RefreshCcw className="w-3.5 h-3.5 text-primary animate-spin" />

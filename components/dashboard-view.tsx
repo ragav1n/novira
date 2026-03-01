@@ -491,10 +491,16 @@ export function DashboardView() {
         }
     };
 
+    const currentMonthForEditPrefix = useMemo(() => {
+        const d = new Date();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        return `${d.getFullYear()}-${month}`;
+    }, []);
+
     const canEditTransaction = useCallback((tx: Transaction) => {
         if (tx.user_id !== userId) return false;
-        return isSameMonth(parseISO(tx.date), new Date());
-    }, [userId]);
+        return tx.date.startsWith(currentMonthForEditPrefix);
+    }, [userId, currentMonthForEditPrefix]);
 
     const calculateUserShare = useCallback((tx: Transaction, currentUserId: string | null) => {
         if (!currentUserId) return 0;
@@ -546,6 +552,12 @@ export function DashboardView() {
     const activeBuckets = useMemo(() => buckets.filter(b => !b.is_archived), [buckets]);
 
     // Calculate personal share for budget tracking
+    const currentMonthPrefix = useMemo(() => {
+        const d = new Date();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        return `${d.getFullYear()}-${month}`;
+    }, []);
+
     const totalSpent = useMemo(() => transactions.reduce((acc, tx) => {
         if (!userId) return acc;
 
@@ -556,9 +568,8 @@ export function DashboardView() {
             // Allowance Focus: exclude project elements that are marked explicitly
             if (tx.exclude_from_allowance) return acc;
             
-            // Filter for current month using parseISO
-            const txDate = parseISO(tx.date);
-            if (!isSameMonth(txDate, new Date())) return acc;
+            // Filter for current month using ultra-fast string comparison (YYYY-MM)
+            if (!tx.date.startsWith(currentMonthPrefix)) return acc;
         }
 
         const myShare = calculateUserShare(tx, userId);
@@ -590,9 +601,8 @@ export function DashboardView() {
             // Allowance Focus: exclude project elements that are marked explicitly
             if (tx.exclude_from_allowance) return acc;
             
-            // Filter for current month using parseISO
-            const txDate = parseISO(tx.date);
-            if (!isSameMonth(txDate, new Date())) return acc;
+            // Filter for current month using ultra-fast string comparison (YYYY-MM)
+            if (!tx.date.startsWith(currentMonthPrefix)) return acc;
         }
 
         const cat = tx.category.toLowerCase();
@@ -660,18 +670,7 @@ export function DashboardView() {
                 )}
             </AnimatePresence>
 
-            <AnimatePresence>
-                {loading && (
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-50 flex items-center justify-center bg-background/20 backdrop-blur-[2px]"
-                    >
-                        <WaveLoader bars={5} message="" />
-                    </motion.div>
-                )}
-            </AnimatePresence>
+
 
             <div 
                 className={cn(

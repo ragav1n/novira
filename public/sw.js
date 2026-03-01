@@ -3,6 +3,8 @@ const STATIC_ASSETS = [
     '/',
     '/Novira.png',
     '/manifest.json',
+    '/offline.html',
+    '/offline-illustration.png'
 ];
 
 // Install: pre-cache essential static assets
@@ -132,8 +134,14 @@ self.addEventListener('fetch', (event) => {
                     }
                     return response;
                 }).catch(() => {
-                    // Network failed, cachedResponse will be used (or fallback to root)
-                    return cachedResponse || caches.match('/');
+                    // Network failed
+                    if (cachedResponse) {
+                        return cachedResponse;
+                    }
+                    // If no cache for this route, try returning the root app shell
+                    return caches.match('/').then((rootCache) => {
+                        return rootCache || caches.match('/offline.html');
+                    });
                 });
 
                 return cachedResponse || fetchPromise;
