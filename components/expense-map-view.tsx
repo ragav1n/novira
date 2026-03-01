@@ -34,10 +34,19 @@ interface ExpenseMapViewProps {
     formatCurrency: (amount: number, currency?: string) => string;
 }
 
+// Helper for radial offsets (approx meters to degrees)
+function getGridOffsetCoords(lng: number, lat: number, offsetX: number, offsetY: number) {
+    const radiusEarth = 6378137;
+    const dLat = offsetY / radiusEarth;
+    const dLng = offsetX / (radiusEarth * Math.cos(lat * Math.PI / 180));
+    return [lng + (dLng * 180 / Math.PI), lat + (dLat * 180 / Math.PI)];
+}
+
 export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency }: ExpenseMapViewProps) {
     const mapContainerRef = useRef<HTMLDivElement>(null);
     const mapRef = useRef<mapboxgl.Map | null>(null);
-    const markersRef = useRef<mapboxgl.Marker[]>([]);
+    const animFrameIdRef = useRef<number | undefined>(undefined);
+    const isFirstBoundFit = useRef(true);
     const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set());
     const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
     const [viewMode, setViewMode] = useState<'pins' | 'heatmap'>('pins');
@@ -229,25 +238,28 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency }
                     const map = mapRef.current;
                     if (!map || !map.getLayer('trail-core')) return;
                     
-                    step = (step + 0.005) % 1;
+                    const visibility = map.getLayoutProperty('trail-core', 'visibility');
+                    if (visibility === 'visible') {
+                        step = (step + 0.005) % 1;
+                        
+                        // Strictly ascending: 0 < s1 < s2 < s3 < 1 (with 0.02 buffer)
+                        const s1 = 0.1 + (step * 0.7); // 0.1 to 0.8
+                        const s2 = s1 + 0.05;          // 0.15 to 0.85
+                        const s3 = s2 + 0.05;          // 0.2 to 0.9
+                        
+                        map.setPaintProperty('trail-core', 'line-gradient', [
+                            'interpolate',
+                            ['linear'],
+                            ['line-progress'],
+                            0, 'rgba(0, 255, 255, 0.05)',
+                            s1, 'rgba(0, 255, 255, 0.05)',
+                            s2, 'rgba(0, 255, 255, 1)',
+                            s3, 'rgba(0, 255, 255, 0.05)',
+                            1, 'rgba(0, 255, 255, 0.05)'
+                        ]);
+                    }
                     
-                    // Strictly ascending: 0 < s1 < s2 < s3 < 1 (with 0.02 buffer)
-                    const s1 = 0.1 + (step * 0.7); // 0.1 to 0.8
-                    const s2 = s1 + 0.05;          // 0.15 to 0.85
-                    const s3 = s2 + 0.05;          // 0.2 to 0.9
-                    
-                    map.setPaintProperty('trail-core', 'line-gradient', [
-                        'interpolate',
-                        ['linear'],
-                        ['line-progress'],
-                        0, 'rgba(0, 255, 255, 0.05)',
-                        s1, 'rgba(0, 255, 255, 0.05)',
-                        s2, 'rgba(0, 255, 255, 1)',
-                        s3, 'rgba(0, 255, 255, 0.05)',
-                        1, 'rgba(0, 255, 255, 0.05)'
-                    ]);
-                    
-                    requestAnimationFrame(animateTrails);
+                    animFrameIdRef.current = requestAnimationFrame(animateTrails);
                 }
                 animateTrails();
 
@@ -282,14 +294,8 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency }
 
                         map.getCanvas().style.cursor = 'pointer';
 
-                        // Find all transactions for this location/category to get insights
-                        // Note: In a larger app, we'd pre-calculate this, but for this scale we can find it
-                        const category = props.category;
-                        // Use a small epsilon for coordinate matching
-                        const lng = (feature.geometry as any).coordinates[0][0][0]; 
-                        const lat = (feature.geometry as any).coordinates[0][0][1];
-
                         // Set tooltip State
+                        // TODO: The 3D hover tooltip sparkline is currently hardcoded dummy data. This should be connected to the grouped tx history later.
                         setHoveredTower({
                             x: e.point.x,
                             y: e.point.y,
@@ -309,38 +315,24 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency }
         }, 100);
 
         return () => {
+            if (animFrameIdRef.current) cancelAnimationFrame(animFrameIdRef.current);
             clearTimeout(timer);
-            markersRef.current.forEach(m => m.remove());
-            markersRef.current = [];
+            // We'll clean up markers dictionary later below
+            markerDictRef.current.clear();
             mapRef.current?.remove();
             mapRef.current = null;
             setSelectedTx(null);
             setIsInitialLoad(true);
+            isFirstBoundFit.current = true;
         };
     }, [isOpen, mapboxToken]);
 
-    // 1. Source and Marker Management
-    useEffect(() => {
-        const map = mapRef.current;
-        if (!map || isInitialLoad) return;
+    // Marker Reconciliation State
+    const markerDictRef = useRef<Map<string, { marker: mapboxgl.Marker, countBadge: HTMLDivElement | null }>>(new Map());
 
-        // Update Sources
-        const features = filteredTransactions.map(tx => ({
-            type: 'Feature' as const,
-            geometry: {
-                type: 'Point' as const,
-                coordinates: [tx.place_lng!, tx.place_lat!]
-            },
-            properties: { id: tx.id, amount: tx.amount, category: tx.category }
-        }));
-
-        (map.getSource('expenses') as mapboxgl.GeoJSONSource)?.setData({
-            type: 'FeatureCollection',
-            features
-        });
-
-        // 1. Group by Location first
-        const locationGroups = new Map<string, {
+    // 1. Data Transformation: location matching
+    const locationGroups = useMemo(() => {
+        const groups = new Map<string, {
             lat: number,
             lng: number,
             transactions: Transaction[],
@@ -350,10 +342,9 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency }
         }>();
 
         filteredTransactions.forEach(tx => {
-            // Coarser grouping (~22m) to prevent overlapping pins from nearby venues
             const key = `${(Math.round(tx.place_lat! * 5000) / 5000).toFixed(4)},${(Math.round(tx.place_lng! * 5000) / 5000).toFixed(4)}`;
-            if (!locationGroups.has(key)) {
-                locationGroups.set(key, {
+            if (!groups.has(key)) {
+                groups.set(key, {
                     lat: tx.place_lat!,
                     lng: tx.place_lng!,
                     transactions: [],
@@ -362,54 +353,37 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency }
                     categories: new Map()
                 });
             }
-            const group = locationGroups.get(key)!;
+            const group = groups.get(key)!;
             group.transactions.push(tx);
             group.totalAmount += tx.amount;
             group.categories.set(tx.category, (group.categories.get(tx.category) || 0) + tx.amount);
             
-            if (new Date(tx.date) > new Date(group.latestTx.date)) {
+            if (tx.date > group.latestTx.date) {
                 group.latestTx = tx;
             }
         });
+        return groups;
+    }, [filteredTransactions]);
 
-        // Helper for radial offsets (approx meters to degrees)
-        const getOffsetCoords = (lng: number, lat: number, distanceMeters: number, bearingDegrees: number) => {
-            const radiusEarth = 6378137;
-            const dLat = (distanceMeters * Math.cos(bearingDegrees * Math.PI / 180)) / radiusEarth;
-            const dLng = (distanceMeters * Math.sin(bearingDegrees * Math.PI / 180)) / (radiusEarth * Math.cos(lat * Math.PI / 180));
-            return [lng + (dLng * 180 / Math.PI), lat + (dLat * 180 / Math.PI)];
-        };
-
-        const getGridOffsetCoords = (lng: number, lat: number, offsetX: number, offsetY: number) => {
-            const radiusEarth = 6378137;
-            const dLat = offsetY / radiusEarth;
-            const dLng = offsetX / (radiusEarth * Math.cos(lat * Math.PI / 180));
-            return [lng + (dLng * 180 / Math.PI), lat + (dLat * 180 / Math.PI)];
-        };
-
-        // 2. Generate 3D Tower Features with Clusters
-        const towerFeatures: any[] = [];
+    // 2. Data Transformation: 3D Geometry
+    const towerFeatures = useMemo(() => {
+        const features: any[] = [];
         locationGroups.forEach(group => {
-            // Sort categories by amount (ASC) so shorter pillars are in front
             const cats = Array.from(group.categories.entries()).sort((a, b) => a[1] - b[1]);
-            const count = cats.length;
-            const gridSpacing = 15; // 15 meters spacing
-            const cols = 2; // 2 columns for the grid
+            const gridSpacing = 15;
+            const cols = 2;
             
             cats.forEach(([category, amount], idx) => {
                 let center = [group.lng, group.lat];
-                
-                // Always use grid layout even for single items to prevent overlap between adjacent groups
                 const row = Math.floor(idx / cols);
                 const col = idx % cols;
                 
-                // Front Row (row 0) is South (negative offsetY) so it's closer to camera
                 const offsetX = (col - (cols - 1) / 2) * gridSpacing;
                 const offsetY = -row * gridSpacing; 
                 
                 center = getGridOffsetCoords(group.lng, group.lat, offsetX, offsetY);
 
-                const radius = 0.00003; // Even skinnier pillars (~3m)
+                const radius = 0.00003; 
                 const sides = 8;
                 const coordinates = [];
                 for (let i = 0; i < sides; i++) {
@@ -425,17 +399,76 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency }
                 const txsInCategory = group.transactions.filter(t => t.category === category);
                 const count = txsInCategory.length;
                 
-                // Find top merchant (description with highest total amount)
                 const merchantMap = new Map<string, number>();
                 txsInCategory.forEach(t => merchantMap.set(t.description, (merchantMap.get(t.description) || 0) + t.amount));
                 const topMerchant = Array.from(merchantMap.entries()).sort((a, b) => b[1] - a[1])[0]?.[0] || 'Unknown';
 
-                towerFeatures.push({
+                features.push({
                     type: 'Feature',
                     geometry: { type: 'Polygon', coordinates: [coordinates] },
                     properties: { amount, category: category.toLowerCase(), topMerchant, count }
                 });
             });
+        });
+        return features;
+    }, [locationGroups]);
+
+    // 3. Data Transformation: Lines
+    const trailFeatures = useMemo(() => {
+        if (filteredTransactions.length < 2) return [];
+        
+        const userTrails: Record<string, Transaction[]> = {};
+        filteredTransactions.forEach(tx => {
+            const uid = tx.user_id;
+            if (!userTrails[uid]) userTrails[uid] = [];
+            userTrails[uid].push(tx);
+        });
+        
+        const userColors = ['#00ffff', '#F472B6', '#F9C74F', '#10B981', '#6366F1', '#A855F7'];
+        
+        const hexToRgba = (hex: string, alpha: number) => {
+            const r = parseInt(hex.slice(1, 3), 16);
+            const g = parseInt(hex.slice(3, 5), 16);
+            const b = parseInt(hex.slice(5, 7), 16);
+            return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+        };
+
+        return Object.entries(userTrails).map(([uid, txs], index) => {
+            const sorted = [...txs].sort((a, b) => a.created_at < b.created_at ? -1 : 1);
+            if (sorted.length < 2) return null;
+            const color = userColors[index % userColors.length];
+
+            return {
+                type: 'Feature' as const,
+                geometry: { type: 'LineString' as const, coordinates: sorted.map(tx => [tx.place_lng!, tx.place_lat!]) },
+                properties: { 
+                    user_id: uid, 
+                    color: color, 
+                    halo: hexToRgba(color, 0.5) 
+                }
+            };
+        }).filter(Boolean);
+    }, [filteredTransactions]);
+
+    // Point Features (for heatmap, distinct from 3D)
+    const pointFeatures = useMemo(() => {
+        return filteredTransactions.map(tx => ({
+            type: 'Feature' as const,
+            geometry: { type: 'Point' as const, coordinates: [tx.place_lng!, tx.place_lat!] },
+            properties: { id: tx.id, amount: tx.amount, category: tx.category }
+        }));
+    }, [filteredTransactions]);
+
+
+    // Map Data & DOM Marker Sync Effect
+    useEffect(() => {
+        const map = mapRef.current;
+        if (!map || isInitialLoad) return;
+
+        // Sync Sources
+        (map.getSource('expenses') as mapboxgl.GeoJSONSource)?.setData({
+            type: 'FeatureCollection',
+            features: pointFeatures as any[]
         });
 
         (map.getSource('towers') as mapboxgl.GeoJSONSource)?.setData({
@@ -443,39 +476,13 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency }
             features: towerFeatures
         });
 
-        // Update Trails
-        if (filteredTransactions.length > 1) {
-            const userTrails: Record<string, Transaction[]> = {};
-            filteredTransactions.forEach(tx => {
-                const uid = tx.user_id;
-                if (!userTrails[uid]) userTrails[uid] = [];
-                userTrails[uid].push(tx);
-            });
-            const userColors = ['#00ffff', '#F472B6', '#F9C74F', '#10B981', '#6366F1', '#A855F7'];
-            const trailFeatures = Object.entries(userTrails).map(([uid, txs], index) => {
-                const sorted = [...txs].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
-                if (sorted.length < 2) return null;
-                const color = userColors[index % userColors.length];
-                
-                // Convert hex to rgba for Mapbox stability
-                const hexToRgba = (hex: string, alpha: number) => {
-                    const r = parseInt(hex.slice(1, 3), 16);
-                    const g = parseInt(hex.slice(3, 5), 16);
-                    const b = parseInt(hex.slice(5, 7), 16);
-                    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-                };
-
-                return {
-                    type: 'Feature' as const,
-                    geometry: { type: 'LineString' as const, coordinates: sorted.map(tx => [tx.place_lng!, tx.place_lat!]) },
-                    properties: { 
-                        user_id: uid, 
-                        color: color, 
-                        halo: hexToRgba(color, 0.5) 
-                    }
-                };
-            }).filter(Boolean);
-            (map.getSource('trails') as mapboxgl.GeoJSONSource)?.setData({ type: 'FeatureCollection', features: trailFeatures as any });
+        (map.getSource('trails') as mapboxgl.GeoJSONSource)?.setData({
+            type: 'FeatureCollection',
+            features: trailFeatures as any[]
+        });
+        
+        // Dynamically color trails layer (could also do exactly once at setup, but safe here)
+        if (trailFeatures.length > 0) {
             if (map.getLayer('trail-blur')) map.setPaintProperty('trail-blur', 'line-color', ['get', 'color']);
             if (map.getLayer('trail-core')) map.setPaintProperty('trail-core', 'line-color', ['get', 'color']);
             if (map.getLayer('trail-arrows')) {
@@ -484,36 +491,45 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency }
             }
         }
 
-        // Update Aggregated HTML Markers
-        markersRef.current.forEach(m => m.remove());
-        markersRef.current = [];
+        // --- MARKER RECONCILIATION ---
+        const nextKeys = new Set<string>();
 
         if (viewMode !== 'heatmap') {
-            locationGroups.forEach(group => {
-                // Same sorting logic for markers
+            locationGroups.forEach((group, groupKey) => {
                 const categoryEntries = Array.from(group.categories.entries()).sort((a, b) => a[1] - b[1]);
-                const catCount = categoryEntries.length;
                 const gridSpacing = 15;
                 const cols = 2;
 
                 categoryEntries.forEach(([category, totalAmount], idx) => {
+                    // Create stable key for reconciliation
+                    const key = `${groupKey},${category}`;
+                    nextKeys.add(key);
+                    
                     const txs = group.transactions.filter(t => t.category === category);
-                    const latestTx = txs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
+                    const count = txs.length;
+
+                    // 1. RE-USE EXISTING MARKER
+                    if (markerDictRef.current.has(key)) {
+                        const existing = markerDictRef.current.get(key)!;
+                        if (existing.countBadge) {
+                            existing.countBadge.innerText = count.toString();
+                            existing.countBadge.style.display = count > 1 ? 'block' : 'none';
+                        }
+                        return; // Found it, move on!
+                    }
+
+                    // 2. CREATE NEW MARKER
+                    const latestTx = txs.sort((a, b) => b.date < a.date ? -1 : 1)[0];
                     const color = CATEGORY_COLORS[category.toLowerCase() as keyof typeof CATEGORY_COLORS] || CATEGORY_COLORS.others;
                     const iconSvg = getIconSvgForCategory(category);
                     const abbr = latestTx.profile?.full_name ? latestTx.profile.full_name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : '?';
                     const avatarImg = latestTx.profile?.avatar_url;
-                    const count = txs.length;
 
-                    // Apply the same grid logic
                     const row = Math.floor(idx / cols);
                     const col = idx % cols;
                     const offsetX = (col - (cols - 1) / 2) * gridSpacing;
                     const offsetY = -row * gridSpacing;
                     const pillarPos = getGridOffsetCoords(group.lng, group.lat, offsetX, offsetY);
-
-                    // Shift marker slightly SOUTH (additional 5m) of the pillar base
-                    // so it appears in front of the 3D tower
                     const markerPos = getGridOffsetCoords(pillarPos[0], pillarPos[1], 0, -5);
 
                     const el = document.createElement('div');
@@ -529,11 +545,11 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency }
                         position: relative;
                     `;
                     el.appendChild(wrapper);
-                    
                     wrapper.innerHTML = `<span style="color: white;">${iconSvg}</span>`;
 
-                    if (count > 1) {
-                        const countBadge = document.createElement('div');
+                    let countBadge: HTMLDivElement | null = null;
+                    if (count > 0) { // always inject badge, update innerText later if needed
+                        countBadge = document.createElement('div');
                         countBadge.style.cssText = `
                             position: absolute; top: -6px; right: -6px;
                             background: #f43f5e; color: white; border-radius: 10px;
@@ -541,6 +557,8 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency }
                             border: 1.5px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);
                         `;
                         countBadge.innerText = count.toString();
+                        // Hide it if count is 1
+                        countBadge.style.display = count > 1 ? 'block' : 'none';
                         wrapper.appendChild(countBadge);
                     }
 
@@ -574,20 +592,33 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency }
                         .setLngLat([markerPos[0], markerPos[1]] as [number, number])
                         .addTo(map);
 
-                    markersRef.current.push(marker);
+                    markerDictRef.current.set(key, { marker, countBadge });
                 });
             });
         }
 
-        // Fit bounds on first load or category change
-        if (filteredTransactions.length > 0) {
-            const bounds = new mapboxgl.LngLatBounds();
-            filteredTransactions.forEach(tx => bounds.extend([tx.place_lng!, tx.place_lat!]));
-            map.fitBounds(bounds, { padding: 60, maxZoom: 14, duration: 1000 });
-        }
-    }, [filteredTransactions, viewMode, isInitialLoad]);
+        // 3. TEARDOWN STALE MARKERS
+        markerDictRef.current.forEach((val, key) => {
+            if (!nextKeys.has(key)) {
+                val.marker.remove();
+                markerDictRef.current.delete(key);
+            }
+        });
 
-    // 2. Visibilities and Layer states (Cheap updates)
+    }, [pointFeatures, towerFeatures, trailFeatures, locationGroups, viewMode, isInitialLoad]);
+
+    // Bounding Box centering ONLY on absolute initial data load structure change
+    useEffect(() => {
+        const map = mapRef.current;
+        if (!map || isInitialLoad || filteredTransactions.length === 0 || !isFirstBoundFit.current) return;
+        
+        const bounds = new mapboxgl.LngLatBounds();
+        filteredTransactions.forEach(tx => bounds.extend([tx.place_lng!, tx.place_lat!]));
+        map.fitBounds(bounds, { padding: 60, maxZoom: 14, duration: 1000 });
+        isFirstBoundFit.current = false;
+    }, [filteredTransactions, isInitialLoad]);
+
+    // 3. Visibilities and Layer states (Cheap updates)
     useEffect(() => {
         const map = mapRef.current;
         if (!map || isInitialLoad) return;
@@ -776,11 +807,11 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency }
                                     <div
                                         className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 border"
                                         style={{
-                                            backgroundColor: `${CATEGORY_COLORS[selectedTx.category] || CATEGORY_COLORS.others}20`,
-                                            borderColor: `${CATEGORY_COLORS[selectedTx.category] || CATEGORY_COLORS.others}40`,
+                                            backgroundColor: `${CATEGORY_COLORS[selectedTx.category as keyof typeof CATEGORY_COLORS] || CATEGORY_COLORS.others}20`,
+                                            borderColor: `${CATEGORY_COLORS[selectedTx.category as keyof typeof CATEGORY_COLORS] || CATEGORY_COLORS.others}40`,
                                         }}
                                     >
-                                        <MapPin className="w-4.5 h-4.5" style={{ color: CATEGORY_COLORS[selectedTx.category] || CATEGORY_COLORS.others }} />
+                                        <MapPin className="w-4.5 h-4.5" style={{ color: CATEGORY_COLORS[selectedTx.category as keyof typeof CATEGORY_COLORS] || CATEGORY_COLORS.others }} />
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-start justify-between gap-2">
@@ -796,14 +827,14 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency }
                                                 )}
                                             </div>
                                             <span className="text-base font-black shrink-0">
-                                                {formatCurrency(selectedTx.amount, selectedTx.currency)}
+                                                {formatCurrency(selectedTx.amount, selectedTx.currency || 'USD')}
                                             </span>
                                         </div>
                                         <div className="flex items-center gap-2 mt-2">
                                             <span className="px-1.5 py-0.5 rounded-md text-[10px] font-bold capitalize"
                                                 style={{
-                                                    backgroundColor: `${CATEGORY_COLORS[selectedTx.category] || CATEGORY_COLORS.others}15`,
-                                                    color: CATEGORY_COLORS[selectedTx.category] || CATEGORY_COLORS.others,
+                                                    backgroundColor: `${CATEGORY_COLORS[selectedTx.category as keyof typeof CATEGORY_COLORS] || CATEGORY_COLORS.others}15`,
+                                                    color: CATEGORY_COLORS[selectedTx.category as keyof typeof CATEGORY_COLORS] || CATEGORY_COLORS.others,
                                                 }}
                                             >
                                                 {selectedTx.category}
@@ -836,7 +867,6 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency }
                         </motion.div>
                     )}
                 </AnimatePresence>
-                </div>
 
                 {/* Glassmorphic Hover Insight Bubble */}
                 <AnimatePresence>
@@ -897,6 +927,7 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency }
                         </motion.div>
                     )}
                 </AnimatePresence>
+                </div>
             </motion.div>
         </AnimatePresence>
     );

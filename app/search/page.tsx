@@ -1,6 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
+import { DataBoundary } from '@/components/boundaries/data-boundary';
 
 const SearchSkeleton = () => (
   <div className="flex flex-col min-h-screen p-5 space-y-6 max-w-md mx-auto">
@@ -24,5 +25,9 @@ const SearchView = dynamic(
 );
 
 export default function SearchPage() {
-    return <SearchView />;
+    return (
+        <DataBoundary onReset={() => window.location.reload()}>
+            <SearchView />
+        </DataBoundary>
+    );
 }

@@ -63,8 +63,16 @@ export function SyncIndicator() {
             return fetchPromise;
         };
 
+        const onSyncStart = () => setIsSyncing(true);
+        const onSyncEnd = () => setIsSyncing(false);
+
+        window.addEventListener('novira-sync-started', onSyncStart);
+        window.addEventListener('novira-sync-finished', onSyncEnd);
+
         return () => {
             window.fetch = originalFetch;
+            window.removeEventListener('novira-sync-started', onSyncStart);
+            window.removeEventListener('novira-sync-finished', onSyncEnd);
         };
     }, []);
 

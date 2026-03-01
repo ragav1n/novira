@@ -10,11 +10,13 @@ So I built Novira.
 
 ## Features
 
--   **Groups & Friends:** Easily split bills for trips, projects, or just hanging out.
--   **Dashboard:** See where your money is going without the clutter.
--   **Recurring Expenses:** Automate your financial life with scheduled transactions and smart duplicate detection.
--   **Analytics:** Deep dive into your spending with beautiful pie charts.
--   **Bank Integration:** Import your bank statements directly (supports HDFC & SBI).
--   **Exportable Reports:** Download clean CSV or PDF reports for your records.
--   **Smart Settlements:** Keeps track of debts so you don't have to.
--   **Real-time:** Updates instantly for everyone in the group.
+- **Groups & Friends:** Easily split bills for trips, projects, or just hanging out.
+- **Dashboard:** See where your money is going without the clutter.
+- **Recurring Expenses:** Automate your financial life with scheduled transactions and smart duplicate detection.
+- **Analytics:** Deep dive into your spending with beautiful pie charts.
+- **Bank Integration:** Import your bank statements directly (supports HDFC & SBI).
+- **Exportable Reports:** Download clean CSV or PDF reports for your records.
+- **Smart Settlements:** Keeps track of debts so you don't have to.
+- **Real-time:** Updates instantly for everyone in the group.
+- **Offline-First:** Add expenses without an internet connection. Novira uses robust IndexedDB background sync with idempotency keys to safely retry transactions when you come back online.
+- **Resilient PWA:** Native-feeling app installation with automatic cache invalidation, fallback offline screens, and optimized UI boundaries.
