@@ -244,6 +244,11 @@ def build_toc(story):
             "8.3  Preferences",
             "8.4  Security & Privacy",
         ]),
+        ("9.", "Offline Capabilities & Sync", [
+            "9.1  Offline Mode",
+            "9.2  Automatic Synchronization",
+            "9.3  Pending Review",
+        ]),
     ]
 
     for num, title, subs in toc_items:
@@ -804,6 +809,48 @@ def build_settings_section(story):
     ))
 
 
+def build_offline_section(story):
+    """Section 9: Offline Capabilities & Sync."""
+    story.append(Paragraph("9. Offline Capabilities & Sync", heading1_style))
+    add_horizontal_rule(story)
+
+    story.append(Paragraph(
+        "Novira is built as a Resilient Progressive Web App (PWA), meaning it continues to function "
+        "even when you lose internet connection. You can seamlessly add expenses offline.",
+        body_style
+    ))
+
+    # 9.1
+    story.append(Paragraph("9.1  Offline Mode", heading2_style))
+    story.append(Paragraph(
+        "When offline, the app displays a custom offline screen if you try to navigate to a new page. "
+        "However, you can still use the <b>Add Expense</b> feature. When you save an expense offline, "
+        "you will see a subtle blue notification: \"Saved — will sync when online\". "
+        "Your transaction is securely stored in your device's local database.",
+        body_style
+    ))
+
+    # 9.2
+    story.append(Paragraph("9.2  Automatic Synchronization", heading2_style))
+    story.append(Paragraph(
+        "Once your internet connection is restored, Novira automatically detects it and "
+        "silently syncs your queued transactions to the cloud. You will see a small "
+        "<b>Syncing...</b> indicator appear at the top of your screen during this process.",
+        body_style
+    ))
+
+    # 9.3
+    story.append(Paragraph("9.3  Pending Review", heading2_style))
+    story.append(Paragraph(
+        "In the rare event that a transaction fails to sync permanently (e.g., due to a server error), "
+        "it will appear in the <b>Settings</b> page under an <b>Offline Sync Failures</b> section. "
+        "From there, you can view the failed items and choose to <b>Retry Sync</b> or <b>Discard</b> them.",
+        body_style
+    ))
+
+    story.append(PageBreak())
+
+
 # --- Footer callback ---
 class NumberedCanvas(canvas.Canvas):
     def __init__(self, *args, **kwargs):
@@ -876,6 +923,9 @@ def main():
 
     print("  ⚙️  Building Settings section...")
     build_settings_section(story)
+
+    print("  📶  Building Offline section...")
+    build_offline_section(story)
 
     print("  🔧 Assembling PDF...")
     doc.build(story, canvasmaker=NumberedCanvas)

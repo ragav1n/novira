@@ -33,6 +33,9 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { BudgetAlertManager } from '@/components/budget-alert-manager';
+import { useSyncQueueState } from '@/hooks/use-sync-queue-state';
+import { retryFailedItem, discardFailedItem } from '@/lib/sync-manager';
 import { CurrencyDropdown } from '@/components/ui/currency-dropdown';
 
 export function SettingsView() {
@@ -76,6 +79,8 @@ export function SettingsView() {
     const [recurringTemplates, setRecurringTemplates] = useState<any[]>([]);
     const [loadingTemplates, setLoadingTemplates] = useState(false);
     const [templateToDelete, setTemplateToDelete] = useState<any | null>(null);
+
+    const { failedItems, pending } = useSyncQueueState();
 
     useEffect(() => {
         setLocalBudget(monthlyBudget.toString());
@@ -619,6 +624,34 @@ export function SettingsView() {
                     </div>
                 </div>
 
+                {/* Dead-Letter Queue UI for Failed Syncs */}
+                {failedItems.length > 0 && (
+                    <div className="bg-destructive/10 border border-destructive/20 p-4 rounded-3xl space-y-3 animate-in fade-in slide-in-from-bottom-4">
+                        <div className="flex items-center gap-2 text-destructive">
+                            <AlertTriangle className="w-5 h-5" />
+                            <h3 className="font-semibold text-sm">Offline Sync Failures</h3>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                            {failedItems.length} transaction{failedItems.length > 1 ? 's' : ''} failed to sync permanently due to server conflicts.
+                        </p>
+                        <div className="space-y-2">
+                            {failedItems.map(item => (
+                                <div key={item.id} className="bg-background/80 p-3 rounded-2xl flex flex-col gap-2 shadow-sm border border-destructive/10">
+                                    <div>
+                                        <p className="text-sm font-medium">{item.data.transaction?.description || 'Unknown Item'}</p>
+                                        <p className="text-[10px] font-mono text-destructive/80 mt-1">{item.errorReason || 'Unknown error'}</p>
+                                        {item.failedAt && <p className="text-[9px] text-muted-foreground mt-0.5">{new Date(item.failedAt).toLocaleString()}</p>}
+                                    </div>
+                                    <div className="flex gap-2 self-end">
+                                        <Button size="sm" variant="ghost" onClick={() => discardFailedItem(item.id)} className="h-7 px-3 text-xs hover:bg-destructive/20 hover:text-destructive text-muted-foreground transition-colors">Discard</Button>
+                                        <Button size="sm" onClick={() => retryFailedItem(item.id)} className="h-7 px-3 text-xs bg-primary hover:bg-primary/90">Retry Sync</Button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
                 {/* Logout */}
                 <div className="pt-2">
                     <button
@@ -652,7 +685,7 @@ export function SettingsView() {
 
                 {/* Footer Info */}
                 <div className="text-center py-4 space-y-2">
-                    <p className="text-xs text-muted-foreground font-medium">Novira v2.5.2</p>
+                    <p className="text-xs text-muted-foreground font-medium">Novira v2.5.6</p>
                     <div className="flex justify-center items-center gap-3 text-[11px] text-muted-foreground">
                         <Link href="/privacy" className="hover:text-primary transition-colors">Privacy Policy</Link>
                         <span className="w-1 h-1 rounded-full bg-white/10" />

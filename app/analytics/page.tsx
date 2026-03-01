@@ -1,6 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
+import { DataBoundary } from '@/components/boundaries/data-boundary';
 
 const AnalyticsSkeleton = () => (
   <div className="flex flex-col min-h-screen p-5 space-y-6 max-w-md mx-auto">
@@ -20,5 +21,9 @@ const AnalyticsView = dynamic(
 );
 
 export default function AnalyticsPage() {
-    return <AnalyticsView />;
+    return (
+        <DataBoundary onReset={() => window.location.reload()}>
+            <AnalyticsView />
+        </DataBoundary>
+    );
 }

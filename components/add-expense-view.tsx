@@ -25,6 +25,7 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { CurrencyDropdown } from '@/components/ui/currency-dropdown';
 import { LocationPicker } from '@/components/ui/location-picker';
+import { enqueueMutation } from '@/lib/sync-manager';
 
 const dropdownCategories: Category[] = [
     { id: 'food', label: 'Food & Dining', icon: Utensils, color: '#FF6B6B' },
@@ -205,7 +206,7 @@ export function AddExpenseView() {
                 }
             }
 
-            const { data: transaction, error: txError } = await supabase.from('transactions').insert({
+            const transactionRecord = {
                 user_id: userId,
                 amount: parseFloat(amount),
                 description,
@@ -227,11 +228,10 @@ export function AddExpenseView() {
                     place_lat: placeLat,
                     place_lng: placeLng,
                 } : {})
-            }).select().single();
+            };
 
-            if (txError) throw txError;
+            let splitRecordsToInsert = null;
 
-            // Handle Splits
             if (isSplitEnabled) {
                 let debtors: string[] = [];
                 if (selectedGroupId) {
@@ -248,48 +248,32 @@ export function AddExpenseView() {
                 }
 
                 if (debtors.length > 0) {
-                    let splitRecords;
-
                     if (splitMode === 'custom') {
-                        // Custom: use manually entered amounts
                         const totalCustom = debtors.reduce((sum, id) => sum + (parseFloat(customAmounts[id] || '0') || 0), 0);
-                        if (totalCustom <= 0) {
-                            toast.error('Please enter split amounts for each person');
+                        if (totalCustom <= 0 || totalCustom > parseFloat(amount)) {
+                            toast.error(totalCustom <= 0 ? 'Please enter split amounts' : 'Split amounts exceed total expense');
                             setLoading(false);
                             return;
                         }
-                        if (totalCustom > parseFloat(amount)) {
-                            toast.error('Split amounts exceed the total expense');
-                            setLoading(false);
-                            return;
-                        }
-                        splitRecords = debtors
+                        splitRecordsToInsert = debtors
                             .filter(debtorId => parseFloat(customAmounts[debtorId] || '0') > 0)
                             .map(debtorId => ({
-                                transaction_id: transaction.id,
                                 user_id: debtorId,
                                 amount: parseFloat(customAmounts[debtorId]),
                                 is_paid: false
                             }));
                     } else {
-                        // Even: split equally
                         const splitAmount = parseFloat(amount) / (debtors.length + 1);
-                        splitRecords = debtors.map(debtorId => ({
-                            transaction_id: transaction.id,
+                        splitRecordsToInsert = debtors.map(debtorId => ({
                             user_id: debtorId,
                             amount: splitAmount,
                             is_paid: false
                         }));
                     }
-
-                    if (splitRecords.length > 0) {
-                        const { error: splitError } = await supabase.from('splits').insert(splitRecords);
-                        if (splitError) throw splitError;
-                    }
                 }
             }
 
-            // Handle Recurring
+            let recurringRecordToInsert = null;
             if (isRecurring) {
                 const nextDate = new Date(date);
                 if (frequency === 'daily') nextDate.setDate(nextDate.getDate() + 1);
@@ -297,7 +281,7 @@ export function AddExpenseView() {
                 else if (frequency === 'monthly') nextDate.setMonth(nextDate.getMonth() + 1);
                 else if (frequency === 'yearly') nextDate.setFullYear(nextDate.getFullYear() + 1);
 
-                const { error: recurringError } = await supabase.from('recurring_templates').insert({
+                recurringRecordToInsert = {
                     user_id: userId,
                     description,
                     amount: parseFloat(amount),
@@ -314,8 +298,39 @@ export function AddExpenseView() {
                         notes,
                         bucket_id: selectedBucketId
                     }
-                });
+                };
+            }
 
+            // OFFLINE GUARD
+            if (!navigator.onLine) {
+                 await enqueueMutation('ADD_FULL_TRANSACTION', { 
+                     transaction: transactionRecord, 
+                     splitRecords: splitRecordsToInsert, 
+                     recurringRecord: recurringRecordToInsert 
+                 });
+                 if (isNative) {
+                     Haptics.notification({ type: NotificationType.Warning }).catch(() => { });
+                 }
+                 toast('Saved — will sync when online', {
+                     icon: '☁️',
+                     style: { background: 'rgba(14, 165, 233, 0.1)', border: '1px solid rgba(14, 165, 233, 0.2)', color: '#38BDF8' }
+                 });
+                 resetFormAndNavigate();
+                 return;
+            }
+
+            // ONLINE FLOW
+            const { data: transaction, error: txError } = await supabase.from('transactions').insert(transactionRecord).select().single();
+            if (txError) throw txError;
+
+            if (splitRecordsToInsert && splitRecordsToInsert.length > 0) {
+                const finalSplits = splitRecordsToInsert.map(s => ({ ...s, transaction_id: transaction.id }));
+                const { error: splitError } = await supabase.from('splits').insert(finalSplits);
+                if (splitError) throw splitError;
+            }
+
+            if (recurringRecordToInsert) {
+                const { error: recurringError } = await supabase.from('recurring_templates').insert(recurringRecordToInsert);
                 if (recurringError) throw recurringError;
             }
 
@@ -323,30 +338,8 @@ export function AddExpenseView() {
                 Haptics.notification({ type: NotificationType.Success }).catch(() => { });
             }
             toast.success('Expense added successfully!');
+            resetFormAndNavigate();
 
-            // Reset all form fields before navigating
-            setAmount('');
-            setDescription('');
-            setNotes('');
-            setSelectedCategory('food');
-            setDate(new Date());
-            setPaymentMethod('Cash');
-            setTxCurrency(currency);
-            setSelectedBucketId(null);
-            setIsSplitEnabled(false);
-            setSelectedGroupId(null);
-            setSelectedFriendIds([]);
-            setSplitMode('even');
-            setCustomAmounts({});
-            setIsRecurring(false);
-            setFrequency('monthly');
-            setExcludeFromAllowance(false);
-            setPlaceName(null);
-            setPlaceAddress(null);
-            setPlaceLat(null);
-            setPlaceLng(null);
-
-            router.push('/');
         } catch (error: any) {
             if (isNative) {
                 Haptics.notification({ type: NotificationType.Error }).catch(() => { });
@@ -355,6 +348,30 @@ export function AddExpenseView() {
         } finally {
             setLoading(false);
         }
+    };
+
+    const resetFormAndNavigate = () => {
+        setAmount('');
+        setDescription('');
+        setNotes('');
+        setSelectedCategory('food');
+        setDate(new Date());
+        setPaymentMethod('Cash');
+        setTxCurrency(currency);
+        setSelectedBucketId(null);
+        setIsSplitEnabled(false);
+        setSelectedGroupId(null);
+        setSelectedFriendIds([]);
+        setSplitMode('even');
+        setCustomAmounts({});
+        setIsRecurring(false);
+        setFrequency('monthly');
+        setExcludeFromAllowance(false);
+        setPlaceName(null);
+        setPlaceAddress(null);
+        setPlaceLat(null);
+        setPlaceLng(null);
+        router.push('/');
     };
 
     return (

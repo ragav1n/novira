@@ -27,6 +27,7 @@ const DashboardView = dynamic(
 )
 
 import { useUserPreferences } from '@/components/providers/user-preferences-provider'
+import { DataBoundary } from '@/components/boundaries/data-boundary'
 
 export default function Page() {
   const { isAuthenticated, isLoading } = useUserPreferences()
@@ -47,5 +48,9 @@ export default function Page() {
     return <SignInCard isSignUp={false} />
   }
 
-  return <DashboardView />
+  return (
+    <DataBoundary onReset={() => window.location.reload()}>
+      <DashboardView />
+    </DataBoundary>
+  )
 }

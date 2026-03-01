@@ -8,6 +8,7 @@ import { Toaster } from 'sonner';
 import { cn } from '@/lib/utils';
 import { useUserPreferences } from '@/components/providers/user-preferences-provider';
 import { WaveLoader } from '@/components/ui/wave-loader';
+import { UIBoundary } from '@/components/boundaries/ui-boundary';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useIsNative } from '@/hooks/use-native';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
@@ -148,7 +149,11 @@ export function MobileLayout({ children }: { children: React.ReactNode }) {
                 "flex-1 w-full overflow-y-auto no-scrollbar relative flex flex-col",
                 showNav ? "pb-24" : "pb-0"
             )}>
-                {children}
+                <UIBoundary>
+                    <AnimatePresence mode="wait" initial={false}>
+                        {children}
+                    </AnimatePresence>
+                </UIBoundary>
             </main>
 
             {/* Bottom Navigation */}
