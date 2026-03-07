@@ -1,18 +1,24 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { toast } from '@/utils/haptics';
 import { RefreshCcw } from 'lucide-react';
 
 export function PWAUpdater() {
+    const hasShownToastRef = useRef(false);
+
     useEffect(() => {
         if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return;
 
         const handleUpdate = (registration: ServiceWorkerRegistration) => {
             if (!registration.waiting) return;
+            if (hasShownToastRef.current) return;
+            
+            hasShownToastRef.current = true;
 
             // Notify user that a new version is available
             toast('New Version Available', {
+                id: 'pwa-update-toast',
                 description: 'Refresh to see the latest updates and features.',
                 duration: Infinity,
                 action: {
