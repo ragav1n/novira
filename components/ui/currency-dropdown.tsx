@@ -54,9 +54,10 @@ interface CurrencyDropdownProps {
     value: string;
     onValueChange: (value: string) => void;
     className?: string;
+    compact?: boolean;
 }
 
-export function CurrencyDropdown({ value, onValueChange, className }: CurrencyDropdownProps) {
+export function CurrencyDropdown({ value, onValueChange, className, compact = false }: CurrencyDropdownProps) {
     const [isOpen, setIsOpen] = React.useState(false)
     const [hoveredCode, setHoveredCode] = React.useState<string | null>(null)
     const dropdownRef = React.useRef<HTMLDivElement>(null)
@@ -94,22 +95,24 @@ export function CurrencyDropdown({ value, onValueChange, className }: CurrencyDr
                         "focus:ring-2 focus:ring-primary/50 focus:ring-offset-0",
                         "transition-all duration-200 ease-in-out",
                         "border border-white/10 focus:border-primary/50",
-                        "h-11 px-4 rounded-xl",
+                        "h-11 px-3 rounded-xl",
                         isOpen && "bg-secondary/20",
                     )}
                     aria-expanded={isOpen}
                     aria-haspopup="true"
                     type="button"
                 >
-                    <div className="flex items-center gap-2">
-                        <span className="text-primary font-bold w-12 text-left">{currentDetail.symbol}</span>
-                        <span className="text-sm font-semibold w-12 text-left">{value}</span>
-                        <span className="text-xs text-muted-foreground ml-2 truncate">{currentDetail.name}</span>
+                    <div className="flex items-center gap-1.5 min-w-0 pr-1 truncate">
+                        <span className="text-primary font-bold text-left shrink-0">{currentDetail.symbol}</span>
+                        <span className="text-sm font-semibold truncate text-left shrink-0 px-1">{value}</span>
+                        {!compact && (
+                            <span className="text-secondary-foreground text-xs truncate ml-1">{currentDetail.name}</span>
+                        )}
                     </div>
                     <motion.div
                         animate={{ rotate: isOpen ? 180 : 0 }}
                         transition={{ duration: 0.2 }}
-                        className="flex items-center justify-center w-5 h-5 ml-2"
+                        className="flex items-center justify-center shrink-0 w-4 h-4 ml-1"
                     >
                         <ChevronDown className="w-4 h-4 text-muted-foreground" />
                     </motion.div>
@@ -186,12 +189,14 @@ export function CurrencyDropdown({ value, onValueChange, className }: CurrencyDr
                                                 />
                                             )}
 
-                                            <div className="relative z-10 flex items-center w-full gap-2">
-                                                <span className="text-primary font-bold w-12 text-left">{detail.symbol}</span>
-                                                <span className="text-sm font-semibold w-12 text-left">{code}</span>
-                                                <span className="text-xs text-muted-foreground ml-2 truncate">{detail.name}</span>
+                                            <div className="relative z-10 flex items-center w-full gap-3">
+                                                <span className="text-primary font-bold w-6 text-center shrink-0">{detail.symbol}</span>
+                                                <span className="text-sm font-semibold w-8 text-left shrink-0">{code}</span>
+                                                {!compact && (
+                                                    <span className="text-sm text-neutral-400 truncate flex-1 text-left">{detail.name}</span>
+                                                )}
                                                 {value === code && (
-                                                    <Check className="w-4 h-4 text-primary ml-auto" />
+                                                    <Check className="w-4 h-4 text-primary ml-auto shrink-0" />
                                                 )}
                                             </div>
                                         </motion.button>

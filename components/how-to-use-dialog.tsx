@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Zap, Users, Tag, PieChart, Plus, Wallet, Globe, X, CheckCircle2, MapPin, RefreshCcw, Search } from 'lucide-react';
+import { Zap, Users, Tag, PieChart, Plus, Wallet, Globe, X, CheckCircle2, MapPin, RefreshCcw, Search, Home, Target } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 type HowToUseDialogProps = {
@@ -42,7 +42,7 @@ export function HowToUseDialog({ isOpen, onClose }: HowToUseDialogProps) {
         {
             icon: <MapPin className="w-6 h-6 text-rose-400" />,
             title: "Spatial Intelligence",
-            desc: "Location is everything. Use the 'Expense Map' to visualize your finances in 3D. Our Clear-Sight Grid prevents occlusion, while Hover Insights reveal top merchants at a glance. Enable 'Heatmap' mode for density hotspots or 'Trip Trails' to see your spending pulse flow through the city.",
+            desc: "Location is everything. Use the 'Expense Map' to visualize your finances in 3D. Enable 'Heatmap' mode for density hotspots or 'Trip Trails' to see your spending pulse flow through the city.",
             subPoints: [
                 "Clear-Sight 3D visualization",
                 "Animated Flow Trails & Hover Insights",
@@ -50,13 +50,33 @@ export function HowToUseDialog({ isOpen, onClose }: HowToUseDialogProps) {
             ]
         },
         {
+            icon: <Home className="w-6 h-6 text-indigo-400" />,
+            title: "Dedicated Workspaces",
+            desc: "Don't mix personal and shared finances. Use the Workspace Switcher dropdown at the top of the dashboard to seamlessly swap into a 'Couple' or 'Household' dashboard. The entire app's budget and transactions will isolate to that group.",
+            subPoints: [
+                "100% isolated shared dashboards",
+                "Custom joint monthly budgets",
+                "Auto-calculation of household spending"
+            ]
+        },
+        {
             icon: <Tag className="w-6 h-6 text-cyan-500" />,
             title: "Mission Buckets & Focus",
-            desc: "Stop mixing your 'Life' money with your 'Goal' money. Create a Mission Bucket for specific travel or big purchases. Use the Dashboard Focus pill to isolate your entire view to ONLY that mission's localized budget and pacing. Stay perfectly on track for big goals without the clutter.",
+            desc: "Create a Mission Bucket for specific travel or big purchases. Use the Dashboard Focus pill to isolate your entire view to ONLY that mission's localized budget and pacing.",
             subPoints: [
                 "Isolated goal-based Mission views",
                 "Localized currency and budget targets",
                 "Archive completed & settled missions"
+            ]
+        },
+        {
+            icon: <Target className="w-6 h-6 text-emerald-400" />,
+            title: "Savings Goals",
+            desc: "Set ambitious financial targets like 'New Car' or 'Emergency Fund'. Make periodic deposits towards your target and watch the progress bar fill up over time in the dedicated Goals tab.",
+            subPoints: [
+                "Visual target progress tracking",
+                "Deposit log history",
+                "Achieve long-term milestones"
             ]
         },
         {
@@ -71,10 +91,10 @@ export function HowToUseDialog({ isOpen, onClose }: HowToUseDialogProps) {
         },
         {
             icon: <RefreshCcw className="w-6 h-6 text-orange-400" />,
-            title: "Automation & Imports",
-            desc: "Save hours of manual entry. Set up Recurring Expense templates for your subscriptions. Scale your tracking by importing bank statements (CSV/Excel) with smart keyword-to-category mapping. Plus, our proactive PWA technology ensures you're always on the newest, fastest version.",
+            title: "Automation & Subs",
+            desc: "Track all your recurring expenses in the Subscriptions tab calendar to manage your monthly drain. Save hours by importing bank statements (CSV) with smart category mapping.",
             subPoints: [
-                "Recurring expense automation",
+                "Subscription calendar manager",
                 "Smart Bank Statement Import",
                 "Proactive background app updates"
             ]
@@ -142,7 +162,7 @@ export function HowToUseDialog({ isOpen, onClose }: HowToUseDialogProps) {
                                     Master Your <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-purple-400">Financial Flow</span>
                                 </h1>
                                 <p className="text-white/50 text-xs sm:text-sm max-w-[360px] mx-auto leading-relaxed mt-3">
-                                    Novira is a living pulse of your finances. Explore these 8 core mechanics to master your financial universe.
+                                    Novira is a living pulse of your finances. Explore these 10 core mechanics to master your financial universe.
                                 </p>
                                 
                                 <button 

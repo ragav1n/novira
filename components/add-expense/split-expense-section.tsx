@@ -1,5 +1,5 @@
 import React from 'react';
-import { Users, CheckCircle2, User } from 'lucide-react';
+import { Users, CheckCircle2, User, Home, Plane, Heart } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
@@ -103,7 +103,10 @@ export function SplitExpenseSection({
                                     )}
                                 >
                                     <div className="w-10 h-10 rounded-full bg-secondary/30 flex items-center justify-center relative">
-                                        <Users className="w-5 h-5" />
+                                        {group.type === 'home' && <Home className="w-5 h-5 text-blue-400" />}
+                                        {group.type === 'couple' && <Heart className="w-5 h-5 text-rose-400" />}
+                                        {group.type === 'trip' && <Plane className="w-5 h-5 text-emerald-400" />}
+                                        {(!group.type || (group.type !== 'home' && group.type !== 'couple' && group.type !== 'trip')) && <Users className="w-5 h-5 text-primary" />}
                                         {selectedGroupId === group.id && (
                                             <div className="absolute -top-1 -right-1">
                                                 <CheckCircle2 className="w-4 h-4 text-primary fill-background" />

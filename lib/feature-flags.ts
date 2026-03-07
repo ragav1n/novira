@@ -1,31 +1,26 @@
 export const LATEST_FEATURE_ANNOUNCEMENT = {
-    id: 'location-maps-v5', // New ID to trigger the modal
-    title: 'Maps, Trails & Insights!',
+    id: 'workspaces-goals-v6', // New ID to trigger the modal
+    title: 'Workspaces, Goals & Subs!',
     features: [
         {
-            title: 'Location Tagging',
-            description: 'Tag your expenses with physical locations using our new smart search. Never forget where you spent your money.',
-            icon: 'map'
+            title: 'Dedicated Workspaces',
+            description: 'Instantly swap between your Personal dashboard and shared Household/Couple workspaces. Budgets and expenses isolate perfectly.',
+            icon: 'home'
         },
         {
-            title: 'Interactive Expense Map',
-            description: 'Visualize your spending globally on a premium floating map with real-time category filtering.',
-            icon: 'globe'
+            title: 'Savings Goals',
+            description: 'Set ambitious financial targets. Add deposits over time and watch your progress bar fill up until you hit your goal.',
+            icon: 'target'
         },
         {
-            title: 'Trip Mode & Trails',
-            description: 'Chronologically connect your spending to see your "Spending Path" through a city or on a vacation.',
+            title: 'Subscription Manager',
+            description: 'Keep track of all your recurring expenses in one place. Instantly see your total monthly subscription drain.',
+            icon: 'calendar'
+        },
+        {
+            title: 'Predictive Run Rate',
+            description: 'A new smart widget on your dashboard predicts your end-of-month spend based on your daily average.',
             icon: 'zap'
-        },
-        {
-            title: 'Spending Heatmaps',
-            description: 'Identify spending "hotspots" with our new density-based heatmaps. See where your money concentrates most.',
-            icon: 'ai'
-        },
-        {
-            title: 'Multi-Currency Support',
-            description: 'Spend globally. Automatically track expenses in foreign currencies with real-time exchange rate conversions.',
-            icon: 'globe'
         }
     ],
     buttonText: 'Let\'s Go!!',
@@ -63,8 +58,23 @@ export const WELCOME_FEATURES = [
         icon: 'bell'
     },
     {
+        title: 'Dedicated Workspaces',
+        description: 'Isolate personal finances from shared couple/home finances perfectly.',
+        icon: 'home'
+    },
+    {
+        title: 'Savings Goals',
+        description: 'Track long-term financial targets with deposits and visual progress.',
+        icon: 'target'
+    },
+    {
+        title: 'Subscription Manager',
+        description: 'See all recurring expenses in one place to manage monthly drain.',
+        icon: 'calendar'
+    },
+    {
         title: 'Multi-Currency',
-        description: 'Spend globally with automatic conversions and historical exchange rates.',
+        description: 'Spend globally with automatic conversions and historical rates.',
         icon: 'globe'
     },
     {

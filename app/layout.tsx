@@ -68,13 +68,13 @@ export default async function RootLayout({
       <body suppressHydrationWarning className={`${geist.variable} ${geistMono.variable} font-sans antialiased`}>
         <UserPreferencesProvider>
           <SyncIndicator />
-          <MobileLayout>
-            <GroupsProvider>
-              <BucketsProvider>
+          <GroupsProvider>
+            <BucketsProvider>
+              <MobileLayout>
                 {children}
-              </BucketsProvider>
-            </GroupsProvider>
-          </MobileLayout>
+              </MobileLayout>
+            </BucketsProvider>
+          </GroupsProvider>
         </UserPreferencesProvider>
         <Analytics />
         <SpeedInsights />
