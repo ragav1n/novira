@@ -1,15 +1,18 @@
 'use client';
 
 import React, { useEffect, useRef, useState, useMemo } from 'react';
-import { X, MapPin, Navigation, Zap, Flame, MousePointer2 } from 'lucide-react';
+import { X, MapPin, Navigation } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { cn } from '@/lib/utils';
 import { CATEGORY_COLORS, getIconSvgForCategory } from '@/lib/categories';
 import { createPortal } from 'react-dom';
+import { useMapData, getGridOffsetCoords } from '@/hooks/useMapData';
+import { MapHeader } from './map-header';
+import { MapControls } from './map-controls';
 
-interface Transaction {
+export interface Transaction {
     id: string;
     description: string;
     amount: number;
@@ -28,19 +31,11 @@ interface Transaction {
     };
 }
 
-interface ExpenseMapViewProps {
+export interface ExpenseMapViewProps {
     isOpen: boolean;
     onClose: () => void;
     transactions: Transaction[];
     formatCurrency: (amount: number, currency?: string) => string;
-}
-
-// Helper for radial offsets (approx meters to degrees)
-function getGridOffsetCoords(lng: number, lat: number, offsetX: number, offsetY: number) {
-    const radiusEarth = 6378137;
-    const dLat = offsetY / radiusEarth;
-    const dLng = offsetX / (radiusEarth * Math.cos(lat * Math.PI / 180));
-    return [lng + (dLng * 180 / Math.PI), lat + (dLat * 180 / Math.PI)];
 }
 
 export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency }: ExpenseMapViewProps) {
@@ -388,144 +383,8 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency }
     // Marker Reconciliation State
     const markerDictRef = useRef<Map<string, { marker: mapboxgl.Marker, countBadge: HTMLDivElement | null }>>(new Map());
 
-    // 1. Data Transformation: location matching
-    const locationGroups = useMemo(() => {
-        const groups = new Map<string, {
-            lat: number,
-            lng: number,
-            transactions: Transaction[],
-            latestTx: Transaction,
-            totalAmount: number,
-            categories: Map<string, number>
-        }>();
-
-        filteredTransactions.forEach(tx => {
-            const key = `${(Math.round(tx.place_lat! * 5000) / 5000).toFixed(4)},${(Math.round(tx.place_lng! * 5000) / 5000).toFixed(4)}`;
-            if (!groups.has(key)) {
-                groups.set(key, {
-                    lat: tx.place_lat!,
-                    lng: tx.place_lng!,
-                    transactions: [],
-                    latestTx: tx,
-                    totalAmount: 0,
-                    categories: new Map()
-                });
-            }
-            const group = groups.get(key)!;
-            group.transactions.push(tx);
-            group.totalAmount += tx.amount;
-            group.categories.set(tx.category, (group.categories.get(tx.category) || 0) + tx.amount);
-            
-            if (tx.date > group.latestTx.date) {
-                group.latestTx = tx;
-            }
-        });
-        return groups;
-    }, [filteredTransactions]);
-
-    // 2. Data Transformation: 3D Geometry
-    const towerFeatures = useMemo(() => {
-        const features: any[] = [];
-        locationGroups.forEach(group => {
-            const cats = Array.from(group.categories.entries()).sort((a, b) => a[1] - b[1]);
-            const totalCategories = cats.length;
-            const clusterRadius = totalCategories > 1 ? 20 : 0;
-            
-            cats.forEach(([category, amount], idx) => {
-                let center = [group.lng, group.lat];
-                
-                const angle = totalCategories > 1 ? (idx / totalCategories) * 2 * Math.PI : 0;
-                const offsetX = Math.cos(angle) * clusterRadius;
-                const offsetY = Math.sin(angle) * clusterRadius;
-                
-                center = getGridOffsetCoords(group.lng, group.lat, offsetX, offsetY);
-
-                const radius = 0.00003; 
-                const sides = 24; // Optimized from 32 down to 24 for faster polygon generation
-                const coordinates = [];
-                for (let i = 0; i < sides; i++) {
-                    const ang = (i * 360) / sides;
-                    const rad = (ang * Math.PI) / 180;
-                    coordinates.push([
-                        center[0] + (radius / Math.cos(center[1] * Math.PI / 180)) * Math.cos(rad),
-                        center[1] + radius * Math.sin(rad)
-                    ]);
-                }
-                coordinates.push(coordinates[0]);
-
-                const txsInCategory = group.transactions.filter(t => t.category === category).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-                const count = txsInCategory.length;
-                
-                const merchantMap = new Map<string, number>();
-                txsInCategory.forEach(t => merchantMap.set(t.description, (merchantMap.get(t.description) || 0) + t.amount));
-                const topMerchant = Array.from(merchantMap.entries()).sort((a, b) => b[1] - a[1])[0]?.[0] || 'Unknown';
-                
-                const amounts = txsInCategory.map(t => t.amount);
-                const sparkline = amounts.slice(-10);
-                const txIds = txsInCategory.map(t => t.id).join(',');
-
-                features.push({
-                    type: 'Feature',
-                    geometry: { type: 'Polygon', coordinates: [coordinates] },
-                    properties: { 
-                        amount, 
-                        category: category.toLowerCase(), 
-                        topMerchant, 
-                        count,
-                        sparkline: JSON.stringify(sparkline),
-                        txIds
-                    }
-                });
-            });
-        });
-        return features;
-    }, [locationGroups]);
-
-    // 3. Data Transformation: Lines
-    const trailFeatures = useMemo(() => {
-        if (filteredTransactions.length < 2) return [];
-        
-        const userTrails: Record<string, Transaction[]> = {};
-        filteredTransactions.forEach(tx => {
-            const uid = tx.user_id;
-            if (!userTrails[uid]) userTrails[uid] = [];
-            userTrails[uid].push(tx);
-        });
-        
-        const userColors = ['#00ffff', '#F472B6', '#F9C74F', '#10B981', '#6366F1', '#A855F7'];
-        
-        const hexToRgba = (hex: string, alpha: number) => {
-            const r = parseInt(hex.slice(1, 3), 16);
-            const g = parseInt(hex.slice(3, 5), 16);
-            const b = parseInt(hex.slice(5, 7), 16);
-            return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-        };
-
-        return Object.entries(userTrails).map(([uid, txs], index) => {
-            const sorted = [...txs].sort((a, b) => a.created_at < b.created_at ? -1 : 1);
-            if (sorted.length < 2) return null;
-            const color = userColors[index % userColors.length];
-
-            return {
-                type: 'Feature' as const,
-                geometry: { type: 'LineString' as const, coordinates: sorted.map(tx => [tx.place_lng!, tx.place_lat!]) },
-                properties: { 
-                    user_id: uid, 
-                    color: color, 
-                    halo: hexToRgba(color, 0.5) 
-                }
-            };
-        }).filter(Boolean);
-    }, [filteredTransactions]);
-
-    // Point Features (for heatmap, distinct from 3D)
-    const pointFeatures = useMemo(() => {
-        return filteredTransactions.map(tx => ({
-            type: 'Feature' as const,
-            geometry: { type: 'Point' as const, coordinates: [tx.place_lng!, tx.place_lat!] },
-            properties: { id: tx.id, amount: tx.amount, category: tx.category }
-        }));
-    }, [filteredTransactions]);
+    // 1 & 2 & 3 & Point Features from Hook
+    const { locationGroups, towerFeatures, trailFeatures, pointFeatures } = useMapData(filteredTransactions);
 
 
     // Map Data & DOM Marker Sync Effect
@@ -746,89 +605,19 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency }
                 >
                     <div className="relative w-full h-full max-h-[calc(100dvh-2rem)] sm:max-h-[calc(100dvh-3rem)] max-w-5xl bg-background rounded-[32px] overflow-hidden shadow-2xl border border-white/10 flex flex-col">
 
-                {/* Header Overlay */}
-                    <div className="absolute top-0 left-0 right-0 z-20 flex flex-col sm:flex-row items-center justify-between p-4 sm:p-6 bg-gradient-to-b from-background/90 via-background/40 to-transparent pointer-events-none">
-                        <div className="w-full sm:w-auto flex items-center justify-between gap-3 pointer-events-auto">
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center border border-primary/30 backdrop-blur-md shrink-0">
-                                    <MapPin className="w-5 h-5 text-primary" />
-                                </div>
-                                <div className="min-w-0">
-                                    <h2 className="text-lg font-black tracking-tight truncate">Expense Map</h2>
-                                    <p className="text-[11px] text-muted-foreground font-medium">
-                                        {geoTransactions.length} location{geoTransactions.length !== 1 ? 's' : ''} tagged
-                                    </p>
-                                </div>
-                            </div>
-                            
-                            {/* Mobile-only Close */}
-                            <button
-                                onClick={onClose}
-                                className="sm:hidden w-10 h-10 rounded-full bg-card/60 backdrop-blur-md flex items-center justify-center border border-white/10 hover:bg-white/10 transition-colors pointer-events-auto shrink-0"
-                            >
-                                <X className="w-5 h-5" />
-                            </button>
-                        </div>
-
-                        {/* View Content Controls */}
-                        <div className="flex items-center gap-2 mt-2 sm:mt-0 pointer-events-auto">
-                            <div className="flex p-1 rounded-full bg-card/60 backdrop-blur-md border border-white/10 shadow-lg">
-                                <button
-                                    onClick={() => setViewMode('pins')}
-                                    className={cn(
-                                        "w-9 h-9 rounded-full flex items-center justify-center transition-all",
-                                        viewMode === 'pins' ? "bg-primary text-primary-foreground shadow-inner" : "text-muted-foreground hover:bg-white/5"
-                                    )}
-                                    title="Show Pins"
-                                >
-                                    <MousePointer2 className="w-4 h-4" />
-                                </button>
-                                <button
-                                    onClick={() => setViewMode('heatmap')}
-                                    className={cn(
-                                        "w-9 h-9 rounded-full flex items-center justify-center transition-all",
-                                        viewMode === 'heatmap' ? "bg-primary text-primary-foreground shadow-inner" : "text-muted-foreground hover:bg-white/5"
-                                    )}
-                                    title="Show Heatmap"
-                                >
-                                    <Flame className="w-4 h-4" />
-                                </button>
-                                <button
-                                    onClick={() => setShow3D(!show3D)}
-                                    className={cn(
-                                        "w-9 h-9 rounded-full flex items-center justify-center transition-all",
-                                        show3D ? "bg-primary text-primary-foreground shadow-inner" : "text-muted-foreground hover:bg-white/5"
-                                    )}
-                                    title="Toggle 3D View"
-                                >
-                                    <div className="relative">
-                                        <div className="w-3.5 h-3.5 border-2 border-current rounded-sm transform rotate-45 -translate-y-0.5" />
-                                        <div className="absolute inset-0 w-3.5 h-3.5 border-2 border-current rounded-sm transform rotate-45 translate-y-0.5 opacity-50" />
-                                    </div>
-                                </button>
-                            </div>
-
-                            <button
-                                onClick={() => setShowTrails(!showTrails)}
-                                className={cn(
-                                    "w-11 h-11 rounded-full flex items-center justify-center border transition-all shadow-lg backdrop-blur-md",
-                                    showTrails 
-                                        ? "bg-cyan-500/20 border-cyan-500/40 text-cyan-400" 
-                                        : "bg-card/60 border-white/10 text-muted-foreground hover:bg-white/5"
-                                )}
-                                title="Toggle Spending Trails"
-                            >
-                                <Zap className={cn("w-5 h-5", showTrails && "fill-current animate-pulse")} />
-                            </button>
-                        </div>
-
-                        <button
-                            onClick={onClose}
-                            className="hidden sm:flex w-10 h-10 rounded-full bg-card/60 backdrop-blur-md items-center justify-center border border-white/10 hover:bg-white/10 transition-colors pointer-events-auto shrink-0"
+                        <MapHeader 
+                            transactionCount={geoTransactions.length}
+                            onClose={onClose}
                         >
-                            <X className="w-5 h-5" />
-                        </button>
-                    </div>
+                            <MapControls 
+                                viewMode={viewMode}
+                                setViewMode={setViewMode}
+                                show3D={show3D}
+                                setShow3D={setShow3D}
+                                showTrails={showTrails}
+                                setShowTrails={setShowTrails}
+                            />
+                        </MapHeader>
 
                 {/* Map Container */}
                 {geoTransactions.length > 0 ? (
