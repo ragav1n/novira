@@ -7,6 +7,7 @@ import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { cn } from '@/lib/utils';
 import { CATEGORY_COLORS, getIconSvgForCategory } from '@/lib/categories';
+import { createPortal } from 'react-dom';
 
 interface Transaction {
     id: string;
@@ -53,6 +54,11 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency }
     const [showTrails, setShowTrails] = useState(false);
     const [show3D, setShow3D] = useState(false);
     const [isInitialLoad, setIsInitialLoad] = useState(true);
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => {
+        setMounted(true);
+    }, []);
 
     // Lock body scroll when map is open
     useEffect(() => {
@@ -125,7 +131,8 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency }
                 attributionControl: false,
             });
 
-            map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right');
+            // Moving navigation control so it doesn't overlap the close 'X' button
+            map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'bottom-right');
 
             mapRef.current = map;
 
@@ -647,17 +654,18 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency }
         });
     }, [viewMode, showTrails, show3D, isInitialLoad]);
 
-    if (!isOpen) return null;
+    if (!mounted) return null;
 
-    return (
+    return createPortal(
         <AnimatePresence>
-            <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="fixed inset-0 z-[100] flex items-end justify-center p-4 pb-4 sm:p-6 sm:pb-4 bg-black/40 backdrop-blur-sm overscroll-contain touch-none"
-            >
-                <div className="relative w-full h-full max-h-[calc(100dvh-7rem)] sm:max-h-[calc(100dvh-8rem)] max-w-5xl bg-background rounded-[32px] overflow-hidden shadow-2xl border border-white/10 flex flex-col">
+            {isOpen && (
+                <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="fixed inset-0 z-[100] flex items-end justify-center p-4 pb-4 sm:p-6 sm:pb-4 bg-black/40 backdrop-blur-sm overscroll-contain touch-none"
+                >
+                    <div className="relative w-full h-full max-h-[calc(100dvh-7rem)] sm:max-h-[calc(100dvh-8rem)] max-w-5xl bg-background rounded-[32px] overflow-hidden shadow-2xl border border-white/10 flex flex-col">
 
                 {/* Header Overlay */}
                     <div className="absolute top-0 left-0 right-0 z-20 flex flex-col sm:flex-row items-center justify-between p-4 sm:p-6 bg-gradient-to-b from-background/90 via-background/40 to-transparent pointer-events-none">
@@ -937,6 +945,8 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency }
                 </AnimatePresence>
                 </div>
             </motion.div>
-        </AnimatePresence>
+            )}
+        </AnimatePresence>,
+        document.body
     );
 }
