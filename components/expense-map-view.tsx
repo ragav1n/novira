@@ -53,6 +53,14 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency }
     const [showTrails, setShowTrails] = useState(false);
     const [show3D, setShow3D] = useState(false);
     const [isInitialLoad, setIsInitialLoad] = useState(true);
+
+    // Lock body scroll when map is open
+    useEffect(() => {
+        if (isOpen) {
+            document.body.style.overflow = 'hidden';
+            return () => { document.body.style.overflow = ''; };
+        }
+    }, [isOpen]);
     const [hoveredTower, setHoveredTower] = useState<{
         x: number;
         y: number;
@@ -647,9 +655,9 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency }
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-black/40 backdrop-blur-sm"
+                className="fixed inset-0 z-[100] flex items-end justify-center p-4 pb-4 sm:p-6 sm:pb-4 bg-black/40 backdrop-blur-sm overscroll-contain touch-none"
             >
-                <div className="relative w-full h-full max-w-5xl bg-background rounded-[32px] overflow-hidden shadow-2xl border border-white/10 flex flex-col">
+                <div className="relative w-full h-full max-h-[calc(100dvh-7rem)] sm:max-h-[calc(100dvh-8rem)] max-w-5xl bg-background rounded-[32px] overflow-hidden shadow-2xl border border-white/10 flex flex-col">
 
                 {/* Header Overlay */}
                     <div className="absolute top-0 left-0 right-0 z-20 flex flex-col sm:flex-row items-center justify-between p-4 sm:p-6 bg-gradient-to-b from-background/90 via-background/40 to-transparent pointer-events-none">
@@ -737,7 +745,7 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency }
 
                 {/* Map Container */}
                 {geoTransactions.length > 0 ? (
-                    <div className="relative w-full h-full min-h-[400px]">
+                    <div className="relative w-full flex-1 min-h-0">
                         {!mapboxToken && (
                             <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-background/80 backdrop-blur-md p-6 text-center">
                                 <div className="w-16 h-16 rounded-full bg-rose-500/20 flex items-center justify-center mb-4 border border-rose-500/40">

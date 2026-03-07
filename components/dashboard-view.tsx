@@ -94,52 +94,13 @@ const chartConfig: any = {
     uncategorized: { label: "Uncategorized" },
 };
 
-type Transaction = {
-    id: string;
-    description: string;
-    amount: number;
-    category: string;
-    is_settlement?: boolean;
-    date: string;
-    created_at: string;
-    user_id: string;
-    currency?: string;
-    exchange_rate?: number;
-    base_currency?: string;
-    converted_amount?: number;
-    is_recurring?: boolean;
-    bucket_id?: string;
-    exclude_from_allowance?: boolean;
-    place_name?: string;
-    place_address?: string;
-    place_lat?: number;
-    place_lng?: number;
-    splits?: {
-        user_id: string;
-        amount: number;
-        is_paid: boolean;
-    }[];
-    profile?: {
-        full_name: string;
-        avatar_url?: string;
-    };
-};
+import type { Transaction, AuditLog } from '@/types/transaction';
 
 type SpendingCategory = {
     name: string;
     value: number;
     color: string;
     fill: string;
-};
-type AuditLog = {
-    id: string;
-    action: 'INSERT' | 'UPDATE' | 'DELETE';
-    old_data: any;
-    new_data: any;
-    created_at: string;
-    changed_by_profile?: {
-        full_name: string;
-    };
 };
 
 const VirtualizedTransactionList = React.memo(function VirtualizedTransactionList({
@@ -222,11 +183,10 @@ const VirtualizedTransactionList = React.memo(function VirtualizedTransactionLis
 
 export function DashboardView() {
     const router = useRouter();
-    const [userName, setUserName] = useState<string>('User');
     const [transactions, setTransactions] = useState<Transaction[]>([]);
 
     const [loading, setLoading] = useState(true);
-    const { formatCurrency, currency, convertAmount, monthlyBudget, userId, isRatesLoading, avatarUrl } = useUserPreferences();
+    const { formatCurrency, currency, convertAmount, monthlyBudget, userId, isRatesLoading, avatarUrl, fullName: userName } = useUserPreferences();
     const { balances, groups, friends } = useGroups();
     const { buckets } = useBuckets();
 
@@ -257,12 +217,15 @@ export function DashboardView() {
     const [isMapOpen, setIsMapOpen] = useState(false);
     const isAnyModalOpen = isViewAllOpen || activeModal !== null || isAddFundsOpen || isHowToUseOpen || isEditOpen;
 
+    // Use a ref so realtime/event callbacks always call the latest loadTransactions
+    const loadTxRef = useRef<((uid: string) => Promise<void>) | null>(null);
+
     // Debounced realtime refresh for transaction changes
     const txDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const debouncedLoadTx = useCallback((uid: string) => {
         if (txDebounceRef.current) clearTimeout(txDebounceRef.current);
         txDebounceRef.current = setTimeout(() => {
-            loadTransactions(uid);
+            loadTxRef.current?.(uid);
         }, 300);
     }, []);
 
@@ -295,6 +258,26 @@ export function DashboardView() {
         };
     }, [userId, debouncedLoadTx]);
 
+    // Refetch when an expense is added (custom event from AddExpenseView)
+    useEffect(() => {
+        if (!userId) return;
+        const handleExpenseAdded = () => loadTxRef.current?.(userId);
+        window.addEventListener('novira:expense-added', handleExpenseAdded);
+        return () => window.removeEventListener('novira:expense-added', handleExpenseAdded);
+    }, [userId]);
+
+    // Refetch when the page becomes visible again (tab switch, app resume)
+    useEffect(() => {
+        if (!userId) return;
+        const handleVisibility = () => {
+            if (document.visibilityState === 'visible') {
+                loadTxRef.current?.(userId);
+            }
+        };
+        document.addEventListener('visibilitychange', handleVisibility);
+        return () => document.removeEventListener('visibilitychange', handleVisibility);
+    }, [userId]);
+
     // Handle modal sequencing and initial data load
     useEffect(() => {
         if (userId) {
@@ -316,19 +299,9 @@ export function DashboardView() {
                 setTimeout(() => setActiveModal('announcement'), 1500);
             }
 
-            // Parallel Data Fetching
+            // Load transactions (profile data now comes from UserPreferencesProvider)
             const fetchData = async () => {
                 try {
-                    const { data } = await supabase
-                        .from('profiles')
-                        .select('full_name')
-                        .eq('id', userId)
-                        .single();
-
-                    if (data) {
-                        setUserName(data.full_name || 'User');
-                    }
-
                     await loadTransactions(userId);
                 } catch (error) {
                     console.error("Error fetching data:", error);
@@ -337,10 +310,9 @@ export function DashboardView() {
                 }
             };
             fetchData();
-        } else if (!loading) {
-            setLoading(false);
         }
-    }, [userId, loading, isFocusRestored]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [userId, isFocusRestored]);
 
     // Save Focus Mode Persistence
     useEffect(() => {
@@ -382,6 +354,9 @@ export function DashboardView() {
             console.error("Error loading transactions:", error);
         }
     };
+
+    // Keep the ref in sync so event/realtime callbacks use the latest function
+    loadTxRef.current = loadTransactions;
 
     const handleDeleteTransaction = async (tx: Transaction) => {
         // Optimistic: remove from UI immediately
@@ -651,8 +626,8 @@ export function DashboardView() {
                         transition={{ duration: 0.8 }}
                         className="fixed inset-0 pointer-events-none z-0 overflow-hidden gpu"
                     >
-                        <div className="absolute -top-[10%] -left-[10%] w-[70%] h-[70%] rounded-full blur-[80px] bg-cyan-500 opacity-[0.2] gpu" />
-                        <div className="absolute -bottom-[10%] -right-[10%] w-[60%] h-[60%] rounded-full blur-[70px] bg-teal-500 opacity-10 gpu" />
+                        <div className="absolute -top-[10%] -left-[10%] w-[70%] h-[70%] rounded-full blur-[50px] bg-cyan-500 opacity-[0.2] gpu" />
+                        <div className="absolute -bottom-[10%] -right-[10%] w-[60%] h-[60%] rounded-full blur-[40px] bg-teal-500 opacity-10 gpu" />
                         <div className="absolute inset-0 bg-gradient-to-br from-cyan-950/20 via-transparent to-teal-950/20" />
                     </motion.div>
                 ) : (
@@ -664,8 +639,8 @@ export function DashboardView() {
                         transition={{ duration: 0.8 }}
                         className="fixed inset-0 pointer-events-none z-0 overflow-hidden gpu"
                     >
-                        <div className="absolute top-[20%] -right-[10%] w-[60%] h-[60%] rounded-full blur-[80px] bg-primary opacity-15 gpu" />
-                        <div className="absolute bottom-[20%] -left-[10%] w-[50%] h-[50%] rounded-full blur-[70px] bg-primary/40 opacity-10 gpu" />
+                        <div className="absolute top-[20%] -right-[10%] w-[60%] h-[60%] rounded-full blur-[50px] bg-primary opacity-15 gpu" />
+                        <div className="absolute bottom-[20%] -left-[10%] w-[50%] h-[50%] rounded-full blur-[40px] bg-primary/40 opacity-10 gpu" />
                     </motion.div>
                 )}
             </AnimatePresence>
