@@ -5,7 +5,7 @@ import { BudgetAlertManager } from '@/components/budget-alert-manager';
 import React, { useEffect, useState, useRef, useCallback, useMemo, startTransition, lazy, Suspense } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { useRouter } from 'next/navigation';
-import { Plus, Utensils, Car, Zap, ShoppingBag, HeartPulse, Clapperboard, CircleDollarSign, ArrowUpRight, ArrowDownLeft, Users, MoreVertical, Pencil, Trash2, X, History, Clock, HelpCircle, Tag, Plane, Home, Gift, ShoppingCart, Stethoscope, Gamepad2, School, Laptop, Music, Heart, RefreshCcw, Wallet, ChevronRight, Check, Shirt, LayoutGrid, MapPin } from 'lucide-react';
+import { Plus, Utensils, Car, Zap, ShoppingBag, HeartPulse, Clapperboard, CircleDollarSign, ArrowUpRight, ArrowDownLeft, Users, MoreVertical, Pencil, Trash2, X, History, Clock, HelpCircle, Tag, Plane, Home, Gift, ShoppingCart, Stethoscope, Gamepad2, School, Laptop, Music, Heart, RefreshCcw, Wallet, ChevronRight, Check, Shirt, LayoutGrid, MapPin, Target, ChevronDown, UserCircle, Building2 } from 'lucide-react';
 import { CATEGORY_COLORS, getIconForCategory } from '@/lib/categories';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -33,6 +33,8 @@ import {
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuTrigger,
+    DropdownMenuSeparator,
+    DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -113,7 +115,7 @@ import { VirtualizedTransactionList } from '@/components/virtualized-transaction
 
 export function DashboardView() {
     const router = useRouter();
-    const { formatCurrency, currency, convertAmount, monthlyBudget, userId, isRatesLoading, avatarUrl, fullName: userName } = useUserPreferences();
+    const { formatCurrency, currency, convertAmount, monthlyBudget, setMonthlyBudget, userId, isRatesLoading, avatarUrl, fullName: userName, activeWorkspaceId, setActiveWorkspaceId, workspaceBudgets, setWorkspaceBudget } = useUserPreferences();
     const { balances, groups, friends } = useGroups();
     const { buckets } = useBuckets();
 
@@ -131,19 +133,70 @@ export function DashboardView() {
         isMapOpen, setIsMapOpen, hoveredFocusId, setHoveredFocusId
     } = useDashboardState(userId);
 
+    const [isBudgetEditOpen, setIsBudgetEditOpen] = useState(false);
+    const [tempBudgetInput, setTempBudgetInput] = useState("");
+
+    const eligibleGroups = useMemo(() => groups.filter(g => g.type === 'couple' || g.type === 'home'), [groups]);
+    const activeWorkspaceGroup = useMemo(() => 
+        activeWorkspaceId ? eligibleGroups.find(g => g.id === activeWorkspaceId) : null, 
+    [eligibleGroups, activeWorkspaceId]);
+
+    const isCoupleWorkspace = activeWorkspaceGroup?.type === 'couple';
+
     const isBucketFocused = dashboardFocus !== 'allowance' && dashboardFocus !== '';
     const bucketCurrencyTemp = isBucketFocused ? buckets.find(b => b.id === dashboardFocus)?.currency || currency : currency;
     const bucketCurrency = bucketCurrencyTemp.toUpperCase() as Currency;
 
+    const currentWorkspaceBudget = activeWorkspaceId ? (workspaceBudgets[activeWorkspaceId] || 0) : monthlyBudget;
+
     const {
         focusedBucket, displayBudget, calculateUserShare, totalSpent,
-        remaining, progress, spendingData, displayTransactions
+        remaining, progress, spendingData, displayTransactions, runRateData
     } = useDashboardStats({
-        transactions, userId, isBucketFocused, effectiveFocus: dashboardFocus,
-        bucketCurrency, currency, convertAmount, monthlyBudget, buckets
+        transactions, 
+        userId: activeWorkspaceId ? null : userId, // if workspace, null so we get all workspace txs
+        isBucketFocused, effectiveFocus: dashboardFocus,
+        bucketCurrency, currency, convertAmount, monthlyBudget: currentWorkspaceBudget, buckets
     });
 
-    const isAnyModalOpen = isViewAllOpen || activeModal !== null || isAddFundsOpen || isHowToUseOpen || isEditOpen;
+    const effectiveCalculateUserShare = useCallback((tx: Transaction, uid: string | null) => {
+        if (!activeWorkspaceId || !activeWorkspaceGroup) return calculateUserShare(tx, uid);
+        
+        // In workspace, we count spending by *anyone* in the workspace group
+        const partnerIds = activeWorkspaceGroup.members.map(m => m.user_id);
+        
+        // If the transaction belongs to anyone in the workspace, count the full amount
+        if (partnerIds.includes(tx.user_id)) {
+             return Number(tx.amount);
+        }
+        
+        // If it's a split with other people outside the workspace, sum up the shares of the workspace members
+        if (tx.splits) {
+             let workspaceShare = 0;
+             for (const split of tx.splits) {
+                 if (partnerIds.includes(split.user_id)) {
+                     workspaceShare += Number(split.amount);
+                 }
+             }
+             if (workspaceShare > 0) return workspaceShare;
+        }
+
+        return 0;
+    }, [activeWorkspaceId, activeWorkspaceGroup, calculateUserShare]);
+
+    const handleSaveBudget = async () => {
+        const newBudget = Number(tempBudgetInput);
+        if (!isNaN(newBudget) && newBudget >= 0) {
+            if (activeWorkspaceId) {
+                await setWorkspaceBudget(activeWorkspaceId, newBudget);
+            } else {
+                await setMonthlyBudget(newBudget);
+            }
+            setIsBudgetEditOpen(false);
+        }
+    };
+
+    const isAnyModalOpen = isViewAllOpen || activeModal !== null || isAddFundsOpen || isHowToUseOpen || isEditOpen || isBudgetEditOpen;
 
     const currentMonthForEditPrefix = useMemo(() => {
         const d = new Date();
@@ -179,10 +232,35 @@ export function DashboardView() {
         );
     }, [buckets, getBucketIcon]);
 
-    const activeBuckets = useMemo(() => buckets.filter(b => !b.is_archived), [buckets]);
+    const activeBuckets = useMemo(() => activeWorkspaceId ? [] : buckets.filter(b => !b.is_archived), [buckets, activeWorkspaceId]);
 
     return (
         <div className="relative min-h-screen">
+            <Dialog open={isBudgetEditOpen} onOpenChange={setIsBudgetEditOpen}>
+                <DialogContent className="max-w-[340px] bg-card border-white/10 rounded-3xl p-6">
+                    <DialogHeader className="mb-4">
+                        <DialogTitle>Edit {activeWorkspaceId ? 'Workspace' : 'Personal'} Budget</DialogTitle>
+                        <DialogDescription className="text-xs">
+                            Set your monthly spending allowance for this context.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                        <div className="space-y-2">
+                            <Label>Monthly Allowance ({currency})</Label>
+                            <Input 
+                                type="number" 
+                                value={tempBudgetInput} 
+                                onChange={(e) => setTempBudgetInput(e.target.value)} 
+                                placeholder="e.g. 5000"
+                                className="bg-secondary/50 border-white/10 h-12 rounded-xl text-lg font-bold"
+                            />
+                        </div>
+                        <Button onClick={handleSaveBudget} className="w-full h-12 rounded-xl font-bold bg-primary hover:bg-primary/90">
+                            Save Budget
+                        </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
             {/* Focus-based Background Overlay */}
             <AnimatePresence>
                 {isBucketFocused ? (
@@ -207,8 +285,14 @@ export function DashboardView() {
                         transition={{ duration: 0.8 }}
                         className="fixed inset-0 pointer-events-none z-0 overflow-hidden gpu"
                     >
-                        <div className="absolute top-[20%] -right-[10%] w-[60%] h-[60%] rounded-full blur-[50px] bg-primary opacity-15 gpu" />
-                        <div className="absolute bottom-[20%] -left-[10%] w-[50%] h-[50%] rounded-full blur-[40px] bg-primary/40 opacity-10 gpu" />
+                        <div className={cn(
+                            "absolute top-[20%] -right-[10%] w-[60%] h-[60%] rounded-full blur-[50px] opacity-15 gpu transition-colors duration-1000",
+                            isCoupleWorkspace ? "bg-rose-500" : "bg-primary"
+                        )} />
+                        <div className={cn(
+                            "absolute bottom-[20%] -left-[10%] w-[50%] h-[50%] rounded-full blur-[40px] opacity-10 gpu transition-colors duration-1000",
+                            isCoupleWorkspace ? "bg-rose-500" : "bg-primary/40"
+                        )} />
                     </motion.div>
                 )}
             </AnimatePresence>
@@ -229,14 +313,60 @@ export function DashboardView() {
                         <div className="w-10 h-10 relative shrink-0">
                             <img src="/Novira.png" alt="Novira" className="w-full h-full object-contain drop-shadow-[0_0_8px_rgba(138,43,226,0.5)]" />
                         </div>
-                        <div className="min-w-0">
-                            <h1 className="text-xl font-bold flex items-center gap-1.5 min-w-0">
-                                <span className="bg-clip-text text-transparent bg-gradient-to-r from-white to-white/80 truncate">
-                                    Hi, {userName.split(' ')[0]}!
-                                </span>
-                                <span className="shrink-0">👋</span>
-                            </h1>
-                            <p className="text-[11px] text-muted-foreground font-medium truncate">Track your expenses with Novira</p>
+                        <div className="min-w-0 flex flex-col justify-center">
+                            {eligibleGroups.length > 0 ? (
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger className="flex items-center gap-1.5 focus:outline-none">
+                                        <h1 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-white/80 truncate">
+                                            {activeWorkspaceId ? activeWorkspaceGroup?.name : `Hi, ${userName.split(' ')[0]}!`}
+                                        </h1>
+                                        <ChevronDown className="w-4 h-4 text-white/50 shrink-0" />
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="start" className="w-48 bg-card/95 backdrop-blur-xl border-white/10 rounded-2xl">
+                                        <DropdownMenuItem 
+                                            onClick={() => {
+                                                setActiveWorkspaceId(null);
+                                                setDashboardFocus('allowance');
+                                            }} 
+                                            className={cn("rounded-xl cursor-pointer py-2", !activeWorkspaceId && "bg-primary/10 text-primary")}
+                                        >
+                                            <UserCircle className="w-4 h-4 mr-2" />
+                                            Personal
+                                            {!activeWorkspaceId && <Check className="w-3 h-3 ml-auto" />}
+                                        </DropdownMenuItem>
+                                        <DropdownMenuSeparator className="bg-white/5" />
+                                        <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold px-2 py-1.5">
+                                            Shared Workspaces
+                                        </DropdownMenuLabel>
+                                        {eligibleGroups.map(g => (
+                                            <DropdownMenuItem 
+                                                key={g.id} 
+                                                onClick={() => {
+                                                    setActiveWorkspaceId(g.id);
+                                                    setDashboardFocus('allowance');
+                                                }} 
+                                                className={cn("rounded-xl cursor-pointer py-2", activeWorkspaceId === g.id && "bg-rose-500/10 text-rose-400")}
+                                            >
+                                                <Building2 className="w-4 h-4 mr-2" />
+                                                <span className="truncate">{g.name}</span>
+                                                {activeWorkspaceId === g.id && <Check className="w-3 h-3 ml-auto shrink-0" />}
+                                            </DropdownMenuItem>
+                                        ))}
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+                            ) : (
+                                <h1 className="text-xl font-bold flex items-center gap-1.5 min-w-0">
+                                    <span className="bg-clip-text text-transparent bg-gradient-to-r from-white to-white/80 truncate">Hi, {userName.split(' ')[0]}!</span>
+                                    <span className="shrink-0">👋</span>
+                                </h1>
+                            )}
+                            <p className="text-[11px] text-muted-foreground font-medium truncate">
+                                {activeWorkspaceId ? (
+                                    activeWorkspaceGroup?.type === 'couple' ? 'Couple Dashboard' : 
+                                    activeWorkspaceGroup?.type === 'home' ? 'Home Dashboard' : 
+                                    'Household Dashboard'
+                                ) : 'Track your expenses with Novira'}
+                            </p>
                         </div>
                     </div>
                     <div className="flex items-center gap-1.5 shrink-0">
@@ -265,6 +395,7 @@ export function DashboardView() {
                         </button>
                     </div>
                 </div>
+
 
                 <BudgetAlertManager totalSpent={totalSpent} />
 
@@ -446,7 +577,9 @@ export function DashboardView() {
                     "relative overflow-hidden rounded-3xl p-6 shadow-xl transition-all duration-500",
                     isBucketFocused 
                         ? "bg-gradient-to-br from-cyan-500 to-teal-600 shadow-cyan-500/20"
-                        : "bg-gradient-to-br from-[#8A2BE2] to-[#4B0082] shadow-primary/20"
+                        : isCoupleWorkspace 
+                            ? "bg-gradient-to-br from-rose-500 to-rose-700 shadow-rose-500/20"
+                            : "bg-gradient-to-br from-[#8A2BE2] to-[#4B0082] shadow-primary/20"
                 )}>
                     <div className="absolute top-0 right-0 p-6 opacity-10 transition-colors">
                         <span className="text-9xl font-bold text-white leading-none translate-x-4 -translate-y-4">
@@ -471,7 +604,20 @@ export function DashboardView() {
                         </div>
                         <div className="space-y-2">
                             <div className="flex justify-between text-xs font-medium text-white/80 gap-2">
-                                <span className="truncate">{isBucketFocused ? "Target" : "Allowance"}: {formatCurrency(displayBudget, bucketCurrency)}</span>
+                                <div className="flex items-center gap-1 min-w-0">
+                                    <span className="truncate">{isBucketFocused ? "Target" : "Allowance"}: {formatCurrency(displayBudget, bucketCurrency)}</span>
+                                    {!isBucketFocused && (
+                                        <button 
+                                            onClick={() => {
+                                                setTempBudgetInput(displayBudget.toString());
+                                                setIsBudgetEditOpen(true);
+                                            }} 
+                                            className="p-1 hover:bg-white/10 rounded-full transition-colors shrink-0 outline-none"
+                                        >
+                                            <Pencil className="w-3 h-3 text-white/70 hover:text-white" />
+                                        </button>
+                                    )}
+                                </div>
                                 <span className={cn("shrink-0", remaining < 0 ? "text-red-200" : "")}>{remaining < 0 ? "Over by " : "Remaining: "}{isRatesLoading ? "..." : formatCurrency(Math.abs(remaining), bucketCurrency)}</span>
                             </div>
                             <Progress value={progress} className="h-2 bg-black/30" indicatorClassName={cn(remaining < 0 ? "bg-red-400" : "bg-white")} />
@@ -523,11 +669,64 @@ export function DashboardView() {
                     </div>
                 </div>
 
+                {/* Run Rate Widget */}
+                {runRateData && !isBucketFocused && runRateData.currentDayOfMoth > 1 && (
+                    <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className={cn(
+                            "p-4 rounded-3xl border backdrop-blur-md relative overflow-hidden",
+                            runRateData.isExceeding
+                                ? "bg-rose-500/10 border-rose-500/20"
+                                : "bg-emerald-500/10 border-emerald-500/20"
+                        )}
+                    >
+                        <div className={cn(
+                            "absolute top-0 right-0 w-24 h-24 rounded-full blur-[40px] opacity-20",
+                            runRateData.isExceeding ? "bg-rose-500" : "bg-emerald-500"
+                        )} />
+                        
+                        <div className="relative z-10">
+                            <div className="flex justify-between items-start mb-2">
+                                <div className="flex items-center gap-2">
+                                    <Clock className={cn("w-4 h-4", runRateData.isExceeding ? "text-rose-400" : "text-emerald-400")} />
+                                    <h3 className="text-sm font-bold">Month Forecasting</h3>
+                                </div>
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground bg-secondary/30 px-2 py-0.5 rounded-full">
+                                    Day {runRateData.currentDayOfMoth}/{runRateData.daysInMonth}
+                                </span>
+                            </div>
+
+                            <p className="text-xs text-muted-foreground mb-3 font-medium">
+                                Based on your spending speed of <span className="text-foreground font-bold">{formatCurrency(runRateData.dailyAverage)}/day</span>, 
+                                you are projected to hit <span className="text-foreground font-bold">{formatCurrency(runRateData.projectedSpend)}</span> by month's end.
+                            </p>
+
+                            {runRateData.isExceeding ? (
+                                <div className="flex items-center gap-2 text-xs font-bold text-rose-400 bg-rose-500/10 px-3 py-2 rounded-xl border border-rose-500/20 mt-2">
+                                    <ArrowUpRight className="w-4 h-4" />
+                                    Projected to exceed budget by {formatCurrency(Math.abs(monthlyBudget - runRateData.projectedSpend))}
+                                </div>
+                            ) : (
+                                <div className="flex items-center gap-2 text-xs font-bold text-emerald-400 bg-emerald-500/10 px-3 py-2 rounded-xl border border-emerald-500/20 mt-2">
+                                    <ArrowDownLeft className="w-4 h-4" />
+                                    On track! Projected to save {formatCurrency(monthlyBudget - runRateData.projectedSpend)}
+                                </div>
+                            )}
+                        </div>
+                    </motion.div>
+                )}
+
                 {/* Separate Add Funds Action */}
                 <div className="flex justify-center mt-4 mb-6 relative group">
                     <button 
                         onClick={() => setIsAddFundsOpen(true)}
-                        className="flex items-center justify-center w-full gap-2 py-4 rounded-3xl bg-primary/20 backdrop-blur-xl border border-primary/30 text-white font-bold transition-all shadow-[0_4px_30px_rgba(138,43,226,0.15)] active:scale-95 hover:bg-primary/30 hover:border-primary/50"
+                        className={cn(
+                            "flex items-center justify-center w-full gap-2 py-4 rounded-3xl backdrop-blur-xl border text-white font-bold transition-all active:scale-95",
+                            isCoupleWorkspace 
+                                ? "bg-rose-500/20 border-rose-500/30 shadow-[0_4px_30px_rgba(244,63,94,0.15)] hover:bg-rose-500/30 hover:border-rose-500/50" 
+                                : "bg-primary/20 border-primary/30 shadow-[0_4px_30px_rgba(138,43,226,0.15)] hover:bg-primary/30 hover:border-primary/50"
+                        )}
                     >
                         <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center backdrop-blur-sm">
                             <Plus className="w-4 h-4 text-white" />
@@ -562,7 +761,10 @@ export function DashboardView() {
                 <div className="space-y-4">
                     <div className="flex flex-wrap justify-between items-center gap-2">
                         <h3 className="text-lg font-bold">Spending by Category</h3>
-                        <span className="text-[11px] bg-secondary/50 backdrop-blur-md px-3 py-1 rounded-full text-primary border border-primary/20 font-bold uppercase tracking-wider whitespace-nowrap">{format(new Date(), 'MMMM')} Overview</span>
+                        <span className={cn(
+                            "text-[11px] bg-secondary/50 backdrop-blur-md px-3 py-1 rounded-full border font-bold uppercase tracking-wider whitespace-nowrap",
+                            isCoupleWorkspace ? "text-rose-400 border-rose-500/20" : "text-primary border-primary/20"
+                        )}>{format(new Date(), 'MMMM')} Overview</span>
                     </div>
                     <Card className="border-none bg-card/40 backdrop-blur-md shadow-none">
                         <CardContent className="p-4 flex flex-col sm:flex-row items-center justify-between gap-6">
@@ -639,7 +841,10 @@ export function DashboardView() {
                             )}
                             <button
                                 onClick={() => setIsViewAllOpen(true)}
-                                className="text-xs text-primary font-bold hover:text-primary/80 transition-colors uppercase tracking-wider px-2 py-1"
+                                className={cn(
+                                    "text-xs font-bold transition-colors uppercase tracking-wider px-2 py-1",
+                                    isCoupleWorkspace ? "text-rose-400 hover:text-rose-300" : "text-primary hover:text-primary/80"
+                                )}
                             >
                                 View All
                             </button>
@@ -648,7 +853,7 @@ export function DashboardView() {
 
                     <div className="space-y-1">
                         {displayTransactions.slice(0, 5).map((tx: Transaction) => {
-                            const myShare = calculateUserShare(tx, userId);
+                            const myShare = effectiveCalculateUserShare(tx, userId);
                             const showConverted = tx.currency && tx.currency !== currency;
                             return (
                                 <TransactionRow
@@ -694,7 +899,7 @@ export function DashboardView() {
                             userId={userId}
                             currency={currency}
                             buckets={buckets}
-                            calculateUserShare={calculateUserShare}
+                            calculateUserShare={effectiveCalculateUserShare}
                             getIconForCategory={getIconForCategory}
                             formatCurrency={formatCurrency}
                             convertAmount={convertAmount}

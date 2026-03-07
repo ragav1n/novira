@@ -54,6 +54,12 @@ interface UserPreferencesContextType {
     isRatesLoading: boolean;
     CURRENCY_SYMBOLS: Record<Currency, string>;
     CURRENCY_DETAILS: Record<Currency, { name: string; symbol: string }>;
+    
+    // Joint Workspaces
+    activeWorkspaceId: string | null;
+    setActiveWorkspaceId: (id: string | null) => void;
+    workspaceBudgets: Record<string, number>; // Maps group_id to budget
+    setWorkspaceBudget: (groupId: string, budget: number) => Promise<void>;
 }
 
 export const CURRENCY_SYMBOLS: Record<Currency, string> = {
@@ -100,6 +106,10 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
     const [budgets, setBudgets] = useState<Record<string, number>>({});
     const [exchangeRates, setExchangeRates] = useState<Record<string, number>>({});
     const [isNavigating, setIsNavigating] = useState(false);
+    
+    // Joint Workspaces State
+    const [activeWorkspaceId, setActiveWorkspaceId] = useState<string | null>(null);
+    const [workspaceBudgets, setWorkspaceBudgets] = useState<Record<string, number>>({});
 
     const processRecurringExpenses = useCallback(async (uid: string) => {
         try {
@@ -148,6 +158,20 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
             if (error && error.code !== 'PGRST116') {
                 console.error('Error fetching preferences:', error);
             }
+
+            // Fetch workspace budgets (RLS ensures user only gets their groups)
+            const { data: workspaceData, error: workspaceError } = await supabase
+                .from('workspace_budgets')
+                .select('group_id, monthly_budget');
+            
+            if (workspaceData && !workspaceError) {
+                const wBudgets: Record<string, number> = {};
+                workspaceData.forEach(row => {
+                    wBudgets[row.group_id] = Number(row.monthly_budget);
+                });
+                setWorkspaceBudgets(wBudgets);
+            }
+
         } catch (error) {
             console.error('Error loading preferences:', error);
         }
@@ -171,6 +195,8 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
             setBudgets({});
             setExchangeRates({});
             setAvatarUrl(null);
+            setActiveWorkspaceId(null);
+            setWorkspaceBudgets({});
         }
     }, [loadPreferences, processRecurringExpenses]);
 
@@ -448,6 +474,28 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
         }
     }, [currency, budgets, userId, refreshPreferences]);
 
+    const setWorkspaceBudget = useCallback(async (groupId: string, budget: number) => {
+        setWorkspaceBudgets(prev => ({ ...prev, [groupId]: budget }));
+
+        if (userId) {
+            try {
+                const { error } = await supabase
+                    .from('workspace_budgets')
+                    .upsert(
+                        { group_id: groupId, monthly_budget: budget, currency },
+                        { onConflict: 'group_id, currency' }
+                    );
+
+                if (error) throw error;
+                toast.success('Household budget updated');
+            } catch (error) {
+                console.error('Error updating workspace budget:', error);
+                toast.error('Failed to update workspace budget');
+                refreshPreferences();
+            }
+        }
+    }, [userId, currency, refreshPreferences]);
+
     const contextValue = useMemo(() => ({
         user,
         userId,
@@ -470,7 +518,11 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
         setIsNavigating,
         isRatesLoading: Object.keys(exchangeRates).length === 0,
         CURRENCY_SYMBOLS,
-        CURRENCY_DETAILS
+        CURRENCY_DETAILS,
+        activeWorkspaceId,
+        setActiveWorkspaceId,
+        workspaceBudgets,
+        setWorkspaceBudget
     }), [
         user,
         userId,
@@ -488,6 +540,9 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
         fullName,
         isNavigating,
         exchangeRates,
+        activeWorkspaceId,
+        workspaceBudgets,
+        setWorkspaceBudget
     ]);
 
     return (

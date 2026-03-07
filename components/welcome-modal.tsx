@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, CheckCircle2, Zap, Users, RefreshCw, BarChart3, QrCode, Upload, Bell, Globe, FileDown } from 'lucide-react';
+import { X, CheckCircle2, Zap, Users, RefreshCw, BarChart3, QrCode, Upload, Bell, Globe, FileDown, Target, Calendar, Home } from 'lucide-react';
 import { WELCOME_FEATURES } from '@/lib/feature-flags';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -23,6 +23,9 @@ const ICON_MAP: Record<string, any> = {
     bell: Bell,
     globe: Globe,
     export: FileDown,
+    target: Target,
+    calendar: Calendar,
+    home: Home,
 };
 
 const COLOR_MAP: Record<string, string> = {
@@ -34,6 +37,9 @@ const COLOR_MAP: Record<string, string> = {
     bell: 'text-rose-400 bg-rose-400/10 border-rose-400/20 group-hover:bg-rose-400/20 group-hover:border-rose-400/40',
     globe: 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20 group-hover:bg-emerald-400/20 group-hover:border-emerald-400/40',
     export: 'text-pink-400 bg-pink-400/10 border-pink-400/20 group-hover:bg-pink-400/20 group-hover:border-pink-400/40',
+    target: 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20 group-hover:bg-emerald-400/20 group-hover:border-emerald-400/40',
+    calendar: 'text-orange-400 bg-orange-400/10 border-orange-400/20 group-hover:bg-orange-400/20 group-hover:border-orange-400/40',
+    home: 'text-rose-400 bg-rose-400/10 border-rose-400/20 group-hover:bg-rose-400/20 group-hover:border-rose-400/40',
 };
 
 export function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {

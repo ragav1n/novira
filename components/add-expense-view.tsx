@@ -75,6 +75,8 @@ export function AddExpenseView() {
         });
     };
 
+
+
     return (
         <div className="relative">
             <div className={cn(

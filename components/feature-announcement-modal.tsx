@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Zap, Tag, PieChart, Users, QrCode, Upload, Bell, Globe, FileDown, RefreshCcw, Shield, Search, Sparkles, Moon, CreditCard, Wallet, Lock, SlidersHorizontal, Star, Fingerprint, BarChart2, Receipt, Layers, MessageSquare, Link, Smartphone, MapPin } from 'lucide-react';
+import { X, Zap, Tag, PieChart, Users, QrCode, Upload, Bell, Globe, FileDown, RefreshCcw, Shield, Search, Sparkles, Moon, CreditCard, Wallet, Lock, SlidersHorizontal, Star, Fingerprint, BarChart2, Receipt, Layers, MessageSquare, Link, Smartphone, MapPin, Home, Target, Calendar } from 'lucide-react';
 import { LATEST_FEATURE_ANNOUNCEMENT } from '@/lib/feature-flags';
 import { Button } from '@/components/ui/button';
 
@@ -140,6 +140,12 @@ export function FeatureAnnouncementModal({ showAnnouncement = false, userId, onC
                                                 <Link className="w-6 h-6 text-indigo-400" />
                                             ) : feature.icon === 'qr' ? (
                                                 <QrCode className="w-6 h-6 text-cyan-400" />
+                                            ) : feature.icon === 'home' ? (
+                                                <Home className="w-6 h-6 text-indigo-400 fill-indigo-400/20" />
+                                            ) : feature.icon === 'target' ? (
+                                                <Target className="w-6 h-6 text-emerald-400" />
+                                            ) : feature.icon === 'calendar' ? (
+                                                <Calendar className="w-6 h-6 text-orange-400 fill-orange-400/20" />
                                                 /* ── Settings / UX ── */
                                             ) : feature.icon === 'settings' ? (
                                                 <SlidersHorizontal className="w-6 h-6 text-slate-400" />

@@ -1,4 +1,5 @@
 import { useMemo, useCallback } from 'react';
+import { differenceInDays, endOfMonth, startOfMonth } from 'date-fns';
 import type { Transaction } from '@/types/transaction';
 import { CATEGORY_COLORS } from '@/lib/categories';
 import type { Currency } from '@/components/providers/user-preferences-provider';
@@ -115,6 +116,34 @@ export function useDashboardStats({
         return false;
     }), [transactions, userId]);
 
+    // Run Rate Calculation
+    const runRateData = useMemo(() => {
+        if (isBucketFocused) return null; // Run rate is only for monthly allowance right now
+
+        const today = new Date();
+        const firstDay = startOfMonth(today);
+        const lastDay = endOfMonth(today);
+        const daysInMonth = differenceInDays(lastDay, firstDay) + 1;
+        const currentDayOfMoth = today.getDate();
+
+        // Calculate total spend strictly for this month (excluding future scheduled ones if any)
+        const spentThisMonth = totalSpent;
+
+        // Daily average spend so far
+        const dailyAverage = currentDayOfMoth > 0 ? spentThisMonth / currentDayOfMoth : 0;
+
+        // Projected spend for the entire month
+        const projectedSpend = dailyAverage * daysInMonth;
+
+        return {
+            dailyAverage,
+            projectedSpend,
+            isExceeding: projectedSpend > monthlyBudget,
+            daysInMonth,
+            currentDayOfMoth
+        };
+    }, [isBucketFocused, totalSpent, monthlyBudget]);
+
     return {
         focusedBucket,
         displayBudget,
@@ -124,6 +153,7 @@ export function useDashboardStats({
         progress,
         spendingByCategory,
         spendingData,
-        displayTransactions
+        displayTransactions,
+        runRateData
     };
 }
