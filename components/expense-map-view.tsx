@@ -48,8 +48,10 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency }
     const mapRef = useRef<mapboxgl.Map | null>(null);
     const animFrameIdRef = useRef<number | undefined>(undefined);
     const isFirstBoundFit = useRef(true);
+    const hide3DTimerRef = useRef<NodeJS.Timeout | null>(null);
     const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set());
     const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
+    const [drillDownTxIds, setDrillDownTxIds] = useState<string[] | null>(null);
     const [viewMode, setViewMode] = useState<'pins' | 'heatmap'>('pins');
     const [showTrails, setShowTrails] = useState(false);
     const [show3D, setShow3D] = useState(false);
@@ -74,7 +76,14 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency }
         amount: number;
         topMerchant: string;
         count: number;
+        sparkline: number[];
+        txIds: string;
     } | null>(null);
+
+    const drillDownTxs = useMemo(() => {
+        if (!drillDownTxIds) return null;
+        return transactions.filter(t => drillDownTxIds.includes(t.id));
+    }, [drillDownTxIds, transactions]);
 
     const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 
@@ -233,17 +242,11 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency }
                             'education', CATEGORY_COLORS.education,
                             CATEGORY_COLORS.others
                         ],
-                        'fill-extrusion-height': [
-                            'interpolate', ['linear'], ['get', 'amount'],
-                            0, 0,
-                            100, 30,
-                            1000, 200,
-                            5000, 800,
-                            10000, 1500,
-                            50000, 3000
-                        ],
+                        'fill-extrusion-height': 0,
+                        'fill-extrusion-height-transition': { duration: 1000 },
                         'fill-extrusion-base': 0,
-                        'fill-extrusion-opacity': 0.8
+                        'fill-extrusion-opacity': 0.8,
+                        'fill-extrusion-vertical-gradient': true
                     }
                 });
 
@@ -300,7 +303,7 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency }
                     }
                 });
 
-                // Add Hover Listeners for 3D Towers
+                // Add Hover and Click Listeners for 3D Towers
                 map.on('mousemove', 'expense-3d', (e: mapboxgl.MapMouseEvent & { features?: mapboxgl.MapboxGeoJSONFeature[] }) => {
                     if (e.features && e.features.length > 0) {
                         const feature = e.features[0];
@@ -309,15 +312,15 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency }
 
                         map.getCanvas().style.cursor = 'pointer';
 
-                        // Set tooltip State
-                        // TODO: The 3D hover tooltip sparkline is currently hardcoded dummy data. This should be connected to the grouped tx history later.
                         setHoveredTower({
                             x: e.point.x,
                             y: e.point.y,
                             category: props.category,
                             amount: props.amount,
                             topMerchant: props.topMerchant || 'Multiple',
-                            count: props.count || 1
+                            count: props.count || 1,
+                            sparkline: props.sparkline ? JSON.parse(props.sparkline) : [],
+                            txIds: props.txIds || ''
                         });
                     }
                 });
@@ -325,6 +328,14 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency }
                 map.on('mouseleave', 'expense-3d', () => {
                     map.getCanvas().style.cursor = '';
                     setHoveredTower(null);
+                });
+
+                map.on('click', 'expense-3d', (e: mapboxgl.MapMouseEvent & { features?: mapboxgl.MapboxGeoJSONFeature[] }) => {
+                    if (e.features && e.features.length > 0) {
+                        const props = e.features[0].properties;
+                        if (!props || !props.txIds) return;
+                        setDrillDownTxIds(props.txIds.split(','));
+                    }
                 });
             });
         }, 100);
@@ -385,21 +396,20 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency }
         const features: any[] = [];
         locationGroups.forEach(group => {
             const cats = Array.from(group.categories.entries()).sort((a, b) => a[1] - b[1]);
-            const gridSpacing = 15;
-            const cols = 2;
+            const totalCategories = cats.length;
+            const clusterRadius = totalCategories > 1 ? 20 : 0;
             
             cats.forEach(([category, amount], idx) => {
                 let center = [group.lng, group.lat];
-                const row = Math.floor(idx / cols);
-                const col = idx % cols;
                 
-                const offsetX = (col - (cols - 1) / 2) * gridSpacing;
-                const offsetY = -row * gridSpacing; 
+                const angle = totalCategories > 1 ? (idx / totalCategories) * 2 * Math.PI : 0;
+                const offsetX = Math.cos(angle) * clusterRadius;
+                const offsetY = Math.sin(angle) * clusterRadius;
                 
                 center = getGridOffsetCoords(group.lng, group.lat, offsetX, offsetY);
 
                 const radius = 0.00003; 
-                const sides = 8;
+                const sides = 32;
                 const coordinates = [];
                 for (let i = 0; i < sides; i++) {
                     const ang = (i * 360) / sides;
@@ -411,17 +421,28 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency }
                 }
                 coordinates.push(coordinates[0]);
 
-                const txsInCategory = group.transactions.filter(t => t.category === category);
+                const txsInCategory = group.transactions.filter(t => t.category === category).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
                 const count = txsInCategory.length;
                 
                 const merchantMap = new Map<string, number>();
                 txsInCategory.forEach(t => merchantMap.set(t.description, (merchantMap.get(t.description) || 0) + t.amount));
                 const topMerchant = Array.from(merchantMap.entries()).sort((a, b) => b[1] - a[1])[0]?.[0] || 'Unknown';
+                
+                const amounts = txsInCategory.map(t => t.amount);
+                const sparkline = amounts.slice(-10);
+                const txIds = txsInCategory.map(t => t.id).join(',');
 
                 features.push({
                     type: 'Feature',
                     geometry: { type: 'Polygon', coordinates: [coordinates] },
-                    properties: { amount, category: category.toLowerCase(), topMerchant, count }
+                    properties: { 
+                        amount, 
+                        category: category.toLowerCase(), 
+                        topMerchant, 
+                        count,
+                        sparkline: JSON.stringify(sparkline),
+                        txIds
+                    }
                 });
             });
         });
@@ -645,7 +666,30 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency }
         if (map.getLayer('trail-blur')) map.setLayoutProperty('trail-blur', 'visibility', showTrails ? 'visible' : 'none');
         if (map.getLayer('trail-core')) map.setLayoutProperty('trail-core', 'visibility', showTrails ? 'visible' : 'none');
         if (map.getLayer('trail-arrows')) map.setLayoutProperty('trail-arrows', 'visibility', showTrails ? 'visible' : 'none');
-        if (map.getLayer('expense-3d')) map.setLayoutProperty('expense-3d', 'visibility', show3D ? 'visible' : 'none');
+        
+        // Handle 3D Towers growth and visibility
+        if (hide3DTimerRef.current) clearTimeout(hide3DTimerRef.current);
+        if (map.getLayer('expense-3d')) {
+            if (show3D) {
+                map.setLayoutProperty('expense-3d', 'visibility', 'visible');
+                map.setPaintProperty('expense-3d', 'fill-extrusion-height', [
+                    'interpolate', ['linear'], ['get', 'amount'],
+                    0, 0,
+                    100, 30,
+                    1000, 200,
+                    5000, 800,
+                    10000, 1500,
+                    50000, 3000
+                ]);
+            } else {
+                map.setPaintProperty('expense-3d', 'fill-extrusion-height', 0);
+                hide3DTimerRef.current = setTimeout(() => {
+                    if (mapRef.current && mapRef.current.getLayer('expense-3d')) {
+                        mapRef.current.setLayoutProperty('expense-3d', 'visibility', 'none');
+                    }
+                }, 1000);
+            }
+        }
 
         // Handle Map Pitch
         map.easeTo({
@@ -665,7 +709,7 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency }
                     exit={{ opacity: 0 }}
                     className="fixed inset-0 z-[100] flex items-end justify-center p-4 pb-4 sm:p-6 sm:pb-4 bg-black/40 backdrop-blur-sm overscroll-contain touch-none"
                 >
-                    <div className="relative w-full h-full max-h-[calc(100dvh-7rem)] sm:max-h-[calc(100dvh-8rem)] max-w-5xl bg-background rounded-[32px] overflow-hidden shadow-2xl border border-white/10 flex flex-col">
+                    <div className="relative w-full h-full max-h-[calc(100dvh-2rem)] sm:max-h-[calc(100dvh-3rem)] max-w-5xl bg-background rounded-[32px] overflow-hidden shadow-2xl border border-white/10 flex flex-col">
 
                 {/* Header Overlay */}
                     <div className="absolute top-0 left-0 right-0 z-20 flex flex-col sm:flex-row items-center justify-between p-4 sm:p-6 bg-gradient-to-b from-background/90 via-background/40 to-transparent pointer-events-none">
@@ -884,6 +928,61 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency }
                     )}
                 </AnimatePresence>
 
+                {/* Drill Down Modal for Cylinder Click */}
+                <AnimatePresence>
+                    {drillDownTxs && drillDownTxs.length > 0 && (
+                        <motion.div
+                            initial={{ y: 200, opacity: 0 }}
+                            animate={{ y: 0, opacity: 1 }}
+                            exit={{ y: 200, opacity: 0 }}
+                            transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+                            className="absolute bottom-4 left-4 right-4 sm:bottom-8 sm:left-auto sm:right-8 sm:w-[350px] z-40 max-h-[60vh] overflow-hidden flex flex-col rounded-2xl bg-card/95 backdrop-blur-xl border border-white/10 shadow-2xl"
+                        >
+                            <div className="p-4 border-b border-white/10 flex items-center justify-between bg-card/80 sticky top-0">
+                                <div className="flex items-center gap-2">
+                                    <div
+                                        className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 border"
+                                        style={{
+                                            backgroundColor: `${CATEGORY_COLORS[drillDownTxs[0].category as keyof typeof CATEGORY_COLORS] || CATEGORY_COLORS.others}40`,
+                                            borderColor: `${CATEGORY_COLORS[drillDownTxs[0].category as keyof typeof CATEGORY_COLORS] || CATEGORY_COLORS.others}60`,
+                                        }}
+                                    >
+                                        <span className="scale-[0.7] text-white">
+                                            {getIconSvgForCategory(drillDownTxs[0].category)}
+                                        </span>
+                                    </div>
+                                    <div>
+                                        <h3 className="font-bold text-sm">
+                                            <span className="capitalize">{drillDownTxs[0].category}</span>
+                                        </h3>
+                                        <p className="text-[10px] text-muted-foreground">{drillDownTxs.length} Transactions</p>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => setDrillDownTxIds(null)}
+                                    className="p-1.5 rounded-full hover:bg-white/10 text-muted-foreground transition-colors"
+                                >
+                                    <X className="w-4 h-4" />
+                                </button>
+                            </div>
+                            <div className="overflow-y-auto p-2 no-scrollbar">
+                                {drillDownTxs.map(tx => (
+                                    <div key={tx.id} className="p-3 mb-1 flex items-center justify-between rounded-xl hover:bg-white/5 transition-colors cursor-pointer" onClick={() => { setDrillDownTxIds(null); setSelectedTx(tx); }}>
+                                        <div className="flex items-center gap-3 min-w-0">
+                                            <div className="min-w-0">
+                                                <p className="text-sm font-bold truncate max-w-[150px]">{tx.description}</p>
+                                                <p className="text-[10px] text-emerald-400 truncate">{tx.place_name || 'Location'}</p>
+                                                <p className="text-[10px] text-muted-foreground">{new Date(tx.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
+                                            </div>
+                                        </div>
+                                        <span className="font-black text-sm shrink-0 pl-2">{formatCurrency(tx.amount, tx.currency)}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+
                 {/* Glassmorphic Hover Insight Bubble */}
                 <AnimatePresence>
                     {hoveredTower && !selectedTx && (
@@ -926,16 +1025,25 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency }
                                         <span className="text-muted-foreground font-medium">Transactions</span>
                                         <span className="text-white font-black">{hoveredTower.count}</span>
                                     </div>
-                                    {/* Mock Sparkline Visual */}
-                                    <div className="h-6 w-full flex items-end gap-0.5 mt-2 bg-white/5 rounded px-1.5 py-1">
-                                        {[40, 70, 45, 90, 65, 85, 30].map((h, i) => (
-                                            <div 
-                                                key={i} 
-                                                className="flex-1 bg-primary/40 rounded-t-[1px]" 
-                                                style={{ height: `${h}%`, opacity: 0.4 + (i * 0.1) }}
-                                            />
-                                        ))}
-                                    </div>
+                                    {/* Real Sparkline Visual */}
+                                    {hoveredTower.sparkline && hoveredTower.sparkline.length > 0 && (
+                                        <div className="h-6 w-full flex items-end gap-0.5 mt-2 bg-white/5 rounded px-1.5 py-1">
+                                            {hoveredTower.sparkline.map((val, i) => {
+                                                const max = Math.max(...hoveredTower.sparkline);
+                                                const min = Math.min(...hoveredTower.sparkline, 0);
+                                                const range = max - min || 1;
+                                                const h = Math.max(10, ((val - min) / range) * 100);
+                                                return (
+                                                    <div 
+                                                        key={i} 
+                                                        className="flex-1 bg-primary/40 rounded-t-[1px]" 
+                                                        style={{ height: `${h}%`, opacity: 0.4 + ((i / hoveredTower.sparkline.length) * 0.6) }}
+                                                        title={formatCurrency(val)}
+                                                    />
+                                                );
+                                            })}
+                                        </div>
+                                    )}
                                 </div>
                                 {/* Triangular notch */}
                                 <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-4 h-4 bg-card/40 backdrop-blur-xl border-r border-b border-white/20 rotate-45" />
