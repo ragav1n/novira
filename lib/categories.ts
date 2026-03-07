@@ -15,6 +15,26 @@ import {
 } from 'lucide-react';
 import React from 'react';
 
+/**
+ * Canonical category list used across the app.
+ * Import this instead of redefining category arrays in individual components.
+ */
+export const CATEGORIES = [
+    { id: 'food', label: 'Food' },
+    { id: 'groceries', label: 'Groceries' },
+    { id: 'fashion', label: 'Fashion' },
+    { id: 'transport', label: 'Transport' },
+    { id: 'bills', label: 'Bills' },
+    { id: 'shopping', label: 'Shopping' },
+    { id: 'healthcare', label: 'Healthcare' },
+    { id: 'entertainment', label: 'Entertainment' },
+    { id: 'rent', label: 'Rent' },
+    { id: 'education', label: 'Education' },
+    { id: 'others', label: 'Others' },
+    { id: 'uncategorized', label: 'Uncategorized' },
+] as const;
+
+
 export const CATEGORY_COLORS: Record<string, string> = {
     food: '#9333EA',      // Deep Purple
     groceries: '#10B981', // Emerald

@@ -60,12 +60,14 @@ export function BucketsProvider({ children }: { children: React.ReactNode }) {
 
             // Process spending with the fetched buckets
             if (!spendingResult.error && spendingResult.data) {
+                // Build a lookup Map for O(1) access instead of O(n) .find() per transaction
+                const bucketMap = new Map(fetchedBuckets.map(b => [b.id, b]));
                 const spending: Record<string, number> = {};
                 spendingResult.data.forEach(tx => {
                     const bId = tx.bucket_id;
                     if (!bId) return;
 
-                    const bucketConfig = fetchedBuckets.find(b => b.id === bId);
+                    const bucketConfig = bucketMap.get(bId);
                     const bucketCurrency = (bucketConfig?.currency || currency).toUpperCase();
 
                     let amountInBucketCurrency = 0;
@@ -128,7 +130,7 @@ export function BucketsProvider({ children }: { children: React.ReactNode }) {
         }
     }, [userId, fetchBuckets, debouncedFetchBuckets]);
 
-    const createBucket = async (data: Partial<Bucket>) => {
+    const createBucket = useCallback(async (data: Partial<Bucket>) => {
         if (!userId) {
             toast.error('Not authenticated');
             return null;
@@ -152,9 +154,9 @@ export function BucketsProvider({ children }: { children: React.ReactNode }) {
             toast.error(error.message || 'Failed to create bucket');
             return null;
         }
-    };
+    }, [userId, fetchBuckets]);
 
-    const updateBucket = async (id: string, data: Partial<Bucket>) => {
+    const updateBucket = useCallback(async (id: string, data: Partial<Bucket>) => {
         try {
             const { error } = await supabase
                 .from('buckets')
@@ -167,9 +169,9 @@ export function BucketsProvider({ children }: { children: React.ReactNode }) {
         } catch (error: any) {
             toast.error(error.message || 'Failed to update bucket');
         }
-    };
+    }, [fetchBuckets]);
 
-    const deleteBucket = async (id: string) => {
+    const deleteBucket = useCallback(async (id: string) => {
         try {
             const { error } = await supabase
                 .from('buckets')
@@ -182,11 +184,11 @@ export function BucketsProvider({ children }: { children: React.ReactNode }) {
         } catch (error: any) {
             toast.error(error.message || 'Failed to delete bucket');
         }
-    };
+    }, [fetchBuckets]);
 
-    const archiveBucket = async (id: string, archive: boolean) => {
+    const archiveBucket = useCallback(async (id: string, archive: boolean) => {
         await updateBucket(id, { is_archived: archive });
-    };
+    }, [updateBucket]);
 
     const contextValue = useMemo(() => ({
         buckets,

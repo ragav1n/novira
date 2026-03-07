@@ -47,6 +47,8 @@ interface UserPreferencesContextType {
     setMonthlyBudget: (budget: number) => Promise<void>;
     avatarUrl: string | null;
     setAvatarUrl: (url: string | null) => void;
+    fullName: string;
+    setFullName: (name: string) => void;
     isNavigating: boolean;
     setIsNavigating: (isNavigating: boolean) => void;
     isRatesLoading: boolean;
@@ -94,6 +96,7 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
     const [budgetAlertsEnabled, setBudgetAlertsEnabledState] = useState(false);
     const [monthlyBudget, setMonthlyBudgetState] = useState(DEFAULT_BUDGETS.INR);
     const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+    const [fullName, setFullName] = useState<string>('User');
     const [budgets, setBudgets] = useState<Record<string, number>>({});
     const [exchangeRates, setExchangeRates] = useState<Record<string, number>>({});
     const [isNavigating, setIsNavigating] = useState(false);
@@ -127,7 +130,7 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
 
             const { data, error } = await supabase
                 .from('profiles')
-                .select('currency, budget_alerts, monthly_budget, budgets, avatar_url')
+                .select('currency, budget_alerts, monthly_budget, budgets, avatar_url, full_name')
                 .eq('id', uid)
                 .single();
  
@@ -137,6 +140,7 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
                 if (data.monthly_budget) setMonthlyBudgetState(data.monthly_budget);
                 if (data.avatar_url) setAvatarUrl(data.avatar_url);
                 if (data.budgets) setBudgets(data.budgets as Record<string, number>);
+                if (data.full_name) setFullName(data.full_name);
 
                 // Update cache with fresh data
                 localStorage.setItem(cacheKey, JSON.stringify(data));
@@ -176,10 +180,12 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
 
         const initializeAuth = async () => {
             try {
-                const { data: { user } } = await supabase.auth.getUser();
+                // Use getSession() instead of getUser() to avoid a redundant network call.
+                // The server-side proxy.ts already validates the JWT via getUser().
+                // getSession() reads from local cookies — no network round-trip.
+                const { data: { session } } = await supabase.auth.getSession();
                 if (mounted) {
-                    // Construct a minimal session-like object for handleSession
-                    handleSession(user ? { user } as any : null);
+                    handleSession(session);
                 }
             } catch (error) {
                 console.error('Auth initialization error:', error);
@@ -194,11 +200,15 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
         // Checks when the user returns to the tab or opens it.
         const handleVisibilityChange = () => {
             if (document.visibilityState === 'visible') {
-                supabase.auth.getUser().then(({ data: { user } }) => {
-                    if (user?.id) {
-                        processRecurringExpenses(user.id);
-                    }
-                });
+                // Throttle: only run if >5 minutes since last check
+                const lastCheck = parseInt(localStorage.getItem('novira_last_visibility_check') || '0', 10);
+                if (Date.now() - lastCheck < 5 * 60 * 1000) return;
+                localStorage.setItem('novira_last_visibility_check', String(Date.now()));
+
+                // Use userId from state instead of making a network call
+                if (userId) {
+                    processRecurringExpenses(userId);
+                }
             }
         };
 
@@ -216,7 +226,7 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
             subscription.unsubscribe();
             document.removeEventListener('visibilitychange', handleVisibilityChange);
         };
-    }, [handleSession, processRecurringExpenses]);
+    }, [handleSession, processRecurringExpenses, userId]);
 
     // Fetch Exchange Rates when currency changes (with localStorage caching)
     useEffect(() => {
@@ -454,6 +464,8 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
         setMonthlyBudget,
         avatarUrl,
         setAvatarUrl,
+        fullName,
+        setFullName,
         isNavigating,
         setIsNavigating,
         isRatesLoading: Object.keys(exchangeRates).length === 0,
@@ -473,6 +485,7 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
         monthlyBudget,
         setMonthlyBudget,
         avatarUrl,
+        fullName,
         isNavigating,
         exchangeRates,
     ]);

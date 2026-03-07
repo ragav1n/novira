@@ -371,6 +371,8 @@ export function AddExpenseView() {
         setPlaceAddress(null);
         setPlaceLat(null);
         setPlaceLng(null);
+        // Signal the dashboard to refetch transactions
+        window.dispatchEvent(new Event('novira:expense-added'));
         router.push('/');
     };
 
