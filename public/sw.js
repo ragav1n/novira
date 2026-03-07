@@ -1,4 +1,4 @@
-const CACHE_NAME = 'novira-cache-47f048b3'; // Updated version
+const CACHE_NAME = 'novira-cache-40133ea4'; // Updated version
 const STATIC_ASSETS = [
     '/',
     '/Novira.png',
