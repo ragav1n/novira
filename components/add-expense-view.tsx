@@ -1,33 +1,33 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { ChevronLeft, CreditCard, Utensils, Car, Zap, ShoppingBag, HeartPulse, Clapperboard, Wallet, Banknote, HelpCircle, RefreshCcw, Calendar as CalendarIcon, Users, User, CheckCircle2, X, Tag, Plane, Home, Gift, ShoppingCart, Gamepad2, School, Laptop, Music, Heart, Smartphone, Shirt, LayoutGrid, Building2, MapPin } from 'lucide-react';
+import React, { useEffect } from 'react';
+import { ChevronLeft, CreditCard, Utensils, Car, Zap, ShoppingBag, HeartPulse, Clapperboard, Wallet, Banknote, HelpCircle, Calendar as CalendarIcon, Home, School, LayoutGrid, Building2, MapPin, Shirt, ShoppingCart } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { useIsNative } from '@/hooks/use-native';
-import { Haptics, ImpactStyle, NotificationType } from '@capacitor/haptics';
+import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { FloatingLabelInput } from '@/components/ui/floating-label';
-import { FluidDropdown, type Category } from '@/components/ui/fluid-dropdown';
 import { format } from "date-fns";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { TimePicker } from "@/components/ui/datetime-picker";
-import { supabase } from '@/lib/supabase';
-import { toast } from '@/utils/haptics';
 import { useUserPreferences } from '@/components/providers/user-preferences-provider';
 import { useGroups } from '@/components/providers/groups-provider';
 import { useBuckets } from '@/components/providers/buckets-provider';
 import { Switch } from '@/components/ui/switch';
-import { Badge } from '@/components/ui/badge';
 import { CurrencyDropdown } from '@/components/ui/currency-dropdown';
 import { LocationPicker } from '@/components/ui/location-picker';
-import { enqueueMutation } from '@/lib/sync-manager';
+import { CategorySelector, BucketSelector } from './add-expense/selectors';
+import { SplitExpenseSection } from './add-expense/split-expense-section';
+import { RecurringExpenseSection } from './add-expense/recurring-expense-section';
+import { useExpenseForm } from '@/hooks/useExpenseForm';
+import { useExpenseSubmission } from '@/hooks/useExpenseSubmission';
 
-const dropdownCategories: Category[] = [
+const dropdownCategories = [
     { id: 'food', label: 'Food & Dining', icon: Utensils, color: '#FF6B6B' },
     { id: 'groceries', label: 'Groceries', icon: ShoppingCart, color: '#10B981' },
     { id: 'fashion', label: 'Fashion', icon: Shirt, color: '#F472B6' },
@@ -53,328 +53,26 @@ const PAYMENT_METHOD_COLORS: Record<string, string> = {
 export function AddExpenseView() {
     const router = useRouter();
     const isNative = useIsNative();
-    const [selectedCategory, setSelectedCategory] = useState('food');
-    const [amount, setAmount] = useState('');
-    const [description, setDescription] = useState('');
-    const [notes, setNotes] = useState('');
-    const [date, setDate] = useState<Date | undefined>(new Date());
-    const [paymentMethod, setPaymentMethod] = useState<'Cash' | 'Debit Card' | 'Credit Card' | 'UPI' | 'Bank Transfer'>('Cash');
-    const [loading, setLoading] = useState(false);
-    const { currency, userId, formatCurrency, convertAmount, CURRENCY_SYMBOLS, CURRENCY_DETAILS } = useUserPreferences();
-    const [txCurrency, setTxCurrency] = useState(currency);
+    const { currency, userId, CURRENCY_SYMBOLS } = useUserPreferences();
     const { groups, friends } = useGroups();
     const { buckets } = useBuckets();
-    const [selectedBucketId, setSelectedBucketId] = useState<string | null>(null);
 
-    useEffect(() => {
-        setTxCurrency(currency);
-    }, [currency]);
+    const formState = useExpenseForm(userId, currency);
+    const { handleSubmit, loading } = useExpenseSubmission();
 
-
-    // Splitting State
-    const [isSplitEnabled, setIsSplitEnabled] = useState(false);
-    const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
-    const [selectedFriendIds, setSelectedFriendIds] = useState<string[]>([]);
-    const [splitMode, setSplitMode] = useState<'even' | 'custom'>('even');
-    const [customAmounts, setCustomAmounts] = useState<Record<string, string>>({});
-
-    // Recurring State
-    const [isRecurring, setIsRecurring] = useState(false);
-    const [frequency, setFrequency] = useState<'daily' | 'weekly' | 'monthly' | 'yearly'>('monthly');
-
-    // Exclusion State
-    const [excludeFromAllowance, setExcludeFromAllowance] = useState(false);
-
-    // Location State
-    const [placeName, setPlaceName] = useState<string | null>(null);
-    const [placeAddress, setPlaceAddress] = useState<string | null>(null);
-    const [placeLat, setPlaceLat] = useState<number | null>(null);
-    const [placeLng, setPlaceLng] = useState<number | null>(null);
-    const [suggestedLocation, setSuggestedLocation] = useState<{ name: string, address: string, lat: number, lng: number } | null>(null);
-
-    // Smart Location Memory: Suggest location from previous transactions with same description
-    useEffect(() => {
-        if (!description || description.length < 3 || !userId) {
-            setSuggestedLocation(null);
-            return;
-        }
-
-        const timer = setTimeout(async () => {
-            const { data, error } = await supabase
-                .from('transactions')
-                .select('place_name, place_address, place_lat, place_lng')
-                .eq('user_id', userId)
-                .ilike('description', description)
-                .not('place_name', 'is', null)
-                .order('created_at', { ascending: false })
-                .limit(1);
-
-            if (data && data[0]) {
-                const loc = data[0];
-                // Only suggest if it's different from the current location
-                if (loc.place_name !== placeName) {
-                    setSuggestedLocation({
-                        name: loc.place_name!,
-                        address: loc.place_address!,
-                        lat: loc.place_lat!,
-                        lng: loc.place_lng!
-                    });
-                } else {
-                    setSuggestedLocation(null);
-                }
-            } else {
-                setSuggestedLocation(null);
-            }
-        }, 500);
-
-        return () => clearTimeout(timer);
-    }, [description, userId, placeName, setPlaceName, setPlaceAddress, setPlaceLat, setPlaceLng]);
-
-    const getBucketIcon = (iconName?: string) => {
-        const icons: Record<string, any> = {
-            Tag, Plane, Home, Gift, Car, Utensils, ShoppingCart,
-            Heart, Gamepad2, School, Laptop, Music
-        };
-        const Icon = icons[iconName || 'Tag'] || Tag;
-        return <Icon className="w-full h-full" />;
-    };
-
-    const handleSubmit = async () => {
-        if (!amount || parseFloat(amount) <= 0 || !description || !date) {
-            if (amount && parseFloat(amount) <= 0) {
-                toast.error('Amount must be greater than 0');
-                return;
-            }
-            toast.error('Please fill in all required fields');
-            return;
-        }
-
-        setLoading(true);
-        try {
-            if (!userId) {
-                toast.error('You must be logged in');
-                router.push('/signin');
-                return;
-            }
-
-            let exchangeRate = 1;
-            let convertedAmount = parseFloat(amount);
-
-            if (txCurrency !== currency) {
-                const FRANKFURTER_SUPPORTED = [
-                    'AUD', 'BRL', 'CAD', 'CHF', 'CNY', 'CZK', 'DKK', 'EUR', 'GBP', 'HKD',
-                    'HUF', 'IDR', 'ILS', 'INR', 'ISK', 'JPY', 'KRW', 'MXN', 'MYR', 'NOK',
-                    'NZD', 'PHP', 'PLN', 'RON', 'SEK', 'SGD', 'THB', 'TRY', 'USD', 'ZAR'
-                ];
-
-                try {
-                    const dateStr = format(date, 'yyyy-MM-dd');
-                    let rate: number | null = null;
-
-                    // Step 1: Try Frankfurter for historical records (if supported)
-                    if (FRANKFURTER_SUPPORTED.includes(txCurrency) && FRANKFURTER_SUPPORTED.includes(currency)) {
-                        const response = await fetch(`https://api.frankfurter.dev/v1/${dateStr}?from=${txCurrency}&to=${currency}`);
-                        if (response.ok) {
-                            const data = await response.json();
-                            rate = data.rates[currency];
-                        }
-                    }
-
-                    // Step 2: Fallback to ExchangeRate-API (for TWD, VND or if Frankfurter fails)
-                    if (!rate) {
-                        const API_KEY = process.env.NEXT_PUBLIC_EXCHANGERATE_API_KEY;
-                        if (API_KEY) {
-                            const isToday = format(new Date(), 'yyyy-MM-dd') === dateStr;
-                            const url = isToday 
-                                ? `https://v6.exchangerate-api.com/v6/${API_KEY}/latest/${txCurrency}`
-                                : `https://v6.exchangerate-api.com/v6/${API_KEY}/history/${txCurrency}/${format(date, 'yyyy/MM/dd')}`;
-                            
-                            const response = await fetch(url);
-                            if (response.ok) {
-                                const data = await response.json();
-                                rate = isToday ? data.conversion_rates[currency] : data.conversion_rate;
-                            }
-                        }
-                    }
-
-                    if (rate) {
-                        exchangeRate = rate;
-                        convertedAmount = parseFloat(amount) * exchangeRate;
-                    }
-                } catch (e) {
-                    console.error('Error fetching historical rate:', e);
-                }
-            }
-
-            const transactionRecord = {
-                user_id: userId,
-                amount: parseFloat(amount),
-                description,
-                category: selectedCategory,
-                date: format(date, 'yyyy-MM-dd'),
-                payment_method: paymentMethod,
-                notes,
-                currency: txCurrency,
-                group_id: selectedGroupId,
-                bucket_id: selectedBucketId,
-                exchange_rate: exchangeRate,
-                base_currency: currency,
-                converted_amount: convertedAmount,
-                is_recurring: isRecurring,
-                exclude_from_allowance: excludeFromAllowance,
-                ...(placeName ? {
-                    place_name: placeName,
-                    place_address: placeAddress,
-                    place_lat: placeLat,
-                    place_lng: placeLng,
-                } : {})
-            };
-
-            let splitRecordsToInsert = null;
-
-            if (isSplitEnabled) {
-                let debtors: string[] = [];
-                if (selectedGroupId) {
-                    const { data: members } = await supabase
-                        .from('group_members')
-                        .select('user_id')
-                        .eq('group_id', selectedGroupId);
-
-                    if (members) {
-                        debtors = members.map(m => m.user_id).filter(id => id !== userId);
-                    }
-                } else {
-                    debtors = selectedFriendIds;
-                }
-
-                if (debtors.length > 0) {
-                    if (splitMode === 'custom') {
-                        const totalCustom = debtors.reduce((sum, id) => sum + (parseFloat(customAmounts[id] || '0') || 0), 0);
-                        if (totalCustom <= 0 || totalCustom > parseFloat(amount)) {
-                            toast.error(totalCustom <= 0 ? 'Please enter split amounts' : 'Split amounts exceed total expense');
-                            setLoading(false);
-                            return;
-                        }
-                        splitRecordsToInsert = debtors
-                            .filter(debtorId => parseFloat(customAmounts[debtorId] || '0') > 0)
-                            .map(debtorId => ({
-                                user_id: debtorId,
-                                amount: parseFloat(customAmounts[debtorId]),
-                                is_paid: false
-                            }));
-                    } else {
-                        const splitAmount = parseFloat(amount) / (debtors.length + 1);
-                        splitRecordsToInsert = debtors.map(debtorId => ({
-                            user_id: debtorId,
-                            amount: splitAmount,
-                            is_paid: false
-                        }));
-                    }
-                }
-            }
-
-            let recurringRecordToInsert = null;
-            if (isRecurring) {
-                const nextDate = new Date(date);
-                if (frequency === 'daily') nextDate.setDate(nextDate.getDate() + 1);
-                else if (frequency === 'weekly') nextDate.setDate(nextDate.getDate() + 7);
-                else if (frequency === 'monthly') nextDate.setMonth(nextDate.getMonth() + 1);
-                else if (frequency === 'yearly') nextDate.setFullYear(nextDate.getFullYear() + 1);
-
-                recurringRecordToInsert = {
-                    user_id: userId,
-                    description,
-                    amount: parseFloat(amount),
-                    category: selectedCategory,
-                    currency: txCurrency,
-                    group_id: selectedGroupId,
-                    payment_method: paymentMethod,
-                    frequency,
-                    next_occurrence: format(nextDate, 'yyyy-MM-dd'),
-                    exclude_from_allowance: excludeFromAllowance,
-                    metadata: {
-                        is_split: isSplitEnabled,
-                        friend_ids: selectedFriendIds,
-                        notes,
-                        bucket_id: selectedBucketId
-                    }
-                };
-            }
-
-            // OFFLINE GUARD
-            if (!navigator.onLine) {
-                 await enqueueMutation('ADD_FULL_TRANSACTION', { 
-                     transaction: transactionRecord, 
-                     splitRecords: splitRecordsToInsert, 
-                     recurringRecord: recurringRecordToInsert 
-                 });
-                 if (isNative) {
-                     Haptics.notification({ type: NotificationType.Warning }).catch(() => { });
-                 }
-                 toast('Saved — will sync when online', {
-                     icon: '☁️',
-                     style: { background: 'rgba(14, 165, 233, 0.1)', border: '1px solid rgba(14, 165, 233, 0.2)', color: '#38BDF8' }
-                 });
-                 resetFormAndNavigate();
-                 return;
-            }
-
-            // ONLINE FLOW
-            const { data: transaction, error: txError } = await supabase.from('transactions').insert(transactionRecord).select().single();
-            if (txError) throw txError;
-
-            if (splitRecordsToInsert && splitRecordsToInsert.length > 0) {
-                const finalSplits = splitRecordsToInsert.map(s => ({ ...s, transaction_id: transaction.id }));
-                const { error: splitError } = await supabase.from('splits').insert(finalSplits);
-                if (splitError) throw splitError;
-            }
-
-            if (recurringRecordToInsert) {
-                const { error: recurringError } = await supabase.from('recurring_templates').insert(recurringRecordToInsert);
-                if (recurringError) throw recurringError;
-            }
-
-            if (isNative) {
-                Haptics.notification({ type: NotificationType.Success }).catch(() => { });
-            }
-            toast.success('Expense added successfully!');
-            resetFormAndNavigate();
-
-        } catch (error: any) {
-            if (isNative) {
-                Haptics.notification({ type: NotificationType.Error }).catch(() => { });
-            }
-            toast.error('Failed to add expense: ' + error.message);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const resetFormAndNavigate = () => {
-        setAmount('');
-        setDescription('');
-        setNotes('');
-        setSelectedCategory('food');
-        setDate(new Date());
-        setPaymentMethod('Cash');
-        setTxCurrency(currency);
-        setSelectedBucketId(null);
-        setIsSplitEnabled(false);
-        setSelectedGroupId(null);
-        setSelectedFriendIds([]);
-        setSplitMode('even');
-        setCustomAmounts({});
-        setIsRecurring(false);
-        setFrequency('monthly');
-        setExcludeFromAllowance(false);
-        setPlaceName(null);
-        setPlaceAddress(null);
-        setPlaceLat(null);
-        setPlaceLng(null);
-        // Signal the dashboard to refetch transactions bypassing cache
-        sessionStorage.setItem('novira_expense_added', 'true');
-        window.dispatchEvent(new Event('novira:expense-added'));
-        router.push('/');
+    const onSubmit = () => {
+        if (isNative) Haptics.impact({ style: ImpactStyle.Medium }).catch(() => { });
+        handleSubmit({
+            userId, isNative, router, currency, resetForm: formState.resetForm,
+            amount: formState.amount, description: formState.description, date: formState.date,
+            selectedCategory: formState.selectedCategory, txCurrency: formState.txCurrency,
+            selectedGroupId: formState.selectedGroupId, selectedBucketId: formState.selectedBucketId,
+            excludeFromAllowance: formState.excludeFromAllowance, placeName: formState.placeName,
+            placeAddress: formState.placeAddress, placeLat: formState.placeLat, placeLng: formState.placeLng,
+            paymentMethod: formState.paymentMethod, notes: formState.notes, isSplitEnabled: formState.isSplitEnabled,
+            selectedFriendIds: formState.selectedFriendIds, splitMode: formState.splitMode,
+            customAmounts: formState.customAmounts, isRecurring: formState.isRecurring, frequency: formState.frequency
+        });
     };
 
     return (
@@ -384,8 +82,8 @@ export function AddExpenseView() {
             )}>
                 {/* Unified Background Glows */}
                 <AnimatePresence>
-                    {selectedBucketId ? (
-                        <motion.div 
+                    {formState.selectedBucketId ? (
+                        <motion.div
                             key="bucket-focus"
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
@@ -398,7 +96,7 @@ export function AddExpenseView() {
                             <div className="absolute inset-0 bg-gradient-to-br from-cyan-950/20 via-transparent to-teal-950/20" />
                         </motion.div>
                     ) : (
-                        <motion.div 
+                        <motion.div
                             key="default-focus"
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
@@ -411,542 +109,270 @@ export function AddExpenseView() {
                         </motion.div>
                     )}
                 </AnimatePresence>
-            {/* Header */}
-            <div className="flex items-center justify-between relative min-h-[40px]">
-                <button
-                    onClick={() => {
-                        if (isNative) Haptics.impact({ style: ImpactStyle.Light }).catch(() => { });
-                        router.back();
-                    }}
-                    className="p-2 rounded-full bg-secondary/30 hover:bg-secondary/50 transition-colors shrink-0 z-10"
-                >
-                    <ChevronLeft className="w-5 h-5" />
-                </button>
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                    <h2 className={cn(
-                        "text-lg font-bold truncate px-12 text-center leading-tight transition-colors duration-500",
-                        selectedBucketId ? "text-cyan-400" : "text-foreground"
-                    )}>
-                        {selectedBucketId ? buckets.find(b => b.id === selectedBucketId)?.name : "Add Expense"}
-                    </h2>
-                </div>
-                <button
-                    onClick={() => {
-                        if (isNative) Haptics.impact({ style: ImpactStyle.Medium }).catch(() => { });
-                        handleSubmit();
-                    }}
-                    disabled={loading}
-                    className="text-sm font-medium text-primary hover:text-primary/80 disabled:opacity-50 shrink-0 z-10"
-                >
-                    {loading ? 'Saving...' : 'Save'}
-                </button>
-            </div>
-
-            {/* Amount Input */}
-            <div className="space-y-2">
-                <label className="text-sm font-medium">Amount *</label>
-                <div className="relative">
-                    <Input
-                        value={amount}
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        placeholder="0.00"
-                        onChange={(e) => setAmount(e.target.value)}
-                        className="h-16 text-3xl font-bold pl-12 bg-secondary/10 border-primary/50 focus-visible:ring-primary/50"
-                    />
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-bold text-primary">
-                        {CURRENCY_SYMBOLS[txCurrency as keyof typeof CURRENCY_SYMBOLS] || '$'}
-                    </span>
-                </div>
-                <div className="mt-2">
-                    <CurrencyDropdown value={txCurrency} onValueChange={(val) => setTxCurrency(val as any)} />
-                </div>
-            </div>
-
-            {/* Description */}
-            <div className="space-y-4">
-                <FloatingLabelInput
-                    id="description"
-                    label="Description *"
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    className="bg-secondary/10 border-white/10 h-14"
-                />
-            </div>
-
-            {/* Smart Location Suggestion */}
-            <AnimatePresence>
-                {suggestedLocation && (
-                    <motion.div
-                        initial={{ opacity: 0, scale: 0.95, y: -10 }}
-                        animate={{ opacity: 1, scale: 1, y: 0 }}
-                        exit={{ opacity: 0, scale: 0.95, y: -10 }}
-                        className="flex justify-start"
+                {/* Header */}
+                <div className="flex items-center justify-between relative min-h-[40px]">
+                    <button
+                        onClick={() => {
+                            if (isNative) Haptics.impact({ style: ImpactStyle.Light }).catch(() => { });
+                            router.back();
+                        }}
+                        className="p-2 rounded-full bg-secondary/30 hover:bg-secondary/50 transition-colors shrink-0 z-10"
                     >
-                        <button
-                            type="button"
-                            onClick={() => {
-                                setPlaceName(suggestedLocation.name);
-                                setPlaceAddress(suggestedLocation.address);
-                                setPlaceLat(suggestedLocation.lat);
-                                setPlaceLng(suggestedLocation.lng);
-                                setSuggestedLocation(null);
-                            }}
-                            className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/20 text-primary hover:bg-primary/20 transition-all text-[11px] font-bold"
+                        <ChevronLeft className="w-5 h-5" />
+                    </button>
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                        <h2 className={cn(
+                            "text-lg font-bold truncate px-12 text-center leading-tight transition-colors duration-500",
+                            formState.selectedBucketId ? "text-cyan-400" : "text-foreground"
+                        )}>
+                            {formState.selectedBucketId ? buckets.find(b => b.id === formState.selectedBucketId)?.name : "Add Expense"}
+                        </h2>
+                    </div>
+                    <button
+                        onClick={onSubmit}
+                        disabled={loading}
+                        className="text-sm font-medium text-primary hover:text-primary/80 disabled:opacity-50 shrink-0 z-10"
+                    >
+                        {loading ? 'Saving...' : 'Save'}
+                    </button>
+                </div>
+
+                {/* Amount Input */}
+                <div className="space-y-2">
+                    <label className="text-sm font-medium">Amount *</label>
+                    <div className="relative">
+                        <Input
+                            value={formState.amount}
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            placeholder="0.00"
+                            onChange={(e) => formState.setAmount(e.target.value)}
+                            className="h-16 text-3xl font-bold pl-12 bg-secondary/10 border-primary/50 focus-visible:ring-primary/50"
+                        />
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-bold text-primary">
+                            {CURRENCY_SYMBOLS[formState.txCurrency as keyof typeof CURRENCY_SYMBOLS] || '$'}
+                        </span>
+                    </div>
+                    <div className="mt-2">
+                        <CurrencyDropdown value={formState.txCurrency} onValueChange={(val) => formState.setTxCurrency(val as any)} />
+                    </div>
+                </div>
+
+                {/* Description */}
+                <div className="space-y-4">
+                    <FloatingLabelInput
+                        id="description"
+                        label="Description *"
+                        value={formState.description}
+                        onChange={(e) => formState.setDescription(e.target.value)}
+                        className="bg-secondary/10 border-white/10 h-14"
+                    />
+                </div>
+
+                {/* Smart Location Suggestion */}
+                <AnimatePresence>
+                    {formState.suggestedLocation && (
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95, y: -10 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.95, y: -10 }}
+                            className="flex justify-start"
                         >
-                            <MapPin className="w-3 h-3" />
-                            Use last location: {suggestedLocation.name}
-                        </button>
-                    </motion.div>
-                )}
-            </AnimatePresence>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    formState.setPlaceName(formState.suggestedLocation!.name);
+                                    formState.setPlaceAddress(formState.suggestedLocation!.address);
+                                    formState.setPlaceLat(formState.suggestedLocation!.lat);
+                                    formState.setPlaceLng(formState.suggestedLocation!.lng);
+                                    formState.setSuggestedLocation(null);
+                                }}
+                                className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/20 text-primary hover:bg-primary/20 transition-all text-[11px] font-bold"
+                            >
+                                <MapPin className="w-3 h-3" />
+                                Use last location: {formState.suggestedLocation.name}
+                            </button>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
 
-            {/* Location Picker */}
-            <LocationPicker
-                placeName={placeName}
-                placeAddress={placeAddress}
-                placeLat={placeLat}
-                placeLng={placeLng}
-                onChange={(loc) => {
-                    setPlaceName(loc.place_name);
-                    setPlaceAddress(loc.place_address);
-                    setPlaceLat(loc.place_lat);
-                    setPlaceLng(loc.place_lng);
-                }}
-            />
-
-            {/* Category Selection */}
-            <div className="space-y-2">
-                <label className="text-sm font-medium">Category *</label>
-                <FluidDropdown
-                    items={dropdownCategories}
-                    onSelect={(cat) => setSelectedCategory(cat.id)}
-                    className="w-full max-w-none"
+                {/* Location Picker */}
+                <LocationPicker
+                    placeName={formState.placeName}
+                    placeAddress={formState.placeAddress}
+                    placeLat={formState.placeLat}
+                    placeLng={formState.placeLng}
+                    onChange={(loc) => {
+                        formState.setPlaceName(loc.place_name);
+                        formState.setPlaceAddress(loc.place_address);
+                        formState.setPlaceLat(loc.place_lat);
+                        formState.setPlaceLng(loc.place_lng);
+                    }}
                 />
-            </div>
 
-            {/* Personal Bucket Selection */}
-            {buckets.length > 0 && (
-                <div className="space-y-2">
-                    <label className="text-sm font-medium">Personal Bucket (Private)</label>
-                    <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1 scrollbar-hide">
-                        <div
-                            onClick={() => setSelectedBucketId(null)}
-                            className={cn(
-                                "flex flex-col items-center gap-1.5 p-3 rounded-xl border transition-all min-w-[80px] cursor-pointer",
-                                selectedBucketId === null
-                                    ? "bg-secondary/30 border-white/20"
-                                    : "bg-background/20 border-white/5 hover:border-white/10"
-                            )}
-                        >
-                            <div className="w-10 h-10 rounded-full flex items-center justify-center bg-secondary/20 border border-white/5">
-                                <X className="w-4 h-4 text-muted-foreground" />
-                            </div>
-                            <span className="text-[11px] font-medium truncate w-16 text-center">None</span>
-                        </div>
-                        {buckets.filter(b => !b.is_archived).map((bucket) => (
-                            <div
-                                key={bucket.id}
-                                onClick={() => setSelectedBucketId(bucket.id)}
-                                className={cn(
-                                    "flex flex-col items-center gap-1.5 p-3 rounded-xl border transition-all min-w-[80px] cursor-pointer",
-                                    selectedBucketId === bucket.id
-                                        ? "bg-primary/20 border-primary shadow-[0_0_15px_rgba(138,43,226,0.2)]"
-                                        : "bg-background/20 border-white/5 hover:border-white/10"
-                                )}
-                            >
-                                <div className="w-10 h-10 rounded-full flex items-center justify-center bg-secondary/20 border border-white/5">
-                                    <div className="w-5 h-5 text-primary">
-                                        {getBucketIcon(bucket.icon)}
-                                    </div>
-                                </div>
-                                <span className="text-[11px] font-medium truncate w-16 text-center">{bucket.name}</span>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            )}
+                {/* Category Selection */}
+                <CategorySelector
+                    categories={dropdownCategories as any}
+                    selectedCategory={formState.selectedCategory}
+                    onSelect={formState.setSelectedCategory}
+                />
 
-            {/* Date & Payment */}
-            <div className="space-y-4">
-                <div className="space-y-2">
-                    <label className="text-sm font-medium">Date *</label>
-                    <Popover>
-                        <PopoverTrigger asChild>
-                            <Button
-                                variant={"outline"}
-                                className={cn(
-                                    "w-full justify-start text-left font-normal h-12 rounded-xl bg-secondary/10 border-white/10 hover:bg-secondary/20",
-                                    !date && "text-muted-foreground"
-                                )}
-                            >
-                                <CalendarIcon className="mr-2 h-4 w-4" />
-                                {date ? format(date, "PPP p") : <span>Pick a date</span>}
-                            </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0 bg-card border-white/10 text-foreground" align="center">
-                            <CalendarComponent
-                                mode="single"
-                                selected={date}
-                                onSelect={setDate}
-                                initialFocus
-                                className="p-3"
-                            />
-                            <div className="p-3 border-t border-white/10">
-                                <TimePicker setDate={setDate} date={date} />
-                            </div>
-                        </PopoverContent>
-                    </Popover>
-                </div>
-                <div className="space-y-2">
-                    <label className="text-sm font-medium">Payment Method</label>
-                    <div className="grid grid-cols-2 gap-2">
-                        {(['Cash', 'UPI', 'Debit Card', 'Credit Card', 'Bank Transfer'] as const).map((method, index) => {
-                            const isSelected = paymentMethod === method;
-                            const color = PAYMENT_METHOD_COLORS[method];
-                            
-                            return (
-                                <div
-                                    key={method}
-                                    onClick={() => setPaymentMethod(method)}
+                {/* Personal Bucket Selection */}
+                <BucketSelector
+                    buckets={buckets}
+                    selectedBucketId={formState.selectedBucketId}
+                    setSelectedBucketId={formState.setSelectedBucketId}
+                />
+
+                {/* Date & Payment */}
+                <div className="space-y-4">
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium">Date *</label>
+                        <Popover>
+                            <PopoverTrigger asChild>
+                                <Button
+                                    variant={"outline"}
                                     className={cn(
-                                        "flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all",
-                                        isSelected
-                                            ? "border-white/20 shadow-lg"
-                                            : "bg-secondary/10 border-white/5 hover:bg-secondary/20",
-                                        index === 4 && "col-span-2"
+                                        "w-full justify-start text-left font-normal h-12 rounded-xl bg-secondary/10 border-white/10 hover:bg-secondary/20",
+                                        !formState.date && "text-muted-foreground"
                                     )}
-                                    style={{
-                                        backgroundColor: isSelected ? `${color}20` : undefined,
-                                        borderColor: isSelected ? color : undefined,
-                                    }}
                                 >
-                                    <div 
-                                        className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition-colors"
-                                        style={{ 
-                                            backgroundColor: isSelected ? `${color}30` : 'rgba(255,255,255,0.05)',
-                                            color: isSelected ? color : 'inherit'
-                                        }}
-                                    >
-                                        {method === 'Cash' ? <Banknote className="w-4 h-4" /> :
-                                            method === 'UPI' ? <Smartphone className="w-4 h-4" /> :
-                                                method === 'Debit Card' ? <CreditCard className="w-4 h-4" /> :
-                                                    method === 'Credit Card' ? <Wallet className="w-4 h-4" /> :
-                                                        <Building2 className="w-4 h-4" />}
-                                    </div>
-                                    <span 
-                                        className="text-sm font-medium transition-colors"
-                                        style={{ color: isSelected ? color : undefined }}
-                                    >
-                                        {method}
-                                    </span>
+                                    <CalendarIcon className="mr-2 h-4 w-4" />
+                                    {formState.date ? format(formState.date, "PPP p") : <span>Pick a date</span>}
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0 bg-card border-white/10 text-foreground" align="center">
+                                <CalendarComponent
+                                    mode="single"
+                                    selected={formState.date}
+                                    onSelect={formState.setDate}
+                                    initialFocus
+                                    className="p-3"
+                                />
+                                <div className="p-3 border-t border-white/10">
+                                    <TimePicker setDate={formState.setDate} date={formState.date} />
                                 </div>
-                            );
-                        })}
+                            </PopoverContent>
+                        </Popover>
                     </div>
-                </div>
-            </div>
-
-            {/* Exclude from Allowance Toggle */}
-            <div className="space-y-4 p-4 rounded-2xl bg-secondary/10 border border-white/5">
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-cyan-500/20 flex items-center justify-center shrink-0">
-                            <Wallet className="w-4 h-4 text-cyan-500" />
-                        </div>
-                        <div>
-                            <p className="text-sm font-medium">Exclude from Allowance</p>
-                            <p className="text-[11px] text-muted-foreground">Don't count this against your monthly limit</p>
-                        </div>
-                    </div>
-                    <Switch
-                        checked={excludeFromAllowance}
-                        onCheckedChange={setExcludeFromAllowance}
-                        className="data-[state=checked]:bg-cyan-500"
-                    />
-                </div>
-            </div>
-
-            {/* Split Expense Section */}
-            <div className="space-y-4 p-4 rounded-2xl bg-secondary/10 border border-white/5">
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                        <Users className="w-5 h-5 text-primary" />
-                        <div>
-                            <p className="text-sm font-medium">Split this expense</p>
-                            <p className="text-[11px] text-muted-foreground">Divide cost with others</p>
-                        </div>
-                    </div>
-                    <Switch
-                        checked={isSplitEnabled}
-                        onCheckedChange={setIsSplitEnabled}
-                    />
-                </div>
-
-                {isSplitEnabled && (
-                    <div className="space-y-4 pt-2 animate-in fade-in slide-in-from-top-2 duration-300">
-                        {/* Split Mode Toggle */}
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium">Payment Method</label>
                         <div className="grid grid-cols-2 gap-2">
-                            <button
-                                onClick={() => setSplitMode('even')}
-                                className={cn(
-                                    "py-2.5 text-xs font-bold uppercase tracking-wider rounded-xl border transition-all",
-                                    splitMode === 'even'
-                                        ? "bg-primary text-white border-primary shadow-lg shadow-primary/20"
-                                        : "bg-background/20 border-white/5 text-muted-foreground hover:border-white/10"
-                                )}
-                            >
-                                Even Split
-                            </button>
-                            <button
-                                onClick={() => setSplitMode('custom')}
-                                className={cn(
-                                    "py-2.5 text-xs font-bold uppercase tracking-wider rounded-xl border transition-all",
-                                    splitMode === 'custom'
-                                        ? "bg-primary text-white border-primary shadow-lg shadow-primary/20"
-                                        : "bg-background/20 border-white/5 text-muted-foreground hover:border-white/10"
-                                )}
-                            >
-                                Custom Amounts
-                            </button>
-                        </div>
+                            {(['Cash', 'UPI', 'Debit Card', 'Credit Card', 'Bank Transfer'] as const).map((method, index) => {
+                                const isSelected = formState.paymentMethod === method;
+                                const color = PAYMENT_METHOD_COLORS[method];
 
-                        <div className="space-y-2">
-                            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Split with Group</p>
-                            <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1 scrollbar-hide">
-                                {groups.map((group) => (
+                                return (
                                     <div
-                                        key={group.id}
-                                        onClick={() => {
-                                            setSelectedGroupId(selectedGroupId === group.id ? null : group.id);
-                                            setSelectedFriendIds([]);
-                                            setCustomAmounts({});
-                                        }}
+                                        key={method}
+                                        onClick={() => formState.setPaymentMethod(method as any)}
                                         className={cn(
-                                            "flex flex-col items-center gap-1.5 p-3 rounded-xl border transition-all min-w-[80px] cursor-pointer",
-                                            selectedGroupId === group.id
-                                                ? "bg-primary/20 border-primary shadow-[0_0_15px_rgba(138,43,226,0.2)]"
-                                                : "bg-background/20 border-white/5 hover:border-white/10"
+                                            "flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all",
+                                            isSelected
+                                                ? "border-white/20 shadow-lg"
+                                                : "bg-secondary/10 border-white/5 hover:bg-secondary/20",
+                                            index === 4 && "col-span-2"
                                         )}
-                                    >
-                                        <div className="w-10 h-10 rounded-full bg-secondary/30 flex items-center justify-center relative">
-                                            <Users className="w-5 h-5" />
-                                            {selectedGroupId === group.id && (
-                                                <div className="absolute -top-1 -right-1">
-                                                    <CheckCircle2 className="w-4 h-4 text-primary fill-background" />
-                                                </div>
-                                            )}
-                                        </div>
-                                        <span className="text-[11px] font-medium truncate w-16 text-center">{group.name}</span>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-
-                        <div className="space-y-2">
-                            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Or Split with Friends</p>
-                            <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1 scrollbar-hide">
-                                {friends.map((friend) => (
-                                    <div
-                                        key={friend.id}
-                                        onClick={() => {
-                                            if (selectedGroupId) setSelectedGroupId(null);
-                                            setSelectedFriendIds(prev => {
-                                                const next = prev.includes(friend.id) ? prev.filter(id => id !== friend.id) : [...prev, friend.id];
-                                                // Clean up custom amounts for deselected friends
-                                                if (!next.includes(friend.id)) {
-                                                    setCustomAmounts(prev => {
-                                                        const copy = { ...prev };
-                                                        delete copy[friend.id];
-                                                        return copy;
-                                                    });
-                                                }
-                                                return next;
-                                            });
+                                        style={{
+                                            backgroundColor: isSelected ? `${color}20` : undefined,
+                                            borderColor: isSelected ? color : undefined,
                                         }}
-                                        className={cn(
-                                            "flex flex-col items-center gap-1.5 p-3 rounded-xl border transition-all min-w-[80px] cursor-pointer",
-                                            selectedFriendIds.includes(friend.id)
-                                                ? "bg-primary/20 border-primary shadow-[0_0_15px_rgba(138,43,226,0.2)]"
-                                                : "bg-background/20 border-white/5 hover:border-white/10"
-                                        )}
                                     >
-                                        <div className="w-10 h-10 rounded-full overflow-hidden border border-white/5 relative">
-                                            {friend.avatar_url ? (
-                                                <img src={friend.avatar_url} alt={friend.full_name} className="w-full h-full object-cover" />
-                                            ) : (
-                                                <div className="w-full h-full flex items-center justify-center bg-secondary/30">
-                                                    <User className="w-5 h-5" />
-                                                </div>
-                                            )}
-                                            {selectedFriendIds.includes(friend.id) && (
-                                                <div className="absolute -top-1 -right-1">
-                                                    <CheckCircle2 className="w-4 h-4 text-primary fill-background" />
-                                                </div>
-                                            )}
+                                        <div
+                                            className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition-colors"
+                                            style={{
+                                                backgroundColor: isSelected ? `${color}30` : 'rgba(255,255,255,0.05)',
+                                                color: isSelected ? color : 'inherit'
+                                            }}
+                                        >
+                                            {method === 'Cash' ? <Banknote className="w-4 h-4" /> :
+                                                method === 'UPI' ? <Wallet className="w-4 h-4" /> :
+                                                    method === 'Debit Card' ? <CreditCard className="w-4 h-4" /> :
+                                                        method === 'Credit Card' ? <Wallet className="w-4 h-4" /> :
+                                                            <Building2 className="w-4 h-4" />}
                                         </div>
-                                        <span className="text-[11px] font-medium truncate w-16 text-center">{friend.full_name.split(' ')[0]}</span>
+                                        <span
+                                            className="text-sm font-medium transition-colors"
+                                            style={{ color: isSelected ? color : undefined }}
+                                        >
+                                            {method}
+                                        </span>
                                     </div>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* Custom Amount Inputs */}
-                        {splitMode === 'custom' && (selectedFriendIds.length > 0 || selectedGroupId) && (
-                            <div className="space-y-3 pt-2 border-t border-white/5 animate-in fade-in slide-in-from-top-2 duration-300">
-                                <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Enter amounts each person owes you</p>
-                                {selectedGroupId ? (
-                                    // For groups, we show group members (fetched dynamically)
-                                    <p className="text-[11px] text-muted-foreground italic">Custom amounts for group members will be applied after saving</p>
-                                ) : (
-                                    selectedFriendIds.map((friendId) => {
-                                        const friend = friends.find(f => f.id === friendId);
-                                        if (!friend) return null;
-                                        return (
-                                            <div key={friendId} className="flex items-center gap-3">
-                                                <div className="flex items-center gap-2 min-w-[100px]">
-                                                    <div className="w-7 h-7 rounded-full overflow-hidden border border-white/5 shrink-0">
-                                                        {friend.avatar_url ? (
-                                                            <img src={friend.avatar_url} alt={friend.full_name} className="w-full h-full object-cover" />
-                                                        ) : (
-                                                            <div className="w-full h-full flex items-center justify-center bg-secondary/30">
-                                                                <User className="w-3.5 h-3.5" />
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                    <span className="text-xs font-medium truncate">{friend.full_name.split(' ')[0]}</span>
-                                                </div>
-                                                <div className="relative flex-1">
-                                                    <Input
-                                                        type="number"
-                                                        min="0"
-                                                        step="0.01"
-                                                        placeholder="0.00"
-                                                        value={customAmounts[friendId] || ''}
-                                                        onChange={(e) => setCustomAmounts(prev => ({ ...prev, [friendId]: e.target.value }))}
-                                                        className="h-9 text-sm pl-8 bg-secondary/10 border-white/10 rounded-lg"
-                                                    />
-                                                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
-                                                        {CURRENCY_SYMBOLS[currency] || '$'}
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        );
-                                    })
-                                )}
-
-                                {/* Running total */}
-                                {selectedFriendIds.length > 0 && !selectedGroupId && (() => {
-                                    const totalAllocated = selectedFriendIds.reduce((sum, id) => sum + (parseFloat(customAmounts[id] || '0') || 0), 0);
-                                    const expenseAmount = parseFloat(amount) || 0;
-                                    const yourShare = expenseAmount - totalAllocated;
-                                    return (
-                                        <div className="space-y-1.5 pt-2 border-t border-white/5">
-                                            <div className="flex justify-between text-[11px]">
-                                                <span className="text-muted-foreground">Others owe:</span>
-                                                <span className="font-medium text-emerald-500">
-                                                    {CURRENCY_SYMBOLS[currency] || '$'}{totalAllocated.toFixed(2)}
-                                                </span>
-                                            </div>
-                                            <div className="flex justify-between text-[11px]">
-                                                <span className="text-muted-foreground">Your share:</span>
-                                                <span className={cn("font-medium", yourShare < 0 ? "text-red-400" : "text-white")}>
-                                                    {CURRENCY_SYMBOLS[currency] || '$'}{yourShare.toFixed(2)}
-                                                </span>
-                                            </div>
-                                            {yourShare < 0 && (
-                                                <p className="text-[11px] text-red-400">⚠ Split amounts exceed the total expense</p>
-                                            )}
-                                        </div>
-                                    );
-                                })()}
-                            </div>
-                        )}
-
-                        {/* Even split preview */}
-                        {splitMode === 'even' && (selectedFriendIds.length > 0 || selectedGroupId) && amount && (
-                            <div className="pt-2 border-t border-white/5">
-                                <p className="text-[11px] text-muted-foreground text-center">
-                                    Each person pays <span className="font-medium text-primary">
-                                        {CURRENCY_SYMBOLS[currency] || '$'}
-                                        {(parseFloat(amount) / ((selectedGroupId ? 2 : selectedFriendIds.length) + 1)).toFixed(2)}
-                                    </span>
-                                </p>
-                            </div>
-                        )}
-                    </div>
-                )}
-            </div>
-
-            {/* Recurring Expense Section */}
-            <div className="space-y-4 p-4 rounded-2xl bg-secondary/10 border border-white/5">
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                        <RefreshCcw className="w-5 h-5 text-primary" />
-                        <div>
-                            <p className="text-sm font-medium">Recurring Expense</p>
-                            <p className="text-[11px] text-muted-foreground">Automatically post this expense</p>
+                                );
+                            })}
                         </div>
                     </div>
-                    <Switch
-                        checked={isRecurring}
-                        onCheckedChange={setIsRecurring}
+                </div>
+
+                {/* Exclude from Allowance Toggle */}
+                <div className="space-y-4 p-4 rounded-2xl bg-secondary/10 border border-white/5">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-cyan-500/20 flex items-center justify-center shrink-0">
+                                <Wallet className="w-4 h-4 text-cyan-500" />
+                            </div>
+                            <div>
+                                <p className="text-sm font-medium">Exclude from Allowance</p>
+                                <p className="text-[11px] text-muted-foreground">Don't count this against your monthly limit</p>
+                            </div>
+                        </div>
+                        <Switch
+                            checked={formState.excludeFromAllowance}
+                            onCheckedChange={formState.setExcludeFromAllowance}
+                            className="data-[state=checked]:bg-cyan-500"
+                        />
+                    </div>
+                </div>
+
+                {/* Split Expense Section */}
+                <SplitExpenseSection
+                    isSplitEnabled={formState.isSplitEnabled}
+                    setIsSplitEnabled={formState.setIsSplitEnabled}
+                    splitMode={formState.splitMode}
+                    setSplitMode={formState.setSplitMode}
+                    groups={groups}
+                    friends={friends}
+                    selectedGroupId={formState.selectedGroupId}
+                    setSelectedGroupId={formState.setSelectedGroupId}
+                    selectedFriendIds={formState.selectedFriendIds}
+                    setSelectedFriendIds={formState.setSelectedFriendIds}
+                    customAmounts={formState.customAmounts}
+                    setCustomAmounts={formState.setCustomAmounts}
+                    amount={formState.amount}
+                    currency={currency}
+                    CURRENCY_SYMBOLS={CURRENCY_SYMBOLS}
+                />
+
+                {/* Recurring Expense Section */}
+                <RecurringExpenseSection
+                    isRecurring={formState.isRecurring}
+                    setIsRecurring={formState.setIsRecurring}
+                    frequency={formState.frequency}
+                    setFrequency={formState.setFrequency}
+                    date={formState.date}
+                />
+
+                {/* Notes */}
+                <div className="space-y-2">
+                    <label className="text-sm font-medium">Notes (Optional)</label>
+                    <Textarea
+                        placeholder="Add notes..."
+                        value={formState.notes}
+                        onChange={(e) => formState.setNotes(e.target.value)}
+                        className="bg-secondary/10 border-white/10 resize-none min-h-[80px]"
                     />
                 </div>
 
-                {isRecurring && (
-                    <div className="space-y-4 pt-2 animate-in fade-in slide-in-from-top-2 duration-300">
-                        <div className="grid grid-cols-4 gap-2">
-                            {(['daily', 'weekly', 'monthly', 'yearly'] as const).map((freq) => (
-                                <button
-                                    key={freq}
-                                    onClick={() => setFrequency(freq)}
-                                    className={cn(
-                                     "py-2 text-[11px] font-bold uppercase tracking-wider rounded-xl border transition-all",
-                                        frequency === freq
-                                            ? "bg-primary text-white border-primary shadow-lg shadow-primary/20"
-                                            : "bg-background/20 border-white/5 text-muted-foreground hover:border-white/10"
-                                    )}
-                                >
-                                    {freq}
-                                </button>
-                            ))}
-                        </div>
-                        <p className="text-[11px] text-center text-muted-foreground italic">
-                            Next bill: {(() => {
-                                const next = new Date(date || new Date());
-                                if (frequency === 'daily') next.setDate(next.getDate() + 1);
-                                else if (frequency === 'weekly') next.setDate(next.getDate() + 7);
-                                else if (frequency === 'monthly') next.setMonth(next.getMonth() + 1);
-                                else if (frequency === 'yearly') next.setFullYear(next.getFullYear() + 1);
-                                return format(next, 'PPPP');
-                            })()}
-                        </p>
-                    </div>
-                )}
+                {/* Main Action Button */}
+                <Button
+                    onClick={onSubmit}
+                    disabled={loading}
+                    className="w-full h-12 text-base font-semibold shadow-[0_0_20px_rgba(138,43,226,0.3)] hover:shadow-[0_0_30px_rgba(138,43,226,0.5)] transition-all"
+                >
+                    {loading ? 'Adding Expense...' : 'Add Expense'}
+                </Button>
             </div>
-
-            {/* Notes */}
-            <div className="space-y-2">
-                <label className="text-sm font-medium">Notes (Optional)</label>
-                <Textarea
-                    placeholder="Add notes..."
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    className="bg-secondary/10 border-white/10 resize-none min-h-[80px]"
-                />
-            </div>
-
-            {/* Main Action Button */}
-            <Button
-                onClick={handleSubmit}
-                disabled={loading}
-                className="w-full h-12 text-base font-semibold shadow-[0_0_20px_rgba(138,43,226,0.3)] hover:shadow-[0_0_30px_rgba(138,43,226,0.5)] transition-all"
-            >
-                {loading ? 'Adding Expense...' : 'Add Expense'}
-            </Button>
         </div>
-    </div>
-);
+    );
 }

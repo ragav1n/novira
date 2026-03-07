@@ -6,7 +6,7 @@ import { toast } from '@/utils/haptics';
 import { useUserPreferences } from './user-preferences-provider';
 import { simplifyDebts, type SimplifiedPayment } from '@/utils/simplify-debts';
 
-interface Group {
+export interface Group {
     id: string;
     name: string;
     created_by: string;
@@ -22,7 +22,7 @@ interface Group {
     }[];
 }
 
-interface Friend {
+export interface Friend {
     id: string;
     full_name: string;
     avatar_url: string | null;
