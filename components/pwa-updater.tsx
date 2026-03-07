@@ -77,20 +77,22 @@ export function PWAUpdater() {
         // 3. Periodic check every 30 minutes
         const interval = setInterval(checkUpdate, 30 * 60 * 1000);
 
-        return () => {
-            clearTimeout(mountTimer);
-            clearInterval(interval);
-            document.removeEventListener('visibilitychange', handleVisibilityChange);
-        };
-
         // Reload the page once the new service worker takes over
         let refreshing = false;
-        navigator.serviceWorker.addEventListener('controllerchange', () => {
+        const handleControllerChange = () => {
             if (!refreshing) {
                 refreshing = true;
                 window.location.reload();
             }
-        });
+        };
+        navigator.serviceWorker.addEventListener('controllerchange', handleControllerChange);
+
+        return () => {
+            clearTimeout(mountTimer);
+            clearInterval(interval);
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+            navigator.serviceWorker.removeEventListener('controllerchange', handleControllerChange);
+        };
     }, []);
 
     return null;
