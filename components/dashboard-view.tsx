@@ -104,380 +104,46 @@ type SpendingCategory = {
     fill: string;
 };
 
-const VirtualizedTransactionList = React.memo(function VirtualizedTransactionList({
-  transactions, userId, currency, buckets,
-  calculateUserShare, getIconForCategory, formatCurrency,
-  convertAmount, setEditingTransaction, setIsEditOpen,
-  handleDeleteTransaction, getBucketChip, loadAuditLogs,
-  canEditTransaction, toast
-}: any) {
-  const parentRef = useRef<HTMLDivElement>(null);
+import { useDashboardData } from '@/hooks/useDashboardData';
+import { useDashboardState } from '@/hooks/useDashboardState';
+import { useDashboardStats } from '@/hooks/useDashboardStats';
+import { VirtualizedTransactionList } from '@/components/virtualized-transaction-list';
 
-  const rowVirtualizer = useVirtualizer({
-    count: transactions.length,
-    getScrollElement: () => parentRef.current,
-    estimateSize: () => 130, // Tall enough for badge row
-    overscan: 10,
-  });
 
-  return (
-    <div ref={parentRef} className="overflow-auto h-[65vh]">
-      <div
-        style={{ height: `${rowVirtualizer.getTotalSize()}px`, position: 'relative' }}
-      >
-        {rowVirtualizer.getVirtualItems().map((virtualItem) => {
-          const tx = transactions[virtualItem.index];
-          const myShare = calculateUserShare(tx, userId);
-          const showConverted = tx.currency && tx.currency !== currency;
-
-          return (
-            <div
-              key={tx.id}
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                width: '100%',
-                transform: `translateY(${virtualItem.start}px)`,
-              }}
-              className="px-2"
-            >
-              <TransactionRow
-                tx={tx}
-                userId={userId}
-                myShare={myShare}
-                formattedAmount={formatCurrency(Math.abs(myShare), tx.currency)}
-                formattedConverted={
-                  showConverted
-                    ? formatCurrency(convertAmount(Math.abs(myShare), tx.currency || 'USD'), currency)
-                    : undefined
-                }
-                showConverted={showConverted}
-                canEdit={canEditTransaction(tx)}
-                icon={getIconForCategory(tx.category, 'w-4 h-4')}
-                color={CATEGORY_COLORS[tx.category.toLowerCase()] || CATEGORY_COLORS.uncategorized}
-                bucketChip={getBucketChip(tx)}
-                onHistory={() => loadAuditLogs(tx)}
-                onEdit={() => {
-                  setEditingTransaction(tx);
-                  setIsEditOpen(true);
-                }}
-                onDelete={() => {
-                  toast('Delete transaction?', {
-                    action: { label: 'Delete', onClick: () => handleDeleteTransaction(tx) }
-                  });
-                }}
-              />
-            </div>
-          );
-        })}
-
-        {transactions.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-16 text-muted-foreground/40 text-sm">
-            No transactions found.
-          </div>
-        )}
-      </div>
-    </div>
-  );
-});
 
 export function DashboardView() {
     const router = useRouter();
-    const [transactions, setTransactions] = useState<Transaction[]>([]);
-
-    const [loading, setLoading] = useState(true);
     const { formatCurrency, currency, convertAmount, monthlyBudget, userId, isRatesLoading, avatarUrl, fullName: userName } = useUserPreferences();
     const { balances, groups, friends } = useGroups();
     const { buckets } = useBuckets();
 
-    const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
-    const [isEditOpen, setIsEditOpen] = useState(false);
+    const {
+        transactions, loading, editingTransaction, setEditingTransaction,
+        isEditOpen, setIsEditOpen, selectedAuditTx, setSelectedAuditTx,
+        auditLogs, loadingAudit, handleDeleteTransaction, handleUpdateTransaction, loadAuditLogs, loadTransactions
+    } = useDashboardData(userId);
 
-    const [selectedAuditTx, setSelectedAuditTx] = useState<Transaction | null>(null);
-    const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
-    const [loadingAudit, setLoadingAudit] = useState(false);
+    const {
+        dashboardFocus, setDashboardFocus, isFocusRestored,
+        isAddFundsOpen, setIsAddFundsOpen, isHowToUseOpen, setIsHowToUseOpen,
+        activeModal, setActiveModal, isFocusMenuOpen, setIsFocusMenuOpen,
+        focusSelectorRef, isViewAllOpen, setIsViewAllOpen,
+        isMapOpen, setIsMapOpen, hoveredFocusId, setHoveredFocusId
+    } = useDashboardState(userId);
 
-    // Dashboard Focus State
-    const [dashboardFocus, setDashboardFocus] = useState<string>('');
-    const [isFocusRestored, setIsFocusRestored] = useState(false);
-    const [isAddFundsOpen, setIsAddFundsOpen] = useState(false);
-    const [isHowToUseOpen, setIsHowToUseOpen] = useState(false);
+    const isBucketFocused = dashboardFocus !== 'allowance' && dashboardFocus !== '';
+    const bucketCurrencyTemp = isBucketFocused ? buckets.find(b => b.id === dashboardFocus)?.currency || currency : currency;
+    const bucketCurrency = bucketCurrencyTemp.toUpperCase() as Currency;
 
-    // Modal Sequencing State
-    const [activeModal, setActiveModal] = useState<'welcome' | 'announcement' | null>(null);
-    const [isFocusMenuOpen, setIsFocusMenuOpen] = useState(false);
-    const focusSelectorRef = useRef<HTMLDivElement>(null);
-    const [hoveredFocusId, setHoveredFocusId] = useState<string | null>(null);
-    
-    // Virtualization parent ref for "View All" modal
-    const parentRef = useRef<HTMLDivElement>(null);
+    const {
+        focusedBucket, displayBudget, calculateUserShare, totalSpent,
+        remaining, progress, spendingData, displayTransactions
+    } = useDashboardStats({
+        transactions, userId, isBucketFocused, effectiveFocus: dashboardFocus,
+        bucketCurrency, currency, convertAmount, monthlyBudget, buckets
+    });
 
-    // Modal Interaction State
-    const [isViewAllOpen, setIsViewAllOpen] = useState(false);
-    const [isMapOpen, setIsMapOpen] = useState(false);
     const isAnyModalOpen = isViewAllOpen || activeModal !== null || isAddFundsOpen || isHowToUseOpen || isEditOpen;
-
-    // Use a ref so realtime/event callbacks always call the latest loadTransactions
-    const loadTxRef = useRef<((uid: string, bypassCache?: boolean) => Promise<void>) | null>(null);
-
-    // Debounced realtime refresh for transaction changes
-    const txDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const debouncedLoadTx = useCallback((uid: string, bypassCache = false) => {
-        if (txDebounceRef.current) clearTimeout(txDebounceRef.current);
-        txDebounceRef.current = setTimeout(() => {
-            loadTxRef.current?.(uid, bypassCache);
-        }, 300);
-    }, []);
-
-    useEffect(() => {
-        return () => {
-            if (txDebounceRef.current) clearTimeout(txDebounceRef.current);
-        };
-    }, []);
-
-    useEffect(() => {
-        if (!userId) return;
-
-        const channel = supabase
-            .channel('db-changes')
-            .on(
-                'postgres_changes',
-                {
-                    event: '*',
-                    schema: 'public',
-                    table: 'transactions',
-                },
-                () => {
-                    debouncedLoadTx(userId, true);
-                }
-            )
-            .subscribe();
-
-        return () => {
-            supabase.removeChannel(channel);
-        };
-    }, [userId, debouncedLoadTx]);
-
-    // Refetch when an expense is added (custom event from AddExpenseView)
-    useEffect(() => {
-        if (!userId) return;
-        const handleExpenseAdded = () => loadTxRef.current?.(userId, true);
-        window.addEventListener('novira:expense-added', handleExpenseAdded);
-        return () => window.removeEventListener('novira:expense-added', handleExpenseAdded);
-    }, [userId]);
-
-    // Refetch when the page becomes visible again (tab switch, app resume)
-    useEffect(() => {
-        if (!userId) return;
-        const handleVisibility = () => {
-            if (document.visibilityState === 'visible') {
-                loadTxRef.current?.(userId, true);
-            }
-        };
-        document.addEventListener('visibilitychange', handleVisibility);
-        return () => document.removeEventListener('visibilitychange', handleVisibility);
-    }, [userId]);
-
-    // Handle modal sequencing and initial data load
-    useEffect(() => {
-        if (userId) {
-            // 1. Sync Restoration (Critical to do before any async calls to avoid race conditions)
-            if (!isFocusRestored) {
-                const savedFocus = localStorage.getItem(`dashboard_focus_${userId}`);
-                setDashboardFocus(savedFocus || 'allowance');
-                setIsFocusRestored(true);
-            }
-
-            // Modal Sequencing Logic (Per-User)
-            const hasSeenWelcome = localStorage.getItem(`welcome_seen_${userId}`);
-            const lastSeenFeatureId = localStorage.getItem(`last_seen_feature_id_${userId}`) || localStorage.getItem('last_seen_feature_id');
-            const hasNewAnnouncement = lastSeenFeatureId !== LATEST_FEATURE_ANNOUNCEMENT.id;
-
-            if (!hasSeenWelcome) {
-                setTimeout(() => setActiveModal('welcome'), 1500);
-            } else if (hasNewAnnouncement) {
-                setTimeout(() => setActiveModal('announcement'), 1500);
-            }
-
-            // Load transactions (profile data now comes from UserPreferencesProvider)
-            const fetchData = async () => {
-                try {
-                    const needsRefresh = sessionStorage.getItem('novira_expense_added');
-                    if (needsRefresh) {
-                        sessionStorage.removeItem('novira_expense_added');
-                        await loadTransactions(userId, true);
-                    } else {
-                        await loadTransactions(userId, false);
-                    }
-                } catch (error) {
-                    console.error("Error fetching data:", error);
-                } finally {
-                    setLoading(false);
-                }
-            };
-            fetchData();
-        }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [userId, isFocusRestored]);
-
-    // Save Focus Mode Persistence
-    useEffect(() => {
-        // Only save if we have successfully restored AND have a valid value
-        if (userId && dashboardFocus && isFocusRestored && dashboardFocus !== '') {
-            localStorage.setItem(`dashboard_focus_${userId}`, dashboardFocus);
-        }
-    }, [userId, dashboardFocus, isFocusRestored]);
-
-    useEffect(() => {
-        function handleClickOutside(event: MouseEvent) {
-            if (focusSelectorRef.current && !focusSelectorRef.current.contains(event.target as Node)) {
-                setIsFocusMenuOpen(false);
-            }
-        }
-        document.addEventListener("mousedown", handleClickOutside);
-        return () => document.removeEventListener("mousedown", handleClickOutside);
-    }, []);
-
-    const loadTransactions = async (currentUserId: string, bypassCache = false) => {
-        try {
-            let query = supabase
-                .from('transactions')
-                .select('id, description, amount, category, date, created_at, user_id, currency, exchange_rate, base_currency, bucket_id, exclude_from_allowance, is_recurring, place_name, place_address, place_lat, place_lng, profile:profiles(full_name, avatar_url), splits(user_id, amount, is_paid)')
-                .order('date', { ascending: false })
-                .order('created_at', { ascending: false })
-                .limit(200);
-
-            if (bypassCache) {
-                 query = query.neq('id', `bypass-${Date.now()}`);
-            }
-
-            const { data: txs } = await query;
-
-            if (txs) {
-                // Flatten profile and splits if they are arrays (Supabase dynamic returns)
-                const formattedTxs = txs.map(tx => ({
-                    ...tx,
-                    profile: Array.isArray(tx.profile) ? tx.profile[0] : tx.profile,
-                    splits: tx.splits || []
-                })) as Transaction[];
-                setTransactions(formattedTxs);
-            }
-        } catch (error) {
-            console.error("Error loading transactions:", error);
-        }
-    };
-
-    // Keep the ref in sync so event/realtime callbacks use the latest function
-    loadTxRef.current = loadTransactions;
-
-    const handleDeleteTransaction = async (tx: Transaction) => {
-        // Optimistic: remove from UI immediately
-        const previousTransactions = [...transactions];
-        setTransactions(prev => prev.filter(t => t.id !== tx.id));
-        toast.success('Transaction deleted');
-
-        try {
-            const { error } = await supabase
-                .from('transactions')
-                .delete()
-                .eq('id', tx.id);
-
-            if (error) throw error;
-
-            // If recurring, ask if user wants to stop future ones
-            if (tx.is_recurring) {
-                // We use a small delay to not collide with the previous toast
-                setTimeout(() => {
-                    toast('This was a recurring expense.', {
-                        description: 'Stop future occurrences too?',
-                        action: {
-                            label: 'Stop Series',
-                            onClick: async () => {
-                                try {
-                                    const { error } = await supabase
-                                        .from('recurring_templates')
-                                        .delete()
-                                        .eq('user_id', userId)
-                                        .eq('description', tx.description)
-                                        .eq('amount', tx.amount);
-
-                                    if (error) throw error;
-                                    toast.success('Recurring series stopped');
-                                } catch (err: any) {
-                                    toast.error('Failed to stop series: ' + err.message);
-                                }
-                            }
-                        }
-                    });
-                }, 1000);
-            }
-        } catch (error: any) {
-            // Rollback on failure
-            setTransactions(previousTransactions);
-            toast.error('Failed to delete: ' + error.message);
-        }
-    };
-
-    const handleUpdateTransaction = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!editingTransaction) return;
-
-        // Optimistic: update in UI immediately
-        const previousTransactions = [...transactions];
-        setTransactions(prev => prev.map(tx =>
-            tx.id === editingTransaction.id
-                ? { ...tx, ...editingTransaction }
-                : tx
-        ));
-        toast.success('Transaction updated');
-        setIsEditOpen(false);
-        const savedEditingTx = editingTransaction;
-        setEditingTransaction(null);
-
-        try {
-            const { error } = await supabase
-                .from('transactions')
-                .update({
-                    description: savedEditingTx.description,
-                    category: savedEditingTx.category,
-                    amount: savedEditingTx.amount,
-                    bucket_id: savedEditingTx.bucket_id || null,
-                    exclude_from_allowance: savedEditingTx.exclude_from_allowance || false,
-                    place_name: savedEditingTx.place_name || null,
-                    place_address: savedEditingTx.place_address || null,
-                    place_lat: savedEditingTx.place_lat || null,
-                    place_lng: savedEditingTx.place_lng || null,
-                })
-                .eq('id', savedEditingTx.id);
-
-            if (error) throw error;
-        } catch (error: any) {
-            // Rollback on failure
-            setTransactions(previousTransactions);
-            toast.error('Failed to update: ' + error.message);
-        }
-    };
-
-    const loadAuditLogs = async (tx: Transaction) => {
-        setSelectedAuditTx(tx);
-        setLoadingAudit(true);
-        try {
-            const { data, error } = await supabase
-                .from('transaction_history')
-                .select('*, changed_by_profile:profiles(full_name)')
-                .eq('transaction_id', tx.id)
-                .order('created_at', { ascending: false });
-
-            if (error) throw error;
-            setAuditLogs(data || []);
-        } catch (error: any) {
-            console.error("Error loading audit logs:", error);
-            toast.error("Failed to load history");
-        } finally {
-            setLoadingAudit(false);
-        }
-    };
 
     const currentMonthForEditPrefix = useMemo(() => {
         const d = new Date();
@@ -489,23 +155,6 @@ export function DashboardView() {
         if (tx.user_id !== userId) return false;
         return tx.date.startsWith(currentMonthForEditPrefix);
     }, [userId, currentMonthForEditPrefix]);
-
-    const calculateUserShare = useCallback((tx: Transaction, currentUserId: string | null) => {
-        if (!currentUserId) return 0;
-
-        // CASH BASIS LOGIC:
-        // 1. If I PAID the transaction (user_id === currentUserId), I spent the FULL amount immediately.
-        //    Reimbursements will come later as separate 'Settlement Received' transactions (negative amount).
-        if (tx.user_id === currentUserId) {
-            return Number(tx.amount);
-        }
-
-        // 2. If I am a DEBTOR (in splits) but didn't pay:
-        //    - I haven't "spent" money yet in cash items.
-        //    - My expense will be recorded when I SETTLE (via 'Settlement Sent' transaction).
-        //    - So for the ORIGINAL split transaction, my share is 0.
-        return 0;
-    }, []);
 
     const getBucketIcon = useCallback((iconName?: string) => {
         const icons: Record<string, any> = {
@@ -530,101 +179,7 @@ export function DashboardView() {
         );
     }, [buckets, getBucketIcon]);
 
-    const effectiveFocus = dashboardFocus || 'allowance';
-    const focusedBucket = effectiveFocus !== 'allowance' ? buckets.find(b => b.id === effectiveFocus) : null;
-    const isBucketFocused = effectiveFocus !== 'allowance';
-    const bucketCurrency = (focusedBucket?.currency || currency).toUpperCase() as Currency;
-    const displayBudget = isBucketFocused && focusedBucket ? Number(focusedBucket.budget) : monthlyBudget;
-
-    // Memoize active (non-archived) buckets to avoid repeated filtering in JSX
     const activeBuckets = useMemo(() => buckets.filter(b => !b.is_archived), [buckets]);
-
-    // Calculate personal share for budget tracking
-    const currentMonthPrefix = useMemo(() => {
-        const d = new Date();
-        const month = String(d.getMonth() + 1).padStart(2, '0');
-        return `${d.getFullYear()}-${month}`;
-    }, []);
-
-    const totalSpent = useMemo(() => transactions.reduce((acc, tx) => {
-        if (!userId) return acc;
-
-        if (isBucketFocused) {
-            // Project Focus: show all expenses for this project bucket (all time)
-            if (tx.bucket_id !== effectiveFocus) return acc;
-        } else {
-            // Allowance Focus: exclude project elements that are marked explicitly
-            if (tx.exclude_from_allowance) return acc;
-            
-            // Filter for current month using ultra-fast string comparison (YYYY-MM)
-            if (!tx.date.startsWith(currentMonthPrefix)) return acc;
-        }
-
-        const myShare = calculateUserShare(tx, userId);
-
-        // Conversion Logic:
-        const txCurr = (tx.currency || 'USD').toUpperCase();
-        const targetCurr = bucketCurrency;
-        
-        const isSameCurrency = txCurr === targetCurr;
-        
-        if (!isSameCurrency && tx.exchange_rate && tx.exchange_rate !== 1 && tx.base_currency === targetCurr) {
-            return acc + (myShare * Number(tx.exchange_rate));
-        }
-
-        return acc + convertAmount(myShare, txCurr, targetCurr);
-    }, 0), [transactions, userId, isBucketFocused, dashboardFocus, calculateUserShare, bucketCurrency, convertAmount]);
-
-    const remaining = displayBudget - totalSpent;
-    const progress = displayBudget > 0 ? Math.min((totalSpent / displayBudget) * 100, 100) : 0;
-
-    // Calculate Spending by Category (converted personal share)
-    const spendingByCategory = useMemo(() => transactions.reduce((acc, tx) => {
-        if (!userId) return acc;
-
-        if (isBucketFocused) {
-            // Project Focus: show all expenses for this project bucket (all time)
-            if (tx.bucket_id !== effectiveFocus) return acc;
-        } else {
-            // Allowance Focus: exclude project elements that are marked explicitly
-            if (tx.exclude_from_allowance) return acc;
-            
-            // Filter for current month using ultra-fast string comparison (YYYY-MM)
-            if (!tx.date.startsWith(currentMonthPrefix)) return acc;
-        }
-
-        const cat = tx.category.toLowerCase();
-        const myShare = calculateUserShare(tx, userId);
-
-        if (myShare > 0) {
-            if (!acc[cat]) acc[cat] = 0;
-
-            const txCurr = tx.currency || 'USD';
-            const isSameCurrency = txCurr === currency;
-
-            if (!isSameCurrency && tx.exchange_rate && tx.exchange_rate !== 1 && tx.base_currency === currency) {
-                acc[cat] += (myShare * Number(tx.exchange_rate));
-            } else {
-                acc[cat] += convertAmount(myShare, txCurr);
-            }
-        }
-        return acc;
-    }, {} as Record<string, number>), [transactions, userId, isBucketFocused, effectiveFocus, calculateUserShare, currency, convertAmount]);
-
-    const spendingData: SpendingCategory[] = useMemo(() => Object.entries(spendingByCategory).map(([cat, value]) => ({
-        name: cat.charAt(0).toUpperCase() + cat.slice(1),
-        value,
-        color: CATEGORY_COLORS[cat] || CATEGORY_COLORS.others,
-        fill: CATEGORY_COLORS[cat] || CATEGORY_COLORS.others,
-    })), [spendingByCategory]);
-
-
-    // Filter transactions to only show relevant ones (where user has a share, paid, or it's a settlement for them)
-    const displayTransactions = useMemo(() => transactions.filter(tx => {
-        if (tx.user_id === userId) return true; // I paid or created the settlement
-        if (tx.splits && tx.splits.some(s => s.user_id === userId)) return true; // I'm in splits
-        return false;
-    }), [transactions, userId]);
 
     return (
         <div className="relative min-h-screen">
