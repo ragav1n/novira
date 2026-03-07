@@ -132,21 +132,49 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency }
 
             mapboxgl.accessToken = mapboxToken;
 
+            // 2. Compute true center/zoom *before* creating the map so we don't need a slow animated fitBounds
+            const bounds = new mapboxgl.LngLatBounds();
+            geoTransactions.forEach(tx => bounds.extend([tx.place_lng!, tx.place_lat!]));
+            
+            // Create dummy map options just to run cameraForBounds (it's a static utility)
+            // Or alternatively, simply use fitBounds immediately on the instance without animation
             const map = new mapboxgl.Map({
                 container: mapContainerRef.current,
                 style: 'mapbox://styles/mapbox/dark-v11',
+                // Temporarily center on first if bounds calculation gets weird, but we fitBounds immediately below
                 center: [geoTransactions[0].place_lng!, geoTransactions[0].place_lat!],
                 zoom: 12,
                 attributionControl: false,
             });
 
+            // Snap camera immediately to encompass data
+            map.fitBounds(bounds, { padding: 60, maxZoom: 14, duration: 0 });
+
             // Moving navigation control so it doesn't overlap the close 'X' button
             map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'bottom-right');
+
+            // Add geolocate control to the map to track user location
+            const geolocate = new mapboxgl.GeolocateControl({
+                positionOptions: {
+                    enableHighAccuracy: true
+                },
+                // Automatically track and show the user's direction
+                trackUserLocation: true,
+                showUserHeading: true,
+                fitBoundsOptions: {
+                    maxZoom: 14 // Don't zoom in *too* uncomfortably close automatically
+                }
+            });
+            map.addControl(geolocate, 'bottom-right');
 
             mapRef.current = map;
 
             map.on('load', () => {
                 setIsInitialLoad(false);
+                
+                // Trigger geolocation automatically once the map has loaded
+                geolocate.trigger();
+
                 // Ensure initial pitch is set if 3D is already on (though usually off at start)
                 if (show3D) map.setPitch(60);
 
@@ -305,6 +333,10 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency }
 
                 // Add Hover and Click Listeners for 3D Towers
                 map.on('mousemove', 'expense-3d', (e: mapboxgl.MapMouseEvent & { features?: mapboxgl.MapboxGeoJSONFeature[] }) => {
+                    // Prevent hover if the layer is transitioning out or invisible
+                    if (map.getLayoutProperty('expense-3d', 'visibility') === 'none') return;
+                    if (map.getPaintProperty('expense-3d', 'fill-extrusion-height') === 0) return;
+
                     if (e.features && e.features.length > 0) {
                         const feature = e.features[0];
                         const props = feature.properties;
@@ -409,7 +441,7 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency }
                 center = getGridOffsetCoords(group.lng, group.lat, offsetX, offsetY);
 
                 const radius = 0.00003; 
-                const sides = 32;
+                const sides = 24; // Optimized from 32 down to 24 for faster polygon generation
                 const coordinates = [];
                 for (let i = 0; i < sides; i++) {
                     const ang = (i * 360) / sides;
@@ -533,8 +565,8 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency }
         if (viewMode !== 'heatmap') {
             locationGroups.forEach((group, groupKey) => {
                 const categoryEntries = Array.from(group.categories.entries()).sort((a, b) => a[1] - b[1]);
-                const gridSpacing = 15;
-                const cols = 2;
+                const totalCategories = categoryEntries.length;
+                const clusterRadius = totalCategories > 1 ? 20 : 0;
 
                 categoryEntries.forEach(([category, totalAmount], idx) => {
                     // Create stable key for reconciliation
@@ -543,6 +575,12 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency }
                     
                     const txs = group.transactions.filter(t => t.category === category);
                     const count = txs.length;
+                    
+                    const angle = totalCategories > 1 ? (idx / totalCategories) * 2 * Math.PI : 0;
+                    const offsetX = Math.cos(angle) * clusterRadius;
+                    const offsetY = Math.sin(angle) * clusterRadius;
+                    const pillarPos = getGridOffsetCoords(group.lng, group.lat, offsetX, offsetY);
+                    const markerPos = getGridOffsetCoords(pillarPos[0], pillarPos[1], 0, -5);
 
                     // 1. RE-USE EXISTING MARKER
                     if (markerDictRef.current.has(key)) {
@@ -551,6 +589,8 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency }
                             existing.countBadge.innerText = count.toString();
                             existing.countBadge.style.display = count > 1 ? 'block' : 'none';
                         }
+                        // Update position in case the cluster size changed
+                        existing.marker.setLngLat([markerPos[0], markerPos[1]] as [number, number]);
                         return; // Found it, move on!
                     }
 
@@ -560,13 +600,6 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency }
                     const iconSvg = getIconSvgForCategory(category);
                     const abbr = latestTx.profile?.full_name ? latestTx.profile.full_name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : '?';
                     const avatarImg = latestTx.profile?.avatar_url;
-
-                    const row = Math.floor(idx / cols);
-                    const col = idx % cols;
-                    const offsetX = (col - (cols - 1) / 2) * gridSpacing;
-                    const offsetY = -row * gridSpacing;
-                    const pillarPos = getGridOffsetCoords(group.lng, group.lat, offsetX, offsetY);
-                    const markerPos = getGridOffsetCoords(pillarPos[0], pillarPos[1], 0, -5);
 
                     const el = document.createElement('div');
                     el.className = 'expense-marker-root';
@@ -624,11 +657,18 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency }
                     wrapper.onmouseenter = () => { wrapper.style.transform = 'scale(1.15) translateY(-4px)'; };
                     wrapper.onmouseleave = () => { wrapper.style.transform = 'scale(1) translateY(0px)'; };
 
+                    // Pre-calculate marker, but attach in idle callback
                     const marker = new mapboxgl.Marker({ element: el })
-                        .setLngLat([markerPos[0], markerPos[1]] as [number, number])
-                        .addTo(map);
-
+                        .setLngLat([markerPos[0], markerPos[1]] as [number, number]);
+                    
                     markerDictRef.current.set(key, { marker, countBadge });
+
+                    // Defer DOM attachment so Mapbox canvas paints first 
+                    if (typeof requestIdleCallback !== 'undefined') {
+                        requestIdleCallback(() => { if (markerDictRef.current.has(key)) marker.addTo(map); }, { timeout: 1000 });
+                    } else {
+                        setTimeout(() => { if (markerDictRef.current.has(key)) marker.addTo(map); }, 50);
+                    }
                 });
             });
         }
@@ -643,16 +683,11 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency }
 
     }, [pointFeatures, towerFeatures, trailFeatures, locationGroups, viewMode, isInitialLoad]);
 
-    // Bounding Box centering ONLY on absolute initial data load structure change
+    // Bounding Box centering effect removed because we now snap synchronously inside constructor!
     useEffect(() => {
-        const map = mapRef.current;
-        if (!map || isInitialLoad || filteredTransactions.length === 0 || !isFirstBoundFit.current) return;
-        
-        const bounds = new mapboxgl.LngLatBounds();
-        filteredTransactions.forEach(tx => bounds.extend([tx.place_lng!, tx.place_lat!]));
-        map.fitBounds(bounds, { padding: 60, maxZoom: 14, duration: 1000 });
+        // Keeping an empty ref just in case isFirstBoundFit triggers anything later
         isFirstBoundFit.current = false;
-    }, [filteredTransactions, isInitialLoad]);
+    }, []);
 
     // 3. Visibilities and Layer states (Cheap updates)
     useEffect(() => {
@@ -947,9 +982,10 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency }
                                             borderColor: `${CATEGORY_COLORS[drillDownTxs[0].category as keyof typeof CATEGORY_COLORS] || CATEGORY_COLORS.others}60`,
                                         }}
                                     >
-                                        <span className="scale-[0.7] text-white">
-                                            {getIconSvgForCategory(drillDownTxs[0].category)}
-                                        </span>
+                                        <span 
+                                            className="scale-[0.7] text-white"
+                                            dangerouslySetInnerHTML={{ __html: getIconSvgForCategory(drillDownTxs[0].category) }}
+                                        />
                                     </div>
                                     <div>
                                         <h3 className="font-bold text-sm">
@@ -992,7 +1028,7 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency }
                             exit={{ opacity: 0, scale: 0.9, y: 10 }}
                             className="absolute z-[110] pointer-events-none"
                             style={{
-                                left: hoveredTower.x,
+                                left: hoveredTower.x < 120 ? 120 : (typeof window !== 'undefined' && hoveredTower.x > window.innerWidth - 120 ? window.innerWidth - 120 : hoveredTower.x),
                                 top: hoveredTower.y - 120, // offset above cursor
                                 transform: 'translateX(-50%)'
                             }}
@@ -1003,9 +1039,10 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency }
                                         className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 border border-white/20"
                                         style={{ backgroundColor: `${CATEGORY_COLORS[hoveredTower.category as keyof typeof CATEGORY_COLORS] || CATEGORY_COLORS.others}40` }}
                                     >
-                                        <span className="scale-75 text-white">
-                                            {getIconSvgForCategory(hoveredTower.category)}
-                                        </span>
+                                        <span 
+                                            className="scale-75 text-white"
+                                            dangerouslySetInnerHTML={{ __html: getIconSvgForCategory(hoveredTower.category) }}
+                                        />
                                     </div>
                                     <div>
                                         <p className="text-[10px] uppercase font-black tracking-widest text-muted-foreground opacity-70">
