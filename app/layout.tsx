@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 import { headers } from 'next/headers'
 import { Analytics } from '@vercel/analytics/next'
+import { SpeedInsights } from '@vercel/speed-insights/next'
 import './globals.css'
 import { MobileLayout } from '@/components/mobile-layout'
 import { UserPreferencesProvider } from '@/components/providers/user-preferences-provider'
@@ -76,6 +77,7 @@ export default async function RootLayout({
           </MobileLayout>
         </UserPreferencesProvider>
         <Analytics />
+        <SpeedInsights />
         <script
           nonce={nonce}
           suppressHydrationWarning={true}
