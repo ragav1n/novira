@@ -48,7 +48,8 @@ import { TransactionRow } from '@/components/transaction-row';
 import { DashboardTransactionsDrawer } from '@/components/dashboard-transactions-drawer';
 import { TransactionHistoryDialog } from '@/components/transaction-history-dialog';
 import { LocationPicker } from '@/components/ui/location-picker';
-import { ExpenseMapView } from '@/components/expense-map-view';
+import dynamic from 'next/dynamic';
+const ExpenseMapView = dynamic(() => import('@/components/expense-map-view').then(mod => mod.ExpenseMapView), { ssr: false });
 
 // Lazy load non-critical dialogs
 const AddFundsDialog = lazy(() => import('@/components/add-funds-dialog').then(module => ({ default: module.AddFundsDialog })));
