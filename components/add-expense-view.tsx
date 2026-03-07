@@ -371,7 +371,8 @@ export function AddExpenseView() {
         setPlaceAddress(null);
         setPlaceLat(null);
         setPlaceLng(null);
-        // Signal the dashboard to refetch transactions
+        // Signal the dashboard to refetch transactions bypassing cache
+        sessionStorage.setItem('novira_expense_added', 'true');
         window.dispatchEvent(new Event('novira:expense-added'));
         router.push('/');
     };

@@ -189,7 +189,7 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency }
                     id: 'expense-heat',
                     type: 'heatmap',
                     source: 'expenses',
-                    maxzoom: 15,
+                    maxzoom: 24,
                     paint: {
                         'heatmap-weight': ['interpolate', ['linear'], ['get', 'amount'], 0, 0, 1000, 1],
                         'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 0, 1, 15, 3],
@@ -202,8 +202,8 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency }
                             0.8, 'rgba(0, 255, 255, 0.9)',
                             1, 'rgba(0, 255, 255, 1)'
                         ],
-                        'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 0, 2, 15, 40],
-                        'heatmap-opacity': ['interpolate', ['linear'], ['zoom'], 14, 1, 15, 0]
+                        'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 0, 2, 15, 40, 20, 100],
+                        'heatmap-opacity': ['interpolate', ['linear'], ['zoom'], 14, 0.8, 22, 0.6]
                     },
                     layout: { visibility: 'none' }
                 });

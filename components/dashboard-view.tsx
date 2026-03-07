@@ -219,14 +219,14 @@ export function DashboardView() {
     const isAnyModalOpen = isViewAllOpen || activeModal !== null || isAddFundsOpen || isHowToUseOpen || isEditOpen;
 
     // Use a ref so realtime/event callbacks always call the latest loadTransactions
-    const loadTxRef = useRef<((uid: string) => Promise<void>) | null>(null);
+    const loadTxRef = useRef<((uid: string, bypassCache?: boolean) => Promise<void>) | null>(null);
 
     // Debounced realtime refresh for transaction changes
     const txDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const debouncedLoadTx = useCallback((uid: string) => {
+    const debouncedLoadTx = useCallback((uid: string, bypassCache = false) => {
         if (txDebounceRef.current) clearTimeout(txDebounceRef.current);
         txDebounceRef.current = setTimeout(() => {
-            loadTxRef.current?.(uid);
+            loadTxRef.current?.(uid, bypassCache);
         }, 300);
     }, []);
 
@@ -249,7 +249,7 @@ export function DashboardView() {
                     table: 'transactions',
                 },
                 () => {
-                    debouncedLoadTx(userId);
+                    debouncedLoadTx(userId, true);
                 }
             )
             .subscribe();
@@ -262,7 +262,7 @@ export function DashboardView() {
     // Refetch when an expense is added (custom event from AddExpenseView)
     useEffect(() => {
         if (!userId) return;
-        const handleExpenseAdded = () => loadTxRef.current?.(userId);
+        const handleExpenseAdded = () => loadTxRef.current?.(userId, true);
         window.addEventListener('novira:expense-added', handleExpenseAdded);
         return () => window.removeEventListener('novira:expense-added', handleExpenseAdded);
     }, [userId]);
@@ -272,7 +272,7 @@ export function DashboardView() {
         if (!userId) return;
         const handleVisibility = () => {
             if (document.visibilityState === 'visible') {
-                loadTxRef.current?.(userId);
+                loadTxRef.current?.(userId, true);
             }
         };
         document.addEventListener('visibilitychange', handleVisibility);
@@ -303,7 +303,13 @@ export function DashboardView() {
             // Load transactions (profile data now comes from UserPreferencesProvider)
             const fetchData = async () => {
                 try {
-                    await loadTransactions(userId);
+                    const needsRefresh = sessionStorage.getItem('novira_expense_added');
+                    if (needsRefresh) {
+                        sessionStorage.removeItem('novira_expense_added');
+                        await loadTransactions(userId, true);
+                    } else {
+                        await loadTransactions(userId, false);
+                    }
                 } catch (error) {
                     console.error("Error fetching data:", error);
                 } finally {
@@ -333,14 +339,20 @@ export function DashboardView() {
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
-    const loadTransactions = async (currentUserId: string) => {
+    const loadTransactions = async (currentUserId: string, bypassCache = false) => {
         try {
-            const { data: txs } = await supabase
+            let query = supabase
                 .from('transactions')
                 .select('id, description, amount, category, date, created_at, user_id, currency, exchange_rate, base_currency, bucket_id, exclude_from_allowance, is_recurring, place_name, place_address, place_lat, place_lng, profile:profiles(full_name, avatar_url), splits(user_id, amount, is_paid)')
                 .order('date', { ascending: false })
                 .order('created_at', { ascending: false })
                 .limit(200);
+
+            if (bypassCache) {
+                 query = query.neq('id', `bypass-${Date.now()}`);
+            }
+
+            const { data: txs } = await query;
 
             if (txs) {
                 // Flatten profile and splits if they are arrays (Supabase dynamic returns)
