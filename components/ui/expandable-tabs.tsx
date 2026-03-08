@@ -33,10 +33,10 @@ const buttonVariants = {
         paddingLeft: ".5rem",
         paddingRight: ".5rem",
     },
-    animate: (isSelected: boolean) => ({
+    animate: ({ isSelected, hasSelected }: { isSelected: boolean; hasSelected: boolean }) => ({
         gap: isSelected ? ".5rem" : 0,
-        paddingLeft: isSelected ? "1rem" : ".5rem",
-        paddingRight: isSelected ? "1rem" : ".5rem",
+        paddingLeft: isSelected ? "1rem" : hasSelected ? ".25rem" : ".5rem",
+        paddingRight: isSelected ? "1rem" : hasSelected ? ".25rem" : ".5rem",
     }),
 };
 
@@ -56,6 +56,7 @@ export function ExpandableTabs({
 }: ExpandableTabsProps) {
     const [selected, setSelected] = React.useState<number | null>(null);
     const outsideClickRef = React.useRef<HTMLDivElement>(null);
+    const tabRefs = React.useRef<(HTMLButtonElement | null)[]>([]);
 
     useOnClickOutside(outsideClickRef as any, () => {
         setSelected(null);
@@ -67,6 +68,15 @@ export function ExpandableTabs({
             const timer = setTimeout(() => {
                 setSelected(null);
             }, 5000); // Auto-collapse after 5 seconds
+
+            // Scroll the selected tab into view so it's not hidden off-screen
+            const tab = tabRefs.current[selected];
+            if (tab) {
+                setTimeout(() => {
+                    tab.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+                }, 150); // slight delay to let the layout shift start
+            }
+
             return () => clearTimeout(timer);
         }
     }, [selected]);
@@ -84,7 +94,7 @@ export function ExpandableTabs({
         <div
             ref={outsideClickRef}
             className={cn(
-                "flex flex-nowrap items-center gap-1 sm:gap-2 rounded-2xl border bg-background p-1 shadow-sm overflow-x-auto no-scrollbar max-w-[calc(100vw-2rem)]",
+                "flex flex-nowrap items-center gap-1 sm:gap-2 rounded-2xl border bg-background p-1 shadow-sm overflow-x-auto no-scrollbar",
                 className
             )}
         >
@@ -97,14 +107,17 @@ export function ExpandableTabs({
                 return (
                     <motion.button
                         key={tab.title}
+                        ref={(el) => {
+                            tabRefs.current[index] = el as HTMLButtonElement | null;
+                        }}
                         variants={buttonVariants}
                         initial={false}
                         animate="animate"
-                        custom={selected === index}
+                        custom={{ isSelected: selected === index, hasSelected: selected !== null }}
                         onClick={() => handleSelect(index)}
                         transition={transition}
                         className={cn(
-                            "relative flex items-center rounded-xl px-2.5 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium transition-colors duration-300 shrink-0",
+                            "relative flex items-center rounded-xl py-1.5 sm:py-2 text-xs sm:text-sm font-medium transition-colors duration-300 shrink-0",
                             selected === index
                                 ? cn("bg-muted", activeColor)
                                 : "text-muted-foreground hover:bg-muted hover:text-foreground"

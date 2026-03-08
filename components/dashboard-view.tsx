@@ -235,7 +235,13 @@ export function DashboardView() {
     const activeBuckets = useMemo(() => activeWorkspaceId ? [] : buckets.filter(b => !b.is_archived), [buckets, activeWorkspaceId]);
 
     return (
-        <div className="relative min-h-screen">
+        <motion.div 
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.98 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 30, mass: 0.8 }}
+            className="relative min-h-screen"
+        >
             <Dialog open={isBudgetEditOpen} onOpenChange={setIsBudgetEditOpen}>
                 <DialogContent className="max-w-[340px] bg-card border-white/10 rounded-3xl p-6">
                     <DialogHeader className="mb-4">
@@ -1095,6 +1101,6 @@ export function DashboardView() {
                     />
                 </Suspense>
             </div>
-        </div>
+        </motion.div>
     );
 }

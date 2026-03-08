@@ -1,5 +1,7 @@
 'use client';
 
+import { motion } from 'framer-motion';
+
 import React from 'react';
 import { useRouter } from 'next/navigation';
 import { ChevronLeft, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
@@ -30,7 +32,13 @@ export function GroupsView() {
     const { buckets, archiveBucket, deleteBucket, bucketSpending } = useBuckets();
 
     return (
-        <div className="p-5 space-y-6 max-w-md mx-auto relative pb-24">
+        <motion.div 
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.98 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 30, mass: 0.8 }}
+            className="p-5 space-y-6 max-w-md mx-auto relative pb-24"
+        >
             {/* Header */}
             <div className="flex items-center justify-between relative min-h-[40px]">
                 <button
@@ -121,6 +129,6 @@ export function GroupsView() {
                     />
                 </TabsContent>
             </Tabs>
-        </div>
+        </motion.div>
     );
 }

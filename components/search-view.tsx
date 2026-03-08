@@ -216,7 +216,13 @@ export function SearchView() {
     const totalFilteredAmount = filteredTransactions.reduce((sum, tx) => sum + convertAmount(Number(tx.amount), tx.currency || 'USD'), 0);
 
     return (
-        <div className="p-5 space-y-6 max-w-md mx-auto relative pb-24 h-full flex flex-col">
+        <motion.div 
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.98 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 30, mass: 0.8 }}
+            className="p-5 space-y-6 max-w-md mx-auto relative pb-24 h-full flex flex-col"
+        >
             {/* Header */}
             <div className="flex items-center justify-between relative min-h-[40px]">
                 <button
@@ -590,6 +596,6 @@ export function SearchView() {
                     <button onClick={resetFilters} className="text-[11px] text-primary font-bold hover:underline">RESET</button>
                 </div>
             </div>
-        </div>
+        </motion.div>
     );
 }

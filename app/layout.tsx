@@ -20,7 +20,10 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Novira - Finance Tracker',
+  title: {
+    template: '%s - Novira',
+    default: 'Novira - Finance Tracker',
+  },
   description: 'Experience the future of personal finance with Novira. Track spending, manage budgets, and visualize your financial universe.',
   generator: 'v0.app',
   icons: {
