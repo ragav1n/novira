@@ -114,17 +114,25 @@ const itemVariants = {
 
 interface FluidDropdownProps {
     items?: Category[];
+    activeId?: string | null;
     onSelect?: (category: Category) => void;
     className?: string;
     triggerClassName?: string;
 }
 
 // Main component
-export function FluidDropdown({ items = categories, onSelect, className, triggerClassName }: FluidDropdownProps) {
+export function FluidDropdown({ items = categories, activeId, onSelect, className, triggerClassName }: FluidDropdownProps) {
     const [isOpen, setIsOpen] = React.useState(false)
-    const [selectedCategory, setSelectedCategory] = React.useState<Category>(items[0])
+    const [selectedCategoryState, setSelectedCategoryState] = React.useState<Category>(items[0])
     const [hoveredCategory, setHoveredCategory] = React.useState<string | null>(null)
     const dropdownRef = React.useRef<HTMLDivElement>(null)
+
+    const selectedCategory = React.useMemo(() => {
+        if (activeId !== undefined) {
+            return items.find(i => i.id === activeId) || items[0];
+        }
+        return selectedCategoryState;
+    }, [activeId, items, selectedCategoryState]);
 
     // Explicit typing for useClickAway handler to match hook expectation if needed, 
     // but using 'as any' in the hook call or matching types is better.
@@ -138,7 +146,9 @@ export function FluidDropdown({ items = categories, onSelect, className, trigger
     }
 
     const handleSelect = (category: Category) => {
-        setSelectedCategory(category);
+        if (activeId === undefined) {
+            setSelectedCategoryState(category);
+        }
         setIsOpen(false);
         onSelect?.(category);
     }
@@ -166,13 +176,13 @@ export function FluidDropdown({ items = categories, onSelect, className, trigger
                     aria-haspopup="true"
                     type="button"
                 >
-                    <span className="flex items-center">
+                    <span className="flex items-center min-w-0 max-w-[140px] truncate">
                         <IconWrapper
                             icon={selectedCategory.icon}
                             isHovered={false}
                             color={selectedCategory.color}
                         />
-                        {selectedCategory.label}
+                        <span className="truncate">{selectedCategory.label}</span>
                     </span>
                     <motion.div
                         animate={{ rotate: isOpen ? 180 : 0 }}
@@ -266,7 +276,7 @@ export function FluidDropdown({ items = categories, onSelect, className, trigger
                                                     isHovered={hoveredCategory === category.id}
                                                     color={category.color}
                                                 />
-                                                {category.label}
+                                                <span className="truncate flex-1 text-left">{category.label}</span>
                                             </motion.button>
                                         </React.Fragment>
                                     ))}

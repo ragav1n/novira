@@ -323,8 +323,13 @@ export function DashboardView() {
                         </div>
                         <div className="min-w-0 flex flex-col justify-center">
                             {eligibleGroups.length > 0 ? (
-                                <div className="min-w-[14rem] max-w-[16rem]">
+                                <div className="flex items-center flex-wrap gap-x-1.5 gap-y-0.5 -ml-1">
+                                    <h1 className="text-xl font-bold flex items-center gap-1.5 min-w-0 shrink-0 ml-1">
+                                        <span className="bg-clip-text text-transparent bg-gradient-to-r from-white to-white/80 truncate">Hi, {userName.split(' ')[0]}!</span>
+                                        <span className="shrink-0">👋</span>
+                                    </h1>
                                     <FluidDropdown
+                                        activeId={activeWorkspaceId || 'personal'}
                                         items={[
                                             {
                                                 id: "personal",
@@ -347,22 +352,20 @@ export function DashboardView() {
                                             }
                                             setDashboardFocus('allowance');
                                         }}
-                                        triggerClassName="h-auto py-1.5 px-3 bg-transparent border-0 hover:bg-white/5 focus:ring-0 w-auto inline-flex outline-none"
+                                        triggerClassName="h-auto py-1 px-2.5 bg-transparent border-0 hover:bg-white/5 focus:ring-0 w-auto inline-flex outline-none !text-sm text-muted-foreground hover:text-foreground shrink-0"
                                     />
                                 </div>
                             ) : (
-                                <h1 className="text-xl font-bold flex items-center gap-1.5 min-w-0">
-                                    <span className="bg-clip-text text-transparent bg-gradient-to-r from-white to-white/80 truncate">Hi, {userName.split(' ')[0]}!</span>
-                                    <span className="shrink-0">👋</span>
-                                </h1>
+                                <>
+                                    <h1 className="text-xl font-bold flex items-center gap-1.5 min-w-0 mb-0.5">
+                                        <span className="bg-clip-text text-transparent bg-gradient-to-r from-white to-white/80 truncate">Hi, {userName.split(' ')[0]}!</span>
+                                        <span className="shrink-0">👋</span>
+                                    </h1>
+                                    <p className="text-[11px] text-muted-foreground font-medium truncate">
+                                        Track your expenses with Novira
+                                    </p>
+                                </>
                             )}
-                            <p className="text-[11px] text-muted-foreground font-medium truncate">
-                                {activeWorkspaceId ? (
-                                    activeWorkspaceGroup?.type === 'couple' ? 'Couple Dashboard' : 
-                                    activeWorkspaceGroup?.type === 'home' ? 'Home Dashboard' : 
-                                    'Household Dashboard'
-                                ) : 'Track your expenses with Novira'}
-                            </p>
                         </div>
                     </div>
                     <div className="flex items-center gap-1.5 shrink-0">
