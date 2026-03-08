@@ -199,10 +199,7 @@ export function GoalsView() {
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.98 }}
             transition={{ type: 'spring', stiffness: 300, damping: 30, mass: 0.8 }}
-            className={cn(
-                "p-5 space-y-6 max-w-md mx-auto relative min-h-screen pb-32 transition-all duration-300",
-                loading ? "opacity-40 blur-[1px] pointer-events-none" : "opacity-100 blur-0"
-            )}
+            className="relative min-h-screen w-full"
         >
             {/* Background Glows */}
             <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
@@ -210,7 +207,7 @@ export function GoalsView() {
                 <div className="absolute bottom-[20%] -left-[10%] w-[50%] h-[50%] rounded-full blur-[90px] bg-emerald-400 opacity-10" />
             </div>
 
-            <div className="relative z-10 space-y-6">
+            <div className="p-5 max-w-md mx-auto pb-32 relative z-10 space-y-6">
                 <div className="flex items-center justify-between relative min-h-[40px] mb-2">
                     <button 
                         onClick={() => router.back()} 

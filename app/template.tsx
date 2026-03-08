@@ -2,9 +2,6 @@
 
 import { usePathname } from 'next/navigation';
 
-// Wrap the route components in a CSS animation container
-// template.tsx creates a unique instance per route change (unlike layout.tsx)
-// which allows entry animations to fire reliably
 export default function Template({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
     
@@ -16,10 +13,8 @@ export default function Template({ children }: { children: React.ReactNode }) {
     }
 
     return (
-        <div
-            className="w-full h-full animate-page-in"
-        >
+        <>
             {children}
-        </div>
+        </>
     );
 }

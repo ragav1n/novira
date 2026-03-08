@@ -30,13 +30,13 @@ interface ExpandableTabsProps {
 const buttonVariants = {
     initial: {
         gap: 0,
-        paddingLeft: ".5rem",
-        paddingRight: ".5rem",
+        paddingLeft: ".35rem",
+        paddingRight: ".35rem",
     },
     animate: ({ isSelected, hasSelected }: { isSelected: boolean; hasSelected: boolean }) => ({
         gap: isSelected ? ".5rem" : 0,
-        paddingLeft: isSelected ? "1rem" : hasSelected ? ".25rem" : ".5rem",
-        paddingRight: isSelected ? "1rem" : hasSelected ? ".25rem" : ".5rem",
+        paddingLeft: isSelected ? ".85rem" : hasSelected ? ".2rem" : ".35rem",
+        paddingRight: isSelected ? ".85rem" : hasSelected ? ".2rem" : ".35rem",
     }),
 };
 
@@ -123,7 +123,7 @@ export function ExpandableTabs({
                                 : "text-muted-foreground hover:bg-muted hover:text-foreground"
                         )}
                     >
-                        <Icon size={20} />
+                        <Icon size={18} />
                         <AnimatePresence initial={false}>
                             {selected === index && (
                                 <motion.span
