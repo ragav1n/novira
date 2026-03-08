@@ -116,10 +116,11 @@ interface FluidDropdownProps {
     items?: Category[];
     onSelect?: (category: Category) => void;
     className?: string;
+    triggerClassName?: string;
 }
 
 // Main component
-export function FluidDropdown({ items = categories, onSelect, className }: FluidDropdownProps) {
+export function FluidDropdown({ items = categories, onSelect, className, triggerClassName }: FluidDropdownProps) {
     const [isOpen, setIsOpen] = React.useState(false)
     const [selectedCategory, setSelectedCategory] = React.useState<Category>(items[0])
     const [hoveredCategory, setHoveredCategory] = React.useState<string | null>(null)
@@ -159,6 +160,7 @@ export function FluidDropdown({ items = categories, onSelect, className }: Fluid
                         "border border-white/10 focus:border-primary/50",
                         "h-14 px-4 rounded-xl", // Match input height and radius
                         isOpen && "bg-secondary/20",
+                        triggerClassName
                     )}
                     aria-expanded={isOpen}
                     aria-haspopup="true"
