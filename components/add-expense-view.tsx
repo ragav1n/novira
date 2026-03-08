@@ -53,11 +53,11 @@ const PAYMENT_METHOD_COLORS: Record<string, string> = {
 export function AddExpenseView() {
     const router = useRouter();
     const isNative = useIsNative();
-    const { currency, userId, CURRENCY_SYMBOLS } = useUserPreferences();
+    const { currency, userId, CURRENCY_SYMBOLS, activeWorkspaceId } = useUserPreferences();
     const { groups, friends } = useGroups();
     const { buckets } = useBuckets();
 
-    const formState = useExpenseForm(userId, currency);
+    const formState = useExpenseForm(userId, currency, activeWorkspaceId);
     const { handleSubmit, loading } = useExpenseSubmission();
 
     const onSubmit = () => {
@@ -88,35 +88,7 @@ export function AddExpenseView() {
             <div className={cn(
                 "p-5 space-y-6 max-w-md mx-auto pt-4 relative min-h-screen z-10"
             )}>
-                {/* Unified Background Glows */}
-                <AnimatePresence>
-                    {formState.selectedBucketId ? (
-                        <motion.div
-                            key="bucket-focus"
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            transition={{ duration: 0.8 }}
-                            className="fixed inset-0 pointer-events-none z-0 overflow-hidden"
-                        >
-                            <div className="absolute -top-[10%] -left-[10%] w-[70%] h-[70%] rounded-full blur-[120px] bg-cyan-500 opacity-[0.25]" />
-                            <div className="absolute -bottom-[10%] -right-[10%] w-[60%] h-[60%] rounded-full blur-[100px] bg-teal-500 opacity-15" />
-                            <div className="absolute inset-0 bg-gradient-to-br from-cyan-950/20 via-transparent to-teal-950/20" />
-                        </motion.div>
-                    ) : (
-                        <motion.div
-                            key="default-focus"
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            transition={{ duration: 0.8 }}
-                            className="fixed inset-0 pointer-events-none z-0 overflow-hidden"
-                        >
-                            <div className="absolute top-[20%] -right-[10%] w-[60%] h-[60%] rounded-full blur-[110px] bg-primary opacity-20" />
-                            <div className="absolute bottom-[20%] -left-[10%] w-[50%] h-[50%] rounded-full blur-[90px] bg-primary/40 opacity-10" />
-                        </motion.div>
-                    )}
-                </AnimatePresence>
+
                 {/* Header */}
                 <div className="flex items-center justify-between relative min-h-[40px]">
                     <button

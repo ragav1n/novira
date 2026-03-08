@@ -269,41 +269,7 @@ export function DashboardView() {
                     </div>
                 </DialogContent>
             </Dialog>
-            {/* Focus-based Background Overlay */}
-            <AnimatePresence>
-                {isBucketFocused ? (
-                    <motion.div 
-                        key="bucket-focus"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        transition={{ duration: 0.8 }}
-                        className="fixed inset-0 pointer-events-none z-0 overflow-hidden gpu"
-                    >
-                        <div className="absolute -top-[10%] -left-[10%] w-[70%] h-[70%] rounded-full blur-[50px] bg-cyan-500 opacity-[0.2] gpu" />
-                        <div className="absolute -bottom-[10%] -right-[10%] w-[60%] h-[60%] rounded-full blur-[40px] bg-teal-500 opacity-10 gpu" />
-                        <div className="absolute inset-0 bg-gradient-to-br from-cyan-950/20 via-transparent to-teal-950/20" />
-                    </motion.div>
-                ) : (
-                    <motion.div 
-                        key="default-focus"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        transition={{ duration: 0.8 }}
-                        className="fixed inset-0 pointer-events-none z-0 overflow-hidden gpu"
-                    >
-                        <div className={cn(
-                            "absolute top-[20%] -right-[10%] w-[60%] h-[60%] rounded-full blur-[50px] opacity-15 gpu transition-colors duration-1000",
-                            isCoupleWorkspace ? "bg-rose-500" : isHomeWorkspace ? "bg-yellow-500" : "bg-primary"
-                        )} />
-                        <div className={cn(
-                            "absolute bottom-[20%] -left-[10%] w-[50%] h-[50%] rounded-full blur-[40px] opacity-10 gpu transition-colors duration-1000",
-                            isCoupleWorkspace ? "bg-rose-500" : isHomeWorkspace ? "bg-amber-500" : "bg-primary/40"
-                        )} />
-                    </motion.div>
-                )}
-            </AnimatePresence>
+
 
 
 

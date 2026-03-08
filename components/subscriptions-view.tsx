@@ -2,8 +2,9 @@
 
 import { motion } from 'framer-motion';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useUserPreferences } from '@/components/providers/user-preferences-provider';
+import { useGroups } from '@/components/providers/groups-provider';
 import { supabase } from '@/lib/supabase';
 import { Card, CardContent } from '@/components/ui/card';
 import { Calendar, CreditCard, RotateCw, Trash2, ArrowLeft } from 'lucide-react';
@@ -24,7 +25,42 @@ interface RecurringTemplate {
 }
 
 export function SubscriptionsView() {
-    const { userId, formatCurrency, convertAmount, currency } = useUserPreferences();
+    const { userId, formatCurrency, convertAmount, currency, activeWorkspaceId } = useUserPreferences();
+    const { groups } = useGroups();
+    
+    const activeWorkspace = useMemo(() => 
+        activeWorkspaceId && activeWorkspaceId !== 'personal' 
+            ? groups.find((g: any) => g.id === activeWorkspaceId) 
+            : null
+    , [activeWorkspaceId, groups]);
+
+    const themeConfig = useMemo(() => {
+        if (activeWorkspace?.type === 'couple') {
+            return {
+                text: 'text-rose-500',
+                bg: 'bg-rose-500/10',
+                border: 'border-rose-500/20',
+                gradient: 'from-rose-500/20 to-pink-600/20',
+                headerBg: 'bg-rose-500/20',
+            }
+        } else if (activeWorkspace?.type === 'home') {
+            return {
+                text: 'text-amber-500',
+                bg: 'bg-amber-500/10',
+                border: 'border-amber-500/20',
+                gradient: 'from-amber-500/20 to-yellow-600/20',
+                headerBg: 'bg-amber-500/20',
+            }
+        }
+        return {
+            text: 'text-primary',
+            bg: 'bg-primary/10',
+            border: 'border-primary/20',
+            gradient: 'from-[#8A2BE2]/20 to-[#4B0082]/20',
+            headerBg: 'bg-primary/20',
+        }
+    }, [activeWorkspace]);
+
     const router = useRouter();
     const [templates, setTemplates] = useState<RecurringTemplate[]>([]);
     const [loading, setLoading] = useState(true);
@@ -34,11 +70,19 @@ export function SubscriptionsView() {
 
         const loadTemplates = async () => {
             setLoading(true);
-            const { data, error } = await supabase
+            let query = supabase
                 .from('recurring_templates')
                 .select('*')
                 .eq('user_id', userId)
                 .order('next_occurrence', { ascending: true });
+
+            if (activeWorkspaceId && activeWorkspaceId !== 'personal') {
+                query = query.eq('group_id', activeWorkspaceId);
+            } else if (activeWorkspaceId === 'personal') {
+                query = query.is('group_id', null);
+            }
+
+            const { data, error } = await query;
 
             if (!error && data) {
                 setTemplates(data);
@@ -47,7 +91,7 @@ export function SubscriptionsView() {
         };
 
         loadTemplates();
-    }, [userId]);
+    }, [userId, activeWorkspaceId]);
 
     const handleCancel = async (id: string) => {
         if (!confirm('Are you sure you want to cancel this subscription?')) return;
@@ -82,7 +126,9 @@ export function SubscriptionsView() {
             transition={{ type: 'spring', stiffness: 300, damping: 30, mass: 0.8 }}
             className="relative min-h-screen w-full"
         >
-            <div className="p-5 space-y-6 max-w-md mx-auto relative min-h-screen">
+
+
+            <div className="p-5 space-y-6 max-w-md mx-auto relative min-h-screen z-10">
                 <div className="flex items-center justify-between relative min-h-[40px] mb-2">
                 <button 
                     onClick={() => router.back()} 
@@ -92,17 +138,17 @@ export function SubscriptionsView() {
                 </button>
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                     <h1 className="text-lg font-semibold flex items-center gap-2">
-                        <RotateCw className="w-5 h-5 text-primary" /> 
+                        <RotateCw className={`w-5 h-5 ${themeConfig.text}`} /> 
                         Subscriptions
                     </h1>
                 </div>
                 <div className="w-10 shrink-0 z-10" />
             </div>
 
-            <Card className="bg-gradient-to-br from-[#8A2BE2]/20 to-[#4B0082]/20 border-primary/20 backdrop-blur-md">
+            <Card className={cn(`bg-gradient-to-br backdrop-blur-md`, themeConfig.gradient, themeConfig.border)}>
                 <CardContent className="p-6">
                     <p className="text-sm text-muted-foreground font-medium mb-1">Estimated Monthly Cost</p>
-                    <h2 className="text-3xl font-bold text-primary">{formatCurrency(totalMonthly)}</h2>
+                    <h2 className={`text-3xl font-bold ${themeConfig.text}`}>{formatCurrency(totalMonthly)}</h2>
                     <p className="text-xs text-muted-foreground mt-2">Based on {templates.filter(t => t.is_active).length} active recurring expenses</p>
                 </CardContent>
             </Card>
@@ -120,8 +166,8 @@ export function SubscriptionsView() {
                     templates.filter(t => t.is_active).map((template) => (
                         <Card key={template.id} className="bg-card/40 border-white/5 backdrop-blur-sm overflow-hidden group">
                             <CardContent className="p-4 flex items-center gap-4">
-                                <div className="w-12 h-12 rounded-2xl bg-primary/10 flex flex-col items-center justify-center shrink-0 border border-primary/20">
-                                    <span className="text-[10px] font-bold text-primary uppercase leading-tight bg-primary/20 w-full text-center py-0.5 rounded-t-lg">
+                                <div className={cn("w-12 h-12 rounded-2xl flex flex-col items-center justify-center shrink-0 border", themeConfig.bg, themeConfig.border)}>
+                                    <span className={cn("text-[10px] font-bold uppercase leading-tight w-full text-center py-0.5 rounded-t-lg", themeConfig.text, themeConfig.headerBg)}>
                                         {format(parseISO(template.next_occurrence), 'MMM')}
                                     </span>
                                     <span className="text-lg font-bold text-foreground">

@@ -250,14 +250,14 @@ export function SettingsView() {
         setExportModalOpen(true);
     };
 
-    const handleExportConfirm = async (dateRange: DateRange | null, bucketId: string | null) => {
+    const handleExportConfirm = async (dateRange: DateRange | null, bucketId: string | null, groupId: string | 'personal' | null) => {
         setLoadingExport(true);
         try {
             if (!userId) return;
 
             let query = supabase
                 .from('transactions')
-                .select('id, description, amount, category, date, payment_method, created_at, currency, bucket_id, notes, type, is_recurring')
+                .select('id, description, amount, category, date, payment_method, created_at, currency, bucket_id, group_id, notes, type, is_recurring')
                 .order('date', { ascending: false });
 
             if (dateRange?.from) {
@@ -268,6 +268,11 @@ export function SettingsView() {
             }
             if (bucketId) {
                 query = query.eq('bucket_id', bucketId);
+            }
+            if (groupId === 'personal') {
+                query = query.is('group_id', null);
+            } else if (groupId) {
+                query = query.eq('group_id', groupId);
             }
 
             const { data: transactions, error } = await query;
