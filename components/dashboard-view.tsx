@@ -51,6 +51,7 @@ import { DashboardTransactionsDrawer } from '@/components/dashboard-transactions
 import { TransactionHistoryDialog } from '@/components/transaction-history-dialog';
 import { LocationPicker } from '@/components/ui/location-picker';
 import dynamic from 'next/dynamic';
+import { FluidDropdown } from '@/components/ui/fluid-dropdown';
 const ExpenseMapView = dynamic(() => import('@/components/expense-map-view').then(mod => mod.ExpenseMapView), { ssr: false });
 
 // Lazy load non-critical dialogs
@@ -315,65 +316,40 @@ export function DashboardView() {
                 inert={isAnyModalOpen}
             >
                 {/* Header */}
-                <div className="flex justify-between items-center pt-2 gap-2">
+                <div className="flex justify-between items-center pt-2 gap-2 relative z-[70]">
                     <div className="flex items-center gap-2 min-w-0">
                         <div className="w-10 h-10 relative shrink-0">
                             <img src="/Novira.png" alt="Novira" className="w-full h-full object-contain drop-shadow-[0_0_8px_rgba(138,43,226,0.5)]" />
                         </div>
                         <div className="min-w-0 flex flex-col justify-center">
                             {eligibleGroups.length > 0 ? (
-                                <DropdownMenu>
-                                    <DropdownMenuTrigger className="flex items-center gap-1.5 focus:outline-none">
-                                        <h1 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-white/80 truncate">
-                                            {activeWorkspaceId ? activeWorkspaceGroup?.name : `Hi, ${userName.split(' ')[0]}!`}
-                                        </h1>
-                                        <ChevronDown className="w-4 h-4 text-white/50 shrink-0" />
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="start" className="w-48 bg-card/95 backdrop-blur-xl border-white/10 rounded-2xl">
-                                        <DropdownMenuItem 
-                                            onClick={() => {
+                                <div className="min-w-[14rem] max-w-[16rem]">
+                                    <FluidDropdown
+                                        items={[
+                                            {
+                                                id: "personal",
+                                                label: "Personal",
+                                                icon: UserCircle,
+                                                color: "#8a2be2", // primary
+                                            },
+                                            ...eligibleGroups.map(g => ({
+                                                id: g.id,
+                                                label: g.name,
+                                                icon: g.type === 'couple' ? Heart : g.type === 'home' ? Home : Users,
+                                                color: g.type === 'couple' ? "#f43f5e" : g.type === 'home' ? "#eab308" : "#8a2be2",
+                                            }))
+                                        ]}
+                                        onSelect={(category) => {
+                                            if (category.id === "personal") {
                                                 setActiveWorkspaceId(null);
-                                                setDashboardFocus('allowance');
-                                            }} 
-                                            className={cn("rounded-xl cursor-pointer py-2", !activeWorkspaceId && "bg-primary/10 text-primary")}
-                                        >
-                                            <UserCircle className="w-4 h-4 mr-2" />
-                                            Personal
-                                            {!activeWorkspaceId && <Check className="w-3 h-3 ml-auto" />}
-                                        </DropdownMenuItem>
-                                        <DropdownMenuSeparator className="bg-white/5" />
-                                        <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold px-2 py-1.5">
-                                            Shared Workspaces
-                                        </DropdownMenuLabel>
-                                        {eligibleGroups.map(g => (
-                                            <DropdownMenuItem 
-                                                key={g.id} 
-                                                onClick={() => {
-                                                    setActiveWorkspaceId(g.id);
-                                                    setDashboardFocus('allowance');
-                                                }} 
-                                                className={cn(
-                                                    "rounded-xl cursor-pointer py-2",
-                                                    activeWorkspaceId === g.id && (
-                                                        g.type === 'couple' ? "bg-rose-500/10 text-rose-400" :
-                                                        g.type === 'home' ? "bg-yellow-500/10 text-yellow-500" :
-                                                        "bg-primary/10 text-primary"
-                                                    )
-                                                )}
-                                            >
-                                                {g.type === 'couple' ? (
-                                                    <Heart className={cn("w-4 h-4 mr-2", activeWorkspaceId === g.id ? "text-rose-400" : "text-muted-foreground")} />
-                                                ) : g.type === 'home' ? (
-                                                    <Home className={cn("w-4 h-4 mr-2", activeWorkspaceId === g.id ? "text-yellow-500" : "text-muted-foreground")} />
-                                                ) : (
-                                                    <Users className={cn("w-4 h-4 mr-2", activeWorkspaceId === g.id ? "text-primary" : "text-muted-foreground")} />
-                                                )}
-                                                <span className="truncate">{g.name}</span>
-                                                {activeWorkspaceId === g.id && <Check className="w-3 h-3 ml-auto shrink-0" />}
-                                            </DropdownMenuItem>
-                                        ))}
-                                    </DropdownMenuContent>
-                                </DropdownMenu>
+                                            } else {
+                                                setActiveWorkspaceId(category.id);
+                                            }
+                                            setDashboardFocus('allowance');
+                                        }}
+                                        triggerClassName="h-auto py-1.5 px-3 bg-transparent border-0 hover:bg-white/5 focus:ring-0 w-auto inline-flex outline-none"
+                                    />
+                                </div>
                             ) : (
                                 <h1 className="text-xl font-bold flex items-center gap-1.5 min-w-0">
                                     <span className="bg-clip-text text-transparent bg-gradient-to-r from-white to-white/80 truncate">Hi, {userName.split(' ')[0]}!</span>
