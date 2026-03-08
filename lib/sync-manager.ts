@@ -81,9 +81,10 @@ export async function attemptSync() {
     // Notify UI we are actively syncing
     window.dispatchEvent(new Event('novira-sync-started'));
 
-    for (const item of pendingItems) {
-        // Transition to Syncing
-        queue = startSyncing(queue, item.id);
+    try {
+        for (const item of pendingItems) {
+            // Transition to Syncing
+            queue = startSyncing(queue, item.id);
         await set(QUEUE_KEY, queue);
         window.dispatchEvent(new CustomEvent('novira-queue-updated', { detail: { queue } }));
 
@@ -138,16 +139,16 @@ export async function attemptSync() {
         }
 
         await set(QUEUE_KEY, queue);
+        }
+
+        // Clean up
+        queue = removeSynced(queue);
+        await set(QUEUE_KEY, queue);
         window.dispatchEvent(new CustomEvent('novira-queue-updated', { detail: { queue } }));
+    } finally {
+        window.dispatchEvent(new Event('novira-sync-finished'));
+        isSyncingLoopActive = false;
     }
-
-    // Clean up
-    queue = removeSynced(queue);
-    await set(QUEUE_KEY, queue);
-    window.dispatchEvent(new CustomEvent('novira-queue-updated', { detail: { queue } }));
-
-    window.dispatchEvent(new Event('novira-sync-finished'));
-    isSyncingLoopActive = false;
 }
 
 // 4. Manual Retry for Failed Items
