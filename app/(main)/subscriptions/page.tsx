@@ -1,7 +1,7 @@
 import { SubscriptionsView } from '@/components/subscriptions-view';
 
 export const metadata = {
-    title: 'Subscriptions - Novira',
+    title: 'Subscriptions',
 };
 
 export default function SubscriptionsPage() {

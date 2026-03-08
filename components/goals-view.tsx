@@ -1,5 +1,7 @@
 'use client';
 
+import { motion } from 'framer-motion';
+
 import React, { useEffect, useState } from 'react';
 import { useUserPreferences, CURRENCY_SYMBOLS, type Currency } from '@/components/providers/user-preferences-provider';
 import { supabase } from '@/lib/supabase';
@@ -187,18 +189,21 @@ export function GoalsView() {
         }
     };
 
-    if (loading && goals.length === 0) {
-        return (
-            <div className="flex justify-center items-center h-[50vh]">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-            </div>
-        );
-    }
+
 
     const totalSaved = goals.reduce((acc, goal) => acc + Number(goal.current_amount), 0); // Need proper conversion here eventually
     
     return (
-        <div className="p-5 space-y-6 max-w-md mx-auto relative min-h-screen pb-32">
+        <motion.div 
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.98 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 30, mass: 0.8 }}
+            className={cn(
+                "p-5 space-y-6 max-w-md mx-auto relative min-h-screen pb-32 transition-all duration-300",
+                loading ? "opacity-40 blur-[1px] pointer-events-none" : "opacity-100 blur-0"
+            )}
+        >
             {/* Background Glows */}
             <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
                 <div className="absolute top-[20%] -right-[10%] w-[60%] h-[60%] rounded-full blur-[110px] bg-emerald-500 opacity-20" />
@@ -206,22 +211,22 @@ export function GoalsView() {
             </div>
 
             <div className="relative z-10 space-y-6">
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <button 
-                            onClick={() => router.back()} 
-                            className="w-10 h-10 rounded-full bg-secondary/30 hover:bg-secondary/50 flex items-center justify-center transition-colors border border-white/5"
-                        >
-                            <ArrowLeft className="w-5 h-5" />
-                        </button>
-                        <h1 className="text-2xl font-bold flex items-center gap-2">
-                            <Target className="w-6 h-6 text-emerald-400" /> 
+                <div className="flex items-center justify-between relative min-h-[40px] mb-2">
+                    <button 
+                        onClick={() => router.back()} 
+                        className="w-10 h-10 rounded-full bg-secondary/30 hover:bg-secondary/50 flex items-center justify-center transition-colors border border-white/5 shrink-0 z-10"
+                    >
+                        <ArrowLeft className="w-5 h-5" />
+                    </button>
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                        <h1 className="text-lg font-semibold flex items-center gap-2">
+                            <Target className="w-5 h-5 text-emerald-400" /> 
                             Savings Goals
                         </h1>
                     </div>
                     <button
                         onClick={openAddModal}
-                        className="w-10 h-10 rounded-full bg-emerald-500/20 hover:bg-emerald-500/30 flex items-center justify-center border border-emerald-500/20 transition-colors"
+                        className="w-10 h-10 rounded-full bg-emerald-500/20 hover:bg-emerald-500/30 flex items-center justify-center border border-emerald-500/20 transition-colors shrink-0 z-10 pointer-events-auto"
                     >
                         <Plus className="w-5 h-5 text-emerald-400" />
                     </button>
@@ -452,6 +457,6 @@ export function GoalsView() {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
-        </div>
+        </motion.div>
     );
 }

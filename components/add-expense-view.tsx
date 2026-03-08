@@ -78,9 +78,15 @@ export function AddExpenseView() {
 
 
     return (
-        <div className="relative">
+        <motion.div 
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.98 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 30, mass: 0.8 }}
+            className="relative"
+        >
             <div className={cn(
-                "p-5 space-y-6 max-w-md mx-auto pt-4 relative min-h-screen transition-all duration-700 ease-in-out z-10"
+                "p-5 space-y-6 max-w-md mx-auto pt-4 relative min-h-screen z-10"
             )}>
                 {/* Unified Background Glows */}
                 <AnimatePresence>
@@ -375,6 +381,6 @@ export function AddExpenseView() {
                     {loading ? 'Adding Expense...' : 'Add Expense'}
                 </Button>
             </div>
-        </div>
+        </motion.div>
     );
 }

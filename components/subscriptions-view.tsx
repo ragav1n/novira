@@ -1,5 +1,7 @@
 'use client';
 
+import { motion } from 'framer-motion';
+
 import React, { useEffect, useState } from 'react';
 import { useUserPreferences, CURRENCY_SYMBOLS } from '@/components/providers/user-preferences-provider';
 import { supabase } from '@/lib/supabase';
@@ -15,7 +17,7 @@ interface RecurringTemplate {
     amount: number;
     currency: string;
     frequency: 'daily' | 'weekly' | 'monthly' | 'yearly';
-    next_date: string;
+    next_occurrence: string;
     last_processed: string | null;
     category: string;
     status: 'active' | 'paused' | 'cancelled';
@@ -36,7 +38,7 @@ export function SubscriptionsView() {
                 .from('recurring_templates')
                 .select('*')
                 .eq('user_id', userId)
-                .order('next_date', { ascending: true });
+                .order('next_occurrence', { ascending: true });
 
             if (!error && data) {
                 setTemplates(data);
@@ -59,13 +61,7 @@ export function SubscriptionsView() {
             .eq('id', id);
     };
 
-    if (loading) {
-        return (
-            <div className="flex h-[50vh] items-center justify-center">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-            </div>
-        );
-    }
+
 
     const totalMonthly = templates
         .filter(t => t.status === 'active')
@@ -78,18 +74,30 @@ export function SubscriptionsView() {
         }, 0);
 
     return (
-        <div className="p-5 space-y-6 max-w-md mx-auto relative min-h-screen">
-            <div className="flex items-center gap-3">
+        <motion.div 
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.98 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 30, mass: 0.8 }}
+            className={cn(
+                "p-5 space-y-6 max-w-md mx-auto relative min-h-screen transition-all duration-300",
+                loading ? "opacity-40 blur-[1px] pointer-events-none" : "opacity-100 blur-0"
+            )}
+        >
+            <div className="flex items-center justify-between relative min-h-[40px] mb-2">
                 <button 
                     onClick={() => router.back()} 
-                    className="w-10 h-10 rounded-full bg-secondary/30 hover:bg-secondary/50 flex items-center justify-center transition-colors"
+                    className="w-10 h-10 rounded-full bg-secondary/30 hover:bg-secondary/50 flex items-center justify-center transition-colors shrink-0 z-10"
                 >
                     <ArrowLeft className="w-5 h-5" />
                 </button>
-                <h1 className="text-2xl font-bold flex items-center gap-2">
-                    <RotateCw className="w-6 h-6 text-primary" /> 
-                    Subscriptions
-                </h1>
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <h1 className="text-lg font-semibold flex items-center gap-2">
+                        <RotateCw className="w-5 h-5 text-primary" /> 
+                        Subscriptions
+                    </h1>
+                </div>
+                <div className="w-10 shrink-0 z-10" />
             </div>
 
             <Card className="bg-gradient-to-br from-[#8A2BE2]/20 to-[#4B0082]/20 border-primary/20 backdrop-blur-md">
@@ -115,10 +123,10 @@ export function SubscriptionsView() {
                             <CardContent className="p-4 flex items-center gap-4">
                                 <div className="w-12 h-12 rounded-2xl bg-primary/10 flex flex-col items-center justify-center shrink-0 border border-primary/20">
                                     <span className="text-[10px] font-bold text-primary uppercase leading-tight bg-primary/20 w-full text-center py-0.5 rounded-t-lg">
-                                        {format(parseISO(template.next_date), 'MMM')}
+                                        {format(parseISO(template.next_occurrence), 'MMM')}
                                     </span>
                                     <span className="text-lg font-bold text-foreground">
-                                        {format(parseISO(template.next_date), 'd')}
+                                        {format(parseISO(template.next_occurrence), 'd')}
                                     </span>
                                 </div>
                                 <div className="flex-1 min-w-0">
@@ -159,6 +167,6 @@ export function SubscriptionsView() {
                  </div>
             )}
             
-        </div>
+        </motion.div>
     );
 }
