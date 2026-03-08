@@ -32,7 +32,6 @@ export function MobileLayout({ children }: { children: React.ReactNode }) {
         const setupDeepLinks = async () => {
             // 1. Handle URL events when the app is already open
             App.addListener('appUrlOpen', (data) => {
-                console.log('[DeepLink] Received URL (open):', data.url);
                 let path = '';
                 if (data.url.includes('novira://')) {
                     path = '/' + data.url.replace('novira://', '').replace(/^\//, '');
@@ -41,14 +40,12 @@ export function MobileLayout({ children }: { children: React.ReactNode }) {
                         const url = new URL(data.url);
                         path = url.pathname + url.search;
                     } catch (e) {
-                        console.error('[DeepLink] Failed to parse URL:', data.url, e);
+                        // console.error('[DeepLink] Failed to parse URL:', data.url, e);
                     }
                 }
 
-                console.log('[DeepLink] Calculated path:', path);
                 if (path) {
                     setTimeout(() => {
-                        console.log('[DeepLink] Navigating to:', path);
                         router.push(path);
                     }, 100);
                 }
@@ -56,11 +53,9 @@ export function MobileLayout({ children }: { children: React.ReactNode }) {
 
             // 2. Handle the URL that launched the app (cold start)
             const launchUrl = await App.getLaunchUrl();
-            console.log('[DeepLink] Launch URL check:', launchUrl);
 
             if (launchUrl && launchUrl.url) {
                 const url = launchUrl.url;
-                console.log('[DeepLink] Received URL (launch):', url);
                 let path = '';
                 if (url.includes('novira://')) {
                     path = '/' + url.replace('novira://', '').replace(/^\//, '');
@@ -71,11 +66,9 @@ export function MobileLayout({ children }: { children: React.ReactNode }) {
                     } catch (e) { }
                 }
 
-                console.log('[DeepLink] Calculated path (launch):', path);
                 // Navigate if it's not the default root (unless explicit)
                 if (path && path !== '/') {
                     setTimeout(() => {
-                        console.log('[DeepLink] Navigating (launch) to:', path);
                         router.push(path);
                     }, 500); // Slightly more delay for cold starts
                 }
@@ -109,8 +102,9 @@ export function MobileLayout({ children }: { children: React.ReactNode }) {
     const { isAuthenticated, isLoading, isNavigating, setIsNavigating, activeWorkspaceId } = useUserPreferences();
     const { groups } = useGroups();
     
-    // Check if the current workspace is a romantic couple workspace AND we are on the dashboard
+    // Check if the current workspace is a specific group type AND we are on the dashboard
     const isCoupleWorkspace = groups.find(g => g.id === activeWorkspaceId)?.type === 'couple' && pathname === '/';
+    const isHomeWorkspace = groups.find(g => g.id === activeWorkspaceId)?.type === 'home' && pathname === '/';
 
     // Reset navigation loading when pathname changes
     useEffect(() => {
@@ -147,11 +141,11 @@ export function MobileLayout({ children }: { children: React.ReactNode }) {
             <div className="fixed inset-0 pointer-events-none overflow-hidden z-0 transition-colors duration-1000">
                 <div className={cn(
                     "absolute -top-[10%] -left-[10%] w-[70%] h-[70%] rounded-full blur-[60px] opacity-[0.25] transition-colors duration-1000",
-                    isCoupleWorkspace ? "bg-rose-600" : "bg-purple-600"
+                    isCoupleWorkspace ? "bg-rose-600" : isHomeWorkspace ? "bg-yellow-600" : "bg-purple-600"
                 )} />
                 <div className={cn(
                     "absolute -bottom-[10%] -right-[10%] w-[60%] h-[60%] rounded-full blur-[50px] opacity-[0.2] transition-colors duration-1000",
-                    isCoupleWorkspace ? "bg-rose-900" : "bg-purple-900"
+                    isCoupleWorkspace ? "bg-rose-900" : isHomeWorkspace ? "bg-amber-700" : "bg-purple-900"
                 )} />
             </div>
 
@@ -159,7 +153,9 @@ export function MobileLayout({ children }: { children: React.ReactNode }) {
                 "fixed inset-0 pointer-events-none z-0 transition-colors duration-1000",
                 isCoupleWorkspace 
                     ? "bg-gradient-to-br from-rose-950/20 via-transparent to-transparent" 
-                    : "bg-gradient-to-br from-purple-950/10 via-transparent to-transparent"
+                    : isHomeWorkspace
+                        ? "bg-gradient-to-br from-amber-950/20 via-transparent to-transparent"
+                        : "bg-gradient-to-br from-purple-950/10 via-transparent to-transparent"
             )} />
 
             {/* Main Content Area */}

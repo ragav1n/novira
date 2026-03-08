@@ -7,6 +7,7 @@ import Papa from 'papaparse';
 import ExcelJS from 'exceljs';
 import { parse, isValid, format } from 'date-fns';
 import { Upload, ChevronRight, Check, AlertCircle, X, ArrowLeft, FileSpreadsheet, Loader2 } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { toast } from '@/utils/haptics';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
@@ -419,7 +420,13 @@ export function ImportView() {
     };
 
     return (
-        <div className="p-5 max-w-2xl mx-auto space-y-6">
+        <motion.div 
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.98 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 30, mass: 0.8 }}
+            className="p-5 max-w-2xl mx-auto space-y-6"
+        >
             <div className="flex items-center gap-4">
                 <Button variant="ghost" size="icon" onClick={() => router.back()}>
                     <ArrowLeft className="w-5 h-5" />
@@ -643,6 +650,6 @@ export function ImportView() {
                     </div>
                 </div>
             )}
-        </div>
+        </motion.div>
     );
 }
