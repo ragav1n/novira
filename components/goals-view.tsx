@@ -2,8 +2,9 @@
 
 import { motion } from 'framer-motion';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useUserPreferences, CURRENCY_SYMBOLS, type Currency } from '@/components/providers/user-preferences-provider';
+import { useGroups } from '@/components/providers/groups-provider';
 import { supabase } from '@/lib/supabase';
 import { Card, CardContent } from '@/components/ui/card';
 import { Target, Plus, Search, HelpCircle, ArrowLeft, TrendingUp, Calendar, PiggyBank, MoreVertical, Edit2, Trash2, CheckCircle2 } from 'lucide-react';
@@ -33,8 +34,73 @@ interface SavingsGoal {
 }
 
 export function GoalsView() {
-    const { userId, formatCurrency, currency } = useUserPreferences();
+    const { userId, formatCurrency, currency, activeWorkspaceId } = useUserPreferences();
     const router = useRouter();
+    const { groups } = useGroups();
+    
+    const activeWorkspace = useMemo(() => 
+        activeWorkspaceId && activeWorkspaceId !== 'personal' 
+            ? groups.find((g: any) => g.id === activeWorkspaceId) 
+            : null
+    , [activeWorkspaceId, groups]);
+
+    const themeConfig = useMemo(() => {
+        if (activeWorkspace?.type === 'couple') {
+            return {
+                text: 'text-rose-500',
+                textLight: 'text-rose-400',
+                textOpacity: 'text-rose-100/80',
+                bg: 'bg-rose-500/20',
+                bgLight: 'bg-rose-500/10',
+                bgSolid: 'bg-rose-500',
+                border: 'border-rose-500/20',
+                borderGlow: 'border-rose-500/30',
+                gradient: 'from-rose-600/20 to-pink-800/20',
+                hoverBg: 'hover:bg-rose-500/30',
+                hoverBtnBg: 'hover:bg-rose-600',
+                shadowGlow: 'shadow-rose-500/20',
+                shadowStrong: 'shadow-[0_0_15px_rgba(244,63,94,0.3)]',
+                indicatorEmpty: 'bg-rose-500',
+                indicatorFull: 'bg-rose-400',
+            }
+        } else if (activeWorkspace?.type === 'home') {
+            return {
+                text: 'text-amber-500',
+                textLight: 'text-amber-400',
+                textOpacity: 'text-amber-100/80',
+                bg: 'bg-amber-500/20',
+                bgLight: 'bg-amber-500/10',
+                bgSolid: 'bg-amber-500',
+                border: 'border-amber-500/20',
+                borderGlow: 'border-amber-500/30',
+                gradient: 'from-amber-600/20 to-yellow-800/20',
+                hoverBg: 'hover:bg-amber-500/30',
+                hoverBtnBg: 'hover:bg-amber-600',
+                shadowGlow: 'shadow-amber-500/20',
+                shadowStrong: 'shadow-[0_0_15px_rgba(245,158,11,0.3)]',
+                indicatorEmpty: 'bg-amber-500',
+                indicatorFull: 'bg-amber-400',
+            }
+        }
+        return {
+            text: 'text-emerald-500',
+            textLight: 'text-emerald-400',
+            textOpacity: 'text-emerald-100/80',
+            bg: 'bg-emerald-500/20',
+            bgLight: 'bg-emerald-500/10',
+            bgSolid: 'bg-emerald-500',
+            border: 'border-emerald-500/20',
+            borderGlow: 'border-emerald-500/30',
+            gradient: 'from-emerald-600/20 to-teal-800/20',
+            hoverBg: 'hover:bg-emerald-500/30',
+            hoverBtnBg: 'hover:bg-emerald-600',
+            shadowGlow: 'shadow-emerald-500/20',
+            shadowStrong: 'shadow-[0_0_15px_rgba(16,185,129,0.3)]',
+            indicatorEmpty: 'bg-emerald-500',
+            indicatorFull: 'bg-emerald-400',
+        }
+    }, [activeWorkspace]);
+
     const [goals, setGoals] = useState<SavingsGoal[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -50,14 +116,22 @@ export function GoalsView() {
     const [selectedGoalId, setSelectedGoalId] = useState<string | null>(null);
     const [depositAmount, setDepositAmount] = useState('');
 
-    const loadGoals = async () => {
+        const loadGoals = async () => {
         if (!userId) return;
         setLoading(true);
-        const { data, error } = await supabase
+        let query = supabase
             .from('savings_goals')
             .select('*')
             .eq('user_id', userId)
             .order('created_at', { ascending: false });
+
+        if (activeWorkspaceId && activeWorkspaceId !== 'personal') {
+            query = query.eq('group_id', activeWorkspaceId);
+        } else if (activeWorkspaceId === 'personal') {
+            query = query.is('group_id', null);
+        }
+
+        const { data, error } = await query;
 
         if (!error && data) {
             setGoals(data);
@@ -67,7 +141,7 @@ export function GoalsView() {
 
     useEffect(() => {
         loadGoals();
-    }, [userId]);
+    }, [userId, activeWorkspaceId]);
 
     const openAddModal = () => {
         setGoalModalMode('add');
@@ -100,7 +174,8 @@ export function GoalsView() {
                     name: goalName,
                     target_amount: parseFloat(goalTarget),
                     currency: goalCurrency,
-                    deadline: goalDeadline ? format(goalDeadline, 'yyyy-MM-dd') : null
+                    deadline: goalDeadline ? format(goalDeadline, 'yyyy-MM-dd') : null,
+                    group_id: activeWorkspaceId && activeWorkspaceId !== 'personal' ? activeWorkspaceId : null
                 });
 
             if (error) {
@@ -201,11 +276,7 @@ export function GoalsView() {
             transition={{ type: 'spring', stiffness: 300, damping: 30, mass: 0.8 }}
             className="relative min-h-screen w-full"
         >
-            {/* Background Glows */}
-            <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
-                <div className="absolute top-[20%] -right-[10%] w-[60%] h-[60%] rounded-full blur-[110px] bg-emerald-500 opacity-20" />
-                <div className="absolute bottom-[20%] -left-[10%] w-[50%] h-[50%] rounded-full blur-[90px] bg-emerald-400 opacity-10" />
-            </div>
+
 
             <div className="p-5 max-w-md mx-auto pb-32 relative z-10 space-y-6">
                 <div className="flex items-center justify-between relative min-h-[40px] mb-2">
@@ -217,34 +288,35 @@ export function GoalsView() {
                     </button>
                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                         <h1 className="text-lg font-semibold flex items-center gap-2">
-                            <Target className="w-5 h-5 text-emerald-400" /> 
+                            <Target className={`w-5 h-5 ${themeConfig.textLight}`} /> 
                             Savings Goals
                         </h1>
                     </div>
+                    
                     <button
                         onClick={openAddModal}
-                        className="w-10 h-10 rounded-full bg-emerald-500/20 hover:bg-emerald-500/30 flex items-center justify-center border border-emerald-500/20 transition-colors shrink-0 z-10 pointer-events-auto"
+                        className={`w-10 h-10 rounded-full flex items-center justify-center border transition-colors shrink-0 z-10 pointer-events-auto ${themeConfig.bg} ${themeConfig.hoverBg} ${themeConfig.border}`}
                     >
-                        <Plus className="w-5 h-5 text-emerald-400" />
+                        <Plus className={`w-5 h-5 ${themeConfig.textLight}`} />
                     </button>
                 </div>
 
                 {/* Total Saved Card */}
-                <Card className="bg-gradient-to-br from-emerald-600/20 to-teal-800/20 border-emerald-500/20 backdrop-blur-md overflow-hidden relative">
+                <Card className={`bg-gradient-to-br backdrop-blur-md overflow-hidden relative ${themeConfig.gradient} ${themeConfig.border}`}>
                      <div className="absolute top-0 right-0 p-6 opacity-10">
-                        <PiggyBank className="w-24 h-24 text-emerald-500" />
+                        <PiggyBank className={`w-24 h-24 ${themeConfig.text}`} />
                     </div>
                     <CardContent className="p-6 relative z-10">
-                        <p className="text-sm text-emerald-100/80 font-medium mb-1">Total Savings</p>
-                        <h2 className="text-4xl font-bold text-emerald-400">{formatCurrency(totalSaved)}</h2>
+                        <p className={`text-sm font-medium mb-1 ${themeConfig.textOpacity}`}>Total Savings</p>
+                        <h2 className={`text-4xl font-bold ${themeConfig.textLight}`}>{formatCurrency(totalSaved)}</h2>
                     </CardContent>
                 </Card>
 
                 <div className="space-y-4">
                     {goals.length === 0 ? (
                         <div className="text-center py-16 px-4 border border-dashed border-white/10 rounded-3xl bg-card/20 backdrop-blur-sm">
-                            <div className="w-16 h-16 rounded-full bg-emerald-500/10 flex items-center justify-center mx-auto mb-4 border border-emerald-500/20">
-                                <Target className="w-8 h-8 text-emerald-400 opacity-80" />
+                            <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 border ${themeConfig.bgLight} ${themeConfig.border}`}>
+                                <Target className={`w-8 h-8 opacity-80 ${themeConfig.textLight}`} />
                             </div>
                             <h3 className="text-lg font-bold mb-2">No savings goals yet</h3>
                             <p className="text-sm text-muted-foreground mb-6 max-w-[250px] mx-auto">
@@ -252,7 +324,7 @@ export function GoalsView() {
                             </p>
                             <Button 
                                 onClick={openAddModal}
-                                className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-xl shadow-[0_0_15px_rgba(16,185,129,0.3)] transition-all"
+                                className={`text-white font-bold rounded-xl transition-all ${themeConfig.bgSolid} ${themeConfig.hoverBtnBg} ${themeConfig.shadowStrong}`}
                             >
                                 <Plus className="w-4 h-4 mr-2" />
                                 Create your first goal
@@ -269,11 +341,11 @@ export function GoalsView() {
                                 <Card key={goal.id} className={cn(
                                     "border-white/5 backdrop-blur-xl relative overflow-hidden group transition-all",
                                     isCompleted 
-                                        ? "border-emerald-500/30 bg-emerald-500/10 shadow-[0_0_30px_rgba(16,185,129,0.1)]" 
+                                        ? `${themeConfig.borderGlow} ${themeConfig.bgLight} shadow-[0_0_30px_rgba(16,185,129,0.1)]` // Keeping the shadow fixed is fine or can use shadowGlow, but 0.1 opacity is very specific. We'll use shadowGlow. actually, let me use template literal.
                                         : "bg-card/40"
                                 )}>
                                      {isCompleted && (
-                                         <div className="absolute top-3 left-1/2 -translate-x-1/2 bg-emerald-500 text-white text-[10px] uppercase tracking-wider font-bold px-3 py-1 rounded-full flex items-center gap-1 z-10 shadow-lg shadow-emerald-500/20">
+                                         <div className={`absolute top-3 left-1/2 -translate-x-1/2 text-white text-[10px] uppercase tracking-wider font-bold px-3 py-1 rounded-full flex items-center gap-1 z-10 shadow-lg ${themeConfig.bgSolid} ${themeConfig.shadowGlow}`}>
                                              <CheckCircle2 className="w-3 h-3" />
                                              Goal Achieved
                                          </div>
@@ -298,8 +370,8 @@ export function GoalsView() {
                                                     className={cn(
                                                         "shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-colors shadow-sm",
                                                         isCompleted 
-                                                            ? "bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/30" 
-                                                            : "bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 text-emerald-400"
+                                                            ? `${themeConfig.bg} border ${themeConfig.border} ${themeConfig.textLight} ${themeConfig.hoverBg}` 
+                                                            : `${themeConfig.bgLight} ${themeConfig.hoverBg} border ${themeConfig.border} ${themeConfig.textLight}`
                                                     )}
                                                 >
                                                     <Plus className="w-4 h-4" />
@@ -324,17 +396,17 @@ export function GoalsView() {
 
                                         <div className="space-y-2">
                                             <div className="flex justify-between text-sm font-medium">
-                                                <span className="text-emerald-400">{formatCurrency(currentAmount, goal.currency)}</span>
+                                                <span className={themeConfig.textLight}>{formatCurrency(currentAmount, goal.currency)}</span>
                                                 <span className="text-muted-foreground">of {formatCurrency(targetAmount, goal.currency)}</span>
                                             </div>
                                             <Progress 
                                                 value={progress} 
                                                 className="h-2.5 bg-black/30" 
-                                                indicatorClassName={isCompleted ? "bg-emerald-400" : "bg-emerald-500"} 
+                                                indicatorClassName={isCompleted ? themeConfig.indicatorFull : themeConfig.indicatorEmpty} 
                                             />
                                             <div className="flex justify-between text-[11px]">
                                                 <span className="text-muted-foreground">{progress.toFixed(1)}% funded</span>
-                                                <span className="text-emerald-500/80 font-bold">
+                                                <span className={`font-bold ${themeConfig.textOpacity}`}>
                                                     {isCompleted ? 'Goal Reached! 🎉' : `${formatCurrency(targetAmount - currentAmount, goal.currency)} to go`}
                                                 </span>
                                             </div>
@@ -408,7 +480,7 @@ export function GoalsView() {
                     <DialogFooter className="mt-6 flex gap-2">
                         <Button variant="ghost" className="flex-1" onClick={() => setIsGoalModalOpen(false)}>Cancel</Button>
                         <Button 
-                            className="flex-1 bg-emerald-500 hover:bg-emerald-600 font-bold text-white shadow-[0_0_15px_rgba(16,185,129,0.3)] transition-all"
+                            className={`flex-1 font-bold text-white transition-all ${themeConfig.bgSolid} ${themeConfig.hoverBtnBg} ${themeConfig.shadowStrong}`}
                             onClick={handleSaveGoal}
                             disabled={!goalName || !goalTarget}
                         >
@@ -436,8 +508,8 @@ export function GoalsView() {
                                     onChange={(e) => setDepositAmount(e.target.value)}
                                     className="bg-secondary/20 border-white/10 h-16 text-3xl font-bold pl-12"
                                 />
-                                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-bold text-emerald-500">
-                                    {selectedGoalId ? CURRENCY_SYMBOLS[goals.find(g => g.id === selectedGoalId)?.currency as Currency] || '$' : '$'}
+                                <span className={`absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-bold ${themeConfig.text}`}>
+                                    {selectedGoalId ? CURRENCY_SYMBOLS[goals.find((g: any) => g.id === selectedGoalId)?.currency as Currency] || '$' : '$'}
                                 </span>
                             </div>
                         </div>
@@ -445,7 +517,7 @@ export function GoalsView() {
                     <DialogFooter className="mt-6 flex gap-2">
                         <Button variant="ghost" className="flex-1" onClick={() => { setIsAddDepositOpen(false); setDepositAmount(''); }}>Cancel</Button>
                         <Button 
-                            className="flex-1 bg-emerald-500 hover:bg-emerald-600 font-bold text-white shadow-[0_0_15px_rgba(16,185,129,0.3)] transition-all"
+                            className={`flex-1 font-bold text-white transition-all ${themeConfig.bgSolid} ${themeConfig.hoverBtnBg} ${themeConfig.shadowStrong}`}
                             onClick={handleAddDeposit}
                             disabled={!depositAmount}
                         >

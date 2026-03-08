@@ -102,9 +102,10 @@ export function MobileLayout({ children }: { children: React.ReactNode }) {
     const { isAuthenticated, isLoading, isNavigating, setIsNavigating, activeWorkspaceId } = useUserPreferences();
     const { groups } = useGroups();
     
-    // Check if the current workspace is a specific group type AND we are on the dashboard
-    const isCoupleWorkspace = groups.find(g => g.id === activeWorkspaceId)?.type === 'couple' && pathname === '/';
-    const isHomeWorkspace = groups.find(g => g.id === activeWorkspaceId)?.type === 'home' && pathname === '/';
+    // Check if the current workspace is a specific group type
+    const activeWorkspace = groups.find(g => g.id === activeWorkspaceId);
+    const isCoupleWorkspace = activeWorkspace?.type === 'couple';
+    const isHomeWorkspace = activeWorkspace?.type === 'home';
 
     // Reset navigation loading when pathname changes
     useEffect(() => {
@@ -137,25 +138,25 @@ export function MobileLayout({ children }: { children: React.ReactNode }) {
             "min-h-screen w-full bg-background text-foreground relative overflow-hidden font-sans select-none flex flex-col",
             isNative && "pt-[env(safe-area-inset-top)]"
         )}>
-            {/* Global Background Glows */}
-            <div className="fixed inset-0 pointer-events-none overflow-hidden z-0 transition-colors duration-1000">
+            {/* Global Background Glows - Matching Dashboard exactly */}
+            <div className="fixed inset-0 pointer-events-none overflow-hidden z-0 transition-colors duration-1000 gpu">
                 <div className={cn(
-                    "absolute -top-[10%] -left-[10%] w-[70%] h-[70%] rounded-full blur-[60px] opacity-[0.25] transition-colors duration-1000",
-                    isCoupleWorkspace ? "bg-rose-600" : isHomeWorkspace ? "bg-yellow-600" : "bg-purple-600"
+                    "absolute top-[20%] -right-[10%] w-[60%] h-[60%] rounded-full blur-[50px] opacity-15 gpu transition-colors duration-1000",
+                    isCoupleWorkspace ? "bg-rose-500" : isHomeWorkspace ? "bg-yellow-500" : "bg-primary"
                 )} />
                 <div className={cn(
-                    "absolute -bottom-[10%] -right-[10%] w-[60%] h-[60%] rounded-full blur-[50px] opacity-[0.2] transition-colors duration-1000",
-                    isCoupleWorkspace ? "bg-rose-900" : isHomeWorkspace ? "bg-amber-700" : "bg-purple-900"
+                    "absolute bottom-[20%] -left-[10%] w-[50%] h-[50%] rounded-full blur-[40px] opacity-10 gpu transition-colors duration-1000",
+                    isCoupleWorkspace ? "bg-rose-500" : isHomeWorkspace ? "bg-amber-500" : "bg-primary/40"
                 )} />
             </div>
 
             <div className={cn(
                 "fixed inset-0 pointer-events-none z-0 transition-colors duration-1000",
                 isCoupleWorkspace 
-                    ? "bg-gradient-to-br from-rose-950/20 via-transparent to-transparent" 
+                    ? "bg-gradient-to-br from-rose-950/10 via-transparent to-transparent" 
                     : isHomeWorkspace
-                        ? "bg-gradient-to-br from-amber-950/20 via-transparent to-transparent"
-                        : "bg-gradient-to-br from-purple-950/10 via-transparent to-transparent"
+                        ? "bg-gradient-to-br from-amber-950/10 via-transparent to-transparent"
+                        : "bg-gradient-to-br from-primary/10 via-transparent to-transparent"
             )} />
 
             {/* Main Content Area */}

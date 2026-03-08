@@ -30,13 +30,13 @@ interface ExpandableTabsProps {
 const buttonVariants = {
     initial: {
         gap: 0,
-        paddingLeft: ".35rem",
-        paddingRight: ".35rem",
+        paddingLeft: "0.35rem",
+        paddingRight: "0.35rem",
     },
     animate: ({ isSelected, hasSelected }: { isSelected: boolean; hasSelected: boolean }) => ({
-        gap: isSelected ? ".5rem" : 0,
-        paddingLeft: isSelected ? ".85rem" : hasSelected ? ".2rem" : ".35rem",
-        paddingRight: isSelected ? ".85rem" : hasSelected ? ".2rem" : ".35rem",
+        gap: isSelected ? "0.5rem" : 0,
+        paddingLeft: isSelected ? "0.85rem" : hasSelected ? "0.2rem" : "0.35rem",
+        paddingRight: isSelected ? "0.85rem" : hasSelected ? "0.2rem" : "0.35rem",
     }),
 };
 
@@ -111,7 +111,7 @@ export function ExpandableTabs({
                             tabRefs.current[index] = el as HTMLButtonElement | null;
                         }}
                         variants={buttonVariants}
-                        initial={false}
+                        initial="initial"
                         animate="animate"
                         custom={{ isSelected: selected === index, hasSelected: selected !== null }}
                         onClick={() => handleSelect(index)}

@@ -9,6 +9,7 @@ import { UserPreferencesProvider } from '@/components/providers/user-preferences
 import { GroupsProvider } from '@/components/providers/groups-provider'
 import { BucketsProvider } from '@/components/providers/buckets-provider'
 import { SyncIndicator } from '@/components/pwa-sync-indicator'
+import { WorkspaceThemeProvider } from '@/components/providers/workspace-theme-provider'
 
 const geist = Geist({
   subsets: ["latin"],
@@ -70,8 +71,9 @@ export default async function RootLayout({
       </head>
       <body suppressHydrationWarning className={`${geist.variable} ${geistMono.variable} font-sans antialiased`}>
         <UserPreferencesProvider>
-          <SyncIndicator />
           <GroupsProvider>
+            <WorkspaceThemeProvider />
+            <SyncIndicator />
             <BucketsProvider>
               <MobileLayout>
                 {children}

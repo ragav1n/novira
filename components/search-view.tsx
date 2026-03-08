@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
     ChevronLeft, Search, SlidersHorizontal, CircleDollarSign, Tag, Plane, Home, Gift, 
     Car, Utensils, ShoppingCart, Heart, Gamepad2, School, Laptop, Music, RefreshCcw, 
@@ -17,6 +17,7 @@ import { format, parseISO, isSameWeek, isSameMonth, isAfter, isBefore, startOfDa
 import { WaveLoader } from '@/components/ui/wave-loader';
 import { useUserPreferences } from '@/components/providers/user-preferences-provider';
 import { useBuckets } from '@/components/providers/buckets-provider';
+import { useGroups } from '@/components/providers/groups-provider';
 import {
     Sheet,
     SheetContent,
@@ -84,8 +85,63 @@ export function SearchView() {
     const [filteredTransactions, setFilteredTransactions] = useState<Transaction[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
     const [loading, setLoading] = useState(true);
-    const { formatCurrency, convertAmount, currency } = useUserPreferences();
+    const { formatCurrency, convertAmount, currency, activeWorkspaceId } = useUserPreferences();
     const { buckets } = useBuckets();
+    const { groups } = useGroups();
+    
+    const activeWorkspace = useMemo(() => 
+        activeWorkspaceId && activeWorkspaceId !== 'personal' 
+            ? groups.find((g: any) => g.id === activeWorkspaceId) 
+            : null
+    , [activeWorkspaceId, groups]);
+
+    const themeConfig = useMemo(() => {
+        if (activeWorkspace?.type === 'couple') {
+            return {
+                bgSolid: 'bg-rose-500',
+                bgLight: 'bg-rose-500/10',
+                bgMedium: 'bg-rose-500/20',
+                text: 'text-rose-500',
+                textWhite: 'text-white',
+                borderLight: 'border-rose-500/10',
+                borderMedium: 'border-rose-500/20',
+                borderSolid: 'border-rose-500',
+                ring: 'focus-visible:ring-rose-500/50',
+                hoverBg: 'hover:bg-rose-500/90',
+                shadowGlow: 'shadow-rose-500/20',
+                gradient: 'from-rose-500/20',
+            }
+        } else if (activeWorkspace?.type === 'home') {
+            return {
+                bgSolid: 'bg-amber-500',
+                bgLight: 'bg-amber-500/10',
+                bgMedium: 'bg-amber-500/20',
+                text: 'text-amber-500',
+                textWhite: 'text-white',
+                borderLight: 'border-amber-500/10',
+                borderMedium: 'border-amber-500/20',
+                borderSolid: 'border-amber-500',
+                ring: 'focus-visible:ring-amber-500/50',
+                hoverBg: 'hover:bg-amber-500/90',
+                shadowGlow: 'shadow-amber-500/20',
+                gradient: 'from-amber-500/20',
+            }
+        }
+        return {
+            bgSolid: 'bg-primary',
+            bgLight: 'bg-primary/10',
+            bgMedium: 'bg-primary/20',
+            text: 'text-primary',
+            textWhite: 'text-white',
+            borderLight: 'border-primary/10',
+            borderMedium: 'border-primary/20',
+            borderSolid: 'border-primary',
+            ring: 'focus-visible:ring-primary/50',
+            hoverBg: 'hover:bg-primary/90',
+            shadowGlow: 'shadow-primary/20',
+            gradient: 'from-primary/20',
+        }
+    }, [activeWorkspace]);
 
     // Advanced Filter State
     const [priceRange, setPriceRange] = useState<[number, number]>([0, 1000]);
@@ -101,7 +157,7 @@ export function SearchView() {
 
     useEffect(() => {
         fetchTransactions();
-    }, []);
+    }, [activeWorkspaceId]);
 
     useEffect(() => {
         applyFilters();
@@ -118,10 +174,18 @@ export function SearchView() {
 
     const fetchTransactions = async () => {
         try {
-            const { data } = await supabase
+            let query = supabase
                 .from('transactions')
                 .select('id, description, amount, category, date, payment_method, created_at, currency, is_recurring, bucket_id')
                 .order('date', { ascending: false });
+
+            if (activeWorkspaceId && activeWorkspaceId !== 'personal') {
+                query = query.eq('group_id', activeWorkspaceId);
+            } else if (activeWorkspaceId === 'personal') {
+                query = query.is('group_id', null);
+            }
+
+            const { data } = await query;
 
             if (data) {
                 setTransactions(data);
@@ -223,7 +287,9 @@ export function SearchView() {
             transition={{ type: 'spring', stiffness: 300, damping: 30, mass: 0.8 }}
             className="relative min-h-screen w-full h-full"
         >
-            <div className="p-5 space-y-6 max-w-md mx-auto relative pb-24 h-full flex flex-col">
+
+
+            <div className="p-5 space-y-6 max-w-md mx-auto relative pb-24 h-full flex flex-col z-10">
                 {/* Header */}
             <div className="flex items-center justify-between relative min-h-[40px]">
                 <button
@@ -246,7 +312,7 @@ export function SearchView() {
                         placeholder="Search transactions"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="pl-9 bg-secondary/10 border-white/10 h-10 rounded-xl focus-visible:ring-primary/50"
+                        className={`pl-9 bg-secondary/10 border-white/10 h-10 rounded-xl ${themeConfig.ring}`}
                     />
                 </div>
 
@@ -255,7 +321,7 @@ export function SearchView() {
                         <Button variant="outline" size="icon" className="h-10 w-10 shrink-0 rounded-xl bg-secondary/10 border-white/10 relative">
                             <SlidersHorizontal className="w-4 h-4" />
                             {getActiveFilterCount() > 0 && (
-                                <span className="absolute -top-1 -right-1 w-4 h-4 bg-primary text-white text-[11px] rounded-full flex items-center justify-center font-bold">
+                                <span className={`absolute -top-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center font-bold text-[11px] ${themeConfig.bgSolid} ${themeConfig.textWhite}`}>
                                     {getActiveFilterCount()}
                                 </span>
                             )}
@@ -288,7 +354,7 @@ export function SearchView() {
                             <div className="space-y-4">
                                 <div className="flex justify-between">
                                     <Label className="text-xs font-bold uppercase text-muted-foreground tracking-wider">Price Range</Label>
-                                    <span className="text-xs font-mono text-primary font-bold">
+                                    <span className={`text-xs font-mono font-bold ${themeConfig.text}`}>
                                         {formatCurrency(priceRange[0])} - {formatCurrency(priceRange[1])}
                                     </span>
                                 </div>
@@ -351,7 +417,7 @@ export function SearchView() {
                                             className={cn(
                                                 "flex flex-col items-center gap-1.5 p-2 rounded-xl border transition-all min-w-[70px] cursor-pointer",
                                                 !selectedBucketId
-                                                    ? "bg-primary/20 border-primary/50"
+                                                    ? `${themeConfig.bgMedium} ${themeConfig.borderMedium}`
                                                     : "bg-secondary/10 border-white/5 hover:border-white/10"
                                             )}
                                         >
@@ -393,7 +459,7 @@ export function SearchView() {
                                             className={cn(
                                                 "flex items-center justify-between p-3 rounded-xl border transition-colors cursor-pointer",
                                                 selectedCategories.includes(cat.id)
-                                                    ? "bg-primary/20 border-primary/50"
+                                                    ? `${themeConfig.bgMedium} ${themeConfig.borderMedium}`
                                                     : "bg-secondary/10 border-white/5 hover:border-white/10"
                                             )}
                                             onClick={() => {
@@ -416,7 +482,7 @@ export function SearchView() {
                                                 </div>
                                                 <span className="text-xs font-medium">{cat.label}</span>
                                             </div>
-                                            {selectedCategories.includes(cat.id) && <Check className="w-4 h-4 text-primary" />}
+                                            {selectedCategories.includes(cat.id) && <Check className={`w-4 h-4 ${themeConfig.text}`} />}
                                         </div>
                                     ))}
                                 </div>
@@ -433,7 +499,7 @@ export function SearchView() {
                                             className={cn(
                                                 "px-3 py-1 cursor-pointer transition-colors border-white/10",
                                                 selectedPayments.includes(method)
-                                                    ? "bg-primary border-primary text-white"
+                                                    ? `${themeConfig.bgSolid} ${themeConfig.borderSolid} text-white`
                                                     : "bg-secondary/10 hover:bg-secondary/20"
                                             )}
                                             onClick={() => {
@@ -454,7 +520,7 @@ export function SearchView() {
                                 Reset All
                             </Button>
                             <SheetClose asChild>
-                                <Button className="h-11 rounded-xl shadow-lg shadow-primary/20">
+                                <Button className={`h-11 rounded-xl shadow-lg ${themeConfig.bgSolid} ${themeConfig.shadowGlow} ${themeConfig.textWhite} ${themeConfig.hoverBg}`}>
                                     Apply Filters
                                 </Button>
                             </SheetClose>
@@ -467,22 +533,22 @@ export function SearchView() {
             {getActiveFilterCount() > 0 && (
                 <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide shrink-0">
                     {dateRange.from && (
-                        <div className="flex items-center gap-1.5 px-3 py-1 bg-primary/20 border border-primary/20 rounded-full text-[11px] text-primary whitespace-nowrap">
+                        <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] whitespace-nowrap ${themeConfig.bgMedium} ${themeConfig.borderMedium} ${themeConfig.text}`}>
                             Date Range <X className="w-3 h-3 cursor-pointer" onClick={() => setDateRange({ from: undefined, to: undefined })} />
                         </div>
                     )}
                     {(priceRange[0] > 0 || priceRange[1] < maxPossiblePrice) && (
-                        <div className="flex items-center gap-1.5 px-3 py-1 bg-primary/20 border border-primary/20 rounded-full text-[11px] text-primary whitespace-nowrap">
+                        <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] whitespace-nowrap ${themeConfig.bgMedium} ${themeConfig.borderMedium} ${themeConfig.text}`}>
                             Price: {formatCurrency(priceRange[0])}-{formatCurrency(priceRange[1])} <X className="w-3 h-3 cursor-pointer" onClick={() => setPriceRange([0, maxPossiblePrice])} />
                         </div>
                     )}
                     {selectedCategories.map(cat => (
-                        <div key={cat} className="flex items-center gap-1.5 px-3 py-1 bg-primary/20 border border-primary/20 rounded-full text-[11px] text-primary whitespace-nowrap capitalize">
+                        <div key={cat} className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] whitespace-nowrap capitalize ${themeConfig.bgMedium} ${themeConfig.borderMedium} ${themeConfig.text}`}>
                             {cat} <X className="w-3 h-3 cursor-pointer" onClick={() => setSelectedCategories(prev => prev.filter(c => c !== cat))} />
                         </div>
                     ))}
                     {selectedPayments.map(p => (
-                        <div key={p} className="flex items-center gap-1.5 px-3 py-1 bg-primary/20 border border-primary/20 rounded-full text-[11px] text-primary whitespace-nowrap">
+                        <div key={p} className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] whitespace-nowrap ${themeConfig.bgMedium} ${themeConfig.borderMedium} ${themeConfig.text}`}>
                             {p} <X className="w-3 h-3 cursor-pointer" onClick={() => setSelectedPayments(prev => prev.filter(m => m !== p))} />
                         </div>
                     ))}
@@ -499,9 +565,9 @@ export function SearchView() {
 
             {/* Total Summary Mini-Card (Visible when filtered) */}
             {getActiveFilterCount() > 0 && (
-                <div className="bg-gradient-to-r from-primary/20 to-secondary/20 border border-primary/10 p-3 rounded-2xl flex justify-between items-center shrink-0">
+                <div className={`bg-gradient-to-r to-secondary/20 p-3 rounded-2xl flex justify-between items-center shrink-0 border ${themeConfig.gradient} ${themeConfig.borderLight}`}>
                     <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Total Filtered</span>
-                    <span className="text-lg font-bold text-primary">{formatCurrency(totalFilteredAmount)}</span>
+                    <span className={`text-lg font-bold ${themeConfig.text}`}>{formatCurrency(totalFilteredAmount)}</span>
                 </div>
             )}
 
@@ -538,7 +604,7 @@ export function SearchView() {
                                         <div className="min-w-0">
                                             <p className="font-medium text-sm truncate">{tx.description}</p>
                                             <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
-                                                <span className="px-1.5 py-0.5 rounded bg-primary/10 text-[11px] text-primary border border-primary/10 capitalize shrink-0">{tx.category}</span>
+                                                <span className={`px-1.5 py-0.5 rounded text-[11px] capitalize shrink-0 border ${themeConfig.bgLight} ${themeConfig.text} ${themeConfig.borderLight}`}>{tx.category}</span>
                                                 <span className="shrink-0">• {tx.payment_method}</span>
                                                 <span className="shrink-0">• {format(parseISO(tx.date), 'MMM d')}</span>
                                             </div>

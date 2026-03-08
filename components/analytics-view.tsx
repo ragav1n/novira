@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/select"
 import { useUserPreferences } from '@/components/providers/user-preferences-provider';
 import { useBuckets } from '@/components/providers/buckets-provider';
+import { useGroups } from '@/components/providers/groups-provider';
 import { CATEGORY_COLORS, getIconForCategory } from '@/lib/categories';
 
 const chartConfig: ChartConfig = {
@@ -115,7 +116,47 @@ export function AnalyticsView() {
     const [transactions, setTransactions] = useState<Transaction[]>([]);
     const [dateRange, setDateRange] = useState<DateRange>('1M');
     const [selectedBucketId, setSelectedBucketId] = useState<string | 'all'>('all');
-    const { formatCurrency, currency, convertAmount, userId } = useUserPreferences();
+    const { formatCurrency, currency, convertAmount, userId, activeWorkspaceId } = useUserPreferences();
+    const { groups } = useGroups();
+    
+    const activeWorkspace = useMemo(() => 
+        activeWorkspaceId && activeWorkspaceId !== 'personal' 
+            ? groups.find((g: any) => g.id === activeWorkspaceId) 
+            : null
+    , [activeWorkspaceId, groups]);
+
+    const themeConfig = useMemo(() => {
+        if (activeWorkspace?.type === 'couple') {
+            return {
+                text: 'text-rose-500',
+                textOpacity: 'text-rose-500/60',
+                bgLight: 'bg-rose-500/10',
+                bgMedium: 'bg-rose-500/20',
+                borderLight: 'border-rose-500/10',
+                borderMedium: 'border-rose-500/20',
+                shadowGlow: 'shadow-[0_0_20px_rgba(244,63,94,0.05)]',
+            }
+        } else if (activeWorkspace?.type === 'home') {
+            return {
+                text: 'text-amber-500',
+                textOpacity: 'text-amber-500/60',
+                bgLight: 'bg-amber-500/10',
+                bgMedium: 'bg-amber-500/20',
+                borderLight: 'border-amber-500/10',
+                borderMedium: 'border-amber-500/20',
+                shadowGlow: 'shadow-[0_0_20px_rgba(245,158,11,0.05)]',
+            }
+        }
+        return {
+            text: 'text-cyan-500',
+            textOpacity: 'text-cyan-500/60',
+            bgLight: 'bg-cyan-500/10',
+            bgMedium: 'bg-cyan-500/20',
+            borderLight: 'border-cyan-500/10',
+            borderMedium: 'border-cyan-500/20',
+            shadowGlow: 'shadow-[0_0_20px_rgba(6,182,212,0.05)]',
+        }
+    }, [activeWorkspace]);
 
     // getIconForCategory is now imported from lib/categories.ts
     const getBucketIcon = (iconName?: string) => {
@@ -129,7 +170,7 @@ export function AnalyticsView() {
         if (userId) {
             fetchData();
         }
-    }, [dateRange, currency, userId, selectedBucketId]);
+    }, [dateRange, currency, userId, selectedBucketId, activeWorkspaceId]);
 
     const fetchData = async () => {
         setLoading(true);
@@ -149,6 +190,12 @@ export function AnalyticsView() {
 
             if (selectedBucketId !== 'all') {
                 query = query.eq('bucket_id', selectedBucketId);
+            }
+
+            if (activeWorkspaceId && activeWorkspaceId !== 'personal') {
+                query = query.eq('group_id', activeWorkspaceId);
+            } else if (activeWorkspaceId === 'personal') {
+                query = query.is('group_id', null);
             }
 
             // Apply Date Filter
@@ -363,7 +410,7 @@ export function AnalyticsView() {
                 {/* Filters Row */}
                 <div className="flex items-center justify-center gap-2 px-1">
                     <Select value={selectedBucketId} onValueChange={(val) => setSelectedBucketId(val)}>
-                        <SelectTrigger className="flex-1 min-w-0 max-w-[160px] px-3 h-9 text-[12px] bg-cyan-500/10 border-cyan-500/20 text-cyan-500 rounded-xl font-medium">
+                        <SelectTrigger className={`flex-1 min-w-0 max-w-[160px] px-3 h-9 text-[12px] rounded-xl font-medium ${themeConfig.bgLight} ${themeConfig.borderMedium} ${themeConfig.text}`}>
                             <SelectValue placeholder="All Spending" />
                         </SelectTrigger>
                         <SelectContent align="center">
@@ -397,20 +444,20 @@ export function AnalyticsView() {
 
                 {/* Bucket Progress Highlight */}
                 {selectedBucketId !== 'all' && buckets.find(b => b.id === selectedBucketId) && (
-                    <Card className="bg-cyan-500/10 border-cyan-500/20 shadow-[0_0_20px_rgba(6,182,212,0.05)]">
+                    <Card className={`${themeConfig.bgLight} ${themeConfig.borderMedium} ${themeConfig.shadowGlow}`}>
                         <CardContent className="p-4 flex items-center justify-between">
                             <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-2xl bg-cyan-500/20 flex items-center justify-center text-cyan-500 border border-cyan-500/20">
+                                <div className={`w-10 h-10 rounded-2xl flex items-center justify-center border ${themeConfig.bgMedium} ${themeConfig.text} ${themeConfig.borderMedium}`}>
                                     {getBucketIcon(buckets.find(b => b.id === selectedBucketId)?.icon)}
                                 </div>
                                 <div>
-                                    <h4 className="text-sm font-bold text-cyan-500">{buckets.find(b => b.id === selectedBucketId)?.name}</h4>
-                                    <p className="text-[11px] text-cyan-500/60 font-bold uppercase tracking-widest">Targeted View</p>
+                                    <h4 className={`text-sm font-bold ${themeConfig.text}`}>{buckets.find(b => b.id === selectedBucketId)?.name}</h4>
+                                    <p className={`text-[11px] font-bold uppercase tracking-widest ${themeConfig.textOpacity}`}>Targeted View</p>
                                 </div>
                             </div>
                             <div className="text-right">
-                                <p className="text-[11px] text-cyan-500/60 font-bold uppercase tracking-widest">Budget Remaining</p>
-                                <p className="text-sm font-bold text-cyan-500">
+                                <p className={`text-[11px] font-bold uppercase tracking-widest ${themeConfig.textOpacity}`}>Budget Remaining</p>
+                                <p className={`text-sm font-bold ${themeConfig.text}`}>
                                     {formatCurrency(Number(buckets.find(b => b.id === selectedBucketId)?.budget || 0) - totalSpentInRange)}
                                 </p>
                             </div>

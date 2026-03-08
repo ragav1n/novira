@@ -12,10 +12,12 @@ import { useBuckets } from '@/components/providers/buckets-provider';
 import { useIsMobile } from '@/components/ui/use-mobile';
 import { getBucketIcon } from '@/utils/icon-utils';
 
+import { useGroups } from '@/components/providers/groups-provider';
+
 interface ExportDateRangeModalProps {
     isOpen: boolean;
     onOpenChange: (open: boolean) => void;
-    onExport: (range: DateRange | null, bucketId: string | null) => void;
+    onExport: (range: DateRange | null, bucketId: string | null, groupId: string | 'personal' | null) => void;
     title?: string;
     description?: string;
     loading?: boolean;
@@ -31,9 +33,16 @@ export function ExportDateRangeModal({
 }: ExportDateRangeModalProps) {
     const isMobile = useIsMobile();
     const { buckets } = useBuckets();
+    const { groups } = useGroups();
     const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
     const [selectedPreset, setSelectedPreset] = useState<string | null>(null);
     const [selectedBucketId, setSelectedBucketId] = useState<string | null>(null);
+    const [selectedGroupId, setSelectedGroupId] = useState<string | 'personal' | null>(null);
+
+    const eligibleGroups = groups.filter(g => g.type === 'couple' || g.type === 'home');
+    
+    // Automatically select the active workspace if any, otherwise all
+    // Since we don't have activeWorkspaceContext here directly, we leave it as 'null' (All) by default.
 
     const handlePresetSelect = (preset: string) => {
         const now = new Date();
@@ -82,7 +91,7 @@ export function ExportDateRangeModal({
             range = dateRange;
         }
 
-        onExport(range, selectedBucketId);
+        onExport(range, selectedBucketId, selectedGroupId);
     };
 
     // Auto-select 'current_month' on open if nothing selected?
@@ -105,7 +114,7 @@ export function ExportDateRangeModal({
                     <DialogDescription>{description}</DialogDescription>
                 </DialogHeader>
 
-                <div className="grid gap-4 py-4">
+                <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto scrollbar-hide pr-1">
                     <div className="grid grid-cols-2 gap-2">
                         {presets.map((preset) => (
                             <Button
@@ -131,6 +140,49 @@ export function ExportDateRangeModal({
                             align={isMobile ? "center" : "start"}
                             className="w-full"
                         />
+                    </div>
+
+                    {/* Workspace Filter */}
+                    <div className="space-y-3">
+                        <label className="text-sm font-medium text-muted-foreground">Context Filter</label>
+                        <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+                            <div
+                                onClick={() => setSelectedGroupId(null)}
+                                className={cn(
+                                    "flex items-center justify-center px-4 py-2 rounded-xl border transition-all cursor-pointer whitespace-nowrap",
+                                    selectedGroupId === null
+                                        ? "bg-primary text-white border-primary"
+                                        : "bg-secondary/10 border-white/5 hover:border-white/10"
+                                )}
+                            >
+                                <span className="text-xs font-bold">All</span>
+                            </div>
+                            <div
+                                onClick={() => setSelectedGroupId('personal')}
+                                className={cn(
+                                    "flex items-center justify-center px-4 py-2 rounded-xl border transition-all cursor-pointer whitespace-nowrap",
+                                    selectedGroupId === 'personal'
+                                        ? "bg-primary text-white border-primary"
+                                        : "bg-secondary/10 border-white/5 hover:border-white/10"
+                                )}
+                            >
+                                <span className="text-xs font-bold">Personal Only</span>
+                            </div>
+                            {eligibleGroups.map((group) => (
+                                <div
+                                    key={group.id}
+                                    onClick={() => setSelectedGroupId(group.id)}
+                                    className={cn(
+                                        "flex items-center justify-center px-4 py-2 rounded-xl border transition-all cursor-pointer whitespace-nowrap",
+                                        selectedGroupId === group.id
+                                            ? "bg-primary text-white border-primary"
+                                            : "bg-secondary/10 border-white/5 hover:border-white/10"
+                                    )}
+                                >
+                                    <span className="text-xs font-bold">{group.name}</span>
+                                </div>
+                            ))}
+                        </div>
                     </div>
 
                     {/* Bucket Filter */}
