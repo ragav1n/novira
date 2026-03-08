@@ -37,7 +37,6 @@ export function PWAUpdater() {
             try {
                 const registration = await navigator.serviceWorker.getRegistration();
                 if (registration) {
-                    console.log('PWA: Checking for updates...');
                     try {
                         await registration.update();
                     } catch (e) {

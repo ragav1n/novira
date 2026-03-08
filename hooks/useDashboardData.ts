@@ -26,7 +26,7 @@ export function useDashboardData(userId: string | null) {
                 .limit(200);
 
             if (bypassCache) {
-                 query = query.neq('id', `bypass-${Date.now()}`);
+                 query = query.neq('description', `bypass-${Date.now()}`);
             }
 
             const { data: txs } = await query;
@@ -143,7 +143,7 @@ export function useDashboardData(userId: string | null) {
                                 try {
                                     const { error } = await supabase
                                         .from('recurring_templates')
-                                        .delete()
+                                        .update({ is_active: false })
                                         .eq('user_id', userId)
                                         .eq('description', tx.description)
                                         .eq('amount', tx.amount);

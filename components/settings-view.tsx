@@ -155,7 +155,7 @@ export function SettingsView() {
         try {
             const { error } = await supabase
                 .from('recurring_templates')
-                .delete()
+                .update({ is_active: false })
                 .eq('id', templateId);
 
             if (error) throw error;

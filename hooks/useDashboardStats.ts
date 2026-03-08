@@ -138,11 +138,11 @@ export function useDashboardStats({
         return {
             dailyAverage,
             projectedSpend,
-            isExceeding: projectedSpend > monthlyBudget,
+            isExceeding: projectedSpend > displayBudget,
             daysInMonth,
             currentDayOfMoth
         };
-    }, [isBucketFocused, totalSpent, monthlyBudget]);
+    }, [isBucketFocused, totalSpent, displayBudget]);
 
     return {
         focusedBucket,

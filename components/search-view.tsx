@@ -108,7 +108,7 @@ export function SearchView() {
     }, [searchQuery, priceRange, selectedCategories, selectedPayments, dateRange, selectedBucketId, sortBy, transactions]);
 
     const getBucketIcon = (iconName?: string) => {
-        const icons: Record<string, any> = {
+        const icons: Record<string, React.ElementType> = {
             Tag, Plane, Home, Gift, Car, Utensils, ShoppingCart,
             Heart, Gamepad2, School, Laptop, Music
         };
@@ -409,9 +409,9 @@ export function SearchView() {
                                                         borderColor: `${CATEGORY_COLORS[cat.id] || '#8A2BE2'}40`
                                                     }}
                                                 >
-                                                    {React.cloneElement(getIconForCategory(cat.id) as React.ReactElement<any>, {
+                                                    {React.cloneElement(getIconForCategory(cat.id) as React.ReactElement<{ style?: React.CSSProperties }>, {
                                                         style: { color: CATEGORY_COLORS[cat.id] || '#8A2BE2' }
-                                                    } as any)}
+                                                    })}
                                                 </div>
                                                 <span className="text-xs font-medium">{cat.label}</span>
                                             </div>
@@ -530,9 +530,9 @@ export function SearchView() {
                                                 borderColor: `${CATEGORY_COLORS[tx.category.toLowerCase()] || CATEGORY_COLORS.uncategorized}40`
                                             }}
                                         >
-                                            {React.cloneElement(getIconForCategory(tx.category.toLowerCase()) as React.ReactElement<any>, {
+                                            {React.cloneElement(getIconForCategory(tx.category.toLowerCase()) as React.ReactElement<{ style?: React.CSSProperties }>, {
                                                 style: { color: CATEGORY_COLORS[tx.category.toLowerCase()] || CATEGORY_COLORS.uncategorized }
-                                            } as any)}
+                                            })}
                                         </div>
                                         <div className="min-w-0">
                                             <p className="font-medium text-sm truncate">{tx.description}</p>

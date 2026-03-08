@@ -82,7 +82,7 @@ const itemVariants = {
 };
 
 // Chart config remains for label mapping, but colors are centralized
-const chartConfig: any = {
+const chartConfig = {
     food: { label: "Food" },
     groceries: { label: "Groceries" },
     fashion: { label: "Fashion" },
@@ -95,7 +95,7 @@ const chartConfig: any = {
     education: { label: "Education" },
     others: { label: "Others" },
     uncategorized: { label: "Uncategorized" },
-};
+} satisfies ChartConfig;
 
 import type { Transaction, AuditLog } from '@/types/transaction';
 
@@ -142,6 +142,7 @@ export function DashboardView() {
     [eligibleGroups, activeWorkspaceId]);
 
     const isCoupleWorkspace = activeWorkspaceGroup?.type === 'couple';
+    const isHomeWorkspace = activeWorkspaceGroup?.type === 'home';
 
     const isBucketFocused = dashboardFocus !== 'allowance' && dashboardFocus !== '';
     const bucketCurrencyTemp = isBucketFocused ? buckets.find(b => b.id === dashboardFocus)?.currency || currency : currency;
@@ -293,11 +294,11 @@ export function DashboardView() {
                     >
                         <div className={cn(
                             "absolute top-[20%] -right-[10%] w-[60%] h-[60%] rounded-full blur-[50px] opacity-15 gpu transition-colors duration-1000",
-                            isCoupleWorkspace ? "bg-rose-500" : "bg-primary"
+                            isCoupleWorkspace ? "bg-rose-500" : isHomeWorkspace ? "bg-yellow-500" : "bg-primary"
                         )} />
                         <div className={cn(
                             "absolute bottom-[20%] -left-[10%] w-[50%] h-[50%] rounded-full blur-[40px] opacity-10 gpu transition-colors duration-1000",
-                            isCoupleWorkspace ? "bg-rose-500" : "bg-primary/40"
+                            isCoupleWorkspace ? "bg-rose-500" : isHomeWorkspace ? "bg-amber-500" : "bg-primary/40"
                         )} />
                     </motion.div>
                 )}
@@ -395,9 +396,12 @@ export function DashboardView() {
                         </button>
                         <button
                             onClick={() => router.push('/add')}
-                            className="w-10 h-10 rounded-full bg-primary/20 hover:bg-primary/30 flex items-center justify-center border border-primary/20 transition-colors shrink-0"
+                            className={cn(
+                                "w-10 h-10 rounded-full flex items-center justify-center border transition-colors shrink-0",
+                                isCoupleWorkspace ? "bg-rose-500/20 hover:bg-rose-500/30 border-rose-500/20" : isHomeWorkspace ? "bg-yellow-500/20 hover:bg-yellow-500/30 border-yellow-500/20" : "bg-primary/20 hover:bg-primary/30 border-primary/20"
+                            )}
                         >
-                            <Plus className="w-5 h-5 text-primary" />
+                            <Plus className={cn("w-5 h-5", isCoupleWorkspace ? "text-rose-500" : isHomeWorkspace ? "text-yellow-500" : "text-primary")} />
                         </button>
                     </div>
                 </div>
@@ -585,7 +589,9 @@ export function DashboardView() {
                         ? "bg-gradient-to-br from-cyan-500 to-teal-600 shadow-cyan-500/20"
                         : isCoupleWorkspace 
                             ? "bg-gradient-to-br from-rose-500 to-rose-700 shadow-rose-500/20"
-                            : "bg-gradient-to-br from-[#8A2BE2] to-[#4B0082] shadow-primary/20"
+                            : isHomeWorkspace
+                                ? "bg-gradient-to-br from-yellow-500 to-amber-600 shadow-yellow-500/20"
+                                : "bg-gradient-to-br from-[#8A2BE2] to-[#4B0082] shadow-primary/20"
                 )}>
                     <div className="absolute top-0 right-0 p-6 opacity-10 transition-colors">
                         <span className="text-9xl font-bold text-white leading-none translate-x-4 -translate-y-4">
@@ -683,19 +689,19 @@ export function DashboardView() {
                         className={cn(
                             "p-4 rounded-3xl border backdrop-blur-md relative overflow-hidden",
                             runRateData.isExceeding
-                                ? "bg-rose-500/10 border-rose-500/20"
-                                : "bg-emerald-500/10 border-emerald-500/20"
+                                ? isCoupleWorkspace ? "bg-rose-500/10 border-rose-500/20" : isHomeWorkspace ? "bg-yellow-500/10 border-yellow-500/20" : "bg-red-500/10 border-red-500/20"
+                                : isCoupleWorkspace ? "bg-rose-500/5 border-rose-500/10" : isHomeWorkspace ? "bg-yellow-500/5 border-yellow-500/10" : "bg-emerald-500/10 border-emerald-500/20"
                         )}
                     >
                         <div className={cn(
                             "absolute top-0 right-0 w-24 h-24 rounded-full blur-[40px] opacity-20",
-                            runRateData.isExceeding ? "bg-rose-500" : "bg-emerald-500"
+                            isCoupleWorkspace ? "bg-rose-500" : isHomeWorkspace ? "bg-yellow-500" : (runRateData.isExceeding ? "bg-red-500" : "bg-emerald-500")
                         )} />
                         
                         <div className="relative z-10">
                             <div className="flex justify-between items-start mb-2">
                                 <div className="flex items-center gap-2">
-                                    <Clock className={cn("w-4 h-4", runRateData.isExceeding ? "text-rose-400" : "text-emerald-400")} />
+                                    <Clock className={cn("w-4 h-4", isCoupleWorkspace ? "text-rose-400" : isHomeWorkspace ? "text-yellow-500" : (runRateData.isExceeding ? "text-red-400" : "text-emerald-400"))} />
                                     <h3 className="text-sm font-bold">Month Forecasting</h3>
                                 </div>
                                 <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground bg-secondary/30 px-2 py-0.5 rounded-full">
@@ -709,14 +715,20 @@ export function DashboardView() {
                             </p>
 
                             {runRateData.isExceeding ? (
-                                <div className="flex items-center gap-2 text-xs font-bold text-rose-400 bg-rose-500/10 px-3 py-2 rounded-xl border border-rose-500/20 mt-2">
+                                <div className={cn(
+                                    "flex items-center gap-2 text-xs font-bold px-3 py-2 rounded-xl border mt-2",
+                                    isCoupleWorkspace ? "text-rose-400 bg-rose-500/10 border-rose-500/20" : isHomeWorkspace ? "text-yellow-500 bg-yellow-500/10 border-yellow-500/20" : "text-red-400 bg-red-500/10 border-red-500/20"
+                                )}>
                                     <ArrowUpRight className="w-4 h-4" />
-                                    Projected to exceed budget by {formatCurrency(Math.abs(monthlyBudget - runRateData.projectedSpend))}
+                                    Projected to exceed {isCoupleWorkspace || isHomeWorkspace ? 'workspace limit' : 'budget'} by {formatCurrency(Math.abs(displayBudget - runRateData.projectedSpend))}
                                 </div>
                             ) : (
-                                <div className="flex items-center gap-2 text-xs font-bold text-emerald-400 bg-emerald-500/10 px-3 py-2 rounded-xl border border-emerald-500/20 mt-2">
+                                <div className={cn(
+                                    "flex items-center gap-2 text-xs font-bold px-3 py-2 rounded-xl border mt-2",
+                                    isCoupleWorkspace ? "text-rose-400 bg-rose-500/10 border-rose-500/20" : isHomeWorkspace ? "text-yellow-500 bg-yellow-500/10 border-yellow-500/20" : "text-emerald-400 bg-emerald-500/10 border-emerald-500/20"
+                                )}>
                                     <ArrowDownLeft className="w-4 h-4" />
-                                    On track! Projected to save {formatCurrency(monthlyBudget - runRateData.projectedSpend)}
+                                    On track! Projected to save {formatCurrency(displayBudget - runRateData.projectedSpend)}
                                 </div>
                             )}
                         </div>
@@ -731,7 +743,9 @@ export function DashboardView() {
                             "flex items-center justify-center w-full gap-2 py-4 rounded-3xl backdrop-blur-xl border text-white font-bold transition-all active:scale-95",
                             isCoupleWorkspace 
                                 ? "bg-rose-500/20 border-rose-500/30 shadow-[0_4px_30px_rgba(244,63,94,0.15)] hover:bg-rose-500/30 hover:border-rose-500/50" 
-                                : "bg-primary/20 border-primary/30 shadow-[0_4px_30px_rgba(138,43,226,0.15)] hover:bg-primary/30 hover:border-primary/50"
+                                : isHomeWorkspace
+                                    ? "bg-yellow-500/20 border-yellow-500/30 shadow-[0_4px_30px_rgba(234,179,8,0.15)] hover:bg-yellow-500/30 hover:border-yellow-500/50"
+                                    : "bg-primary/20 border-primary/30 shadow-[0_4px_30px_rgba(138,43,226,0.15)] hover:bg-primary/30 hover:border-primary/50"
                         )}
                     >
                         <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center backdrop-blur-sm">
@@ -769,7 +783,7 @@ export function DashboardView() {
                         <h3 className="text-lg font-bold">Spending by Category</h3>
                         <span className={cn(
                             "text-[11px] bg-secondary/50 backdrop-blur-md px-3 py-1 rounded-full border font-bold uppercase tracking-wider whitespace-nowrap",
-                            isCoupleWorkspace ? "text-rose-400 border-rose-500/20" : "text-primary border-primary/20"
+                            isCoupleWorkspace ? "text-rose-400 border-rose-500/20" : isHomeWorkspace ? "text-yellow-500 border-yellow-500/20" : "text-primary border-primary/20"
                         )}>{format(new Date(), 'MMMM')} Overview</span>
                     </div>
                     <Card className="border-none bg-card/40 backdrop-blur-md shadow-none">
@@ -849,7 +863,7 @@ export function DashboardView() {
                                 onClick={() => setIsViewAllOpen(true)}
                                 className={cn(
                                     "text-xs font-bold transition-colors uppercase tracking-wider px-2 py-1",
-                                    isCoupleWorkspace ? "text-rose-400 hover:text-rose-300" : "text-primary hover:text-primary/80"
+                                    isCoupleWorkspace ? "text-rose-400 hover:text-rose-300" : isHomeWorkspace ? "text-yellow-500 hover:text-yellow-400" : "text-primary hover:text-primary/80"
                                 )}
                             >
                                 View All

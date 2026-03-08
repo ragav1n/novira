@@ -3,7 +3,7 @@
 import { motion } from 'framer-motion';
 
 import React, { useEffect, useState } from 'react';
-import { useUserPreferences, CURRENCY_SYMBOLS } from '@/components/providers/user-preferences-provider';
+import { useUserPreferences } from '@/components/providers/user-preferences-provider';
 import { supabase } from '@/lib/supabase';
 import { Card, CardContent } from '@/components/ui/card';
 import { Calendar, CreditCard, RotateCw, Trash2, ArrowLeft } from 'lucide-react';
@@ -20,11 +20,11 @@ interface RecurringTemplate {
     next_occurrence: string;
     last_processed: string | null;
     category: string;
-    status: 'active' | 'paused' | 'cancelled';
+    is_active: boolean;
 }
 
 export function SubscriptionsView() {
-    const { userId, formatCurrency } = useUserPreferences();
+    const { userId, formatCurrency, convertAmount, currency } = useUserPreferences();
     const router = useRouter();
     const [templates, setTemplates] = useState<RecurringTemplate[]>([]);
     const [loading, setLoading] = useState(true);
@@ -53,20 +53,21 @@ export function SubscriptionsView() {
         if (!confirm('Are you sure you want to cancel this subscription?')) return;
         
         // Optimistic update
-        setTemplates(prev => prev.filter(t => t.id !== id));
+        setTemplates(prev => prev.map(t => t.id === id ? { ...t, is_active: false } : t));
         
         await supabase
             .from('recurring_templates')
-            .update({ status: 'cancelled' })
+            .update({ is_active: false })
             .eq('id', id);
     };
 
 
 
     const totalMonthly = templates
-        .filter(t => t.status === 'active')
+        .filter(t => t.is_active)
         .reduce((acc, curr) => {
-            let monthlyEquivalent = Number(curr.amount);
+            const amountInBase = convertAmount(Number(curr.amount), curr.currency, currency);
+            let monthlyEquivalent = amountInBase;
             if (curr.frequency === 'yearly') monthlyEquivalent /= 12;
             if (curr.frequency === 'weekly') monthlyEquivalent *= 4.33;
             if (curr.frequency === 'daily') monthlyEquivalent *= 30;
@@ -104,7 +105,7 @@ export function SubscriptionsView() {
                 <CardContent className="p-6">
                     <p className="text-sm text-muted-foreground font-medium mb-1">Estimated Monthly Cost</p>
                     <h2 className="text-3xl font-bold text-primary">{formatCurrency(totalMonthly)}</h2>
-                    <p className="text-xs text-muted-foreground mt-2">Based on {templates.filter(t => t.status === 'active').length} active recurring expenses</p>
+                    <p className="text-xs text-muted-foreground mt-2">Based on {templates.filter(t => t.is_active).length} active recurring expenses</p>
                 </CardContent>
             </Card>
 
@@ -118,7 +119,7 @@ export function SubscriptionsView() {
                         <p className="text-xs opacity-70 mt-1">Add a recurring expense to see it here.</p>
                     </div>
                 ) : (
-                    templates.filter(t => t.status === 'active').map((template) => (
+                    templates.filter(t => t.is_active).map((template) => (
                         <Card key={template.id} className="bg-card/40 border-white/5 backdrop-blur-sm overflow-hidden group">
                             <CardContent className="p-4 flex items-center gap-4">
                                 <div className="w-12 h-12 rounded-2xl bg-primary/10 flex flex-col items-center justify-center shrink-0 border border-primary/20">
@@ -152,10 +153,10 @@ export function SubscriptionsView() {
                 )}
             </div>
             
-            {templates.filter(t => t.status !== 'active').length > 0 && (
+            {templates.filter(t => !t.is_active).length > 0 && (
                  <div className="pt-6 border-t border-white/10 space-y-3">
                      <h3 className="text-sm font-bold text-muted-foreground">Inactive Subscriptions</h3>
-                     {templates.filter(t => t.status !== 'active').map((template) => (
+                     {templates.filter(t => !t.is_active).map((template) => (
                          <div key={template.id} className="flex justify-between items-center p-3 rounded-xl bg-secondary/10 opacity-60">
                              <div className="flex items-center gap-3">
                                  <RotateCw className="w-4 h-4 text-muted-foreground" />
