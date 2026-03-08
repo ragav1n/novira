@@ -352,9 +352,22 @@ export function DashboardView() {
                                                     setActiveWorkspaceId(g.id);
                                                     setDashboardFocus('allowance');
                                                 }} 
-                                                className={cn("rounded-xl cursor-pointer py-2", activeWorkspaceId === g.id && "bg-rose-500/10 text-rose-400")}
+                                                className={cn(
+                                                    "rounded-xl cursor-pointer py-2",
+                                                    activeWorkspaceId === g.id && (
+                                                        g.type === 'couple' ? "bg-rose-500/10 text-rose-400" :
+                                                        g.type === 'home' ? "bg-yellow-500/10 text-yellow-500" :
+                                                        "bg-primary/10 text-primary"
+                                                    )
+                                                )}
                                             >
-                                                <Building2 className="w-4 h-4 mr-2" />
+                                                {g.type === 'couple' ? (
+                                                    <Heart className={cn("w-4 h-4 mr-2", activeWorkspaceId === g.id ? "text-rose-400" : "text-muted-foreground")} />
+                                                ) : g.type === 'home' ? (
+                                                    <Home className={cn("w-4 h-4 mr-2", activeWorkspaceId === g.id ? "text-yellow-500" : "text-muted-foreground")} />
+                                                ) : (
+                                                    <Users className={cn("w-4 h-4 mr-2", activeWorkspaceId === g.id ? "text-primary" : "text-muted-foreground")} />
+                                                )}
                                                 <span className="truncate">{g.name}</span>
                                                 {activeWorkspaceId === g.id && <Check className="w-3 h-3 ml-auto shrink-0" />}
                                             </DropdownMenuItem>

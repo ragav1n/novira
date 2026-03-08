@@ -221,9 +221,10 @@ export function SearchView() {
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.98 }}
             transition={{ type: 'spring', stiffness: 300, damping: 30, mass: 0.8 }}
-            className="p-5 space-y-6 max-w-md mx-auto relative pb-24 h-full flex flex-col"
+            className="relative min-h-screen w-full h-full"
         >
-            {/* Header */}
+            <div className="p-5 space-y-6 max-w-md mx-auto relative pb-24 h-full flex flex-col">
+                {/* Header */}
             <div className="flex items-center justify-between relative min-h-[40px]">
                 <button
                     onClick={() => router.back()}
@@ -595,6 +596,7 @@ export function SearchView() {
                     <p className="text-[11px] text-muted-foreground font-medium uppercase tracking-widest">{filteredTransactions.length} transactions match</p>
                     <button onClick={resetFilters} className="text-[11px] text-primary font-bold hover:underline">RESET</button>
                 </div>
+            </div>
             </div>
         </motion.div>
     );

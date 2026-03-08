@@ -80,12 +80,10 @@ export function SubscriptionsView() {
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.98 }}
             transition={{ type: 'spring', stiffness: 300, damping: 30, mass: 0.8 }}
-            className={cn(
-                "p-5 space-y-6 max-w-md mx-auto relative min-h-screen transition-all duration-300",
-                loading ? "opacity-40 blur-[1px] pointer-events-none" : "opacity-100 blur-0"
-            )}
+            className="relative min-h-screen w-full"
         >
-            <div className="flex items-center justify-between relative min-h-[40px] mb-2">
+            <div className="p-5 space-y-6 max-w-md mx-auto relative min-h-screen">
+                <div className="flex items-center justify-between relative min-h-[40px] mb-2">
                 <button 
                     onClick={() => router.back()} 
                     className="w-10 h-10 rounded-full bg-secondary/30 hover:bg-secondary/50 flex items-center justify-center transition-colors shrink-0 z-10"
@@ -168,6 +166,7 @@ export function SubscriptionsView() {
                  </div>
             )}
             
+            </div>
         </motion.div>
     );
 }
