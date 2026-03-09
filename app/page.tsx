@@ -1,6 +1,5 @@
 'use client'
 
-import { Component as SignInCard } from '@/components/sign-in-card'
 import dynamic from 'next/dynamic'
 import { WaveLoader } from '@/components/ui/wave-loader'
 
@@ -24,6 +23,11 @@ const DashboardSkeleton = () => (
 const DashboardView = dynamic(
   () => import('@/components/dashboard-view').then((mod) => mod.DashboardView),
   { ssr: false, loading: () => <DashboardSkeleton /> }
+)
+
+const SignInCard = dynamic(
+  () => import('@/components/sign-in-card').then((mod) => mod.Component),
+  { ssr: false }
 )
 
 import { useUserPreferences } from '@/components/providers/user-preferences-provider'

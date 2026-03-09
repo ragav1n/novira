@@ -9,12 +9,17 @@ import { Plus, Utensils, Car, Zap, ShoppingBag, HeartPulse, Clapperboard, Circle
 import { CATEGORY_COLORS, getIconForCategory } from '@/lib/categories';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { Pie, PieChart, Cell } from 'recharts';
-import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/pie-chart";
+import dynamic from 'next/dynamic';
+import { ChartConfig } from "@/components/ui/pie-chart";
 import { supabase } from '@/lib/supabase';
 import { format, isSameMonth, parseISO, differenceInDays } from 'date-fns';
 import { WaveLoader } from '@/components/ui/wave-loader';
 import { AnimatePresence, motion } from 'framer-motion';
+
+import { PieChart, Pie, Cell } from 'recharts';
+const ChartContainer: any = dynamic(() => import("@/components/ui/pie-chart").then(mod => mod.ChartContainer as any), { ssr: false });
+const ChartTooltip: any = dynamic(() => import("@/components/ui/pie-chart").then(mod => mod.ChartTooltip as any), { ssr: false });
+const ChartTooltipContent: any = dynamic(() => import("@/components/ui/pie-chart").then(mod => mod.ChartTooltipContent as any), { ssr: false });
 import { useGroups } from './providers/groups-provider';
 import { useBuckets } from './providers/buckets-provider';
 import {
@@ -49,10 +54,9 @@ import { LATEST_FEATURE_ANNOUNCEMENT } from '@/lib/feature-flags';
 import { TransactionRow } from '@/components/transaction-row';
 import { DashboardTransactionsDrawer } from '@/components/dashboard-transactions-drawer';
 import { TransactionHistoryDialog } from '@/components/transaction-history-dialog';
-import { LocationPicker } from '@/components/ui/location-picker';
-import dynamic from 'next/dynamic';
 import { FluidDropdown } from '@/components/ui/fluid-dropdown';
-const ExpenseMapView = dynamic(() => import('@/components/expense-map-view').then(mod => mod.ExpenseMapView), { ssr: false });
+const LocationPicker: any = dynamic(() => import('@/components/ui/location-picker').then(mod => mod.LocationPicker as any), { ssr: false });
+const ExpenseMapView: any = dynamic(() => import('@/components/expense-map-view').then(mod => mod.ExpenseMapView as any), { ssr: false });
 
 // Lazy load non-critical dialogs
 const AddFundsDialog = lazy(() => import('@/components/add-funds-dialog').then(module => ({ default: module.AddFundsDialog })));
@@ -310,7 +314,7 @@ export function DashboardView() {
                                                 color: g.type === 'couple' ? "#f43f5e" : g.type === 'home' ? "#eab308" : "#8a2be2",
                                             }))
                                         ]}
-                                        onSelect={(category) => {
+                                        onSelect={(category: any) => {
                                             if (category.id === "personal") {
                                                 setActiveWorkspaceId(null);
                                             } else {
@@ -742,7 +746,7 @@ export function DashboardView() {
                         <span className={cn(
                             "text-[11px] bg-secondary/50 backdrop-blur-md px-3 py-1 rounded-full border font-bold uppercase tracking-wider whitespace-nowrap",
                             isCoupleWorkspace ? "text-rose-400 border-rose-500/20" : isHomeWorkspace ? "text-yellow-500 border-yellow-500/20" : "text-primary border-primary/20"
-                        )}>{format(new Date(), 'MMMM')} Overview</span>
+                        )}>{isBucketFocused ? "Mission" : format(new Date(), 'MMMM')} Overview</span>
                     </div>
                     <Card className="border-none bg-card/40 backdrop-blur-md shadow-none">
                         <CardContent className="p-4 flex flex-col sm:flex-row items-center justify-between gap-6">
@@ -806,7 +810,7 @@ export function DashboardView() {
                 {/* Recent Transactions */}
                 <div className="space-y-4">
                     <div className="flex justify-between items-center">
-                        <h3 className="text-lg font-bold">Recent Transactions</h3>
+                        <h3 className="text-lg font-bold">{isBucketFocused ? "Mission" : "Recent"} Transactions</h3>
                         <div className="flex items-center gap-2">
                             {transactions.some(tx => tx.place_lat && tx.place_lng) && (
                                 <button
@@ -1004,7 +1008,7 @@ export function DashboardView() {
                                     placeAddress={editingTransaction.place_address || null}
                                     placeLat={editingTransaction.place_lat || null}
                                     placeLng={editingTransaction.place_lng || null}
-                                    onChange={(loc) => setEditingTransaction({
+                                    onChange={(loc: any) => setEditingTransaction({
                                         ...editingTransaction,
                                         place_name: loc.place_name || undefined,
                                         place_address: loc.place_address || undefined,

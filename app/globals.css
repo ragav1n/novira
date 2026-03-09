@@ -150,7 +150,14 @@
   .blur-optimized {
     -webkit-backdrop-filter: blur(8px);
     backdrop-filter: blur(8px);
-    will-change: backdrop-filter;
+    will-change: backdrop-filter, transform;
+    transform: translateZ(0);
+  }
+
+  .glow-optimized {
+    will-change: filter, transform;
+    transform: translateZ(0);
+    filter: blur(50px);
   }
 
   /* Page transition animation (replaces framer-motion in template.tsx) */

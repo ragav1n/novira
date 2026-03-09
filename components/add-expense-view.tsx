@@ -20,10 +20,13 @@ import { useGroups } from '@/components/providers/groups-provider';
 import { useBuckets } from '@/components/providers/buckets-provider';
 import { Switch } from '@/components/ui/switch';
 import { CurrencyDropdown } from '@/components/ui/currency-dropdown';
-import { LocationPicker } from '@/components/ui/location-picker';
+import dynamic from 'next/dynamic';
+
+const LocationPicker: any = dynamic(() => import('@/components/ui/location-picker').then(mod => mod.LocationPicker as any), { ssr: false });
+const SplitExpenseSection: any = dynamic(() => import('./add-expense/split-expense-section').then(mod => mod.SplitExpenseSection as any), { ssr: false });
+const RecurringExpenseSection: any = dynamic(() => import('./add-expense/recurring-expense-section').then(mod => mod.RecurringExpenseSection as any), { ssr: false });
+
 import { CategorySelector, BucketSelector } from './add-expense/selectors';
-import { SplitExpenseSection } from './add-expense/split-expense-section';
-import { RecurringExpenseSection } from './add-expense/recurring-expense-section';
 import { useExpenseForm } from '@/hooks/useExpenseForm';
 import { useExpenseSubmission } from '@/hooks/useExpenseSubmission';
 
@@ -183,7 +186,7 @@ export function AddExpenseView() {
                     placeAddress={formState.placeAddress}
                     placeLat={formState.placeLat}
                     placeLng={formState.placeLng}
-                    onChange={(loc) => {
+                    onChange={(loc: any) => {
                         formState.setPlaceName(loc.place_name);
                         formState.setPlaceAddress(loc.place_address);
                         formState.setPlaceLat(loc.place_lat);
