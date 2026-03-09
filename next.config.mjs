@@ -1,8 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   compress: true,
-  images: {
-    unoptimized: true,
+  experimental: {
+    optimizePackageImports: ['lucide-react', 'recharts', 'framer-motion', '@capacitor/core', '@capacitor/app'],
   },
   async headers() {
     return [

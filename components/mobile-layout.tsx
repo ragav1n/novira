@@ -12,73 +12,71 @@ import { UIBoundary } from '@/components/boundaries/ui-boundary';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useIsNative } from '@/hooks/use-native';
 import { useGroups } from '@/components/providers/groups-provider';
-import { Haptics, ImpactStyle } from '@capacitor/haptics';
-import { App } from '@capacitor/app';
 import { PWAUpdater } from '@/components/pwa-updater';
 
 export function MobileLayout({ children }: { children: React.ReactNode }) {
     const router = useRouter();
     const isNative = useIsNative();
 
-    // Configure the native status bar to overlay (transparent)
+    // Configure the native status bar to overlay (transparent) and handle deep links
     useEffect(() => {
         if (!isNative) return;
-        import('@capacitor/status-bar').then(({ StatusBar, Style }) => {
-            StatusBar.setStyle({ style: Style.Dark });
-            StatusBar.setOverlaysWebView({ overlay: true });
-        }).catch(() => { });
+        
+        const initNative = async () => {
+            try {
+                const [{ StatusBar, Style }] = await Promise.all([
+                    import('@capacitor/status-bar'),
+                ]);
+                StatusBar.setStyle({ style: Style.Dark });
+                StatusBar.setOverlaysWebView({ overlay: true });
 
-        // Handle Deep Linking
-        const setupDeepLinks = async () => {
-            // 1. Handle URL events when the app is already open
-            App.addListener('appUrlOpen', (data) => {
-                let path = '';
-                if (data.url.includes('novira://')) {
-                    path = '/' + data.url.replace('novira://', '').replace(/^\//, '');
-                } else {
-                    try {
-                        const url = new URL(data.url);
-                        path = url.pathname + url.search;
-                    } catch (e) {
-                        // console.error('[DeepLink] Failed to parse URL:', data.url, e);
+                // Handle Deep Linking
+                const { App } = await import('@capacitor/app');
+                
+                App.addListener('appUrlOpen', (data) => {
+                    let path = '';
+                    if (data.url.includes('novira://')) {
+                        path = '/' + data.url.replace('novira://', '').replace(/^\//, '');
+                    } else {
+                        try {
+                            const url = new URL(data.url);
+                            path = url.pathname + url.search;
+                        } catch (e) {}
+                    }
+
+                    if (path) {
+                        setTimeout(() => {
+                            router.push(path);
+                        }, 100);
+                    }
+                });
+
+                const launchUrl = await App.getLaunchUrl();
+                if (launchUrl && launchUrl.url) {
+                    const url = launchUrl.url;
+                    let path = '';
+                    if (url.includes('novira://')) {
+                        path = '/' + url.replace('novira://', '').replace(/^\//, '');
+                    } else {
+                        try {
+                            const parsed = new URL(url);
+                            path = parsed.pathname + parsed.search;
+                        } catch (e) {}
+                    }
+
+                    if (path && path !== '/') {
+                        setTimeout(() => {
+                            router.push(path);
+                        }, 500);
                     }
                 }
-
-                if (path) {
-                    setTimeout(() => {
-                        router.push(path);
-                    }, 100);
-                }
-            });
-
-            // 2. Handle the URL that launched the app (cold start)
-            const launchUrl = await App.getLaunchUrl();
-
-            if (launchUrl && launchUrl.url) {
-                const url = launchUrl.url;
-                let path = '';
-                if (url.includes('novira://')) {
-                    path = '/' + url.replace('novira://', '').replace(/^\//, '');
-                } else {
-                    try {
-                        const parsed = new URL(url);
-                        path = parsed.pathname + parsed.search;
-                    } catch (e) { }
-                }
-
-                // Navigate if it's not the default root (unless explicit)
-                if (path && path !== '/') {
-                    setTimeout(() => {
-                        router.push(path);
-                    }, 500); // Slightly more delay for cold starts
-                }
-            }
+            } catch (error) {}
         };
 
-        setupDeepLinks();
+        initNative();
 
         return () => {
-            App.removeAllListeners();
+            import('@capacitor/app').then(({ App }) => App.removeAllListeners()).catch(() => {});
         };
     }, [isNative, router]);
 
@@ -116,7 +114,9 @@ export function MobileLayout({ children }: { children: React.ReactNode }) {
         if (index !== null) {
             // Trigger haptic feedback on tap
             if (isNative) {
-                Haptics.impact({ style: ImpactStyle.Light }).catch(() => { });
+                import('@capacitor/haptics').then(({ Haptics, ImpactStyle }) => {
+                    Haptics.impact({ style: ImpactStyle.Light }).catch(() => { });
+                }).catch(() => {});
             }
 
             const route = routes[index];
@@ -141,11 +141,11 @@ export function MobileLayout({ children }: { children: React.ReactNode }) {
             {/* Global Background Glows - Matching Dashboard exactly */}
             <div className="fixed inset-0 pointer-events-none overflow-hidden z-0 transition-colors duration-1000 gpu">
                 <div className={cn(
-                    "absolute top-[20%] -right-[10%] w-[60%] h-[60%] rounded-full blur-[50px] opacity-15 gpu transition-colors duration-1000",
+                    "absolute top-[20%] -right-[10%] w-[60%] h-[60%] rounded-full opacity-15 gpu transition-colors duration-1000 glow-optimized",
                     isCoupleWorkspace ? "bg-rose-500" : isHomeWorkspace ? "bg-yellow-500" : "bg-primary"
                 )} />
                 <div className={cn(
-                    "absolute bottom-[20%] -left-[10%] w-[50%] h-[50%] rounded-full blur-[40px] opacity-10 gpu transition-colors duration-1000",
+                    "absolute bottom-[20%] -left-[10%] w-[50%] h-[50%] rounded-full opacity-10 gpu transition-colors duration-1000 glow-optimized",
                     isCoupleWorkspace ? "bg-rose-500" : isHomeWorkspace ? "bg-amber-500" : "bg-primary/40"
                 )} />
             </div>

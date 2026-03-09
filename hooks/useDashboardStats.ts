@@ -42,7 +42,7 @@ export function useDashboardStats({
     }, []);
 
     const calculateUserShare = useCallback((tx: Transaction, currentUserId: string | null) => {
-        if (!currentUserId) return 0;
+        if (!currentUserId) return Number(tx.amount); // For workspaces/full-view, return full amount
         if (tx.user_id === currentUserId) {
             return Number(tx.amount);
         }
@@ -50,8 +50,7 @@ export function useDashboardStats({
     }, []);
 
     const totalSpent = useMemo(() => transactions.reduce((acc, tx) => {
-        if (!userId) return acc;
-
+        // Filter by context (bucket or monthly allowance)
         if (isBucketFocused) {
             if (tx.bucket_id !== effectiveFocus) return acc;
         } else {
@@ -60,6 +59,8 @@ export function useDashboardStats({
         }
 
         const myShare = calculateUserShare(tx, userId);
+        if (myShare === 0) return acc;
+
         const txCurr = (tx.currency || 'USD').toUpperCase();
         const targetCurr = bucketCurrency;
         
@@ -76,8 +77,7 @@ export function useDashboardStats({
     const progress = displayBudget > 0 ? Math.min((totalSpent / displayBudget) * 100, 100) : 0;
 
     const spendingByCategory = useMemo(() => transactions.reduce((acc, tx) => {
-        if (!userId) return acc;
-
+        // Filter by context (bucket or monthly allowance)
         if (isBucketFocused) {
             if (tx.bucket_id !== effectiveFocus) return acc;
         } else {
@@ -92,16 +92,18 @@ export function useDashboardStats({
             if (!acc[cat]) acc[cat] = 0;
 
             const txCurr = tx.currency || 'USD';
-            const isSameCurrency = txCurr === currency;
+            // When bucket focused, we should probably convert to bucketCurrency for the pie chart
+            const targetCurr = isBucketFocused ? bucketCurrency : currency;
+            const isSameCurrency = txCurr === targetCurr;
 
-            if (!isSameCurrency && tx.exchange_rate && tx.exchange_rate !== 1 && tx.base_currency === currency) {
+            if (!isSameCurrency && tx.exchange_rate && tx.exchange_rate !== 1 && tx.base_currency === targetCurr) {
                 acc[cat] += (myShare * Number(tx.exchange_rate));
             } else {
-                acc[cat] += convertAmount(myShare, txCurr);
+                acc[cat] += convertAmount(myShare, txCurr, targetCurr);
             }
         }
         return acc;
-    }, {} as Record<string, number>), [transactions, userId, isBucketFocused, effectiveFocus, calculateUserShare, currency, convertAmount, currentMonthPrefix]);
+    }, {} as Record<string, number>), [transactions, userId, isBucketFocused, effectiveFocus, calculateUserShare, currency, convertAmount, currentMonthPrefix, bucketCurrency]);
 
     const spendingData: SpendingCategory[] = useMemo(() => Object.entries(spendingByCategory).map(([cat, value]) => ({
         name: cat.charAt(0).toUpperCase() + cat.slice(1),
@@ -111,10 +113,25 @@ export function useDashboardStats({
     })), [spendingByCategory]);
 
     const displayTransactions = useMemo(() => transactions.filter(tx => {
+        // Filter by context (bucket or monthly allowance)
+        if (isBucketFocused) {
+            if (tx.bucket_id !== effectiveFocus) return false;
+        } else {
+            if (tx.exclude_from_allowance) return false;
+            // No date filter for allowanceTransactions here to show "Recent" across months?
+            // Actually, for allowance, we should probably stick to current month for consistency 
+            // unless the user wants "Recent" to be truly recent regardless of month.
+            // But usually allowance is monthly strictly. 
+            // Let's keep date filter for allowance for now to match totalSpent.
+            if (!tx.date.startsWith(currentMonthPrefix)) return false;
+        }
+
+        // Involvement filter
+        if (!userId) return true;
         if (tx.user_id === userId) return true;
         if (tx.splits && tx.splits.some(s => s.user_id === userId)) return true;
         return false;
-    }), [transactions, userId]);
+    }), [transactions, userId, isBucketFocused, effectiveFocus, currentMonthPrefix]);
 
     // Run Rate Calculation
     const runRateData = useMemo(() => {
