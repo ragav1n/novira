@@ -4,6 +4,7 @@ import React, { createContext, useContext, useEffect, useState, useCallback, use
 import { supabase } from '@/lib/supabase';
 import { useUserPreferences } from './user-preferences-provider';
 import { toast } from '@/utils/haptics';
+import { BucketService } from '@/lib/services/bucket-service';
 
 export interface Bucket {
     id: string;
@@ -42,28 +43,19 @@ export function BucketsProvider({ children }: { children: React.ReactNode }) {
     const fetchBuckets = useCallback(async () => {
         if (!userId) return;
         try {
-            // Fire both queries in parallel
-            const [bucketsResult, spendingResult] = await Promise.all([
-                supabase
-                    .from('buckets')
-                    .select('id, user_id, name, type, icon, color, budget, currency, is_archived, start_date, end_date, created_at')
-                    .order('created_at', { ascending: false }),
-                supabase
-                    .from('transactions')
-                    .select('amount, currency, bucket_id, exchange_rate, base_currency')
-                    .not('bucket_id', 'is', null)
+            // Fire both queries in parallel via service
+            const [fetchedBuckets, spendingData] = await Promise.all([
+                BucketService.getBuckets(),
+                BucketService.getBucketSpending()
             ]);
 
-            if (bucketsResult.error) throw bucketsResult.error;
-            const fetchedBuckets = bucketsResult.data || [];
             setBuckets(fetchedBuckets);
 
-            // Process spending with the fetched buckets
-            if (!spendingResult.error && spendingResult.data) {
-                // Build a lookup Map for O(1) access instead of O(n) .find() per transaction
+            // Process spending
+            if (spendingData) {
                 const bucketMap = new Map(fetchedBuckets.map(b => [b.id, b]));
                 const spending: Record<string, number> = {};
-                spendingResult.data.forEach(tx => {
+                spendingData.forEach(tx => {
                     const bId = tx.bucket_id;
                     if (!bId) return;
 
@@ -137,16 +129,7 @@ export function BucketsProvider({ children }: { children: React.ReactNode }) {
         }
 
         try {
-            const { data: bucket, error } = await supabase
-                .from('buckets')
-                .insert({
-                    ...data,
-                    user_id: userId
-                })
-                .select()
-                .single();
-
-            if (error) throw error;
+            const bucket = await BucketService.createBucket(data, userId);
             toast.success('Bucket created successfully');
             await fetchBuckets();
             return bucket.id;
@@ -158,12 +141,7 @@ export function BucketsProvider({ children }: { children: React.ReactNode }) {
 
     const updateBucket = useCallback(async (id: string, data: Partial<Bucket>) => {
         try {
-            const { error } = await supabase
-                .from('buckets')
-                .update(data)
-                .eq('id', id);
-
-            if (error) throw error;
+            await BucketService.updateBucket(id, data);
             toast.success('Bucket updated');
             await fetchBuckets();
         } catch (error: any) {
@@ -173,12 +151,7 @@ export function BucketsProvider({ children }: { children: React.ReactNode }) {
 
     const deleteBucket = useCallback(async (id: string) => {
         try {
-            const { error } = await supabase
-                .from('buckets')
-                .delete()
-                .eq('id', id);
-
-            if (error) throw error;
+            await BucketService.deleteBucket(id);
             toast.success('Bucket deleted');
             await fetchBuckets();
         } catch (error: any) {

@@ -50,6 +50,22 @@ export const CATEGORY_COLORS: Record<string, string> = {
     uncategorized: '#94A3B8' // Slate
 };
 
+export const CHART_CONFIG = {
+    food: { label: "Food", color: CATEGORY_COLORS.food },
+    groceries: { label: "Groceries", color: CATEGORY_COLORS.groceries },
+    fashion: { label: "Fashion", color: CATEGORY_COLORS.fashion },
+    transport: { label: "Transport", color: CATEGORY_COLORS.transport },
+    bills: { label: "Bills", color: CATEGORY_COLORS.bills },
+    shopping: { label: "Shopping", color: CATEGORY_COLORS.shopping },
+    healthcare: { label: "Healthcare", color: CATEGORY_COLORS.healthcare },
+    entertainment: { label: "Entertainment", color: CATEGORY_COLORS.entertainment },
+    rent: { label: "Rent", color: CATEGORY_COLORS.rent },
+    education: { label: "Education", color: CATEGORY_COLORS.education },
+    others: { label: "Others", color: CATEGORY_COLORS.others },
+    uncategorized: { label: "Uncategorized", color: CATEGORY_COLORS.uncategorized },
+};
+
+
 export const getIconForCategory = (category: string, className: string = "w-5 h-5 text-white") => {
     const iconProps = { className };
     switch (category.toLowerCase()) {

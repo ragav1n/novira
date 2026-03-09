@@ -7,6 +7,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
+import { motion } from 'framer-motion';
 
 interface TransactionRowProps {
   tx: any; // Assuming 'Transaction' type is not available in the original context, keeping 'any'
@@ -44,7 +45,14 @@ export const TransactionRow = memo(function TransactionRow({
   const showDropdown = canEdit && !isSettlement && !hasSplits;
 
   return (
-    <div className="flex items-start gap-4 p-4.5 rounded-2xl bg-card/30 border border-white/5 hover:bg-card/50 transition-all duration-300 group shadow-md relative mt-2 first:mt-0">
+    <motion.div 
+      layout
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.95 }}
+      transition={{ duration: 0.3, ease: [0.32, 0.725, 0.32, 1] }}
+      className="flex items-start gap-4 p-4.5 rounded-2xl bg-card/30 border border-white/5 hover:bg-card/50 transition-all duration-300 group shadow-md relative mt-2 first:mt-0"
+    >
       {/* Icon */}
       <div className="relative shrink-0 mt-0.5">
         <div
@@ -184,6 +192,6 @@ export const TransactionRow = memo(function TransactionRow({
           </div>
         )}
       </div>
-    </div>
+    </motion.div>
   );
 });

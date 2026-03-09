@@ -29,26 +29,31 @@ export async function updateSession(request: NextRequest) {
         }
     )
 
-    // Validate user via getUser() which verifies the JWT against Supabase's auth server
+    // 1. Early exit for static files and specific paths to avoid redundant getUser() calls
+    const path = request.nextUrl.pathname;
+    if (
+        path.startsWith('/signin') ||
+        path.startsWith('/signup') ||
+        path.startsWith('/forgot-password') ||
+        path.startsWith('/update-password') ||
+        path.startsWith('/privacy') ||
+        path.startsWith('/terms') ||
+        path.startsWith('/auth') ||
+        path.startsWith('/confirm-delete') ||
+        path.startsWith('/_next') ||
+        path.startsWith('/api') || 
+        path.includes('.')
+    ) {
+        return supabaseResponse;
+    }
+
+    // 2. Validate user via getUser() which verifies the JWT against Supabase's auth server
     // getSession() only reads from cookies and is NOT guaranteed to be authentic
     const {
         data: { user },
     } = await supabase.auth.getUser()
 
-    if (
-        !user &&
-        !request.nextUrl.pathname.startsWith('/signin') &&
-        !request.nextUrl.pathname.startsWith('/signup') &&
-        !request.nextUrl.pathname.startsWith('/forgot-password') &&
-        !request.nextUrl.pathname.startsWith('/update-password') &&
-        !request.nextUrl.pathname.startsWith('/privacy') &&
-        !request.nextUrl.pathname.startsWith('/terms') &&
-        !request.nextUrl.pathname.startsWith('/auth') &&
-        !request.nextUrl.pathname.startsWith('/confirm-delete') &&
-        !request.nextUrl.pathname.startsWith('/_next') &&
-        !request.nextUrl.pathname.startsWith('/api') && // Don't redirect API routes, let them return 401 if needed
-        !request.nextUrl.pathname.includes('.') // Don't redirect static files
-    ) {
+    if (!user) {
         // no user, potentially respond by redirecting the user to the login page
         const url = request.nextUrl.clone()
         url.pathname = '/signin'
