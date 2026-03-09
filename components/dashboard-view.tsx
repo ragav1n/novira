@@ -235,14 +235,14 @@ export function DashboardView() {
             transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
             className="relative min-h-screen"
         >
-            <AnimatePresence mode="wait">
+            <AnimatePresence>
                 {loading ? (
                     <motion.div 
                         key="skeleton"
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        transition={{ duration: 0.5, ease: "easeInOut" }}
+                        transition={{ duration: 0.4, ease: "easeInOut" }}
                         className="w-full px-4 pt-4"
                     >
                         <DashboardSkeleton />
@@ -253,9 +253,9 @@ export function DashboardView() {
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+                        transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
                         className={cn(
-                            "p-5 space-y-6 max-w-md mx-auto relative transition-all duration-700 ease-[0.32,0.725,0.32,1]",
+                            "p-5 space-y-6 max-w-md mx-auto relative",
                             isAnyModalOpen ? "pointer-events-none overflow-hidden" : "overflow-x-hidden"
                         )}
                         inert={isAnyModalOpen}
