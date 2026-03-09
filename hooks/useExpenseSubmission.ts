@@ -1,9 +1,8 @@
 import { useState } from 'react';
-import { supabase } from '@/lib/supabase';
 import { format } from 'date-fns';
 import { toast } from '@/utils/haptics';
 import { Haptics, NotificationType } from '@capacitor/haptics';
-import { enqueueMutation } from '@/lib/sync-manager';
+import { TransactionService } from '@/lib/services/transaction-service';
 import type { AppRouterInstance } from 'next/dist/shared/lib/app-router-context.shared-runtime';
 
 interface ExpenseSubmissionParams {
@@ -67,54 +66,8 @@ export function useExpenseSubmission() {
                 return;
             }
 
-            let exchangeRate = 1;
-            let convertedAmount = parseFloat(amount);
-
-            if (txCurrency !== currency) {
-                const FRANKFURTER_SUPPORTED = [
-                    'AUD', 'BRL', 'CAD', 'CHF', 'CNY', 'CZK', 'DKK', 'EUR', 'GBP', 'HKD',
-                    'HUF', 'IDR', 'ILS', 'INR', 'ISK', 'JPY', 'KRW', 'MXN', 'MYR', 'NOK',
-                    'NZD', 'PHP', 'PLN', 'RON', 'SEK', 'SGD', 'THB', 'TRY', 'USD', 'ZAR'
-                ];
-
-                try {
-                    const dateStr = format(date, 'yyyy-MM-dd');
-                    let rate: number | null = null;
-
-                    // Step 1: Try Frankfurter for historical records (if supported)
-                    if (FRANKFURTER_SUPPORTED.includes(txCurrency) && FRANKFURTER_SUPPORTED.includes(currency)) {
-                        const response = await fetch(`https://api.frankfurter.dev/v1/${dateStr}?from=${txCurrency}&to=${currency}`);
-                        if (response.ok) {
-                            const data = await response.json();
-                            rate = data.rates[currency];
-                        }
-                    }
-
-                    // Step 2: Fallback to ExchangeRate-API (for TWD, VND or if Frankfurter fails)
-                    if (!rate) {
-                        const API_KEY = process.env.NEXT_PUBLIC_EXCHANGERATE_API_KEY;
-                        if (API_KEY) {
-                            const isToday = format(new Date(), 'yyyy-MM-dd') === dateStr;
-                            const url = isToday
-                                ? `https://v6.exchangerate-api.com/v6/${API_KEY}/latest/${txCurrency}`
-                                : `https://v6.exchangerate-api.com/v6/${API_KEY}/history/${txCurrency}/${format(date, 'yyyy/MM/dd')}`;
-
-                            const response = await fetch(url);
-                            if (response.ok) {
-                                const data = await response.json();
-                                rate = isToday ? data.conversion_rates[currency] : data.conversion_rate;
-                            }
-                        }
-                    }
-
-                    if (rate) {
-                        exchangeRate = rate;
-                        convertedAmount = parseFloat(amount) * exchangeRate;
-                    }
-                } catch (e) {
-                    console.error('Error fetching historical rate:', e);
-                }
-            }
+            let exchangeRate = await TransactionService.getExchangeRate(txCurrency, currency, date);
+            let convertedAmount = parseFloat(amount) * exchangeRate;
 
             const transactionRecord = {
                 user_id: userId,
@@ -140,18 +93,15 @@ export function useExpenseSubmission() {
                 } : {})
             };
 
-            let splitRecordsToInsert = null;
+            let splitRecordsToInsert: any[] | undefined = undefined;
 
             if (isSplitEnabled) {
                 let debtors: string[] = [];
                 if (selectedGroupId) {
-                    const { data: members } = await supabase
-                        .from('group_members')
-                        .select('user_id')
-                        .eq('group_id', selectedGroupId);
-
+                    // We still need to fetch group members if not provided, but maybe move this to a GroupService later
+                    const { data: members } = await TransactionService.getGroupMembers(selectedGroupId);
                     if (members) {
-                        debtors = members.map(m => m.user_id).filter(id => id !== userId);
+                        debtors = members.map((m: any) => m.user_id).filter((id: string) => id !== userId);
                     }
                 } else {
                     debtors = selectedFriendIds;
@@ -211,51 +161,30 @@ export function useExpenseSubmission() {
                 };
             }
 
-            const resetFormAndNavigate = () => {
+            const result = await TransactionService.createTransaction({
+                transaction: transactionRecord,
+                splits: splitRecordsToInsert,
+                recurring: recurringRecordToInsert
+            });
+
+            if (result.success) {
+                if (isNative) {
+                    Haptics.notification({ type: result.offline ? NotificationType.Warning : NotificationType.Success }).catch(() => { });
+                }
+                if (result.offline) {
+                    toast('Saved — will sync when online', {
+                        icon: '☁️',
+                        style: { background: 'rgba(14, 165, 233, 0.1)', border: '1px solid rgba(14, 165, 233, 0.2)', color: '#38BDF8' }
+                    });
+                } else {
+                    toast.success('Expense added successfully!');
+                }
+                
                 resetForm();
                 sessionStorage.setItem('novira_expense_added', 'true');
                 window.dispatchEvent(new Event('novira:expense-added'));
                 router.push('/');
-            };
-
-            // OFFLINE GUARD
-            if (!navigator.onLine) {
-                await enqueueMutation('ADD_FULL_TRANSACTION', {
-                    transaction: transactionRecord,
-                    splitRecords: splitRecordsToInsert,
-                    recurringRecord: recurringRecordToInsert
-                });
-                if (isNative) {
-                    Haptics.notification({ type: NotificationType.Warning }).catch(() => { });
-                }
-                toast('Saved — will sync when online', {
-                    icon: '☁️',
-                    style: { background: 'rgba(14, 165, 233, 0.1)', border: '1px solid rgba(14, 165, 233, 0.2)', color: '#38BDF8' }
-                });
-                resetFormAndNavigate();
-                return;
             }
-
-            // ONLINE FLOW
-            const { data: transaction, error: txError } = await supabase.from('transactions').insert(transactionRecord).select().single();
-            if (txError) throw txError;
-
-            if (splitRecordsToInsert && splitRecordsToInsert.length > 0) {
-                const finalSplits = splitRecordsToInsert.map(s => ({ ...s, transaction_id: transaction.id }));
-                const { error: splitError } = await supabase.from('splits').insert(finalSplits);
-                if (splitError) throw splitError;
-            }
-
-            if (recurringRecordToInsert) {
-                const { error: recurringError } = await supabase.from('recurring_templates').insert(recurringRecordToInsert);
-                if (recurringError) throw recurringError;
-            }
-
-            if (isNative) {
-                Haptics.notification({ type: NotificationType.Success }).catch(() => { });
-            }
-            toast.success('Expense added successfully!');
-            resetFormAndNavigate();
 
         } catch (error: any) {
             if (isNative) {

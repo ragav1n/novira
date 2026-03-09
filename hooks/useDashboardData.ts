@@ -122,7 +122,7 @@ export function useDashboardData(userId: string | null) {
         // Optimistic: remove from UI immediately
         const previousTransactions = [...transactions];
         setTransactions(prev => prev.filter(t => t.id !== tx.id));
-        toast.success('Transaction deleted');
+        toast.success('Transaction deleted'); // toast.success will trigger light haptic
 
         try {
             const { error } = await supabase

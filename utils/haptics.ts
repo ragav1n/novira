@@ -11,21 +11,31 @@
 
 import { toast as sonnerToast } from 'sonner';
 import type { ExternalToast } from 'sonner';
+import { Haptics, ImpactStyle } from '@capacitor/haptics';
 
 // ---------------------------------------------------------------------------
-// Vibration patterns (milliseconds)
+// Vibration / Haptic Logic
 // ---------------------------------------------------------------------------
-const PATTERNS = {
-    /** Single short click — confirms a successful action */
-    success: [10] as number[],
-} as const;
 
-function vibrate(pattern: number[]) {
-    if (typeof window !== 'undefined' && 'vibrate' in navigator) {
-        try {
-            navigator.vibrate(pattern);
-        } catch {
-            // Silently ignore — some browsers expose the API but restrict usage
+/**
+ * Executes a haptic impact based on the platform.
+ * Supports Capacitor Haptics (Native) and Vibration API (Web/Android).
+ */
+async function triggerHaptic(style: ImpactStyle = ImpactStyle.Light) {
+    try {
+        // Native Capacitor Haptics (Priority)
+        if (typeof window !== 'undefined') {
+             await Haptics.impact({ style });
+        }
+    } catch {
+        // Fallback to Web Vibration API for Android/Web browsers if Capacitor fails or is not available
+        if (typeof window !== 'undefined' && 'vibrate' in navigator) {
+            const pattern = style === ImpactStyle.Heavy ? [20] : [10];
+            try {
+                navigator.vibrate(pattern);
+            } catch {
+                // Silently ignore
+            }
         }
     }
 }
@@ -41,11 +51,20 @@ function toastFn(message: MessageArg, options?: ExternalToast) {
 
 // Forward all static methods from Sonner, override `success`
 toastFn.success = (message: MessageArg, options?: ExternalToast) => {
-    vibrate(PATTERNS.success);
+    triggerHaptic(ImpactStyle.Light);
     return sonnerToast.success(message, options);
 };
 
-toastFn.error = sonnerToast.error.bind(sonnerToast);
+toastFn.error = (message: MessageArg, options?: ExternalToast) => {
+    triggerHaptic(ImpactStyle.Heavy);
+    return sonnerToast.error(message, options);
+};
+
+// Custom haptic triggers
+toastFn.haptic = (style: ImpactStyle = ImpactStyle.Light) => {
+    triggerHaptic(style);
+};
+
 toastFn.warning = sonnerToast.warning.bind(sonnerToast);
 toastFn.info = sonnerToast.info.bind(sonnerToast);
 toastFn.loading = sonnerToast.loading.bind(sonnerToast);
@@ -54,4 +73,5 @@ toastFn.dismiss = sonnerToast.dismiss.bind(sonnerToast);
 toastFn.custom = sonnerToast.custom.bind(sonnerToast);
 toastFn.message = sonnerToast.message.bind(sonnerToast);
 
+export { ImpactStyle };
 export { toastFn as toast };

@@ -5,12 +5,13 @@ import { ChevronLeft, MoreHorizontal, Filter, Shirt } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
-import { LineChart, Line, XAxis, Tooltip, ResponsiveContainer, Pie, PieChart, Cell } from 'recharts';
-import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/pie-chart";
-import { supabase } from '@/lib/supabase';
-import { format, subMonths, startOfMonth, endOfMonth, isSameMonth, parseISO, subYears } from 'date-fns';
-import { WaveLoader } from '@/components/ui/wave-loader';
-import { AnimatePresence, motion } from 'framer-motion';
+import { ChartConfig, BasePieChart } from "@/components/charts/base-pie-chart";
+import { TransactionService } from '@/lib/services/transaction-service';
+import { CHART_CONFIG, CATEGORY_COLORS, getIconForCategory } from '@/lib/categories';
+import { format, startOfMonth, endOfMonth, subMonths, subYears, isSameMonth, parseISO } from 'date-fns';
+import { useUserPreferences } from '@/components/providers/user-preferences-provider';
+import { useBuckets } from '@/components/providers/buckets-provider';
+import { useGroups } from '@/components/providers/groups-provider';
 import {
     Select,
     SelectContent,
@@ -18,25 +19,12 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select"
-import { useUserPreferences } from '@/components/providers/user-preferences-provider';
-import { useBuckets } from '@/components/providers/buckets-provider';
-import { useGroups } from '@/components/providers/groups-provider';
-import { CATEGORY_COLORS, getIconForCategory } from '@/lib/categories';
+import { WaveLoader } from '@/components/ui/wave-loader';
+import { AnimatePresence, motion } from 'framer-motion';
+import { LineChart, Line, XAxis, Tooltip, ResponsiveContainer } from 'recharts';
+import { Transaction } from '@/types/transaction';
 
-const chartConfig: ChartConfig = {
-    food: { label: "Food", color: CATEGORY_COLORS.food },
-    groceries: { label: "Groceries", color: CATEGORY_COLORS.groceries },
-    fashion: { label: "Fashion", color: CATEGORY_COLORS.fashion },
-    transport: { label: "Transport", color: CATEGORY_COLORS.transport },
-    bills: { label: "Bills", color: CATEGORY_COLORS.bills },
-    shopping: { label: "Shopping", color: CATEGORY_COLORS.shopping },
-    healthcare: { label: "Healthcare", color: CATEGORY_COLORS.healthcare },
-    entertainment: { label: "Entertainment", color: CATEGORY_COLORS.entertainment },
-    rent: { label: "Rent", color: CATEGORY_COLORS.rent },
-    education: { label: "Education", color: CATEGORY_COLORS.education },
-    others: { label: "Others", color: CATEGORY_COLORS.others },
-    uncategorized: { label: "Uncategorized", color: CATEGORY_COLORS.uncategorized },
-};
+
 
 const PAYMENT_COLORS: Record<string, string> = {
     cash: '#22C55E',          // Vibrant Green
@@ -47,7 +35,7 @@ const PAYMENT_COLORS: Record<string, string> = {
     other: '#EC4899',         // Hot Pink
 };
 
-const paymentChartConfig: ChartConfig = {
+const paymentChartConfig: any = {
     cash: { label: "Cash", color: PAYMENT_COLORS.cash },
     'debit card': { label: "Debit Card", color: PAYMENT_COLORS['debit card'] },
     'credit card': { label: "Credit Card", color: PAYMENT_COLORS['credit card'] },
@@ -55,7 +43,6 @@ const paymentChartConfig: ChartConfig = {
     'bank transfer': { label: "Bank Transfer", color: PAYMENT_COLORS['bank transfer'] },
     other: { label: "Other", color: PAYMENT_COLORS.other },
 };
-
 // Custom Tooltip Component
 // Custom Tooltip Component needs access to context, but it's outside component. passing formatter?
 // Or better, define CustomTooltip inside, or pass it as prop?
@@ -92,21 +79,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
     return null;
 };
 
-type Transaction = {
-    amount: number;
-    category: string;
-    date: string;
-    payment_method?: string;
-    currency?: string;
-    exchange_rate?: number;
-    base_currency?: string;
-    user_id: string;
-    bucket_id?: string;
-    splits?: {
-        user_id: string;
-        amount: number;
-    }[];
-};
+
 
 type DateRange = '1M' | 'LM' | '3M' | '6M' | '1Y' | 'ALL';
 
@@ -177,55 +150,30 @@ export function AnalyticsView() {
         try {
             if (!userId) return;
 
-            let query = supabase
-                .from('transactions')
-                .select(`
-                    amount, category, date, payment_method, currency, exchange_rate, base_currency, user_id, bucket_id,
-                    splits (
-                        user_id,
-                        amount
-                    )
-                `)
-                .order('date', { ascending: true });
-
-            if (selectedBucketId !== 'all') {
-                query = query.eq('bucket_id', selectedBucketId);
-            }
-
-            if (activeWorkspaceId && activeWorkspaceId !== 'personal') {
-                query = query.eq('group_id', activeWorkspaceId);
-            } else if (activeWorkspaceId === 'personal') {
-                query = query.is('group_id', null);
-            }
-
             // Apply Date Filter
             const now = new Date();
             let startDate: Date | null = null;
+            let endDate: Date | null = null;
 
             if (dateRange === '1M') startDate = startOfMonth(now);
             else if (dateRange === 'LM') {
                 startDate = startOfMonth(subMonths(now, 1));
-                // For LM we need an upper bound too, as it shouldn't include current month
-                query = query.lt('date', startOfMonth(now).toISOString());
+                endDate = startOfMonth(now);
             }
-            else if (dateRange === '3M') startDate = startOfMonth(subMonths(now, 2)); // Current + 2 prev = 3 months
+            else if (dateRange === '3M') startDate = startOfMonth(subMonths(now, 2));
             else if (dateRange === '6M') startDate = startOfMonth(subMonths(now, 5));
             else if (dateRange === '1Y') startDate = startOfMonth(subYears(now, 1));
-            // 'ALL' implies no lower bound filter
 
-            if (startDate) {
-                query = query.gte('date', startDate.toISOString());
-            }
-
-            const { data } = await query;
+            const data = await TransactionService.getTransactions({
+                userId,
+                workspaceId: activeWorkspaceId,
+                bucketId: selectedBucketId === 'all' ? undefined : selectedBucketId,
+                startDate: startDate?.toISOString(),
+                endDate: endDate?.toISOString()
+            });
 
             if (data) {
-                // Flatten splits if they are arrays
-                const formatted = data.map(tx => ({
-                    ...tx,
-                    splits: tx.splits || []
-                }));
-                setTransactions(formatted);
+                setTransactions(data as any);
             }
         } catch (error) {
             console.error("Error fetching analytics:", error);
@@ -377,13 +325,27 @@ export function AnalyticsView() {
         };
     }, [transactions, userId, dateRange, currency, convertAmount]);
 
+    const categorizedBreakdown = categoryBreakdown as Array<{
+        name: string;
+        amount: number;
+        value: number;
+        fill: string;
+    }>;
+
+    const categorizedPayment = paymentBreakdown as Array<{
+        name: string;
+        amount: number;
+        value: number;
+        fill: string;
+    }>;
+
 
     return (
         <motion.div 
-            initial={{ opacity: 0, scale: 0.98 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.98 }}
-            transition={{ type: 'spring', stiffness: 300, damping: 30, mass: 0.8 }}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 8 }}
+            transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
             className="relative min-h-screen"
         >
 
@@ -466,29 +428,22 @@ export function AnalyticsView() {
                 )}
 
                 {/* Monthly Spending Trend */}
-                <Card className="bg-card/50 backdrop-blur-md border-white/5">
-                    <CardContent className="p-5 space-y-4">
+                <Card className="bg-card/40 backdrop-blur-md border-white/5 shadow-none">
+                    <CardContent className="p-4 space-y-3">
                         <div className="flex justify-between items-center">
-                            <h3 className="font-semibold text-sm">Spending Trend</h3>
-                            <span className="text-[11px] text-muted-foreground uppercase tracking-wider">{dateRange === 'ALL' ? 'All Time' : dateRange}</span>
+                            <h3 className="font-bold text-[13px] uppercase tracking-wider text-muted-foreground/80">Spending Trend</h3>
+                            <span className="text-[10px] bg-secondary/30 px-2 py-0.5 rounded-md text-muted-foreground font-bold">{dateRange === 'ALL' ? 'All Time' : dateRange}</span>
                         </div>
 
-                        <div className="h-48 w-full">
+                        <div className="h-[140px] w-full">
                             <ResponsiveContainer width="100%" height="100%">
-                                <LineChart data={categoryTrendData}>
+                                <LineChart data={categoryTrendData} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
                                     <XAxis
                                         dataKey="month"
                                         axisLine={false}
                                         tickLine={false}
-                                        tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 11 }}
+                                        tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 10 }}
                                         interval={dateRange === '1M' || dateRange === 'LM' ? 3 : (dateRange === '1Y' || dateRange === 'ALL' ? 'preserveStartEnd' : 0)}
-                                        tickFormatter={(value) => {
-                                            if (dateRange === '1M' || dateRange === 'LM') {
-                                                const parts = value.split(' ');
-                                                return parts.length === 2 ? parts[1] : value;
-                                            }
-                                            return value;
-                                        }}
                                     />
                                     <Tooltip content={<CustomTooltip />} />
                                     {Object.keys(CATEGORY_COLORS).map((cat: string) => (
@@ -506,147 +461,105 @@ export function AnalyticsView() {
                             </ResponsiveContainer>
                         </div>
 
-                        <div className="flex items-center justify-between">
-                            <div className="flex flex-col">
-                                <span className="text-[11px] text-muted-foreground">Total in Period</span>
-                                <span className="text-lg font-bold">{formatCurrency(totalSpentInRange)}</span>
-                            </div>
+                        <div className="flex items-center justify-between pt-2 border-t border-white/5">
+                            <span className="text-[11px] text-muted-foreground uppercase tracking-widest font-bold">Total Spent</span>
+                            <span className="text-base font-bold">{formatCurrency(totalSpentInRange)}</span>
                         </div>
                     </CardContent>
                 </Card>
 
                 {/* Category Breakdown including Pie Chart */}
-                <div className="space-y-4">
-                    <h3 className="font-semibold text-sm">Spending by Category</h3>
-
-                    {/* Pie Chart Integration */}
-                    <div className="h-[250px] w-full">
-                        {categoryBreakdown.length > 0 ? (
-                            <ChartContainer
-                                config={chartConfig}
-                                className="mx-auto aspect-square max-h-[250px]"
-                            >
-                                <PieChart>
-                                    <ChartTooltip
-                                        cursor={false}
-                                        content={<ChartTooltipContent hideLabel />}
-                                    />
-                                    <Pie
-                                        data={categoryBreakdown}
-                                        dataKey="amount"
-                                        nameKey="name"
-                                        innerRadius={60}
-                                        strokeWidth={0}
-                                        paddingAngle={5}
-                                        cornerRadius={5}
-                                    >
-                                        {categoryBreakdown.map((entry: any, index: number) => (
-                                            <Cell key={`cell-${index}`} fill={entry.color} />
-                                        ))}
-                                    </Pie>
-                                </PieChart>
-                            </ChartContainer>
-                        ) : (
-                            <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
-                                No data for this period
-                            </div>
-                        )}
+                <div className="space-y-2">
+                    <div className="flex items-center justify-between px-1">
+                        <span className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground/80">
+                            Spending by Category
+                        </span>
                     </div>
-
-                    <div className="space-y-4">
-                        {categoryBreakdown.map((cat: any) => (
-                            <div key={cat.name} className="space-y-2">
-                                <div className="flex justify-between text-sm">
-                                    <span className="flex items-center gap-2">
-                                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: cat.fill }} />
-                                        {cat.name}
-                                    </span>
-                                    <span className="font-semibold">{formatCurrency(cat.amount)}</span>
-                                </div>
-
-                                {/* Simple Progress Bar */}
-                                <div className="h-2 w-full bg-secondary/20 rounded-full overflow-hidden">
-                                    <div
-                                        className="h-full rounded-full transition-all duration-500"
-                                        style={{ width: `${cat.value}%`, backgroundColor: cat.fill }}
+                    <Card className="bg-card/40 border-none shadow-none backdrop-blur-md overflow-hidden">
+                        <CardContent className="p-4 flex flex-col sm:flex-row items-center justify-start gap-6">
+                            <div className="w-36 h-36 relative flex-shrink-0">
+                                {categoryBreakdown.length > 0 ? (
+                                    <BasePieChart 
+                                        data={categoryBreakdown} 
+                                        config={CHART_CONFIG} 
+                                        innerRadius={46}
+                                        outerRadius={68}
+                                        hideLabel={true}
                                     />
-                                </div>
+                                ) : (
+                                    <div className="flex items-center justify-center h-full text-muted-foreground text-[10px] font-bold uppercase">
+                                        No Data
+                                    </div>
+                                )}
+                            </div>
 
-                                <div className="flex justify-end text-[11px] text-muted-foreground">
-                                    <span>{cat.value.toFixed(1)}%</span>
-                                </div>
+                            <div className="w-full flex-1 space-y-3">
+                                {categorizedBreakdown.slice(0, 5).map((cat) => (
+                                    <div key={cat.name} className="space-y-1.5">
+                                        <div className="flex justify-between text-[11px] font-bold">
+                                            <span className="flex items-center gap-2 text-muted-foreground/80">
+                                                <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: cat.fill }} />
+                                                {cat.name}
+                                            </span>
+                                            <span className="text-foreground">{formatCurrency(cat.amount)}</span>
+                                        </div>
+                                        <div className="h-1 w-full bg-secondary/20 rounded-full overflow-hidden">
+                                            <div
+                                                className="h-full rounded-full transition-all duration-700"
+                                                style={{ width: `${cat.value}%`, backgroundColor: cat.fill }}
+                                            />
+                                        </div>
+                                    </div>
+                                ))}
                             </div>
-                        ))}
-                        {categoryBreakdown.length === 0 && (
-                            <div className="text-center text-xs text-muted-foreground">
-                                No transactions recorded.
-                            </div>
-                        )}
-                    </div>
+                        </CardContent>
+                    </Card>
                 </div>
 
                 {/* Payment Methods Breakdown */}
-                <div className="space-y-4 pt-4 border-t border-white/5">
-                    <h3 className="font-semibold text-sm text-foreground">Spending by Payment Method</h3>
-
-                    <div className="h-[250px] w-full">
-                        {paymentBreakdown.length > 0 ? (
-                            <ChartContainer
-                                config={paymentChartConfig}
-                                className="mx-auto aspect-square max-h-[250px]"
-                            >
-                                <PieChart>
-                                    <ChartTooltip
-                                        cursor={false}
-                                        content={<ChartTooltipContent hideLabel />}
+                <div className="space-y-2">
+                    <div className="flex items-center justify-between px-1">
+                        <span className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground/80">
+                            Spending by Payment Method
+                        </span>
+                    </div>
+                    <Card className="bg-card/40 border-none shadow-none backdrop-blur-md overflow-hidden">
+                        <CardContent className="p-4 flex flex-col sm:flex-row items-center justify-start gap-6">
+                            <div className="w-32 h-32 relative flex-shrink-0">
+                                {paymentBreakdown.length > 0 ? (
+                                    <BasePieChart 
+                                        data={paymentBreakdown} 
+                                        config={paymentChartConfig} 
+                                        innerRadius={40}
+                                        outerRadius={60}
+                                        hideLabel={true}
                                     />
-                                    <Pie
-                                        data={paymentBreakdown}
-                                        dataKey="amount"
-                                        nameKey="name"
-                                        innerRadius={60}
-                                        strokeWidth={0}
-                                        paddingAngle={5}
-                                        cornerRadius={5}
-                                    >
-                                        {paymentBreakdown.map((entry: any, index: number) => (
-                                            <Cell key={`cell-${index}`} fill={entry.color} />
-                                        ))}
-                                    </Pie>
-                                </PieChart>
-                            </ChartContainer>
-                        ) : (
-                            <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
-                                No payment data for this period
-                            </div>
-                        )}
-                    </div>
-
-                    <div className={cn(
-                        "grid gap-4",
-                        paymentBreakdown.length === 1 ? "grid-cols-1" : "grid-cols-2"
-                    )}>
-                        {paymentBreakdown.map((pay: any) => (
-                            <div key={pay.name} className="flex flex-col p-4 rounded-3xl bg-secondary/5 border border-white/5 hover:bg-secondary/10 transition-colors group">
-                                <span className="flex items-center gap-2 text-[11px] text-muted-foreground uppercase tracking-widest font-bold">
-                                    <div className="w-2 h-2 rounded-full shadow-[0_0_8px_rgba(255,255,255,0.2)]" style={{ backgroundColor: pay.fill }} />
-                                    {pay.name}
-                                </span>
-                                <div className="flex items-baseline gap-1 mt-2">
-                                    <span className="text-base font-bold text-foreground">{formatCurrency(pay.amount)}</span>
-                                </div>
-                                <div className="flex items-center justify-between mt-1">
-                                    <span className="text-[11px] text-muted-foreground font-medium">{pay.value.toFixed(0)}%</span>
-                                    <div className="h-1 flex-1 mx-2 bg-secondary/20 rounded-full overflow-hidden">
-                                        <div
-                                            className="h-full rounded-full transition-all duration-1000"
-                                            style={{ width: `${pay.value}%`, backgroundColor: pay.fill }}
-                                        />
+                                ) : (
+                                    <div className="flex items-center justify-center h-full text-muted-foreground text-[10px] font-bold uppercase">
+                                        No Data
                                     </div>
-                                </div>
+                                )}
                             </div>
-                        ))}
-                    </div>
+
+                            <div className="grid grid-cols-2 gap-3 flex-1 w-full">
+                                {categorizedPayment.map((pay) => (
+                                    <div key={pay.name} className="flex flex-col p-3 rounded-2xl bg-secondary/10 border border-white/5">
+                                        <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground/80 uppercase tracking-widest font-bold">
+                                            <div className="w-1 h-1 rounded-full shadow-glow" style={{ backgroundColor: pay.fill }} />
+                                            {pay.name}
+                                        </span>
+                                        <span className="text-sm font-bold mt-1">{formatCurrency(pay.amount)}</span>
+                                        <div className="h-1 w-full bg-secondary/20 rounded-full mt-2 overflow-hidden">
+                                            <div
+                                                className="h-full rounded-full transition-all duration-1000"
+                                                style={{ width: `${pay.value}%`, backgroundColor: pay.fill }}
+                                            />
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </CardContent>
+                    </Card>
                 </div>
             </div>
         </motion.div>
