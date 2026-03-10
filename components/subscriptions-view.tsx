@@ -2,7 +2,7 @@
 
 import { motion } from 'framer-motion';
 
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { useUserPreferences } from '@/components/providers/user-preferences-provider';
 import { useGroups } from '@/components/providers/groups-provider';
 import { supabase } from '@/lib/supabase';
@@ -65,33 +65,56 @@ export function SubscriptionsView() {
     const [templates, setTemplates] = useState<RecurringTemplate[]>([]);
     const [loading, setLoading] = useState(true);
 
+    const loadTemplates = useCallback(async () => {
+        if (!userId) return;
+        setLoading(true);
+        let query = supabase
+            .from('recurring_templates')
+            .select('*')
+            .eq('user_id', userId)
+            .order('next_occurrence', { ascending: true });
+
+        if (activeWorkspaceId && activeWorkspaceId !== 'personal') {
+            query = query.eq('group_id', activeWorkspaceId);
+        } else if (activeWorkspaceId === 'personal') {
+            query = query.is('group_id', null);
+        }
+
+        const { data, error } = await query;
+
+        if (!error && data) {
+            setTemplates(data);
+        }
+        setLoading(false);
+    }, [userId, activeWorkspaceId]);
+
+    useEffect(() => {
+        loadTemplates();
+    }, [loadTemplates]);
+
+    // Real-time subscription for recurring templates
     useEffect(() => {
         if (!userId) return;
 
-        const loadTemplates = async () => {
-            setLoading(true);
-            let query = supabase
-                .from('recurring_templates')
-                .select('*')
-                .eq('user_id', userId)
-                .order('next_occurrence', { ascending: true });
+        const templatesChannel = supabase
+            .channel(`templates-changes-${userId}`)
+            .on(
+                'postgres_changes',
+                {
+                    event: '*',
+                    schema: 'public',
+                    table: 'recurring_templates'
+                },
+                () => {
+                    loadTemplates();
+                }
+            )
+            .subscribe();
 
-            if (activeWorkspaceId && activeWorkspaceId !== 'personal') {
-                query = query.eq('group_id', activeWorkspaceId);
-            } else if (activeWorkspaceId === 'personal') {
-                query = query.is('group_id', null);
-            }
-
-            const { data, error } = await query;
-
-            if (!error && data) {
-                setTemplates(data);
-            }
-            setLoading(false);
+        return () => {
+            supabase.removeChannel(templatesChannel);
         };
-
-        loadTemplates();
-    }, [userId, activeWorkspaceId]);
+    }, [userId, activeWorkspaceId, loadTemplates]);
 
     const handleCancel = async (id: string) => {
         if (!confirm('Are you sure you want to cancel this subscription?')) return;

@@ -143,6 +143,41 @@ export function GoalsView() {
         loadGoals();
     }, [userId, activeWorkspaceId]);
 
+    // Real-time subscription for goals and deposits
+    useEffect(() => {
+        if (!userId) return;
+
+        const goalsChannel = supabase
+            .channel(`goals-changes-${userId}`)
+            .on(
+                'postgres_changes',
+                {
+                    event: '*',
+                    schema: 'public',
+                    table: 'savings_goals'
+                },
+                () => {
+                    loadGoals();
+                }
+            )
+            .on(
+                'postgres_changes',
+                {
+                    event: '*',
+                    schema: 'public',
+                    table: 'savings_deposits'
+                },
+                () => {
+                    loadGoals();
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(goalsChannel);
+        };
+    }, [userId, activeWorkspaceId]);
+
     const openAddModal = () => {
         setGoalModalMode('add');
         setEditingGoalId(null);

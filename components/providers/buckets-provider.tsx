@@ -35,7 +35,7 @@ interface BucketsContextType {
 const BucketsContext = createContext<BucketsContextType | undefined>(undefined);
 
 export function BucketsProvider({ children }: { children: React.ReactNode }) {
-    const { userId, currency, convertAmount } = useUserPreferences();
+    const { userId, currency, convertAmount, activeWorkspaceId } = useUserPreferences();
     const [buckets, setBuckets] = useState<Bucket[]>([]);
     const [bucketSpending, setBucketSpending] = useState<Record<string, number>>({});
     const [loading, setLoading] = useState(true);
@@ -43,10 +43,10 @@ export function BucketsProvider({ children }: { children: React.ReactNode }) {
     const fetchBuckets = useCallback(async () => {
         if (!userId) return;
         try {
-            // Fire both queries in parallel via service
+            // Fire both queries in parallel via service with workspace scoping
             const [fetchedBuckets, spendingData] = await Promise.all([
-                BucketService.getBuckets(),
-                BucketService.getBucketSpending()
+                BucketService.getBuckets(userId, activeWorkspaceId),
+                BucketService.getBucketSpending(userId, activeWorkspaceId)
             ]);
 
             setBuckets(fetchedBuckets);
@@ -62,13 +62,28 @@ export function BucketsProvider({ children }: { children: React.ReactNode }) {
                     const bucketConfig = bucketMap.get(bId);
                     const bucketCurrency = (bucketConfig?.currency || currency).toUpperCase();
 
+                    let shareAmount = Number(tx.amount);
+                    if (tx.splits && tx.splits.length > 0) {
+                        if (tx.user_id === userId) {
+                            const othersOwe = tx.splits.reduce((sum: number, s: any) => sum + Number(s.amount || 0), 0);
+                            shareAmount = Number(tx.amount) - othersOwe;
+                        } else {
+                            const mySplit = tx.splits.find((s: any) => s.user_id === userId);
+                            shareAmount = mySplit ? Number(mySplit.amount || 0) : 0;
+                        }
+                    } else if (tx.user_id !== userId) {
+                        shareAmount = 0;
+                    }
+
+                    if (shareAmount <= 0) return;
+
                     let amountInBucketCurrency = 0;
                     if (tx.currency === bucketCurrency) {
-                        amountInBucketCurrency = Number(tx.amount);
+                        amountInBucketCurrency = shareAmount;
                     } else if (tx.exchange_rate && tx.base_currency === bucketCurrency) {
-                        amountInBucketCurrency = Number(tx.amount) * Number(tx.exchange_rate);
+                        amountInBucketCurrency = shareAmount * Number(tx.exchange_rate);
                     } else {
-                        amountInBucketCurrency = convertAmount(Number(tx.amount), tx.currency || 'USD', bucketCurrency);
+                        amountInBucketCurrency = convertAmount(shareAmount, tx.currency || 'USD', bucketCurrency);
                     }
 
                     spending[bId] = (spending[bId] || 0) + amountInBucketCurrency;
@@ -80,7 +95,7 @@ export function BucketsProvider({ children }: { children: React.ReactNode }) {
         } finally {
             setLoading(false);
         }
-    }, [userId, currency, convertAmount]);
+    }, [userId, activeWorkspaceId, currency, convertAmount]);
 
     // Debounced refresh to batch rapid realtime events
     const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -100,14 +115,27 @@ export function BucketsProvider({ children }: { children: React.ReactNode }) {
         if (userId) {
             fetchBuckets();
 
-            // Realtime subscription with debounce
+            // Realtime subscription with debounce and workspace scoping
             const channel = supabase
-                .channel('buckets-changes')
+                .channel(`buckets-updates-${userId}-${activeWorkspaceId || 'personal'}`)
                 .on('postgres_changes', {
                     event: '*',
                     schema: 'public',
-                    table: 'buckets',
-                    filter: `user_id=eq.${userId}`
+                    table: 'buckets'
+                }, () => {
+                    debouncedFetchBuckets();
+                })
+                .on('postgres_changes', {
+                    event: '*',
+                    schema: 'public',
+                    table: 'transactions'
+                }, () => {
+                    debouncedFetchBuckets();
+                })
+                .on('postgres_changes', {
+                    event: '*',
+                    schema: 'public',
+                    table: 'splits'
                 }, () => {
                     debouncedFetchBuckets();
                 })
@@ -129,7 +157,10 @@ export function BucketsProvider({ children }: { children: React.ReactNode }) {
         }
 
         try {
-            const bucket = await BucketService.createBucket(data, userId);
+            const bucket = await BucketService.createBucket({
+                ...data,
+                group_id: activeWorkspaceId && activeWorkspaceId !== 'personal' ? activeWorkspaceId : null
+            }, userId);
             toast.success('Bucket created successfully');
             await fetchBuckets();
             return bucket.id;

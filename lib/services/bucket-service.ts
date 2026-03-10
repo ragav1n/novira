@@ -2,27 +2,45 @@ import { supabase } from '@/lib/supabase';
 import { Bucket } from '@/components/providers/buckets-provider';
 
 export const BucketService = {
-    async getBuckets() {
-        const { data, error } = await supabase
+    async getBuckets(userId?: string, workspaceId?: string | null) {
+        let query = supabase
             .from('buckets')
             .select('id, user_id, name, type, icon, color, budget, currency, is_archived, start_date, end_date, created_at')
             .order('created_at', { ascending: false });
 
+        if (workspaceId && workspaceId !== 'personal') {
+            query = query.eq('group_id', workspaceId);
+        } else if (workspaceId === 'personal' && userId) {
+            query = query.eq('user_id', userId).is('group_id', null);
+        } else if (userId) {
+            query = query.eq('user_id', userId);
+        }
+
+        const { data, error } = await query;
         if (error) throw error;
         return data as Bucket[];
     },
 
-    async getBucketSpending() {
-        const { data, error } = await supabase
+    async getBucketSpending(userId?: string, workspaceId?: string | null) {
+        let query = supabase
             .from('transactions')
-            .select('amount, currency, bucket_id, exchange_rate, base_currency')
+            .select('id, amount, currency, bucket_id, exchange_rate, base_currency, user_id, group_id, splits(user_id, amount)')
             .not('bucket_id', 'is', null);
 
+        if (workspaceId && workspaceId !== 'personal') {
+            query = query.eq('group_id', workspaceId);
+        } else if (workspaceId === 'personal' && userId) {
+            query = query.eq('user_id', userId).is('group_id', null);
+        } else if (userId) {
+            query = query.eq('user_id', userId);
+        }
+
+        const { data, error } = await query;
         if (error) throw error;
         return data;
     },
 
-    async createBucket(data: Partial<Bucket>, userId: string) {
+    async createBucket(data: Partial<Bucket> & { group_id?: string | null }, userId: string) {
         const { data: bucket, error } = await supabase
             .from('buckets')
             .insert({

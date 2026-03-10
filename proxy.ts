@@ -9,7 +9,7 @@ export async function proxy(request: NextRequest) {
         "default-src 'self'",
         `script-src 'self' 'nonce-${nonce}' 'wasm-unsafe-eval' blob: https://unpkg.com https://cdn.jsdelivr.net https://va.vercel-scripts.com ${isDev ? "'unsafe-eval'" : ''}`,
         `style-src 'self' 'unsafe-inline'`,
-        "img-src 'self' blob: data: https://*.supabase.co https://*.mapbox.com",
+        "img-src 'self' blob: data: https://*.supabase.co https://*.mapbox.com https://*.googleusercontent.com",
         "media-src 'self' blob: data:",
         "font-src 'self'",
         "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.frankfurter.dev https://unpkg.com https://cdn.jsdelivr.net https://*.gstatic.com https://cdnjs.cloudflare.com https://va.vercel-scripts.com https://*.mapbox.com",
