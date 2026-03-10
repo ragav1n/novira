@@ -32,6 +32,7 @@ export type Transaction = {
         full_name: string;
         avatar_url?: string;
     };
+    group_id?: string | null;
 };
 
 export type AuditLog = {
