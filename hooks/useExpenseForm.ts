@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 
-export function useExpenseForm(userId: string | null | undefined, defaultCurrency: string, activeWorkspaceId: string | null = null) {
+export function useExpenseForm(userId: string | null | undefined, defaultCurrency: string, activeWorkspaceId: string | null = null, defaultSplitEnabled: boolean = !!activeWorkspaceId) {
     const [selectedCategory, setSelectedCategory] = useState('food');
     const [amount, setAmount] = useState('');
     const [description, setDescription] = useState('');
@@ -16,7 +16,7 @@ export function useExpenseForm(userId: string | null | undefined, defaultCurrenc
     }, [defaultCurrency]);
 
     // Splitting State
-    const [isSplitEnabled, setIsSplitEnabled] = useState(!!activeWorkspaceId);
+    const [isSplitEnabled, setIsSplitEnabled] = useState(defaultSplitEnabled);
     const [selectedGroupId, setSelectedGroupId] = useState<string | null>(activeWorkspaceId);
     const [selectedFriendIds, setSelectedFriendIds] = useState<string[]>([]);
     const [splitMode, setSplitMode] = useState<'even' | 'custom'>('even');
@@ -83,7 +83,7 @@ export function useExpenseForm(userId: string | null | undefined, defaultCurrenc
         setPaymentMethod('Cash');
         setTxCurrency(defaultCurrency);
         setSelectedBucketId(null);
-        setIsSplitEnabled(!!activeWorkspaceId);
+        setIsSplitEnabled(defaultSplitEnabled);
         setSelectedGroupId(activeWorkspaceId);
         setSelectedFriendIds([]);
         setSplitMode('even');

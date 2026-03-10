@@ -14,16 +14,24 @@ export function useDashboardData(userId: string | null) {
     const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
     const [loadingAudit, setLoadingAudit] = useState(false);
 
-    const loadTxRef = useRef<((uid: string, bypassCache?: boolean) => Promise<void>) | null>(null);
+    const loadTxRef = useRef<((uid: string, workspaceId: string | null, bypassCache?: boolean) => Promise<void>) | null>(null);
 
-    const loadTransactions = async (currentUserId: string, bypassCache = false) => {
+    const loadTransactions = async (currentUserId: string, workspaceId: string | null = null, bypassCache = false) => {
         try {
             let query = supabase
                 .from('transactions')
-                .select('id, description, amount, category, date, created_at, user_id, currency, exchange_rate, base_currency, bucket_id, exclude_from_allowance, is_recurring, place_name, place_address, place_lat, place_lng, profile:profiles(full_name, avatar_url), splits(user_id, amount, is_paid)')
+                .select('id, description, amount, category, date, created_at, user_id, group_id, currency, exchange_rate, base_currency, bucket_id, exclude_from_allowance, is_recurring, place_name, place_address, place_lat, place_lng, profile:profiles(full_name, avatar_url), splits(user_id, amount, is_paid)')
                 .order('date', { ascending: false })
                 .order('created_at', { ascending: false })
                 .limit(200);
+
+            if (workspaceId && workspaceId !== 'personal') {
+                query = query.eq('group_id', workspaceId);
+            } else if (workspaceId === 'personal') {
+                query = query.is('group_id', null).eq('user_id', currentUserId);
+            } else {
+                query = query.eq('user_id', currentUserId);
+            }
 
             if (bypassCache) {
                  query = query.neq('description', `bypass-${Date.now()}`);
@@ -48,10 +56,10 @@ export function useDashboardData(userId: string | null) {
     loadTxRef.current = loadTransactions;
 
     const txDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const debouncedLoadTx = useCallback((uid: string, bypassCache = false) => {
+    const debouncedLoadTx = useCallback((uid: string, workspaceId: string | null = null, bypassCache = false) => {
         if (txDebounceRef.current) clearTimeout(txDebounceRef.current);
         txDebounceRef.current = setTimeout(() => {
-            loadTxRef.current?.(uid, bypassCache);
+            loadTxRef.current?.(uid, workspaceId, bypassCache);
         }, 300);
     }, []);
 
@@ -61,14 +69,17 @@ export function useDashboardData(userId: string | null) {
         };
     }, []);
 
-    // Initial data fetch
+    // Initial data fetch and workspace change listener
     useEffect(() => {
         if (!userId) return;
         
         const fetchInitialData = async () => {
             setLoading(true);
             try {
-                await loadTxRef.current?.(userId, false);
+                // In a production app, the active workspace ID might come from a separate context/store.
+                // We'll trust the caller to handle the initial fetch correctly if they call loadTransactions.
+                // For now, this hook's default behavior is user-centric.
+                await loadTxRef.current?.(userId, null, false);
             } finally {
                 setLoading(false);
             }
@@ -81,7 +92,7 @@ export function useDashboardData(userId: string | null) {
         if (!userId) return;
 
         const channel = supabase
-            .channel('db-changes')
+            .channel(`dashboard-sync-${userId}`)
             .on(
                 'postgres_changes',
                 {
@@ -90,7 +101,29 @@ export function useDashboardData(userId: string | null) {
                     table: 'transactions',
                 },
                 () => {
-                    debouncedLoadTx(userId, true);
+                    debouncedLoadTx(userId, null, true);
+                }
+            )
+            .on(
+                'postgres_changes',
+                {
+                    event: '*',
+                    schema: 'public',
+                    table: 'splits',
+                },
+                () => {
+                    debouncedLoadTx(userId, null, true);
+                }
+            )
+            .on(
+                'postgres_changes',
+                {
+                    event: 'UPDATE',
+                    schema: 'public',
+                    table: 'profiles',
+                },
+                () => {
+                    debouncedLoadTx(userId, null, true);
                 }
             )
             .subscribe();
@@ -102,7 +135,7 @@ export function useDashboardData(userId: string | null) {
 
     useEffect(() => {
         if (!userId) return;
-        const handleExpenseAdded = () => loadTxRef.current?.(userId, true);
+        const handleExpenseAdded = () => loadTxRef.current?.(userId, null, true);
         window.addEventListener('novira:expense-added', handleExpenseAdded);
         return () => window.removeEventListener('novira:expense-added', handleExpenseAdded);
     }, [userId]);
@@ -111,7 +144,7 @@ export function useDashboardData(userId: string | null) {
         if (!userId) return;
         const handleVisibility = () => {
             if (document.visibilityState === 'visible') {
-                loadTxRef.current?.(userId, true);
+                loadTxRef.current?.(userId, null, true);
             }
         };
         document.addEventListener('visibilitychange', handleVisibility);

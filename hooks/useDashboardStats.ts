@@ -43,6 +43,20 @@ export function useDashboardStats({
 
     const calculateUserShare = useCallback((tx: Transaction, currentUserId: string | null) => {
         if (!currentUserId) return Number(tx.amount); // For workspaces/full-view, return full amount
+        
+        if (tx.splits && tx.splits.length > 0) {
+            if (tx.user_id === currentUserId) {
+                // If I paid, my share is total minus what others owe me
+                const othersOwe = tx.splits.reduce((sum, s) => sum + Number(s.amount), 0);
+                return Number(tx.amount) - othersOwe;
+            } else {
+                // If someone else paid, my share is my split amount
+                const mySplit = tx.splits.find(s => s.user_id === currentUserId);
+                return mySplit ? Number(mySplit.amount) : 0;
+            }
+        }
+
+        // Standard non-split logic
         if (tx.user_id === currentUserId) {
             return Number(tx.amount);
         }

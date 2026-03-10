@@ -60,7 +60,11 @@ export function AddExpenseView() {
     const { groups, friends } = useGroups();
     const { buckets } = useBuckets();
 
-    const formState = useExpenseForm(userId, currency, activeWorkspaceId);
+    const activeGroup = groups.find(g => g.id === activeWorkspaceId);
+    const isSharedWorkspace = activeGroup?.type === 'couple' || activeGroup?.type === 'home';
+    const defaultSplitEnabled = activeWorkspaceId ? !isSharedWorkspace : false;
+
+    const formState = useExpenseForm(userId, currency, activeWorkspaceId, defaultSplitEnabled);
     const { handleSubmit, loading } = useExpenseSubmission();
 
     const onSubmit = () => {

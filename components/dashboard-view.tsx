@@ -107,7 +107,12 @@ import { VirtualizedTransactionList } from '@/components/virtualized-transaction
 
 export function DashboardView() {
     const router = useRouter();
-    const { formatCurrency, currency, convertAmount, monthlyBudget, setMonthlyBudget, userId, isRatesLoading, avatarUrl, fullName: userName, activeWorkspaceId, setActiveWorkspaceId, workspaceBudgets, setWorkspaceBudget } = useUserPreferences();
+    const { 
+        formatCurrency, currency, convertAmount, monthlyBudget, setMonthlyBudget, 
+        userId, isRatesLoading, avatarUrl, fullName: userName, 
+        activeWorkspaceId, setActiveWorkspaceId, 
+        workspaceBudgets, convertedWorkspaceBudgets, setWorkspaceBudget 
+    } = useUserPreferences();
     const { balances, groups, friends } = useGroups();
     const { buckets } = useBuckets();
 
@@ -116,6 +121,12 @@ export function DashboardView() {
         isEditOpen, setIsEditOpen, selectedAuditTx, setSelectedAuditTx,
         auditLogs, loadingAudit, handleDeleteTransaction, handleUpdateTransaction, loadAuditLogs, loadTransactions
     } = useDashboardData(userId);
+
+    useEffect(() => {
+        if (userId) {
+            loadTransactions(userId, activeWorkspaceId, true);
+        }
+    }, [userId, activeWorkspaceId, loadTransactions]);
 
     const {
         dashboardFocus, setDashboardFocus, isFocusRestored,
@@ -140,7 +151,7 @@ export function DashboardView() {
     const bucketCurrencyTemp = isBucketFocused ? buckets.find(b => b.id === dashboardFocus)?.currency || currency : currency;
     const bucketCurrency = bucketCurrencyTemp.toUpperCase() as Currency;
 
-    const currentWorkspaceBudget = activeWorkspaceId ? (workspaceBudgets[activeWorkspaceId] || 0) : monthlyBudget;
+    const currentWorkspaceBudget = activeWorkspaceId ? (convertedWorkspaceBudgets[activeWorkspaceId] || 0) : monthlyBudget;
 
     const {
         focusedBucket, displayBudget, calculateUserShare, totalSpent,

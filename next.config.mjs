@@ -13,6 +13,10 @@ const nextConfig = {
             key: 'Permissions-Policy',
             value: 'geolocation=*',
           },
+          {
+            key: 'Content-Security-Policy',
+            value: "img-src 'self' blob: data: https://*.supabase.co https://*.mapbox.com https://*.googleusercontent.com;",
+          },
         ],
       },
     ]

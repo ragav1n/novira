@@ -300,8 +300,7 @@ export function GroupsProvider({ children }: { children: React.ReactNode }) {
                 .on('postgres_changes', {
                     event: '*',
                     schema: 'public',
-                    table: 'friendships',
-                    filter: `or(user_id.eq.${userId},friend_id.eq.${userId})`
+                    table: 'friendships'
                 }, () => {
                     debouncedRefresh();
                 })

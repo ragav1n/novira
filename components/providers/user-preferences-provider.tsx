@@ -58,7 +58,8 @@ interface UserPreferencesContextType {
     // Joint Workspaces
     activeWorkspaceId: string | null;
     setActiveWorkspaceId: (id: string | null) => void;
-    workspaceBudgets: Record<string, number>; // Maps group_id to budget
+    workspaceBudgets: Record<string, { amount: number; currency: string }>; // Maps group_id to {budget, currency}
+    convertedWorkspaceBudgets: Record<string, number>; // Converted for UI
     setWorkspaceBudget: (groupId: string, budget: number) => Promise<void>;
 }
 
@@ -109,7 +110,7 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
     
     // Joint Workspaces State
     const [activeWorkspaceId, setActiveWorkspaceId] = useState<string | null>(null);
-    const [workspaceBudgets, setWorkspaceBudgets] = useState<Record<string, number>>({});
+    const [workspaceBudgets, setWorkspaceBudgets] = useState<Record<string, { amount: number; currency: string }>>({});
 
     const processRecurringExpenses = useCallback(async (uid: string) => {
         try {
@@ -162,12 +163,15 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
             // Fetch workspace budgets (RLS ensures user only gets their groups)
             const { data: workspaceData, error: workspaceError } = await supabase
                 .from('workspace_budgets')
-                .select('group_id, monthly_budget');
+                .select('group_id, monthly_budget, currency');
             
             if (workspaceData && !workspaceError) {
-                const wBudgets: Record<string, number> = {};
+                const wBudgets: Record<string, { amount: number; currency: string }> = {};
                 workspaceData.forEach(row => {
-                    wBudgets[row.group_id] = Number(row.monthly_budget);
+                    wBudgets[row.group_id] = {
+                        amount: Number(row.monthly_budget),
+                        currency: row.currency || 'USD'
+                    };
                 });
                 setWorkspaceBudgets(wBudgets);
             }
@@ -253,6 +257,47 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
             document.removeEventListener('visibilitychange', handleVisibilityChange);
         };
     }, [handleSession, processRecurringExpenses, userId]);
+
+    // Realtime subscriptions for profile and workspace budgets
+    useEffect(() => {
+        if (!userId) return;
+
+        const profileChannel = supabase
+            .channel(`profile-changes-${userId}`)
+            .on(
+                'postgres_changes',
+                {
+                    event: 'UPDATE',
+                    schema: 'public',
+                    table: 'profiles',
+                    filter: `id=eq.${userId}`
+                },
+                () => {
+                    loadPreferences(userId);
+                }
+            )
+            .subscribe();
+
+        const workspaceChannel = supabase
+            .channel(`workspace-budget-changes-${userId}`)
+            .on(
+                'postgres_changes',
+                {
+                    event: '*',
+                    schema: 'public',
+                    table: 'workspace_budgets'
+                },
+                () => {
+                    loadPreferences(userId);
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(profileChannel);
+            supabase.removeChannel(workspaceChannel);
+        };
+    }, [userId, loadPreferences]);
 
     // Fetch Exchange Rates when currency changes (with localStorage caching)
     useEffect(() => {
@@ -406,7 +451,7 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
 
     const setCurrency = useCallback(async (newCurrency: Currency) => {
         if (newCurrency === currency) return;
-        const newBudget = budgets[newCurrency] || DEFAULT_BUDGETS[newCurrency];
+        const newBudget = budgets[newCurrency] || convertAmount(monthlyBudget, currency, newCurrency);
 
         setCurrencyState(newCurrency);
         setMonthlyBudgetState(newBudget);
@@ -474,8 +519,19 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
         }
     }, [currency, budgets, userId, refreshPreferences]);
 
+    const convertedWorkspaceBudgets = useMemo(() => {
+        const converted: Record<string, number> = {};
+        Object.entries(workspaceBudgets).forEach(([groupId, data]) => {
+            converted[groupId] = convertAmount(data.amount, data.currency, currency);
+        });
+        return converted;
+    }, [workspaceBudgets, currency, convertAmount]);
+
     const setWorkspaceBudget = useCallback(async (groupId: string, budget: number) => {
-        setWorkspaceBudgets(prev => ({ ...prev, [groupId]: budget }));
+        setWorkspaceBudgets(prev => ({ 
+            ...prev, 
+            [groupId]: { amount: budget, currency } 
+        }));
 
         if (userId) {
             try {
@@ -483,7 +539,7 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
                     .from('workspace_budgets')
                     .upsert(
                         { group_id: groupId, monthly_budget: budget, currency },
-                        { onConflict: 'group_id, currency' }
+                        { onConflict: 'group_id' }
                     );
 
                 if (error) throw error;
@@ -522,6 +578,7 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
         activeWorkspaceId,
         setActiveWorkspaceId,
         workspaceBudgets,
+        convertedWorkspaceBudgets,
         setWorkspaceBudget
     }), [
         user,
@@ -542,6 +599,7 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
         exchangeRates,
         activeWorkspaceId,
         workspaceBudgets,
+        convertedWorkspaceBudgets,
         setWorkspaceBudget
     ]);
 

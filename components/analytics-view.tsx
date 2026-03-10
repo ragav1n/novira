@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { ChevronLeft, MoreHorizontal, Filter, Shirt } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -81,6 +81,8 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 
 
 
+import { supabase } from '@/lib/supabase';
+
 type DateRange = '1M' | 'LM' | '3M' | '6M' | '1Y' | 'ALL';
 
 export function AnalyticsView() {
@@ -139,13 +141,7 @@ export function AnalyticsView() {
 
     const { buckets } = useBuckets();
 
-    useEffect(() => {
-        if (userId) {
-            fetchData();
-        }
-    }, [dateRange, currency, userId, selectedBucketId, activeWorkspaceId]);
-
-    const fetchData = async () => {
+    const fetchData = useCallback(async () => {
         setLoading(true);
         try {
             if (!userId) return;
@@ -180,7 +176,40 @@ export function AnalyticsView() {
         } finally {
             setLoading(false);
         }
-    };
+    }, [userId, activeWorkspaceId, dateRange, selectedBucketId]);
+
+    useEffect(() => {
+        if (userId) {
+            fetchData();
+        }
+    }, [fetchData, userId, currency]);
+
+    // Real-time subscription for transactions
+    useEffect(() => {
+        if (!userId) return;
+
+        const channel = supabase
+            .channel(`analytics-updates-${userId}-${activeWorkspaceId || 'personal'}`)
+            .on('postgres_changes', {
+                event: '*',
+                schema: 'public',
+                table: 'transactions'
+            }, () => {
+                fetchData();
+            })
+            .on('postgres_changes', {
+                event: '*',
+                schema: 'public',
+                table: 'splits'
+            }, () => {
+                fetchData();
+            })
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [userId, activeWorkspaceId, fetchData]);
 
     const { categoryTrendData, categoryBreakdown, paymentBreakdown, totalSpentInRange } = useMemo(() => {
         if (!transactions.length || !userId) return {
