@@ -279,7 +279,7 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
             .subscribe();
 
         const workspaceChannel = supabase
-            .channel(`workspace-budget-changes-${userId}`)
+            .channel(`workspace-budget-changes-${userId}-${activeWorkspaceId || 'personal'}`)
             .on(
                 'postgres_changes',
                 {

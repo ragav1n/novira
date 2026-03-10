@@ -19,6 +19,7 @@ export interface Bucket {
     start_date?: string;
     end_date?: string;
     currency?: string;
+    group_id?: string | null;
 }
 
 interface BucketsContextType {

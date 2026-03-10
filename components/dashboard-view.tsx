@@ -120,7 +120,7 @@ export function DashboardView() {
         transactions, loading, editingTransaction, setEditingTransaction,
         isEditOpen, setIsEditOpen, selectedAuditTx, setSelectedAuditTx,
         auditLogs, loadingAudit, handleDeleteTransaction, handleUpdateTransaction, loadAuditLogs, loadTransactions
-    } = useDashboardData(userId);
+    } = useDashboardData(userId, activeWorkspaceId);
 
     useEffect(() => {
         if (userId) {

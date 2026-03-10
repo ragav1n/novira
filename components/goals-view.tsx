@@ -148,7 +148,7 @@ export function GoalsView() {
         if (!userId) return;
 
         const goalsChannel = supabase
-            .channel(`goals-changes-${userId}`)
+            .channel(`goals-changes-${userId}-${activeWorkspaceId || 'personal'}`)
             .on(
                 'postgres_changes',
                 {

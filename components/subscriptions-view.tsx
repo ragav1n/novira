@@ -97,7 +97,7 @@ export function SubscriptionsView() {
         if (!userId) return;
 
         const templatesChannel = supabase
-            .channel(`templates-changes-${userId}`)
+            .channel(`templates-changes-${userId}-${activeWorkspaceId || 'personal'}`)
             .on(
                 'postgres_changes',
                 {

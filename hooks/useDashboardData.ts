@@ -3,7 +3,7 @@ import { supabase } from '@/lib/supabase';
 import { toast } from '@/utils/haptics';
 import type { Transaction, AuditLog } from '@/types/transaction';
 
-export function useDashboardData(userId: string | null) {
+export function useDashboardData(userId: string | null, activeWorkspaceId: string | null = null) {
     const [transactions, setTransactions] = useState<Transaction[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -76,23 +76,20 @@ export function useDashboardData(userId: string | null) {
         const fetchInitialData = async () => {
             setLoading(true);
             try {
-                // In a production app, the active workspace ID might come from a separate context/store.
-                // We'll trust the caller to handle the initial fetch correctly if they call loadTransactions.
-                // For now, this hook's default behavior is user-centric.
-                await loadTxRef.current?.(userId, null, false);
+                await loadTxRef.current?.(userId, activeWorkspaceId, false);
             } finally {
                 setLoading(false);
             }
         };
 
         fetchInitialData();
-    }, [userId]);
+    }, [userId, activeWorkspaceId]);
 
     useEffect(() => {
         if (!userId) return;
 
         const channel = supabase
-            .channel(`dashboard-sync-${userId}`)
+            .channel(`dashboard-sync-${userId}-${activeWorkspaceId || 'personal'}`)
             .on(
                 'postgres_changes',
                 {
@@ -101,7 +98,7 @@ export function useDashboardData(userId: string | null) {
                     table: 'transactions',
                 },
                 () => {
-                    debouncedLoadTx(userId, null, true);
+                    debouncedLoadTx(userId, activeWorkspaceId, true);
                 }
             )
             .on(
@@ -112,7 +109,7 @@ export function useDashboardData(userId: string | null) {
                     table: 'splits',
                 },
                 () => {
-                    debouncedLoadTx(userId, null, true);
+                    debouncedLoadTx(userId, activeWorkspaceId, true);
                 }
             )
             .on(
@@ -123,7 +120,7 @@ export function useDashboardData(userId: string | null) {
                     table: 'profiles',
                 },
                 () => {
-                    debouncedLoadTx(userId, null, true);
+                    debouncedLoadTx(userId, activeWorkspaceId, true);
                 }
             )
             .subscribe();
@@ -131,25 +128,25 @@ export function useDashboardData(userId: string | null) {
         return () => {
             supabase.removeChannel(channel);
         };
-    }, [userId, debouncedLoadTx]);
+    }, [userId, activeWorkspaceId, debouncedLoadTx]);
 
     useEffect(() => {
         if (!userId) return;
-        const handleExpenseAdded = () => loadTxRef.current?.(userId, null, true);
+        const handleExpenseAdded = () => loadTxRef.current?.(userId, activeWorkspaceId, true);
         window.addEventListener('novira:expense-added', handleExpenseAdded);
         return () => window.removeEventListener('novira:expense-added', handleExpenseAdded);
-    }, [userId]);
+    }, [userId, activeWorkspaceId]);
 
     useEffect(() => {
         if (!userId) return;
         const handleVisibility = () => {
             if (document.visibilityState === 'visible') {
-                loadTxRef.current?.(userId, null, true);
+                loadTxRef.current?.(userId, activeWorkspaceId, true);
             }
         };
         document.addEventListener('visibilitychange', handleVisibility);
         return () => document.removeEventListener('visibilitychange', handleVisibility);
-    }, [userId]);
+    }, [userId, activeWorkspaceId]);
 
     const handleDeleteTransaction = async (tx: Transaction) => {
         // Optimistic: remove from UI immediately
