@@ -106,6 +106,11 @@ import { VirtualizedTransactionList } from '@/components/virtualized-transaction
 
 
 export function DashboardView() {
+    const [mounted, setMounted] = useState(false);
+    useEffect(() => {
+        setMounted(true);
+    }, []);
+
     const router = useRouter();
     const { 
         formatCurrency, currency, convertAmount, monthlyBudget, setMonthlyBudget, 
@@ -237,6 +242,8 @@ export function DashboardView() {
     }, [buckets, getBucketIcon]);
 
     const activeBuckets = useMemo(() => activeWorkspaceId ? [] : buckets.filter(b => !b.is_archived), [buckets, activeWorkspaceId]);
+
+    if (!mounted) return <DashboardSkeleton />;
 
     return (
         <motion.div 
