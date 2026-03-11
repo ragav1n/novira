@@ -31,9 +31,27 @@ export function useDashboardStats({
     convertAmount: (amount: number, fromCurrency: string, toCurrency?: string) => number;
     monthlyBudget: number;
     buckets: any[];
-}) {
-    const focusedBucket = isBucketFocused ? buckets.find(b => b.id === effectiveFocus) : null;
-    const displayBudget = isBucketFocused && focusedBucket ? Number(focusedBucket.budget) : monthlyBudget;
+}): {
+    focusedBucket: any;
+    displayBudget: number;
+    calculateUserShare: (tx: Transaction, currentUserId: string | null) => number;
+    totalSpent: number;
+    remaining: number;
+    progress: number;
+    spendingByCategory: Record<string, number>;
+    spendingData: SpendingCategory[];
+    displayTransactions: Transaction[];
+    recentFeed: Transaction[];
+    runRateData: {
+        dailyAverage: number;
+        projectedSpend: number;
+        isExceeding: boolean;
+        daysInMonth: number;
+        currentDayOfMoth: number;
+    } | null;
+} {
+    const focusedBucket = isBucketFocused && Array.isArray(buckets) ? buckets.find(b => b.id === effectiveFocus) : null;
+    const displayBudget = isBucketFocused && focusedBucket ? Number(focusedBucket.budget) : (monthlyBudget || 0);
 
     const currentMonthPrefix = useMemo(() => {
         const d = new Date();
@@ -63,91 +81,102 @@ export function useDashboardStats({
         return 0;
     }, []);
 
-    const totalSpent = useMemo(() => transactions.reduce((acc, tx) => {
-        // Filter by context (bucket or monthly allowance)
-        if (isBucketFocused) {
-            if (tx.bucket_id !== effectiveFocus) return acc;
-        } else {
-            if (tx.exclude_from_allowance) return acc;
-            if (!tx.date.startsWith(currentMonthPrefix)) return acc;
-        }
+    const totalSpent = useMemo(() => {
+        if (!Array.isArray(transactions)) return 0;
+        return transactions.reduce((acc, tx) => {
+            // Filter by context (bucket or monthly allowance)
+            if (isBucketFocused) {
+                if (tx.bucket_id !== effectiveFocus) return acc;
+            } else {
+                if (tx.exclude_from_allowance) return acc;
+                if (!tx.date.startsWith(currentMonthPrefix)) return acc;
+            }
 
-        const myShare = calculateUserShare(tx, userId);
-        if (myShare === 0) return acc;
+            const myShare = calculateUserShare(tx, userId);
+            if (myShare === 0) return acc;
 
-        const txCurr = (tx.currency || 'USD').toUpperCase();
-        const targetCurr = bucketCurrency;
-        
-        const isSameCurrency = txCurr === targetCurr;
-        
-        if (!isSameCurrency && tx.exchange_rate && tx.exchange_rate !== 1 && tx.base_currency === targetCurr) {
-            return acc + (myShare * Number(tx.exchange_rate));
-        }
+            const txCurr = (tx.currency || 'USD').toUpperCase();
+            const targetCurr = bucketCurrency;
+            
+            const isSameCurrency = txCurr === targetCurr;
+            
+            if (!isSameCurrency && tx.exchange_rate && tx.exchange_rate !== 1 && tx.base_currency === targetCurr) {
+                return acc + (myShare * Number(tx.exchange_rate));
+            }
 
-        return acc + convertAmount(myShare, txCurr, targetCurr);
-    }, 0), [transactions, userId, isBucketFocused, effectiveFocus, calculateUserShare, bucketCurrency, convertAmount, currentMonthPrefix]);
+            return acc + convertAmount(myShare, txCurr, targetCurr);
+        }, 0);
+    }, [transactions, userId, isBucketFocused, effectiveFocus, calculateUserShare, bucketCurrency, convertAmount, currentMonthPrefix]);
 
     const remaining = displayBudget - totalSpent;
     const progress = displayBudget > 0 ? Math.min((totalSpent / displayBudget) * 100, 100) : 0;
 
-    const spendingByCategory = useMemo(() => transactions.reduce((acc, tx) => {
-        // Filter by context (bucket or monthly allowance)
-        if (isBucketFocused) {
-            if (tx.bucket_id !== effectiveFocus) return acc;
-        } else {
-            if (tx.exclude_from_allowance) return acc;
-            if (!tx.date.startsWith(currentMonthPrefix)) return acc;
-        }
-
-        const cat = tx.category.toLowerCase();
-        const myShare = calculateUserShare(tx, userId);
-
-        if (myShare > 0) {
-            if (!acc[cat]) acc[cat] = 0;
-
-            const txCurr = tx.currency || 'USD';
-            // When bucket focused, we should probably convert to bucketCurrency for the pie chart
-            const targetCurr = isBucketFocused ? bucketCurrency : currency;
-            const isSameCurrency = txCurr === targetCurr;
-
-            if (!isSameCurrency && tx.exchange_rate && tx.exchange_rate !== 1 && tx.base_currency === targetCurr) {
-                acc[cat] += (myShare * Number(tx.exchange_rate));
+    const spendingByCategory = useMemo(() => {
+        if (!Array.isArray(transactions)) return {};
+        return transactions.reduce((acc, tx) => {
+            // Filter by context (bucket or monthly allowance)
+            if (isBucketFocused) {
+                if (tx.bucket_id !== effectiveFocus) return acc;
             } else {
-                acc[cat] += convertAmount(myShare, txCurr, targetCurr);
+                if (tx.exclude_from_allowance) return acc;
+                if (!tx.date.startsWith(currentMonthPrefix)) return acc;
             }
-        }
-        return acc;
-    }, {} as Record<string, number>), [transactions, userId, isBucketFocused, effectiveFocus, calculateUserShare, currency, convertAmount, currentMonthPrefix, bucketCurrency]);
+
+            const cat = tx.category.toLowerCase();
+            const myShare = calculateUserShare(tx, userId);
+
+            if (myShare > 0) {
+                if (!acc[cat]) acc[cat] = 0;
+
+                const txCurr = tx.currency || 'USD';
+                // When bucket focused, we should probably convert to bucketCurrency for the pie chart
+                const targetCurr = isBucketFocused ? bucketCurrency : currency;
+                const isSameCurrency = txCurr === targetCurr;
+
+                if (!isSameCurrency && tx.exchange_rate && tx.exchange_rate !== 1 && tx.base_currency === targetCurr) {
+                    acc[cat] += (myShare * Number(tx.exchange_rate));
+                } else {
+                    acc[cat] += convertAmount(myShare, txCurr, targetCurr);
+                }
+            }
+            return acc;
+        }, {} as Record<string, number>);
+    }, [transactions, userId, isBucketFocused, effectiveFocus, calculateUserShare, currency, convertAmount, currentMonthPrefix, bucketCurrency]);
 
     const spendingData: SpendingCategory[] = useMemo(() => Object.entries(spendingByCategory).map(([cat, value]) => ({
         name: cat.charAt(0).toUpperCase() + cat.slice(1),
-        value,
+        value: value as number,
         color: CATEGORY_COLORS[cat] || CATEGORY_COLORS.others,
         fill: CATEGORY_COLORS[cat] || CATEGORY_COLORS.others,
     })), [spendingByCategory]);
 
-    const displayTransactions = useMemo(() => transactions.filter(tx => {
-        // Filter by context (bucket or monthly allowance)
-        if (isBucketFocused) {
-            if (tx.bucket_id !== effectiveFocus) return false;
-        } else {
-            if (tx.exclude_from_allowance) return false;
-            if (!tx.date.startsWith(currentMonthPrefix)) return false;
-        }
+    const displayTransactions = useMemo(() => {
+        if (!Array.isArray(transactions)) return [];
+        return transactions.filter(tx => {
+            // Filter by context (bucket or monthly allowance)
+            if (isBucketFocused) {
+                if (tx.bucket_id !== effectiveFocus) return false;
+            } else {
+                if (tx.exclude_from_allowance) return false;
+                if (!tx.date.startsWith(currentMonthPrefix)) return false;
+            }
 
-        // Involvement filter
-        if (!userId) return true;
-        if (tx.user_id === userId) return true;
-        if (tx.splits && tx.splits.some(s => s.user_id === userId)) return true;
-        return false;
-    }), [transactions, userId, isBucketFocused, effectiveFocus, currentMonthPrefix]);
+            // Involvement filter
+            if (!userId) return true;
+            if (tx.user_id === userId) return true;
+            if (tx.splits && tx.splits.some(s => s.user_id === userId)) return true;
+            return false;
+        });
+    }, [transactions, userId, isBucketFocused, effectiveFocus, currentMonthPrefix]);
 
     // Truly recent transactions (top 5 overall) to prevent empty state at start of month
     const recentFeed = useMemo(() => {
         if (isBucketFocused) return displayTransactions.slice(0, 5);
         
+        if (!Array.isArray(transactions)) return [];
+        
         return transactions
-            .filter(tx => !tx.exclude_from_allowance)
+            .filter(tx => tx && !tx.exclude_from_allowance)
             .filter(tx => {
                 if (!userId) return true;
                 if (tx.user_id === userId) return true;

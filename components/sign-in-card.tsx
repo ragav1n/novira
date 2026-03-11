@@ -755,10 +755,18 @@ export function Component({ isSignUp = false }: { isSignUp?: boolean }) {
                   onClick={async () => {
                     setIsLoading(true);
                     try {
+                      // Ensure redirectTo is a fully qualified URL
+                      const origin = window.location.origin;
+                      const redirectTo = `${origin}/auth/callback`;
+                      
                       const { error } = await supabase.auth.signInWithOAuth({
                         provider: 'google',
                         options: {
-                          redirectTo: `${window.location.origin}/auth/callback`,
+                          redirectTo,
+                          queryParams: {
+                            access_type: 'offline',
+                            prompt: 'consent',
+                          },
                         },
                       });
                       if (error) throw error;
