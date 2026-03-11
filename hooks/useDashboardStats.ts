@@ -132,11 +132,6 @@ export function useDashboardStats({
             if (tx.bucket_id !== effectiveFocus) return false;
         } else {
             if (tx.exclude_from_allowance) return false;
-            // No date filter for allowanceTransactions here to show "Recent" across months?
-            // Actually, for allowance, we should probably stick to current month for consistency 
-            // unless the user wants "Recent" to be truly recent regardless of month.
-            // But usually allowance is monthly strictly. 
-            // Let's keep date filter for allowance for now to match totalSpent.
             if (!tx.date.startsWith(currentMonthPrefix)) return false;
         }
 
@@ -146,6 +141,21 @@ export function useDashboardStats({
         if (tx.splits && tx.splits.some(s => s.user_id === userId)) return true;
         return false;
     }), [transactions, userId, isBucketFocused, effectiveFocus, currentMonthPrefix]);
+
+    // Truly recent transactions (top 5 overall) to prevent empty state at start of month
+    const recentFeed = useMemo(() => {
+        if (isBucketFocused) return displayTransactions.slice(0, 5);
+        
+        return transactions
+            .filter(tx => !tx.exclude_from_allowance)
+            .filter(tx => {
+                if (!userId) return true;
+                if (tx.user_id === userId) return true;
+                if (tx.splits && tx.splits.some(s => s.user_id === userId)) return true;
+                return false;
+            })
+            .slice(0, 5);
+    }, [transactions, isBucketFocused, displayTransactions, userId]);
 
     // Run Rate Calculation
     const runRateData = useMemo(() => {
@@ -185,6 +195,7 @@ export function useDashboardStats({
         spendingByCategory,
         spendingData,
         displayTransactions,
+        recentFeed,
         runRateData
     };
 }

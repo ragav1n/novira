@@ -3,6 +3,7 @@
 import React, { memo } from 'react';
 import { format } from 'date-fns';
 import { History, MoreVertical, Users, RefreshCcw, Ban, MapPin } from 'lucide-react';
+import type { Transaction } from '@/types/transaction';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
@@ -10,8 +11,8 @@ import { cn } from '@/lib/utils';
 import { motion } from 'framer-motion';
 
 interface TransactionRowProps {
-  tx: any; // Assuming 'Transaction' type is not available in the original context, keeping 'any'
-  userId: string | null; // Keeping original type
+  tx: Transaction;
+  userId: string | null;
   myShare: number;
   formattedAmount: string;
   formattedConverted?: string;

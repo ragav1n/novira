@@ -9,6 +9,7 @@ import {
     resetToPending, 
     removeSynced 
 } from './offline-sync-queue';
+import { TransactionService } from './services/transaction-service';
 
 const QUEUE_KEY = 'novira-offline-queue';
 let isSyncingLoopActive = false;
@@ -92,28 +93,20 @@ export async function attemptSync() {
             // Execute mutation based on Type
             if (item.type === 'ADD_FULL_TRANSACTION') {
                 const { transaction, splitRecords, recurringRecord } = item.data;
-                const { data: newTx, error, status } = await supabase
-                    .from('transactions')
-                    .insert([{ ...transaction, idempotency_key: item.id }])
-                    .select()
-                    .single();
                 
-                if (error) {
-                    if (status >= 400 && status < 500) {
-                        queue = markFailed(queue, item.id, error.message);
-                    } else {
-                        throw new Error("Temporary failure");
-                    }
-                } else {
-                    // Transaction inserted successfully, insert splits and recurring
-                    if (splitRecords && splitRecords.length > 0) {
-                        const finalSplits = splitRecords.map((s: any) => ({ ...s, transaction_id: newTx.id }));
-                        await supabase.from('splits').insert(finalSplits); // Best effort, since idempotents are tracked on main TX
-                    }
-                    if (recurringRecord) {
-                        await supabase.from('recurring_templates').insert(recurringRecord);
-                    }
+                // Use the Service method which now uses the RPC
+                // We pass the transaction as is, but ensuring idempotency_key is present (it should be from enqueue)
+                const result = await TransactionService.createTransaction({
+                    transaction: { ...transaction, idempotency_key: item.id },
+                    splits: splitRecords,
+                    recurring: recurringRecord
+                });
+
+                if (result.success) {
                     queue = markSynced(queue, item.id);
+                } else {
+                    // This block might not be reachable if createTransaction throws, but keeping for safety
+                    throw new Error("Failed to create transaction via sync");
                 }
             } else if (item.type === 'DELETE_TRANSACTION') {
                 const { error, status } = await supabase

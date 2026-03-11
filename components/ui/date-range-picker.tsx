@@ -80,6 +80,8 @@ export function DateRangePicker({
                         onSelect={setDate}
                         numberOfMonths={monthsToShow}
                         className="bg-card"
+                        fromDate={new Date(2020, 0, 1)}
+                        toDate={new Date(2030, 11, 31)}
                     />
                 </PopoverContent>
             </Popover>

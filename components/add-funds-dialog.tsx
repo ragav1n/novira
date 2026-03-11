@@ -30,7 +30,7 @@ export function AddFundsDialog({ isOpen, onClose, userId, defaultBucketId, onSuc
     const [amount, setAmount] = useState('');
     const [description, setDescription] = useState('');
     const [loading, setLoading] = useState(false);
-    const { currency, CURRENCY_SYMBOLS } = useUserPreferences();
+    const { currency, CURRENCY_SYMBOLS, convertAmount } = useUserPreferences();
     const [txCurrency, setTxCurrency] = useState(currency);
 
     React.useEffect(() => {
@@ -59,48 +59,8 @@ export function AddFundsDialog({ isOpen, onClose, userId, defaultBucketId, onSuc
 
         try {
             const fundAmount = -Math.abs(parseFloat(amount));
-            let exchangeRate = 1;
-            let convertedAmount = fundAmount;
-
-            if (txCurrency !== currency) {
-                const FRANKFURTER_SUPPORTED = [
-                    'AUD', 'BRL', 'CAD', 'CHF', 'CNY', 'CZK', 'DKK', 'EUR', 'GBP', 'HKD',
-                    'HUF', 'IDR', 'ILS', 'INR', 'ISK', 'JPY', 'KRW', 'MXN', 'MYR', 'NOK',
-                    'NZD', 'PHP', 'PLN', 'RON', 'SEK', 'SGD', 'THB', 'TRY', 'USD', 'ZAR'
-                ];
-
-                try {
-                    const dateStr = format(new Date(), 'yyyy-MM-dd');
-                    let rate: number | null = null;
-
-                    if (FRANKFURTER_SUPPORTED.includes(txCurrency) && FRANKFURTER_SUPPORTED.includes(currency)) {
-                        const response = await fetch(`https://api.frankfurter.dev/v1/${dateStr}?from=${txCurrency}&to=${currency}`);
-                        if (response.ok) {
-                            const data = await response.json();
-                            rate = data.rates[currency];
-                        }
-                    }
-
-                    if (!rate) {
-                        const API_KEY = process.env.NEXT_PUBLIC_EXCHANGERATE_API_KEY;
-                        if (API_KEY) {
-                            const url = `https://v6.exchangerate-api.com/v6/${API_KEY}/latest/${txCurrency}`;
-                            const response = await fetch(url);
-                            if (response.ok) {
-                                const data = await response.json();
-                                rate = data.conversion_rates[currency];
-                            }
-                        }
-                    }
-
-                    if (rate) {
-                        exchangeRate = rate;
-                        convertedAmount = fundAmount * exchangeRate;
-                    }
-                } catch (e) {
-                    console.error('Error fetching historical rate:', e);
-                }
-            }
+            const convertedAmount = convertAmount(fundAmount, txCurrency, currency);
+            const exchangeRate = fundAmount !== 0 ? convertedAmount / fundAmount : 1;
 
             const { error } = await supabase.from('transactions').insert({
                 user_id: userId,

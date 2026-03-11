@@ -70,6 +70,21 @@ export const TransactionService = {
         if (from === to) return 1;
 
         const dateStr = format(date, 'yyyy-MM-dd');
+        const cacheKey = `novira-rate-${from}-${to}-${dateStr}`;
+        
+        // 1. Check local cache first
+        if (typeof window !== 'undefined') {
+            const cached = localStorage.getItem(cacheKey);
+            if (cached) {
+                const { rate, ts } = JSON.parse(cached);
+                const isToday = format(new Date(), 'yyyy-MM-dd') === dateStr;
+                // If it's a past date, cache is permanent. If today, valid for 4 hours.
+                if (!isToday || (Date.now() - ts < 4 * 60 * 60 * 1000)) {
+                    return rate;
+                }
+            }
+        }
+
         let rate: number | null = null;
 
         try {
@@ -98,6 +113,11 @@ export const TransactionService = {
                     }
                 }
             }
+
+            // Save to cache if found
+            if (rate && typeof window !== 'undefined') {
+                localStorage.setItem(cacheKey, JSON.stringify({ rate, ts: Date.now() }));
+            }
         } catch (e) {
             console.error('Error fetching exchange rate:', e);
         }
@@ -123,31 +143,21 @@ export const TransactionService = {
         }
 
         try {
-            // Start transaction-like flow (manual sequence)
-            const { data: tx, error: txError } = await supabase
-                .from('transactions')
-                .insert(transaction)
-                .select()
-                .single();
+            // Use the new atomic RPC
+            const { data, error } = await supabase.rpc('create_transaction_atomic', {
+                p_transaction: transaction,
+                p_splits: splits || null,
+                p_recurring: recurring || null
+            });
 
-            if (txError) throw txError;
+            if (error) throw error;
+            if (!data.success) throw new Error(data.error || 'Failed to create transaction');
 
-            if (splits && splits.length > 0) {
-                const finalSplits = splits.map(s => ({ ...s, transaction_id: tx.id }));
-                const { error: splitError } = await supabase
-                    .from('splits')
-                    .insert(finalSplits);
-                if (splitError) throw splitError;
-            }
-
-            if (recurring) {
-                const { error: recError } = await supabase
-                    .from('recurring_templates')
-                    .insert(recurring);
-                if (recError) throw recError;
-            }
-
-            return { success: true, data: tx };
+            return { 
+                success: true, 
+                data: data.data,
+                idempotent: data.idempotent 
+            };
         } catch (error: any) {
             console.error('Error in createTransaction:', error);
             throw error;

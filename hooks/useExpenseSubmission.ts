@@ -58,6 +58,7 @@ export function useExpenseSubmission() {
             return;
         }
 
+        const idempotencyKey = crypto.randomUUID();
         setLoading(true);
         try {
             if (!userId) {
@@ -85,6 +86,7 @@ export function useExpenseSubmission() {
                 converted_amount: convertedAmount,
                 is_recurring: isRecurring,
                 exclude_from_allowance: excludeFromAllowance,
+                idempotency_key: idempotencyKey,
                 ...(placeName ? {
                     place_name: placeName,
                     place_address: placeAddress,
@@ -110,11 +112,17 @@ export function useExpenseSubmission() {
                 if (debtors.length > 0) {
                     if (splitMode === 'custom') {
                         const totalCustom = debtors.reduce((sum, id) => sum + (parseFloat(customAmounts[id] || '0') || 0), 0);
-                        if (totalCustom <= 0 || totalCustom > parseFloat(amount)) {
-                            toast.error(totalCustom <= 0 ? 'Please enter split amounts' : 'Split amounts exceed total expense');
+                        if (totalCustom <= 0) {
+                            toast.error('Please enter split amounts');
                             setLoading(false);
                             return;
                         }
+                        if (totalCustom >= parseFloat(amount)) {
+                            toast.error('Split amounts exceed or equal total expense');
+                            setLoading(false);
+                            return;
+                        }
+                        
                         splitRecordsToInsert = debtors
                             .filter(debtorId => parseFloat(customAmounts[debtorId] || '0') > 0)
                             .map(debtorId => ({

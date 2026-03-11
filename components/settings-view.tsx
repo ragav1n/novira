@@ -385,7 +385,7 @@ export function SettingsView() {
                                 <Input
                                     value={fullName}
                                     onChange={(e) => setFullName(e.target.value)}
-                                    className="bg-secondary/10 border-white/5 h-9"
+                                    className="bg-secondary/10 border-white/5 h-10 rounded-xl"
                                     placeholder="e.g. John Doe"
                                 />
                             </div>
@@ -395,7 +395,7 @@ export function SettingsView() {
                                     ref={budgetInputRef}
                                     value={localBudget}
                                     onChange={(e) => setLocalBudget(e.target.value)}
-                                    className="bg-secondary/10 border-white/5 h-9"
+                                    className="bg-secondary/10 border-white/5 h-10 rounded-xl"
                                     placeholder="e.g. 3000"
                                     type="number"
                                 />
@@ -403,7 +403,7 @@ export function SettingsView() {
                             <Button
                                 onClick={updateProfile}
                                 disabled={saving}
-                                className="w-full h-8 text-xs bg-primary/20 text-primary hover:bg-primary/30 border border-primary/20"
+                                className="w-full h-10 text-xs bg-primary/20 text-primary hover:bg-primary/30 border border-primary/20 rounded-xl font-bold"
                             >
                                 {saving ? 'Saving...' : 'Save Changes'}
                             </Button>
@@ -647,15 +647,30 @@ export function SettingsView() {
                         </p>
                         <div className="space-y-2">
                             {failedItems.map(item => (
-                                <div key={item.id} className="bg-background/80 p-3 rounded-2xl flex flex-col gap-2 shadow-sm border border-destructive/10">
-                                    <div>
-                                        <p className="text-sm font-medium">{item.data.transaction?.description || 'Unknown Item'}</p>
-                                        <p className="text-[10px] font-mono text-destructive/80 mt-1">{item.errorReason || 'Unknown error'}</p>
-                                        {item.failedAt && <p className="text-[9px] text-muted-foreground mt-0.5">{new Date(item.failedAt).toLocaleString()}</p>}
+                                <div key={item.id} className="bg-background/80 p-3 rounded-2xl flex flex-col gap-2 shadow-sm border border-destructive/20 backdrop-blur-md">
+                                    <div className="flex items-start justify-between">
+                                        <div className="min-w-0">
+                                            <p className="text-sm font-bold truncate">{item.data.transaction?.description || 'Unknown Item'}</p>
+                                            <p className="text-[10px] font-bold text-destructive/80 mt-0.5 uppercase tracking-tighter">Error: {item.errorReason || 'Server Conflict'}</p>
+                                        </div>
+                                        {item.failedAt && <span className="text-[9px] text-muted-foreground whitespace-nowrap">{format(new Date(item.failedAt), 'HH:mm')}</span>}
                                     </div>
-                                    <div className="flex gap-2 self-end">
-                                        <Button size="sm" variant="ghost" onClick={() => discardFailedItem(item.id)} className="h-7 px-3 text-xs hover:bg-destructive/20 hover:text-destructive text-muted-foreground transition-colors">Discard</Button>
-                                        <Button size="sm" onClick={() => retryFailedItem(item.id)} className="h-7 px-3 text-xs bg-primary hover:bg-primary/90">Retry Sync</Button>
+                                    <div className="flex gap-2 justify-end mt-1">
+                                        <Button 
+                                            size="sm" 
+                                            variant="ghost" 
+                                            onClick={() => discardFailedItem(item.id)} 
+                                            className="h-8 px-4 text-[11px] font-bold hover:bg-destructive/10 hover:text-destructive text-muted-foreground border border-transparent hover:border-destructive/20 rounded-xl transition-all"
+                                        >
+                                            Discard
+                                        </Button>
+                                        <Button 
+                                            size="sm" 
+                                            onClick={() => retryFailedItem(item.id)} 
+                                            className="h-8 px-4 text-[11px] font-bold bg-primary hover:bg-primary/90 text-white rounded-xl shadow-lg shadow-primary/20"
+                                        >
+                                            Retry Sync
+                                        </Button>
                                     </div>
                                 </div>
                             ))}

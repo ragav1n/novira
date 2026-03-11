@@ -98,88 +98,87 @@ export function ExportDateRangeModal({
     // Or just leave empty.
 
     const presets = [
-        { id: 'current_month', label: 'Current Month' },
+        { id: 'current_month', label: 'This Month' },
         { id: 'last_month', label: 'Last Month' },
-        { id: 'last_3_months', label: 'Last 3 Months' },
-        { id: 'last_6_months', label: 'Last 6 Months' },
+        { id: 'last_3_months', label: 'Last 3M' },
+        { id: 'last_6_months', label: 'Last 6M' },
         { id: 'this_year', label: 'This Year' },
         { id: 'all_time', label: 'All Time' },
     ];
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-[425px] bg-background border-white/10">
-                <DialogHeader>
-                    <DialogTitle>{title}</DialogTitle>
-                    <DialogDescription>{description}</DialogDescription>
+            <DialogContent className="sm:max-w-md bg-background border-white/10 p-3 sm:p-5 gap-3">
+                <DialogHeader className="gap-0.5">
+                    <DialogTitle className="text-base">{title}</DialogTitle>
+                    <DialogDescription className="text-[10px] leading-tight">{description}</DialogDescription>
                 </DialogHeader>
 
-                <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto scrollbar-hide pr-1">
-                    <div className="grid grid-cols-2 gap-2">
+                <div className="grid gap-2.5 py-1 max-h-[75vh] overflow-y-auto scrollbar-hide pr-1">
+                    <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide">
                         {presets.map((preset) => (
                             <Button
                                 key={preset.id}
                                 variant="outline"
                                 onClick={() => handlePresetSelect(preset.id)}
                                 className={cn(
-                                    "justify-start font-normal",
+                                    "flex-none font-normal h-7 text-[10px] px-2.5",
                                     selectedPreset === preset.id && "bg-primary/20 border-primary text-primary hover:bg-primary/25"
                                 )}
                             >
-                                <Calendar className="mr-2 h-4 w-4" />
                                 {preset.label}
                             </Button>
                         ))}
                     </div>
 
-                    <div className="space-y-2">
-                        <label className="text-sm font-medium text-muted-foreground">Custom Range</label>
+                    <div className="space-y-1">
+                        <label className="text-[9px] uppercase font-bold text-muted-foreground tracking-widest opacity-70">Custom Range</label>
                         <DateRangePicker
                             date={dateRange}
                             setDate={handleCustomDateChange}
                             align={isMobile ? "center" : "start"}
-                            className="w-full"
+                            className="w-full h-8"
                         />
                     </div>
 
                     {/* Workspace Filter */}
-                    <div className="space-y-3">
-                        <label className="text-sm font-medium text-muted-foreground">Context Filter</label>
-                        <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+                    <div className="space-y-1">
+                        <label className="text-[9px] uppercase font-bold text-muted-foreground tracking-widest opacity-70">Context</label>
+                        <div className="flex gap-1 overflow-x-auto pb-1 scrollbar-hide">
                             <div
                                 onClick={() => setSelectedGroupId(null)}
                                 className={cn(
-                                    "flex items-center justify-center px-4 py-2 rounded-xl border transition-all cursor-pointer whitespace-nowrap",
+                                    "flex items-center justify-center px-3 py-1 rounded-lg border transition-all cursor-pointer whitespace-nowrap",
                                     selectedGroupId === null
                                         ? "bg-primary text-white border-primary"
                                         : "bg-secondary/10 border-white/5 hover:border-white/10"
                                 )}
                             >
-                                <span className="text-xs font-bold">All</span>
+                                <span className="text-[10px] font-bold">All</span>
                             </div>
                             <div
                                 onClick={() => setSelectedGroupId('personal')}
                                 className={cn(
-                                    "flex items-center justify-center px-4 py-2 rounded-xl border transition-all cursor-pointer whitespace-nowrap",
+                                    "flex items-center justify-center px-3 py-1 rounded-lg border transition-all cursor-pointer whitespace-nowrap",
                                     selectedGroupId === 'personal'
                                         ? "bg-primary text-white border-primary"
                                         : "bg-secondary/10 border-white/5 hover:border-white/10"
                                 )}
                             >
-                                <span className="text-xs font-bold">Personal Only</span>
+                                <span className="text-[10px] font-bold">Personal</span>
                             </div>
                             {eligibleGroups.map((group) => (
                                 <div
                                     key={group.id}
                                     onClick={() => setSelectedGroupId(group.id)}
                                     className={cn(
-                                        "flex items-center justify-center px-4 py-2 rounded-xl border transition-all cursor-pointer whitespace-nowrap",
+                                        "flex items-center justify-center px-3 py-1 rounded-lg border transition-all cursor-pointer whitespace-nowrap",
                                         selectedGroupId === group.id
                                             ? "bg-primary text-white border-primary"
                                             : "bg-secondary/10 border-white/5 hover:border-white/10"
                                     )}
                                 >
-                                    <span className="text-xs font-bold">{group.name}</span>
+                                    <span className="text-[10px] font-bold">{group.name}</span>
                                 </div>
                             ))}
                         </div>
@@ -187,9 +186,9 @@ export function ExportDateRangeModal({
 
                     {/* Bucket Filter */}
                     {buckets.length > 0 && (
-                        <div className="space-y-3">
-                            <label className="text-sm font-medium text-muted-foreground">Target Bucket (Optional)</label>
-                            <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+                        <div className="space-y-1">
+                            <label className="text-[9px] uppercase font-bold text-muted-foreground tracking-widest opacity-70">Bucket (Optional)</label>
+                            <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide">
                                 <div
                                     onClick={() => setSelectedBucketId(null)}
                                     className={cn(
@@ -226,11 +225,11 @@ export function ExportDateRangeModal({
                     )}
                 </div>
 
-                <DialogFooter>
-                    <Button variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>
+                <DialogFooter className="flex-row items-center gap-2 mt-1">
+                    <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={loading} className="flex-1 h-8 text-xs underline underline-offset-4 hover:bg-transparent">
                         Cancel
                     </Button>
-                    <Button onClick={handleExportClick} disabled={loading || (!dateRange && selectedPreset !== 'all_time')} className="min-w-[100px]">
+                    <Button onClick={handleExportClick} disabled={loading || (!dateRange && selectedPreset !== 'all_time')} className="flex-[2] h-9 text-xs font-bold">
                         {loading ? (
                             <div className="flex items-center gap-2">
                                 <div className="w-4 h-4 border-2 border-white/50 border-t-white rounded-full animate-spin" />

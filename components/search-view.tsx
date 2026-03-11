@@ -7,7 +7,7 @@ import {
     X, Check, Zap, ShoppingBag, HeartPulse, Clapperboard, LayoutGrid, HelpCircle, 
     Calendar as CalendarIcon, Filter, Shirt 
 } from "lucide-react";
-import { CATEGORY_COLORS, getIconForCategory } from '@/lib/categories';
+import { CATEGORY_COLORS, getIconForCategory, CATEGORIES as SYSTEM_CATEGORIES } from '@/lib/categories';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { Input } from '@/components/ui/input';
@@ -55,20 +55,7 @@ type Transaction = {
     bucket_id?: string;
 };
 
-const categories = [
-    { id: 'food', label: 'Food' },
-    { id: 'groceries', label: 'Groceries' },
-    { id: 'fashion', label: 'Fashion' },
-    { id: 'transport', label: 'Transport' },
-    { id: 'bills', label: 'Bills' },
-    { id: 'shopping', label: 'Shopping' },
-    { id: 'healthcare', label: 'Healthcare' },
-    { id: 'entertainment', label: 'Entertainment' },
-    { id: 'rent', label: 'Rent' },
-    { id: 'education', label: 'Education' },
-    { id: 'others', label: 'Others' },
-    { id: 'uncategorized', label: 'Uncategorized' },
-];
+const categories = SYSTEM_CATEGORIES.map(c => ({ id: c.label.toLowerCase(), label: c.label }));
 
 const paymentMethods = ['Cash', 'UPI', 'Debit Card', 'Credit Card', 'Bank Transfer'];
 
@@ -371,7 +358,7 @@ export function SearchView() {
                             {/* Date Picker */}
                             <div className="space-y-3">
                                 <Label className="text-xs font-bold uppercase text-muted-foreground tracking-wider">Date Range</Label>
-                                <Popover>
+                                <Popover modal={true}>
                                     <PopoverTrigger asChild>
                                         <Button
                                             variant="outline"
@@ -402,6 +389,8 @@ export function SearchView() {
                                             selected={{ from: dateRange.from, to: dateRange.to }}
                                             onSelect={(range) => setDateRange({ from: range?.from, to: range?.to })}
                                             numberOfMonths={1}
+                                            fromDate={new Date(2020, 0, 1)}
+                                            toDate={new Date(2030, 11, 31)}
                                         />
                                     </PopoverContent>
                                 </Popover>

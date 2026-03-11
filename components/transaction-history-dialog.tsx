@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { WaveLoader } from '@/components/ui/wave-loader';
+import { cn } from '@/lib/utils';
 
 interface AuditLog {
     id: string;
@@ -126,7 +127,3 @@ export const TransactionHistoryDialog = React.memo(function TransactionHistoryDi
     );
 });
 
-// Helper for classes (added here if not imported)
-function cn(...inputs: any[]) {
-    return inputs.filter(Boolean).join(' ');
-}

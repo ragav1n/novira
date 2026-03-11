@@ -36,9 +36,11 @@ export interface ExpenseMapViewProps {
     onClose: () => void;
     transactions: Transaction[];
     formatCurrency: (amount: number, currency?: string) => string;
+    convertAmount: (amount: number, fromCurrency: string, toCurrency: string) => number;
+    currency: string;
 }
 
-export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency }: ExpenseMapViewProps) {
+export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency, convertAmount, currency }: ExpenseMapViewProps) {
     const mapContainerRef = useRef<HTMLDivElement>(null);
     const mapRef = useRef<mapboxgl.Map | null>(null);
     const animFrameIdRef = useRef<number | undefined>(undefined);
@@ -384,7 +386,7 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency }
     const markerDictRef = useRef<Map<string, { marker: mapboxgl.Marker, countBadge: HTMLDivElement | null }>>(new Map());
 
     // 1 & 2 & 3 & Point Features from Hook
-    const { locationGroups, towerFeatures, trailFeatures, pointFeatures } = useMapData(filteredTransactions);
+    const { locationGroups, towerFeatures, trailFeatures, pointFeatures } = useMapData(filteredTransactions, convertAmount, currency);
 
 
     // Map Data & DOM Marker Sync Effect

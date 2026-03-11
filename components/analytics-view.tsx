@@ -55,29 +55,7 @@ const paymentChartConfig: any = {
 // Easiest is to just use the raw symbol if I can't easily pass the function.
 // Wait, I can just use the hook if I make CustomTooltip a component that uses the hook?
 // Yes, CustomTooltip is a component.
-const CustomTooltip = ({ active, payload, label }: any) => {
-    const { formatCurrency } = useUserPreferences();
-    if (active && payload && payload.length) {
-        return (
-            <div className="bg-card/90 backdrop-blur-md border border-white/10 p-3 rounded-xl shadow-xl">
-                <p className="text-sm font-bold mb-2 text-foreground">{label}</p>
-                <div className="space-y-1">
-                    {payload.map((entry: any, index: number) => (
-                        <div key={index} className="flex items-center gap-2 text-xs">
-                            <div
-                                className="w-2 h-2 rounded-full"
-                                style={{ backgroundColor: entry.stroke || entry.color || entry.fill }}
-                            />
-                            <span className="text-muted-foreground capitalize">{entry.name}:</span>
-                            <span className="font-mono font-medium">{formatCurrency(Math.round(Number(entry.value)))}</span>
-                        </div>
-                    ))}
-                </div>
-            </div>
-        );
-    }
-    return null;
-};
+// Custom Tooltip component will be defined inside AnalyticsView to access context safely.
 
 
 
@@ -368,6 +346,32 @@ export function AnalyticsView() {
         fill: string;
     }>;
 
+    // Fixed CustomTooltip inside the component
+    const AnalyticsTooltip = ({ active, payload, label }: any) => {
+        if (active && payload && payload.length) {
+            return (
+                <div className="bg-card/95 backdrop-blur-xl border border-white/10 p-3 rounded-2xl shadow-2xl z-50">
+                    <p className="text-[11px] font-bold uppercase tracking-wider mb-2 text-muted-foreground">{label}</p>
+                    <div className="space-y-1.5">
+                        {payload.map((entry: any, index: number) => (
+                            <div key={index} className="flex items-center justify-between gap-4 text-xs">
+                                <div className="flex items-center gap-2">
+                                    <div
+                                        className="w-1.5 h-1.5 rounded-full"
+                                        style={{ backgroundColor: entry.stroke || entry.color || entry.fill }}
+                                    />
+                                    <span className="text-foreground/80 font-medium capitalize">{entry.name}</span>
+                                </div>
+                                <span className="font-mono font-bold">{formatCurrency(Math.round(Number(entry.value)))}</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+        }
+        return null;
+    };
+
 
     return (
         <motion.div 
@@ -399,9 +403,9 @@ export function AnalyticsView() {
                 </div>
 
                 {/* Filters Row */}
-                <div className="flex items-center justify-center gap-2 px-1">
+                <div className="flex flex-wrap items-center justify-center gap-2 px-1">
                     <Select value={selectedBucketId} onValueChange={(val) => setSelectedBucketId(val)}>
-                        <SelectTrigger className={`flex-1 min-w-0 max-w-[160px] px-3 h-9 text-[12px] rounded-xl font-medium ${themeConfig.bgLight} ${themeConfig.borderMedium} ${themeConfig.text}`}>
+                        <SelectTrigger className={`flex-1 min-w-[140px] px-3 h-10 text-[12px] rounded-xl font-bold ${themeConfig.bgLight} ${themeConfig.borderMedium} ${themeConfig.text}`}>
                             <SelectValue placeholder="All Spending" />
                         </SelectTrigger>
                         <SelectContent align="center">
@@ -419,7 +423,7 @@ export function AnalyticsView() {
                         </SelectContent>
                     </Select>
                     <Select value={dateRange} onValueChange={(val: DateRange) => setDateRange(val)}>
-                        <SelectTrigger className="flex-1 min-w-0 max-w-[140px] px-3 h-9 text-[12px] bg-secondary/20 border-white/5 rounded-xl font-medium">
+                        <SelectTrigger className="flex-1 min-w-[140px] px-3 h-10 text-[12px] bg-secondary/20 border-white/5 rounded-xl font-bold">
                             <SelectValue placeholder="Period" />
                         </SelectTrigger>
                         <SelectContent align="center">
@@ -466,24 +470,26 @@ export function AnalyticsView() {
 
                         <div className="h-[140px] w-full">
                             <ResponsiveContainer width="100%" height="100%">
-                                <LineChart data={categoryTrendData} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
+                                <LineChart data={categoryTrendData} margin={{ top: 5, right: 5, bottom: 0, left: 5 }}>
                                     <XAxis
                                         dataKey="month"
                                         axisLine={false}
                                         tickLine={false}
-                                        tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 10 }}
-                                        interval={dateRange === '1M' || dateRange === 'LM' ? 3 : (dateRange === '1Y' || dateRange === 'ALL' ? 'preserveStartEnd' : 0)}
+                                        tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 9, fontWeight: 600 }}
+                                        interval={dateRange === '1M' || dateRange === 'LM' ? 4 : (dateRange === '1Y' || dateRange === 'ALL' ? 'preserveStartEnd' : 1)}
                                     />
-                                    <Tooltip content={<CustomTooltip />} />
-                                    {Object.keys(CATEGORY_COLORS).map((cat: string) => (
+                                    <Tooltip content={<AnalyticsTooltip />} cursor={{ stroke: 'rgba(255,255,255,0.1)', strokeWidth: 1 }} />
+                                    {Object.keys(CATEGORY_COLORS).map((cat: string, index: number) => (
                                         <Line
                                             key={cat}
                                             type="monotone"
                                             dataKey={cat}
                                             stroke={CATEGORY_COLORS[cat]}
-                                            strokeWidth={2}
+                                            strokeWidth={2.5}
                                             dot={false}
                                             connectNulls
+                                            animationDuration={1500 + (index * 200)}
+                                            animationEasing="ease-in-out"
                                         />
                                     ))}
                                 </LineChart>
