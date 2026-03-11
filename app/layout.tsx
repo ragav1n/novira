@@ -10,6 +10,7 @@ import { GroupsProvider } from '@/components/providers/groups-provider'
 import { BucketsProvider } from '@/components/providers/buckets-provider'
 import { SyncIndicator } from '@/components/pwa-sync-indicator'
 import { WorkspaceThemeProvider } from '@/components/providers/workspace-theme-provider'
+import { ErrorBoundary } from '@/components/error-boundary'
 
 const geist = Geist({
   subsets: ["latin"],
@@ -54,6 +55,7 @@ export const viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
+  viewportFit: 'cover',
 }
 
 export default async function RootLayout({
@@ -70,17 +72,19 @@ export default async function RootLayout({
         <link rel="dns-prefetch" href={process.env.NEXT_PUBLIC_SUPABASE_URL} />
       </head>
       <body suppressHydrationWarning className={`${geist.variable} ${geistMono.variable} font-sans antialiased`}>
-        <UserPreferencesProvider>
-          <GroupsProvider>
-            <WorkspaceThemeProvider />
-            <SyncIndicator />
-            <BucketsProvider>
-              <MobileLayout>
-                {children}
-              </MobileLayout>
-            </BucketsProvider>
-          </GroupsProvider>
-        </UserPreferencesProvider>
+        <ErrorBoundary>
+          <UserPreferencesProvider>
+            <GroupsProvider>
+              <WorkspaceThemeProvider />
+              <SyncIndicator />
+              <BucketsProvider>
+                <MobileLayout>
+                  {children}
+                </MobileLayout>
+              </BucketsProvider>
+            </GroupsProvider>
+          </UserPreferencesProvider>
+        </ErrorBoundary>
         <Analytics />
         <SpeedInsights />
         <script

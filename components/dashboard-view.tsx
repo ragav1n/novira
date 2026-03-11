@@ -155,7 +155,7 @@ export function DashboardView() {
 
     const {
         focusedBucket, displayBudget, calculateUserShare, totalSpent,
-        remaining, progress, spendingData, displayTransactions, runRateData
+        remaining, progress, spendingData, displayTransactions, recentFeed, runRateData
     } = useDashboardStats({
         transactions, 
         userId: activeWorkspaceId ? null : userId, // if workspace, null so we get all workspace txs
@@ -348,7 +348,7 @@ export function DashboardView() {
                     setIsMapOpen={setIsMapOpen}
                     setIsViewAllOpen={setIsViewAllOpen}
                     isViewAllOpen={isViewAllOpen}
-                    displayTransactions={displayTransactions}
+                    displayTransactions={recentFeed}
                     userId={userId}
                     currency={currency}
                     buckets={buckets}
@@ -389,6 +389,7 @@ export function DashboardView() {
                     setIsMapOpen={setIsMapOpen}
                     transactions={transactions}
                     formatCurrency={formatCurrency}
+                    convertAmount={convertAmount}
                     activeModal={activeModal}
                     setActiveModal={setActiveModal}
                     isAddFundsOpen={isAddFundsOpen}

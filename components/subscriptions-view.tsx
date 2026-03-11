@@ -11,6 +11,7 @@ import { Calendar, CreditCard, RotateCw, Trash2, ArrowLeft } from 'lucide-react'
 import { cn } from '@/lib/utils';
 import { format, parseISO } from 'date-fns';
 import { useRouter } from 'next/navigation';
+import { toast } from '@/utils/haptics';
 
 interface RecurringTemplate {
     id: string;
@@ -116,16 +117,24 @@ export function SubscriptionsView() {
         };
     }, [userId, activeWorkspaceId, loadTemplates]);
 
-    const handleCancel = async (id: string) => {
-        if (!confirm('Are you sure you want to cancel this subscription?')) return;
+    const handleToggleActive = async (id: string, currentStatus: boolean) => {
+        const newStatus = !currentStatus;
+        if (currentStatus && !confirm('Are you sure you want to cancel this subscription?')) return;
         
         // Optimistic update
-        setTemplates(prev => prev.map(t => t.id === id ? { ...t, is_active: false } : t));
+        setTemplates(prev => prev.map(t => t.id === id ? { ...t, is_active: newStatus } : t));
         
-        await supabase
+        const { error } = await supabase
             .from('recurring_templates')
-            .update({ is_active: false })
+            .update({ is_active: newStatus })
             .eq('id', id);
+
+        if (error) {
+            toast.error('Failed to update subscription status');
+            loadTemplates();
+        } else {
+            toast.success(newStatus ? 'Subscription re-activated!' : 'Subscription cancelled');
+        }
     };
 
 
@@ -207,7 +216,7 @@ export function SubscriptionsView() {
                                 <div className="flex flex-col items-end gap-2 shrink-0">
                                     <span className="font-bold text-base">{formatCurrency(template.amount, template.currency)}</span>
                                     <button 
-                                        onClick={() => handleCancel(template.id)}
+                                        onClick={() => handleToggleActive(template.id, true)}
                                         className="text-rose-400 hover:text-rose-300 opacity-0 group-hover:opacity-100 transition-opacity p-1"
                                         title="Cancel Subscription"
                                     >
@@ -224,12 +233,20 @@ export function SubscriptionsView() {
                  <div className="pt-6 border-t border-white/10 space-y-3">
                      <h3 className="text-sm font-bold text-muted-foreground">Inactive Subscriptions</h3>
                      {templates.filter(t => !t.is_active).map((template) => (
-                         <div key={template.id} className="flex justify-between items-center p-3 rounded-xl bg-secondary/10 opacity-60">
+                         <div key={template.id} className={cn("flex justify-between items-center p-3 rounded-xl bg-secondary/10 opacity-70 border border-white/5 group", themeConfig.bg)}>
                              <div className="flex items-center gap-3">
-                                 <RotateCw className="w-4 h-4 text-muted-foreground" />
-                                 <span className="font-medium text-sm line-through">{template.description}</span>
+                                 <RotateCw className={cn("w-4 h-4", themeConfig.text)} />
+                                 <span className="font-medium text-sm line-through opacity-60">{template.description}</span>
                              </div>
-                             <span className="text-xs font-bold text-muted-foreground">{formatCurrency(template.amount, template.currency)} / {template.frequency}</span>
+                             <div className="flex items-center gap-3">
+                                <span className="text-xs font-bold text-muted-foreground">{formatCurrency(template.amount, template.currency)} / {template.frequency}</span>
+                                <button 
+                                    onClick={() => handleToggleActive(template.id, false)}
+                                    className={cn("text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-lg bg-secondary/30 hover:bg-secondary/50 transition-colors", themeConfig.text)}
+                                >
+                                    Re-activate
+                                </button>
+                             </div>
                          </div>
                      ))}
                  </div>

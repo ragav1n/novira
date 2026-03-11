@@ -30,20 +30,14 @@ import { CategorySelector, BucketSelector } from './add-expense/selectors';
 import { useExpenseForm } from '@/hooks/useExpenseForm';
 import { useExpenseSubmission } from '@/hooks/useExpenseSubmission';
 
-const dropdownCategories = [
-    { id: 'food', label: 'Food & Dining', icon: Utensils, color: '#FF6B6B' },
-    { id: 'groceries', label: 'Groceries', icon: ShoppingCart, color: '#10B981' },
-    { id: 'fashion', label: 'Fashion', icon: Shirt, color: '#F472B6' },
-    { id: 'transport', label: 'Transportation', icon: Car, color: '#4ECDC4' },
-    { id: 'bills', label: 'Bills & Utilities', icon: Zap, color: '#F9C74F' },
-    { id: 'shopping', label: 'Shopping', icon: ShoppingBag, color: '#A06CD5' },
-    { id: 'healthcare', label: 'Healthcare', icon: HeartPulse, color: '#FF9F1C' },
-    { id: 'entertainment', label: 'Entertainment', icon: Clapperboard, color: '#FF1493' },
-    { id: 'rent', label: 'Rent', icon: Home, color: '#6366F1' },
-    { id: 'education', label: 'Education', icon: School, color: '#84CC16' },
-    { id: 'others', label: 'Others', icon: LayoutGrid, color: '#2DD4BF' },
-    { id: 'uncategorized', label: 'Uncategorized', icon: HelpCircle, color: '#94A3B8' },
-];
+import { CATEGORY_COLORS, getIconForCategory, CATEGORIES as SYSTEM_CATEGORIES } from '@/lib/categories';
+
+const dropdownCategories = SYSTEM_CATEGORIES.map(cat => ({
+    id: cat.id,
+    label: cat.label,
+    icon: (props: any) => getIconForCategory(cat.id, props.className),
+    color: CATEGORY_COLORS[cat.id] || '#8A2BE2'
+}));
 
 const PAYMENT_METHOD_COLORS: Record<string, string> = {
     'Cash': '#22C55E',
@@ -216,7 +210,7 @@ export function AddExpenseView() {
                 <div className="space-y-4">
                     <div className="space-y-2">
                         <label className="text-sm font-medium">Date *</label>
-                        <Popover>
+                        <Popover modal={true}>
                             <PopoverTrigger asChild>
                                 <Button
                                     variant={"outline"}
@@ -236,6 +230,8 @@ export function AddExpenseView() {
                                     onSelect={formState.setDate}
                                     initialFocus
                                     className="p-3"
+                                    fromDate={new Date(2020, 0, 1)}
+                                    toDate={new Date()}
                                 />
                                 <div className="p-3 border-t border-white/10">
                                     <TimePicker setDate={formState.setDate} date={formState.date} />

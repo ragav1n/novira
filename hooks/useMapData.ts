@@ -10,7 +10,11 @@ export function getGridOffsetCoords(lng: number, lat: number, offsetX: number, o
     return [lng + (dLng * 180 / Math.PI), lat + (dLat * 180 / Math.PI)];
 }
 
-export function useMapData(filteredTransactions: Transaction[]) {
+export function useMapData(
+    filteredTransactions: Transaction[],
+    convertAmount: (amount: number, fromCurrency: string, toCurrency: string) => number,
+    baseCurrency: string
+) {
     // 1. Data Transformation: location matching
     const locationGroups = useMemo(() => {
         const groups = new Map<string, {
@@ -24,6 +28,10 @@ export function useMapData(filteredTransactions: Transaction[]) {
 
         filteredTransactions.forEach(tx => {
             const key = `${(Math.round(tx.place_lat! * 5000) / 5000).toFixed(4)},${(Math.round(tx.place_lng! * 5000) / 5000).toFixed(4)}`;
+            
+            // Convert to base currency for aggregation!
+            const amountInBase = convertAmount(Number(tx.amount), tx.currency || 'USD', baseCurrency);
+
             if (!groups.has(key)) {
                 groups.set(key, {
                     lat: tx.place_lat!,
@@ -36,15 +44,15 @@ export function useMapData(filteredTransactions: Transaction[]) {
             }
             const group = groups.get(key)!;
             group.transactions.push(tx);
-            group.totalAmount += tx.amount;
-            group.categories.set(tx.category, (group.categories.get(tx.category) || 0) + tx.amount);
+            group.totalAmount += amountInBase;
+            group.categories.set(tx.category, (group.categories.get(tx.category) || 0) + amountInBase);
             
             if (tx.date > group.latestTx.date) {
                 group.latestTx = tx;
             }
         });
         return groups;
-    }, [filteredTransactions]);
+    }, [filteredTransactions, convertAmount, baseCurrency]);
 
     // 2. Data Transformation: 3D Geometry
     const towerFeatures = useMemo(() => {
@@ -54,7 +62,7 @@ export function useMapData(filteredTransactions: Transaction[]) {
             const totalCategories = cats.length;
             const clusterRadius = totalCategories > 1 ? 20 : 0;
             
-            cats.forEach(([category, amount], idx) => {
+            cats.forEach(([category, amountInBase], idx) => {
                 let center = [group.lng, group.lat];
                 
                 const angle = totalCategories > 1 ? (idx / totalCategories) * 2 * Math.PI : 0;
@@ -80,18 +88,21 @@ export function useMapData(filteredTransactions: Transaction[]) {
                 const count = txsInCategory.length;
                 
                 const merchantMap = new Map<string, number>();
-                txsInCategory.forEach(t => merchantMap.set(t.description, (merchantMap.get(t.description) || 0) + t.amount));
+                txsInCategory.forEach(t => {
+                    const tAmountInBase = convertAmount(Number(t.amount), t.currency || 'USD', baseCurrency);
+                    merchantMap.set(t.description, (merchantMap.get(t.description) || 0) + tAmountInBase);
+                });
                 const topMerchant = Array.from(merchantMap.entries()).sort((a, b) => b[1] - a[1])[0]?.[0] || 'Unknown';
                 
-                const amounts = txsInCategory.map(t => t.amount);
-                const sparkline = amounts.slice(-10);
+                const amountsInBase = txsInCategory.map(t => convertAmount(Number(t.amount), t.currency || 'USD', baseCurrency));
+                const sparkline = amountsInBase.slice(-10);
                 const txIds = txsInCategory.map(t => t.id).join(',');
 
                 features.push({
                     type: 'Feature',
                     geometry: { type: 'Polygon', coordinates: [coordinates] },
                     properties: { 
-                        amount, 
+                        amount: amountInBase, 
                         category: category.toLowerCase(), 
                         topMerchant, 
                         count,
@@ -102,7 +113,7 @@ export function useMapData(filteredTransactions: Transaction[]) {
             });
         });
         return features;
-    }, [locationGroups]);
+    }, [locationGroups, convertAmount, baseCurrency]);
 
     // 3. Data Transformation: Lines
     const trailFeatures = useMemo(() => {
@@ -143,12 +154,15 @@ export function useMapData(filteredTransactions: Transaction[]) {
 
     // Point Features (for heatmap, distinct from 3D)
     const pointFeatures = useMemo(() => {
-        return filteredTransactions.map(tx => ({
-            type: 'Feature' as const,
-            geometry: { type: 'Point' as const, coordinates: [tx.place_lng!, tx.place_lat!] },
-            properties: { id: tx.id, amount: tx.amount, category: tx.category }
-        }));
-    }, [filteredTransactions]);
+        return filteredTransactions.map(tx => {
+            const amountInBase = convertAmount(Number(tx.amount), tx.currency || 'USD', baseCurrency);
+            return {
+                type: 'Feature' as const,
+                geometry: { type: 'Point' as const, coordinates: [tx.place_lng!, tx.place_lat!] },
+                properties: { id: tx.id, amount: amountInBase, category: tx.category }
+            };
+        });
+    }, [filteredTransactions, convertAmount, baseCurrency]);
 
     return {
         locationGroups,

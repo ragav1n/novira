@@ -58,6 +58,7 @@ interface DashboardDialogsProps {
     setIsMapOpen: (open: boolean) => void;
     transactions: Transaction[];
     formatCurrency: (amount: number, currency?: string) => string;
+    convertAmount: (amount: number, fromCurrency: string, toCurrency: string) => number;
     // Other Modals
     activeModal: 'welcome' | 'announcement' | null;
     setActiveModal: (modal: 'welcome' | 'announcement' | null) => void;
@@ -94,6 +95,7 @@ export function DashboardDialogs({
     setIsMapOpen,
     transactions,
     formatCurrency,
+    convertAmount,
     activeModal,
     setActiveModal,
     isAddFundsOpen,
@@ -269,6 +271,8 @@ export function DashboardDialogs({
                 onClose={() => setIsMapOpen(false)}
                 transactions={transactions}
                 formatCurrency={formatCurrency}
+                convertAmount={convertAmount}
+                currency={currency}
             />
 
             <WelcomeModal

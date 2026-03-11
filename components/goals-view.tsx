@@ -34,7 +34,7 @@ interface SavingsGoal {
 }
 
 export function GoalsView() {
-    const { userId, formatCurrency, currency, activeWorkspaceId } = useUserPreferences();
+    const { userId, formatCurrency, currency, activeWorkspaceId, convertAmount } = useUserPreferences();
     const router = useRouter();
     const { groups } = useGroups();
     
@@ -268,40 +268,33 @@ export function GoalsView() {
         const goal = goals.find(g => g.id === selectedGoalId);
         if (!goal) return;
 
-        // Start transaction (simplified via client: insert deposit, update goal)
-        const { error: depositError } = await supabase
-            .from('savings_deposits')
-            .insert({
-                goal_id: selectedGoalId,
-                user_id: userId,
-                amount: amount,
-                currency: goal.currency
-            });
+        const { data, error: rpcError } = await supabase.rpc('add_savings_deposit_atomic', {
+            p_goal_id: selectedGoalId,
+            p_user_id: userId,
+            p_amount: amount,
+            p_currency: goal.currency
+        });
 
-        if (depositError) {
-            toast.error('Failed to add deposit');
+        if (rpcError || (data && !data.success)) {
+            toast.error('Failed to add deposit: ' + (rpcError?.message || data?.error));
             return;
         }
 
-        const { error: updateError } = await supabase
-            .from('savings_goals')
-            .update({ current_amount: Number(goal.current_amount) + amount })
-            .eq('id', selectedGoalId);
-
-        if (updateError) {
-            toast.error('Failed to update goal');
-        } else {
-            toast.success('Deposit added successfully!');
-            setIsAddDepositOpen(false);
-            setDepositAmount('');
-            setSelectedGoalId(null);
-            loadGoals();
-        }
+        toast.success('Deposit added successfully!');
+        setIsAddDepositOpen(false);
+        setDepositAmount('');
+        setSelectedGoalId(null);
+        loadGoals();
     };
 
 
 
-    const totalSaved = goals.reduce((acc, goal) => acc + Number(goal.current_amount), 0); // Need proper conversion here eventually
+    const totalSaved = useMemo(() => {
+        return goals.reduce((acc, goal) => {
+            const amountInBase = convertAmount(Number(goal.current_amount), goal.currency, currency);
+            return acc + amountInBase;
+        }, 0);
+    }, [goals, convertAmount, currency]);
     
     return (
         <motion.div 
@@ -456,22 +449,22 @@ export function GoalsView() {
 
             {/* Goal Modal (Add / Edit) */}
             <Dialog open={isGoalModalOpen} onOpenChange={setIsGoalModalOpen}>
-                <DialogContent className="max-w-md rounded-3xl border-white/10 bg-card/95 backdrop-blur-xl">
-                    <DialogHeader>
+                <DialogContent className="max-w-md rounded-3xl border-white/10 bg-card/95 backdrop-blur-xl p-5">
+                    <DialogHeader className="gap-1">
                         <DialogTitle>{goalModalMode === 'add' ? 'Create Savings Goal' : 'Edit Savings Goal'}</DialogTitle>
                     </DialogHeader>
-                    <div className="space-y-4 pt-4">
-                        <div className="space-y-2">
-                            <Label>Goal Name</Label>
+                    <div className="space-y-3 pt-3">
+                        <div className="space-y-1">
+                            <Label className="text-xs">Goal Name</Label>
                             <Input 
                                 placeholder="e.g. Dream Vacation" 
                                 value={goalName}
                                 onChange={(e) => setGoalName(e.target.value)}
-                                className="bg-secondary/20 border-white/10 h-12"
+                                className="bg-secondary/20 border-white/10 h-10 text-sm"
                             />
                         </div>
-                        <div className="space-y-2">
-                            <Label>Target Amount</Label>
+                        <div className="space-y-1">
+                            <Label className="text-xs">Target Amount</Label>
                             <div className="flex gap-2">
                                 <Input 
                                     type="number" 
@@ -479,26 +472,26 @@ export function GoalsView() {
                                     placeholder="1000.00" 
                                     value={goalTarget}
                                     onChange={(e) => setGoalTarget(e.target.value)}
-                                    className="bg-secondary/20 border-white/10 h-12 flex-1 text-lg font-bold"
+                                    className="bg-secondary/20 border-white/10 h-10 flex-1 text-base font-bold"
                                 />
-                                <div className="w-[140px]">
+                                <div className="w-[120px]">
                                     <CurrencyDropdown value={goalCurrency} onValueChange={(val) => setGoalCurrency(val as Currency)} compact={true} />
                                 </div>
                             </div>
                         </div>
-                        <div className="space-y-2 flex flex-col">
-                            <Label>Target Date (Optional)</Label>
-                            <Popover>
+                        <div className="space-y-1 flex flex-col">
+                            <Label className="text-xs">Target Date (Optional)</Label>
+                            <Popover modal={true}>
                                 <PopoverTrigger asChild>
                                     <Button
                                         variant={"outline"}
                                         className={cn(
-                                            "w-full justify-start text-left font-normal h-12 bg-secondary/20 border-white/10 hover:bg-secondary/30",
+                                            "w-full justify-start text-left font-normal h-10 bg-secondary/20 border-white/10 hover:bg-secondary/30 text-sm",
                                             !goalDeadline && "text-muted-foreground"
                                         )}
                                     >
                                         <Calendar className="mr-2 h-4 w-4" />
-                                        {goalDeadline ? format(goalDeadline, "PPP") : <span>Pick a date</span>}
+                                        {goalDeadline ? format(goalDeadline, "MMM d, yyyy") : <span>Pick a date</span>}
                                     </Button>
                                 </PopoverTrigger>
                                 <PopoverContent className="w-auto p-0 bg-card/95 backdrop-blur-xl border-white/10" align="start">
@@ -507,6 +500,8 @@ export function GoalsView() {
                                         selected={goalDeadline}
                                         onSelect={setGoalDeadline}
                                         initialFocus
+                                        fromDate={new Date()}
+                                        toDate={new Date(2035, 11, 31)}
                                     />
                                 </PopoverContent>
                             </Popover>
@@ -527,13 +522,13 @@ export function GoalsView() {
 
             {/* Add Deposit Dialog */}
             <Dialog open={isAddDepositOpen} onOpenChange={setIsAddDepositOpen}>
-                <DialogContent className="max-w-md rounded-3xl border-white/10 bg-card/95 backdrop-blur-xl">
-                    <DialogHeader>
+                <DialogContent className="max-w-md rounded-3xl border-white/10 bg-card/95 backdrop-blur-xl p-5">
+                    <DialogHeader className="gap-1">
                         <DialogTitle>Add to Savings</DialogTitle>
                     </DialogHeader>
-                    <div className="space-y-4 pt-4">
-                        <div className="space-y-2">
-                            <Label>Deposit Amount</Label>
+                    <div className="space-y-3 pt-3">
+                        <div className="space-y-1">
+                            <Label className="text-xs">Deposit Amount</Label>
                             <div className="relative">
                                 <Input 
                                     type="number" 
@@ -541,18 +536,18 @@ export function GoalsView() {
                                     placeholder="0.00" 
                                     value={depositAmount}
                                     onChange={(e) => setDepositAmount(e.target.value)}
-                                    className="bg-secondary/20 border-white/10 h-16 text-3xl font-bold pl-12"
+                                    className="bg-secondary/20 border-white/10 h-14 text-2xl font-bold pl-10"
                                 />
-                                <span className={`absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-bold ${themeConfig.text}`}>
+                                <span className={`absolute left-4 top-1/2 -translate-y-1/2 text-xl font-bold ${themeConfig.text}`}>
                                     {selectedGoalId ? CURRENCY_SYMBOLS[goals.find((g: any) => g.id === selectedGoalId)?.currency as Currency] || '$' : '$'}
                                 </span>
                             </div>
                         </div>
                     </div>
-                    <DialogFooter className="mt-6 flex gap-2">
-                        <Button variant="ghost" className="flex-1" onClick={() => { setIsAddDepositOpen(false); setDepositAmount(''); }}>Cancel</Button>
+                    <DialogFooter className="mt-4 flex gap-2">
+                        <Button variant="ghost" className="flex-1 h-10 text-xs underline underline-offset-4 hover:bg-transparent" onClick={() => { setIsAddDepositOpen(false); setDepositAmount(''); }}>Cancel</Button>
                         <Button 
-                            className={`flex-1 font-bold text-white transition-all ${themeConfig.bgSolid} ${themeConfig.hoverBtnBg} ${themeConfig.shadowStrong}`}
+                            className={`flex-[1.5] h-10 font-bold text-white transition-all ${themeConfig.bgSolid} ${themeConfig.hoverBtnBg} ${themeConfig.shadowStrong}`}
                             onClick={handleAddDeposit}
                             disabled={!depositAmount}
                         >

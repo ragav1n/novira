@@ -33,6 +33,7 @@ import { useUserPreferences } from '@/components/providers/user-preferences-prov
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
+import { CATEGORIES as SYSTEM_CATEGORIES } from '@/lib/categories';
 
 type ImportStep = 'upload' | 'map' | 'review';
 
@@ -62,7 +63,7 @@ interface ParsedTransaction {
 
 export function ImportView() {
     const router = useRouter();
-    const { userId } = useUserPreferences();
+    const { userId, currency: baseCurrency } = useUserPreferences();
     const [step, setStep] = useState<ImportStep>('upload');
     const [file, setFile] = useState<File | null>(null);
     const [headers, setHeaders] = useState<string[]>([]);
@@ -77,6 +78,7 @@ export function ImportView() {
         credit: '',
         category: ''
     });
+    const [importCurrency, setImportCurrency] = useState<string>(baseCurrency || 'USD');
 
     // Mode for Amount mapping: 'single' (Amount column) or 'split' (Debit/Credit columns)
     const [amountMode, setAmountMode] = useState<'single' | 'split'>('single');
@@ -85,9 +87,7 @@ export function ImportView() {
     const [isImporting, setIsImporting] = useState(false);
 
     // Categories for mapping/fallback
-    const CATEGORIES = [
-        'Food', 'Groceries', 'Fashion', 'Transport', 'Bills', 'Shopping', 'Healthcare', 'Entertainment', 'Rent', 'Education', 'Others', 'Uncategorized'
-    ];
+    const CATEGORIES = SYSTEM_CATEGORIES.map(c => c.label);
 
     const findHeaderRow = (data: any[][]): { index: number, headers: string[] } => {
         // Look for common header keywords in first 1000 rows (some banks have huge headers)
@@ -140,6 +140,11 @@ export function ImportView() {
         // Auto-detect columns based on detected headers
         const lowerHeaders = headers.map(h => h.toLowerCase());
         const newMapping = { ...mapping };
+        
+        // Auto-detect Currency
+        const curIdx = lowerHeaders.findIndex(h => h.includes('curr') || h.includes('ccy'));
+        // In this implementation, we mostly use importCurrency state for the whole batch
+        // but we could auto-set the default base currency here.
 
         // Date
         const dateIdx = lowerHeaders.findIndex(h => h.includes('date') || h.includes('time'));
@@ -401,7 +406,7 @@ export function ImportView() {
                 description: t.description,
                 amount: t.amount, // Positive for expense, negative for income
                 category: t.category,
-                currency: 'INR',
+                currency: importCurrency,
                 payment_method: t.paymentMethod,
                 created_at: new Date().toISOString()
             }));
@@ -480,75 +485,89 @@ export function ImportView() {
                         <CardTitle>Map Columns</CardTitle>
                         <CardDescription>Match your file columns to Novira fields.</CardDescription>
                     </CardHeader>
-                    <CardContent className="space-y-6">
+                    <CardContent className="space-y-4 pt-4">
                         {/* Header Row Info */}
-                        <div className="bg-secondary/20 p-3 rounded-lg text-sm text-muted-foreground">
+                        <div className="bg-secondary/20 p-2.5 rounded-lg text-[11px] text-muted-foreground">
                             Detected Header Row: <strong>Row {headerRowIndex + 1}</strong>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <label className="text-sm font-medium">Date Column <span className="text-rose-500">*</span></label>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div className="space-y-1">
+                                <label className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Date Column <span className="text-rose-500">*</span></label>
                                 <Select value={mapping.date} onValueChange={(val) => setMapping({ ...mapping, date: val })}>
-                                    <SelectTrigger><SelectValue placeholder="Select column" /></SelectTrigger>
+                                    <SelectTrigger className="h-10 text-sm"><SelectValue placeholder="Select column" /></SelectTrigger>
                                     <SelectContent>
                                         {headers.map(h => <SelectItem key={h} value={h}>{h}</SelectItem>)}
                                     </SelectContent>
                                 </Select>
                             </div>
-                            <div className="space-y-2">
-                                <label className="text-sm font-medium">Description Column <span className="text-rose-500">*</span></label>
+                            <div className="space-y-1">
+                                <label className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Description Column <span className="text-rose-500">*</span></label>
                                 <Select value={mapping.description} onValueChange={(val) => setMapping({ ...mapping, description: val })}>
-                                    <SelectTrigger><SelectValue placeholder="Select column" /></SelectTrigger>
+                                    <SelectTrigger className="h-10 text-sm"><SelectValue placeholder="Select column" /></SelectTrigger>
                                     <SelectContent>
                                         {headers.map(h => <SelectItem key={h} value={h}>{h}</SelectItem>)}
                                     </SelectContent>
                                 </Select>
                             </div>
+                        </div>
+
+                        <div className="space-y-1">
+                            <label className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Currency of File <span className="text-rose-500">*</span></label>
+                            <Select value={importCurrency} onValueChange={(val) => setImportCurrency(val)}>
+                                <SelectTrigger className="w-full h-10 text-sm"><SelectValue placeholder="Select currency" /></SelectTrigger>
+                                <SelectContent>
+                                    {['USD', 'EUR', 'GBP', 'INR', 'JPY', 'CAD', 'AUD', 'SGD', 'AED'].map(cur => (
+                                        <SelectItem key={cur} value={cur}>{cur}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                            <p className="text-[9px] text-muted-foreground">Currency used in your uploaded statement.</p>
                         </div>
 
                         <Separator />
 
-                        <div className="space-y-4">
+                        <div className="space-y-3">
                             <div className="flex items-center justify-between">
-                                <Label htmlFor="amount-mode" className="text-sm font-medium">Amount Mapping Mode</Label>
+                                <Label htmlFor="amount-mode" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Amount Mapping Mode</Label>
                                 <div className="flex items-center gap-2">
-                                    <span className={`text-xs ${amountMode === 'single' ? 'text-primary font-bold' : 'text-muted-foreground'}`}>Single Column</span>
+                                    <span className={`text-[10px] ${amountMode === 'single' ? 'text-primary font-bold' : 'text-muted-foreground'}`}>Single</span>
                                     <Switch
                                         id="amount-mode"
                                         checked={amountMode === 'split'}
                                         onCheckedChange={(checked) => setAmountMode(checked ? 'split' : 'single')}
+                                        className="scale-75"
                                     />
-                                    <span className={`text-xs ${amountMode === 'split' ? 'text-primary font-bold' : 'text-muted-foreground'}`}>Split (Debit/Credit)</span>
+                                    <span className={`text-[10px] ${amountMode === 'split' ? 'text-primary font-bold' : 'text-muted-foreground'}`}>Split</span>
                                 </div>
                             </div>
 
                             {amountMode === 'single' ? (
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium">Amount Column <span className="text-rose-500">*</span></label>
+                                <div className="space-y-1">
+                                    <label className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Amount Column <span className="text-rose-500">*</span></label>
                                     <Select value={mapping.amount} onValueChange={(val) => setMapping({ ...mapping, amount: val })}>
-                                        <SelectTrigger><SelectValue placeholder="Select column" /></SelectTrigger>
+                                        <SelectTrigger className="h-10 text-sm"><SelectValue placeholder="Select column" /></SelectTrigger>
                                         <SelectContent>
                                             {headers.map(h => <SelectItem key={h} value={h}>{h}</SelectItem>)}
                                         </SelectContent>
                                     </Select>
                                 </div>
                             ) : (
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <label className="text-sm font-medium">Debit / Withdrawal</label>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div className="space-y-1">
+                                        <label className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Debit</label>
                                         <Select value={mapping.debit || "none"} onValueChange={(val) => setMapping({ ...mapping, debit: val === "none" ? "" : val })}>
-                                            <SelectTrigger><SelectValue placeholder="Select column" /></SelectTrigger>
+                                            <SelectTrigger className="h-10 text-sm"><SelectValue placeholder="Select column" /></SelectTrigger>
                                             <SelectContent>
                                                 <SelectItem value="none">-- Skip --</SelectItem>
                                                 {headers.map(h => <SelectItem key={h} value={h}>{h}</SelectItem>)}
                                             </SelectContent>
                                         </Select>
                                     </div>
-                                    <div className="space-y-2">
-                                        <label className="text-sm font-medium">Credit / Deposit</label>
+                                    <div className="space-y-1">
+                                        <label className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Credit</label>
                                         <Select value={mapping.credit || "none"} onValueChange={(val) => setMapping({ ...mapping, credit: val === "none" ? "" : val })}>
-                                            <SelectTrigger><SelectValue placeholder="Select column" /></SelectTrigger>
+                                            <SelectTrigger className="h-10 text-sm"><SelectValue placeholder="Select column" /></SelectTrigger>
                                             <SelectContent>
                                                 <SelectItem value="none">-- Skip --</SelectItem>
                                                 {headers.map(h => <SelectItem key={h} value={h}>{h}</SelectItem>)}
@@ -561,10 +580,10 @@ export function ImportView() {
 
                         <Separator />
 
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium">Category Column (Optional)</label>
+                        <div className="space-y-1">
+                            <label className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Category Column (Optional)</label>
                             <Select value={mapping.category || ''} onValueChange={(val) => setMapping({ ...mapping, category: val })}>
-                                <SelectTrigger><SelectValue placeholder="Select column" /></SelectTrigger>
+                                <SelectTrigger className="h-10 text-sm"><SelectValue placeholder="Select column" /></SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="none">-- Auto Categorize --</SelectItem>
                                     {headers.map(h => <SelectItem key={h} value={h}>{h}</SelectItem>)}
