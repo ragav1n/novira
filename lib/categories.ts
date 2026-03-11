@@ -66,9 +66,10 @@ export const CHART_CONFIG = {
 };
 
 
-export const getIconForCategory = (category: string, className: string = "w-5 h-5 text-white") => {
-    const iconProps = { className };
-    switch (category.toLowerCase()) {
+export const getIconForCategory = (category: string, className: string = "w-5 h-5 text-white", props: any = {}) => {
+    const iconProps = { className, ...props };
+    const id = category.toLowerCase();
+    switch (id) {
         case 'food': return React.createElement(Utensils, iconProps);
         case 'groceries': return React.createElement(ShoppingCart, iconProps);
         case 'fashion': return React.createElement(Shirt, iconProps);
@@ -86,11 +87,40 @@ export const getIconForCategory = (category: string, className: string = "w-5 h-
 };
 
 /**
+ * Returns the canonical label for a category ID.
+ */
+export const getCategoryLabel = (id: string) => {
+    const category = CATEGORIES.find(c => c.id === id.toLowerCase());
+    return category ? category.label : (id.charAt(0).toUpperCase() + id.slice(1));
+};
+
+/**
+ * Automatically suggests a category based on the description text.
+ */
+export const autoCategorize = (description: string): string => {
+    const lowerDesc = description.toLowerCase();
+    
+    if (lowerDesc.includes('uber') || lowerDesc.includes('taxi') || lowerDesc.includes('fuel') || lowerDesc.includes('petrol') || lowerDesc.includes('ola')) return 'transport';
+    if (lowerDesc.includes('zomato') || lowerDesc.includes('swiggy') || lowerDesc.includes('restaurant') || lowerDesc.includes('cafe') || lowerDesc.includes('dining')) return 'food';
+    if (lowerDesc.includes('milk') || lowerDesc.includes('curd') || lowerDesc.includes('tofu') || lowerDesc.includes('grocer') || lowerDesc.includes('supermarket') || lowerDesc.includes('mart') || lowerDesc.includes('bigbasket') || lowerDesc.includes('blinkit')) return 'groceries';
+    if (lowerDesc.includes('shirt') || lowerDesc.includes('clothes') || lowerDesc.includes('fashion') || lowerDesc.includes('zara') || lowerDesc.includes('h&m') || lowerDesc.includes('apparel') || lowerDesc.includes('myntra') || lowerDesc.includes('ajio')) return 'fashion';
+    if (lowerDesc.includes('netflix') || lowerDesc.includes('spotify') || lowerDesc.includes('movie') || lowerDesc.includes('cinema') || lowerDesc.includes('hotstar') || lowerDesc.includes('prime video')) return 'entertainment';
+    if (lowerDesc.includes('pharmacy') || lowerDesc.includes('doctor') || lowerDesc.includes('hospital') || lowerDesc.includes('medical') || lowerDesc.includes('medicine')) return 'healthcare';
+    if (lowerDesc.includes('bill') || lowerDesc.includes('electricity') || lowerDesc.includes('recharge') || lowerDesc.includes('utility') || lowerDesc.includes('gas')) return 'bills';
+    if (lowerDesc.includes('rent') || lowerDesc.includes('lease') || lowerDesc.includes('landlord') || lowerDesc.includes('maintenance')) return 'rent';
+    if (lowerDesc.includes('school') || lowerDesc.includes('tuition') || lowerDesc.includes('course') || lowerDesc.includes('education') || lowerDesc.includes('college') || lowerDesc.includes('university') || lowerDesc.includes('udemy') || lowerDesc.includes('coursera')) return 'education';
+    if (lowerDesc.includes('shop') || lowerDesc.includes('amazon') || lowerDesc.includes('flipkart')) return 'shopping';
+    
+    return 'uncategorized';
+};
+
+/**
  * Returns the SVG string for a category icon. 
  * Useful for non-React contexts like Mapbox HTML markers.
  */
 export const getIconSvgForCategory = (category: string) => {
-    switch (category.toLowerCase()) {
+    const id = category.toLowerCase();
+    switch (id) {
         case 'food': return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2v0a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/></svg>';
         case 'groceries': return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg>';
         case 'fashion': return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20.38 3.46 16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.47a1 1 0 0 0 .99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 0 0 2-2V10h2.15a1 1 0 0 0 .99-.84l.58-3.47a2 2 0 0 0-1.34-2.23z"/></svg>';

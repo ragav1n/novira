@@ -33,7 +33,7 @@ import { useUserPreferences } from '@/components/providers/user-preferences-prov
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import { CATEGORIES as SYSTEM_CATEGORIES } from '@/lib/categories';
+import { CATEGORIES as SYSTEM_CATEGORIES, autoCategorize, getCategoryLabel, getIconForCategory, CATEGORY_COLORS } from '@/lib/categories';
 
 type ImportStep = 'upload' | 'map' | 'review';
 
@@ -337,22 +337,12 @@ export function ImportView() {
             }
 
             // CATEGORY LOGIC
-            let category = 'Uncategorized';
+            let category = 'uncategorized';
             if (catStr) {
-                const match = CATEGORIES.find(c => c.toLowerCase() === String(catStr).toLowerCase());
-                if (match) category = match;
+                const match = SYSTEM_CATEGORIES.find(c => c.label.toLowerCase() === String(catStr).toLowerCase() || c.id === String(catStr).toLowerCase());
+                if (match) category = match.id;
             } else {
-                const lowerDesc = String(descStr).toLowerCase();
-                if (lowerDesc.includes('uber') || lowerDesc.includes('taxi') || lowerDesc.includes('fuel')) category = 'Transport';
-                else if (lowerDesc.includes('zomato') || lowerDesc.includes('swiggy') || lowerDesc.includes('restaurant') || lowerDesc.includes('cafe')) category = 'Food';
-                else if (lowerDesc.includes('milk') || lowerDesc.includes('curd') || lowerDesc.includes('tofu') || lowerDesc.includes('grocer') || lowerDesc.includes('supermarket') || lowerDesc.includes('mart')) category = 'Groceries';
-                else if (lowerDesc.includes('shirt') || lowerDesc.includes('clothes') || lowerDesc.includes('fashion') || lowerDesc.includes('zara') || lowerDesc.includes('h&m') || lowerDesc.includes('apparel')) category = 'Fashion';
-                else if (lowerDesc.includes('netflix') || lowerDesc.includes('spotify') || lowerDesc.includes('movie') || lowerDesc.includes('cinema')) category = 'Entertainment';
-                else if (lowerDesc.includes('pharmacy') || lowerDesc.includes('doctor') || lowerDesc.includes('hospital')) category = 'Healthcare';
-                else if (lowerDesc.includes('bill') || lowerDesc.includes('electricity') || lowerDesc.includes('recharge')) category = 'Bills';
-                else if (lowerDesc.includes('rent') || lowerDesc.includes('lease') || lowerDesc.includes('landlord')) category = 'Rent';
-                else if (lowerDesc.includes('school') || lowerDesc.includes('tuition') || lowerDesc.includes('course') || lowerDesc.includes('education') || lowerDesc.includes('college') || lowerDesc.includes('university')) category = 'Education';
-                else if (lowerDesc.includes('shop') || lowerDesc.includes('amazon') || lowerDesc.includes('flipkart') || lowerDesc.includes('myntra')) category = 'Shopping';
+                category = autoCategorize(String(descStr));
             }
 
             // PAYMENT METHOD LOGIC
@@ -638,9 +628,21 @@ export function ImportView() {
                                                     {tx.description}
                                                 </TableCell>
                                                 <TableCell>
-                                                    <span className="px-2 py-1 rounded bg-secondary text-xs">
-                                                        {tx.category}
-                                                    </span>
+                                                    <div className="flex items-center gap-1.5">
+                                                        <div className="w-3.5 h-3.5 flex items-center justify-center">
+                                                            {getIconForCategory(tx.category, "w-full h-full", { style: { color: CATEGORY_COLORS[tx.category] || CATEGORY_COLORS.others } })}
+                                                        </div>
+                                                        <span 
+                                                            className="px-1.5 py-0.5 rounded border text-[10px] font-bold capitalize"
+                                                            style={{
+                                                                backgroundColor: `${CATEGORY_COLORS[tx.category] || CATEGORY_COLORS.others}20`,
+                                                                borderColor: `${CATEGORY_COLORS[tx.category] || CATEGORY_COLORS.others}40`,
+                                                                color: CATEGORY_COLORS[tx.category] || CATEGORY_COLORS.others
+                                                            }}
+                                                        >
+                                                            {getCategoryLabel(tx.category)}
+                                                        </span>
+                                                    </div>
                                                 </TableCell>
                                                 <TableCell className={`text-right font-mono ${tx.amount < 0 ? 'text-emerald-500' : ''}`}>
                                                     {tx.amount.toFixed(2)}

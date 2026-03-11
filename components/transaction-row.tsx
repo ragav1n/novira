@@ -9,6 +9,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import { motion } from 'framer-motion';
+import { getCategoryLabel } from '@/lib/categories';
 
 interface TransactionRowProps {
   tx: Transaction;
@@ -104,8 +105,15 @@ export const TransactionRow = memo(function TransactionRow({
 
         <div className="flex items-center justify-between mt-2 gap-2">
           <div className="flex items-center gap-2 text-[11px] text-white/30 font-medium leading-none flex-wrap">
-            <span className="px-1.5 py-0.5 rounded-md bg-primary/10 text-primary border border-primary/20 capitalize shrink-0 font-extrabold tracking-tight">
-              {tx.category}
+            <span 
+              className="px-1.5 py-0.5 rounded-md border capitalize shrink-0 font-extrabold tracking-tight text-[10px]"
+              style={{
+                backgroundColor: `${color}20`,
+                borderColor: `${color}40`,
+                color: color
+              }}
+            >
+              {getCategoryLabel(tx.category)}
             </span>
             <span className="shrink-0 opacity-20">•</span>
             <span className="shrink-0 truncate max-w-[100px] text-primary/80 font-bold">

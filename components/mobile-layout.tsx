@@ -141,11 +141,11 @@ export function MobileLayout({ children }: { children: React.ReactNode }) {
             {/* Global Background Glows - Matching Dashboard exactly */}
             <div className="fixed inset-0 pointer-events-none overflow-hidden z-0 transition-colors duration-1000 gpu">
                 <div className={cn(
-                    "absolute top-[20%] -right-[10%] w-[60%] h-[60%] rounded-full opacity-15 gpu transition-colors duration-1000 glow-optimized",
+                    "absolute top-[20%] -right-[10%] w-[50%] h-[50%] rounded-full opacity-10 gpu transition-colors duration-1000 glow-optimized",
                     isCoupleWorkspace ? "bg-rose-500" : isHomeWorkspace ? "bg-yellow-500" : "bg-primary"
                 )} />
                 <div className={cn(
-                    "absolute bottom-[20%] -left-[10%] w-[50%] h-[50%] rounded-full opacity-10 gpu transition-colors duration-1000 glow-optimized",
+                    "absolute bottom-[20%] -left-[10%] w-[40%] h-[40%] rounded-full opacity-5 gpu transition-colors duration-1000 glow-optimized",
                     isCoupleWorkspace ? "bg-rose-500" : isHomeWorkspace ? "bg-amber-500" : "bg-primary/40"
                 )} />
             </div>

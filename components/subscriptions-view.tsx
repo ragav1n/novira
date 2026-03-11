@@ -12,6 +12,7 @@ import { cn } from '@/lib/utils';
 import { format, parseISO } from 'date-fns';
 import { useRouter } from 'next/navigation';
 import { toast } from '@/utils/haptics';
+import { getCategoryLabel, getIconForCategory, CATEGORY_COLORS } from '@/lib/categories';
 
 interface RecurringTemplate {
     id: string;
@@ -210,7 +211,12 @@ export function SubscriptionsView() {
                                     <h4 className="font-bold text-base truncate">{template.description}</h4>
                                     <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
                                         <span className="capitalize bg-secondary/50 px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wider">{template.frequency}</span>
-                                        <span className="truncate">{template.category}</span>
+                                        <div className="flex items-center gap-1 opacity-70">
+                                            <div className="w-3.5 h-3.5 flex items-center justify-center">
+                                                {getIconForCategory(template.category, "w-full h-full", { style: { color: CATEGORY_COLORS[template.category] || CATEGORY_COLORS.others } })}
+                                            </div>
+                                            <span className="truncate">{getCategoryLabel(template.category)}</span>
+                                        </div>
                                     </div>
                                 </div>
                                 <div className="flex flex-col items-end gap-2 shrink-0">

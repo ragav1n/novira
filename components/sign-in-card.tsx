@@ -1,7 +1,8 @@
 'use client'
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-motion';
+import Image from 'next/image';
+import { motion, AnimatePresence, useMotionValue, useTransform, useSpring } from 'framer-motion';
 import { Mail, Lock, Eye, EyeClosed, ArrowRight } from 'lucide-react';
 
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -41,11 +42,16 @@ export function Component({ isSignUp = false }: { isSignUp?: boolean }) {
   const [isLoading, setIsLoading] = useState(false);
   const [focusedInput, setFocusedInput] = useState(null);
 
-  // For 3D card effect - increased rotation range for more pronounced 3D effect
+  // For 3D card effect - Optimized with spring for smoothness and reduced main-thread load
   const mouseX = useMotionValue(0);
   const mouseY = useMotionValue(0);
-  const rotateX = useTransform(mouseY, [-300, 300], [10, -10]); // Increased from 5/-5 to 10/-10
-  const rotateY = useTransform(mouseX, [-300, 300], [-10, 10]); // Increased from -5/5 to -10/10
+  
+  const springConfig = { damping: 20, stiffness: 300 };
+  const smoothX = useSpring(mouseX, springConfig);
+  const smoothY = useSpring(mouseY, springConfig);
+  
+  const rotateX = useTransform(smoothY, [-300, 300], [8, -8]);
+  const rotateY = useTransform(smoothX, [-300, 300], [-8, 8]);
 
   const handleMouseMove = (e: React.MouseEvent) => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -278,19 +284,21 @@ export function Component({ isSignUp = false }: { isSignUp?: boolean }) {
                 }}
               />
 
-              {/* Password Requirements Checklist */}
-              <AnimatePresence>
-                {isSignUp && (focusedInput === "password" || password.length > 0) && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
-                    className="mt-2 text-left"
-                  >
-                    <PasswordRequirements password={password} />
-                  </motion.div>
-                )}
-              </AnimatePresence>
+                    {/* Password Requirements Checklist - Stabilized layout */}
+                    <div className="min-h-[120px]">
+                      <AnimatePresence>
+                        {isSignUp && (focusedInput === "password" || password.length > 0) && (
+                          <motion.div
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: 'auto' }}
+                            exit={{ opacity: 0, height: 0 }}
+                            className="mt-2 text-left"
+                          >
+                            <PasswordRequirements password={password} />
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
 
               {/* Bottom light beam - enhanced glow */}
               <motion.div
@@ -427,9 +435,16 @@ export function Component({ isSignUp = false }: { isSignUp?: boolean }) {
                   transition={{ type: "spring", duration: 0.8 }}
                   className="mx-auto w-10 h-10 rounded-full border border-primary/30 flex items-center justify-center relative overflow-hidden"
                 >
-                  {/* Logo placeholder - would be an SVG in practice */}
-                  <div className="relative w-full h-full p-2">
-                    <img src="/Novira.png" alt="Novira Logo" className="w-full h-full object-contain drop-shadow-[0_0_10px_rgba(138,43,226,0.5)]" />
+                  {/* Logo - Optimized with Image component */}
+                  <div className="relative w-8 h-8 p-1">
+                    <Image 
+                      src="/Novira.png" 
+                      alt="Novira Logo" 
+                      width={32} 
+                      height={32} 
+                      priority
+                      className="object-contain drop-shadow-[0_0_10px_rgba(138,43,226,0.5)]" 
+                    />
                   </div>
 
                   {/* Inner lighting effect */}
