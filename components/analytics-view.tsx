@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
 import { ChartConfig, BasePieChart } from "@/components/charts/base-pie-chart";
 import { TransactionService } from '@/lib/services/transaction-service';
-import { CHART_CONFIG, CATEGORY_COLORS, getIconForCategory } from '@/lib/categories';
+import { CHART_CONFIG, CATEGORY_COLORS, getIconForCategory, getCategoryLabel } from '@/lib/categories';
 import { format, startOfMonth, endOfMonth, subMonths, subYears, isSameMonth, parseISO } from 'date-fns';
 import { useUserPreferences } from '@/components/providers/user-preferences-provider';
 import { useBuckets } from '@/components/providers/buckets-provider';
@@ -307,7 +307,7 @@ export function AnalyticsView() {
 
         // 4. Finalize Breakdowns
         const breakdownData = Object.entries(breakdownMap).map(([name, amount]: [string, number]) => ({
-            name: name.charAt(0).toUpperCase() + name.slice(1),
+            name: getCategoryLabel(name),
             amount,
             value: total > 0 ? (amount / total) * 100 : 0,
             color: CATEGORY_COLORS[name] || CATEGORY_COLORS.others,

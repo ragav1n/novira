@@ -7,7 +7,7 @@ import {
     X, Check, Zap, ShoppingBag, HeartPulse, Clapperboard, LayoutGrid, HelpCircle, 
     Calendar as CalendarIcon, Filter, Shirt 
 } from "lucide-react";
-import { CATEGORY_COLORS, getIconForCategory, CATEGORIES as SYSTEM_CATEGORIES } from '@/lib/categories';
+import { CATEGORY_COLORS, getIconForCategory, getCategoryLabel, CATEGORIES as SYSTEM_CATEGORIES } from '@/lib/categories';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { Input } from '@/components/ui/input';
@@ -55,7 +55,7 @@ type Transaction = {
     bucket_id?: string;
 };
 
-const categories = SYSTEM_CATEGORIES.map(c => ({ id: c.label.toLowerCase(), label: c.label }));
+const categories = SYSTEM_CATEGORIES;
 
 const paymentMethods = ['Cash', 'UPI', 'Debit Card', 'Credit Card', 'Bank Transfer'];
 
@@ -593,7 +593,21 @@ export function SearchView() {
                                         <div className="min-w-0">
                                             <p className="font-medium text-sm truncate">{tx.description}</p>
                                             <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
-                                                <span className={`px-1.5 py-0.5 rounded text-[11px] capitalize shrink-0 border ${themeConfig.bgLight} ${themeConfig.text} ${themeConfig.borderLight}`}>{tx.category}</span>
+                                                <div className="flex items-center gap-1.5 shrink-0">
+                                                    <div className="w-3.5 h-3.5 flex items-center justify-center">
+                                                        {getIconForCategory(tx.category, "w-full h-full", { style: { color: CATEGORY_COLORS[tx.category] || CATEGORY_COLORS.others } })}
+                                                    </div>
+                                                    <span 
+                                                        className="px-1.5 py-0.5 rounded border text-[10px] font-bold capitalize"
+                                                        style={{
+                                                            backgroundColor: `${CATEGORY_COLORS[tx.category] || CATEGORY_COLORS.others}20`,
+                                                            borderColor: `${CATEGORY_COLORS[tx.category] || CATEGORY_COLORS.others}40`,
+                                                            color: CATEGORY_COLORS[tx.category] || CATEGORY_COLORS.others
+                                                        }}
+                                                    >
+                                                        {getCategoryLabel(tx.category)}
+                                                    </span>
+                                                </div>
                                                 <span className="shrink-0">• {tx.payment_method}</span>
                                                 <span className="shrink-0">• {format(parseISO(tx.date), 'MMM d')}</span>
                                             </div>

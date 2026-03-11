@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { cn } from '@/lib/utils';
-import { CATEGORY_COLORS, getIconSvgForCategory } from '@/lib/categories';
+import { CATEGORY_COLORS, getIconSvgForCategory, getCategoryLabel } from '@/lib/categories';
 import { createPortal } from 'react-dom';
 import { useMapData, getGridOffsetCoords } from '@/hooks/useMapData';
 import { MapHeader } from './map-header';
@@ -670,7 +670,7 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency, 
                                         )}
                                     >
                                         <div className="w-2.5 h-2.5 rounded-full" style={{ background: color }} />
-                                        <span className="text-[11px] font-bold capitalize">{cat}</span>
+                                        <span className="text-[11px] font-bold capitalize">{getCategoryLabel(cat)}</span>
                                     </button>
                                 );
                             })}
@@ -723,7 +723,7 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency, 
                                                     color: CATEGORY_COLORS[selectedTx.category as keyof typeof CATEGORY_COLORS] || CATEGORY_COLORS.others,
                                                 }}
                                             >
-                                                {selectedTx.category}
+                                                {getCategoryLabel(selectedTx.category)}
                                             </span>
                                             <span className="text-[10px] text-muted-foreground">
                                                 {new Date(selectedTx.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
@@ -779,9 +779,7 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency, 
                                         />
                                     </div>
                                     <div>
-                                        <h3 className="font-bold text-sm">
-                                            <span className="capitalize">{drillDownTxs[0].category}</span>
-                                        </h3>
+                                            <span className="capitalize">{getCategoryLabel(drillDownTxs[0].category)}</span>
                                         <p className="text-[10px] text-muted-foreground">{drillDownTxs.length} Transactions</p>
                                     </div>
                                 </div>

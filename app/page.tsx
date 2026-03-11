@@ -1,6 +1,7 @@
 'use client'
 
 import dynamic from 'next/dynamic'
+import Image from 'next/image'
 import { WaveLoader } from '@/components/ui/wave-loader'
 
 // App Shell Skeleton for Dashboard
@@ -40,8 +41,15 @@ export default function Page() {
     return (
       <div className="flex min-h-[100dvh] w-full flex-col items-center justify-center bg-background">
         {/* Instant App Shell Loading Experience */}
-        <div className="w-20 h-20 relative mb-8 animate-pulse opacity-50">
-            <img src="/Novira.png" alt="Novira" className="w-full h-full object-contain drop-shadow-[0_0_8px_rgba(138,43,226,0.5)]" />
+        <div className="w-20 h-20 relative mb-8 opacity-50">
+            <Image 
+                src="/Novira.png" 
+                alt="Novira" 
+                width={80} 
+                height={80} 
+                priority
+                className="object-contain drop-shadow-[0_0_8px_rgba(138,43,226,0.5)]" 
+            />
         </div>
         <WaveLoader bars={5} message="" />
       </div>

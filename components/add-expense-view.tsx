@@ -35,7 +35,7 @@ import { CATEGORY_COLORS, getIconForCategory, CATEGORIES as SYSTEM_CATEGORIES } 
 const dropdownCategories = SYSTEM_CATEGORIES.map(cat => ({
     id: cat.id,
     label: cat.label,
-    icon: (props: any) => getIconForCategory(cat.id, props.className),
+    icon: (props: any) => getIconForCategory(cat.id, props.className || "w-4 h-4", props),
     color: CATEGORY_COLORS[cat.id] || '#8A2BE2'
 }));
 
