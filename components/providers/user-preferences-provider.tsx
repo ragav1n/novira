@@ -137,6 +137,7 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
                 if (parsed.monthly_budget) setMonthlyBudgetState(parsed.monthly_budget);
                 if (parsed.avatar_url) setAvatarUrl(parsed.avatar_url);
                 if (parsed.budgets) setBudgets(parsed.budgets);
+                if (parsed.active_workspace_id) setActiveWorkspaceId(parsed.active_workspace_id);
             }
 
             const { data, error } = await supabase
@@ -476,6 +477,18 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
         }
     }, [currency, budgets, userId, formatCurrency, refreshPreferences]);
 
+    const setActiveWorkspaceIdWithCache = useCallback((id: string | null) => {
+        setActiveWorkspaceId(id);
+        if (userId) {
+            const cacheKey = `novira_profile_${userId}`;
+            const cached = localStorage.getItem(cacheKey);
+            if (cached) {
+                const parsed = JSON.parse(cached);
+                localStorage.setItem(cacheKey, JSON.stringify({ ...parsed, active_workspace_id: id }));
+            }
+        }
+    }, [userId]);
+
     const setBudgetAlertsEnabled = useCallback(async (enabled: boolean) => {
         setBudgetAlertsEnabledState(enabled);
 
@@ -576,7 +589,7 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
         CURRENCY_SYMBOLS,
         CURRENCY_DETAILS,
         activeWorkspaceId,
-        setActiveWorkspaceId,
+        setActiveWorkspaceId: setActiveWorkspaceIdWithCache,
         workspaceBudgets,
         convertedWorkspaceBudgets,
         setWorkspaceBudget

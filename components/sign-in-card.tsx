@@ -71,8 +71,10 @@ export function Component({ isSignUp = false }: { isSignUp?: boolean }) {
   const isSubmittingRef = React.useRef(false);
 
   // Show success toast if message exists in URL
+  const toastShownRef = React.useRef(false);
   React.useEffect(() => {
-    if (message === 'Account deleted') {
+    if (message === 'Account deleted' && !toastShownRef.current) {
+      toastShownRef.current = true;
       import('sonner').then(({ toast }) => {
         toast.success('Account deleted successfully');
       });
@@ -765,7 +767,6 @@ export function Component({ isSignUp = false }: { isSignUp?: boolean }) {
                           redirectTo,
                           queryParams: {
                             access_type: 'offline',
-                            prompt: 'consent',
                           },
                         },
                       });

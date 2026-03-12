@@ -3,6 +3,7 @@
 import dynamic from 'next/dynamic'
 import Image from 'next/image'
 import { WaveLoader } from '@/components/ui/wave-loader'
+import { AnimatePresence, motion } from 'framer-motion'
 
 // App Shell Skeleton for Dashboard
 const DashboardSkeleton = () => (
@@ -37,32 +38,54 @@ import { DataBoundary } from '@/components/boundaries/data-boundary'
 export default function Page() {
   const { isAuthenticated, isLoading } = useUserPreferences()
 
-  if (isLoading) {
-    return (
-      <div className="flex min-h-[100dvh] w-full flex-col items-center justify-center bg-background">
-        {/* Instant App Shell Loading Experience */}
-        <div className="w-20 h-20 relative mb-8 opacity-50">
-            <Image 
-                src="/Novira.png" 
-                alt="Novira" 
-                width={80} 
-                height={80} 
-                priority
-                className="object-contain drop-shadow-[0_0_8px_rgba(138,43,226,0.5)]" 
-            />
-        </div>
-        <WaveLoader bars={5} message="" />
-      </div>
-    )
-  }
-
-  if (!isAuthenticated) {
-    return <SignInCard isSignUp={false} />
-  }
-
   return (
-    <DataBoundary onReset={() => window.location.reload()}>
-      <DashboardView />
-    </DataBoundary>
+    <AnimatePresence mode="wait">
+      {isLoading ? (
+        <motion.div 
+          key="loading"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.4 }}
+          className="flex min-h-[100dvh] w-full flex-col items-center justify-center bg-background"
+        >
+          {/* Instant App Shell Loading Experience */}
+          <div className="w-20 h-20 relative mb-8 opacity-50">
+              <Image 
+                  src="/Novira.png" 
+                  alt="Novira" 
+                  width={80} 
+                  height={80} 
+                  priority
+                  className="object-contain drop-shadow-[0_0_8px_rgba(138,43,226,0.5)]" 
+              />
+          </div>
+          <WaveLoader bars={5} message="" />
+        </motion.div>
+      ) : !isAuthenticated ? (
+        <motion.div
+          key="signin"
+          initial={{ opacity: 0, scale: 0.98 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+          className="w-full"
+        >
+          <SignInCard isSignUp={false} />
+        </motion.div>
+      ) : (
+        <motion.div
+          key="dashboard"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.5 }}
+          className="w-full"
+        >
+          <DataBoundary onReset={() => window.location.reload()}>
+            <DashboardView />
+          </DataBoundary>
+        </motion.div>
+      )}
+    </AnimatePresence>
   )
 }

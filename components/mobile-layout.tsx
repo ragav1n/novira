@@ -110,6 +110,41 @@ export function MobileLayout({ children }: { children: React.ReactNode }) {
         setIsNavigating(false);
     }, [pathname, setIsNavigating]);
 
+    // Global error handler for ChunkLoadErrors
+    useEffect(() => {
+        const handleGlobalError = (event: ErrorEvent | PromiseRejectionEvent) => {
+            const error = 'error' in event ? event.error : event.reason;
+            if (error && (
+                error.name === 'ChunkLoadError' || 
+                error?.message?.includes('Loading chunk') || 
+                error?.message?.includes('Failed to fetch')
+            )) {
+                console.error('Global ChunkLoadError detected:', error);
+                
+                // If we detect a chunk error globally, it's often best to just reload 
+                // but we'll wait a brief moment to see if an ErrorBoundary catches it first
+                setTimeout(() => {
+                    // Only reload if the user hasn't already been presented with an error boundary
+                    // Simple check: is there a "Display Error" or "Update Available" heading?
+                    const hasErrorUI = document.body.innerText.includes('Display Error') || 
+                                     document.body.innerText.includes('Update Available');
+                    
+                    if (!hasErrorUI) {
+                        window.location.reload();
+                    }
+                }, 1000);
+            }
+        };
+
+        window.addEventListener('error', handleGlobalError);
+        window.addEventListener('unhandledrejection', handleGlobalError);
+
+        return () => {
+            window.removeEventListener('error', handleGlobalError);
+            window.removeEventListener('unhandledrejection', handleGlobalError);
+        };
+    }, []);
+
     const handleTabChange = async (index: number | null) => {
         if (index !== null) {
             // Trigger haptic feedback on tap
@@ -136,22 +171,24 @@ export function MobileLayout({ children }: { children: React.ReactNode }) {
     return (
         <div className={cn(
             "min-h-screen w-full bg-background text-foreground relative overflow-hidden font-sans select-none flex flex-col",
-            isNative && "pt-[env(safe-area-inset-top)]"
+            isNative && "pt-[env(safe-area-inset-top)]",
+            isCoupleWorkspace && "theme-couple",
+            isHomeWorkspace && "theme-home"
         )}>
             {/* Global Background Glows - Matching Dashboard exactly */}
-            <div className="fixed inset-0 pointer-events-none overflow-hidden z-0 transition-colors duration-1000 gpu">
+            <div className="fixed inset-0 pointer-events-none overflow-hidden z-0 transition-colors duration-500 gpu">
                 <div className={cn(
-                    "absolute top-[20%] -right-[10%] w-[50%] h-[50%] rounded-full opacity-10 gpu transition-colors duration-1000 glow-optimized",
+                    "absolute top-[20%] -right-[10%] w-[50%] h-[50%] rounded-full opacity-10 gpu transition-colors duration-500 glow-optimized",
                     isCoupleWorkspace ? "bg-rose-500" : isHomeWorkspace ? "bg-yellow-500" : "bg-primary"
                 )} />
                 <div className={cn(
-                    "absolute bottom-[20%] -left-[10%] w-[40%] h-[40%] rounded-full opacity-5 gpu transition-colors duration-1000 glow-optimized",
+                    "absolute bottom-[20%] -left-[10%] w-[40%] h-[40%] rounded-full opacity-5 gpu transition-colors duration-500 glow-optimized",
                     isCoupleWorkspace ? "bg-rose-500" : isHomeWorkspace ? "bg-amber-500" : "bg-primary/40"
                 )} />
             </div>
 
             <div className={cn(
-                "fixed inset-0 pointer-events-none z-0 transition-colors duration-1000",
+                "fixed inset-0 pointer-events-none z-0 transition-colors duration-500",
                 isCoupleWorkspace 
                     ? "bg-gradient-to-br from-rose-950/10 via-transparent to-transparent" 
                     : isHomeWorkspace

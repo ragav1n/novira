@@ -16,12 +16,15 @@ export function WorkspaceThemeProvider() {
 
     useEffect(() => {
         const root = document.documentElement;
-        root.classList.remove('theme-couple', 'theme-home');
         
         if (activeWorkspace?.type === 'couple') {
             root.classList.add('theme-couple');
+            root.classList.remove('theme-home');
         } else if (activeWorkspace?.type === 'home') {
             root.classList.add('theme-home');
+            root.classList.remove('theme-couple');
+        } else {
+            root.classList.remove('theme-couple', 'theme-home');
         }
     }, [activeWorkspace]);
 
