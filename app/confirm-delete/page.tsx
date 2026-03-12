@@ -55,8 +55,7 @@ export default function ConfirmDeletePage() {
                 // 4. Finalize
                 setStatus('Cleaning up...')
                 await supabase.auth.signOut()
-
-                toast.success('Account deleted successfully')
+                
                 router.push('/signin?message=Account+deleted')
 
             } catch (error: any) {

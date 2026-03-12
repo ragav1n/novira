@@ -78,7 +78,6 @@ export function DeleteAccountDialog({ trigger }: DeleteAccountDialogProps) {
 
                 // Success
                 await supabase.auth.signOut();
-                toast.success('Account deleted successfully');
                 window.location.href = '/signin?message=Account+deleted';
             }
         } catch (error: any) {

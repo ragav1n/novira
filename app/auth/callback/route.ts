@@ -17,11 +17,14 @@ export async function GET(request: Request) {
         const supabase = await createClient()
         const { error } = await supabase.auth.exchangeCodeForSession(code)
         if (!error) {
-            const forwardedHost = request.headers.get('x-forwarded-host') // original origin before load balancer
+            const forwardedHost = request.headers.get('x-forwarded-host')
+            const forwardedProto = request.headers.get('x-forwarded-proto') || 'https'
             
-            // Construct mapping for final redirect
+            // In development, we want to stay on http if we're on localhost
+            const protocol = forwardedHost?.includes('localhost') ? 'http' : forwardedProto
+
             if (forwardedHost) {
-                return NextResponse.redirect(`https://${forwardedHost}${next}`)
+                return NextResponse.redirect(`${protocol}://${forwardedHost}${next}`)
             }
             return NextResponse.redirect(`${origin}${next}`)
         }
