@@ -12,9 +12,41 @@ function ErrorFallback({ error: unknownError, resetErrorBoundary }: FallbackProp
     error.message?.includes('Loading chunk') || 
     error.message?.includes('Failed to fetch');
 
+  const hardReload = async () => {
+    try {
+      // 1. Unregister all service workers
+      if ('serviceWorker' in navigator) {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        for (const registration of registrations) {
+          await registration.unregister();
+        }
+      }
+
+      // 2. Clear all caches
+      if ('caches' in window) {
+        const cacheNames = await caches.keys();
+        for (const cacheName of cacheNames) {
+          await caches.delete(cacheName);
+        }
+      }
+
+      // 3. Clear storage (optional but helpful for a clean state)
+      // localStorage.clear();
+      // sessionStorage.clear();
+
+      // 4. Force reload with cache-buster
+      const url = new URL(window.location.href);
+      url.searchParams.set('reload', Date.now().toString());
+      window.location.href = url.toString();
+    } catch (err) {
+      console.error('Hard reload failed, falling back to basic reload:', err);
+      window.location.reload();
+    }
+  };
+
   const handleAction = () => {
     if (isChunkError) {
-      window.location.reload();
+      hardReload();
     } else {
       resetErrorBoundary();
     }
