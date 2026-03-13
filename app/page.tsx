@@ -29,7 +29,7 @@ const DashboardView = dynamic(
 
 const SignInCard = dynamic(
   () => import('@/components/sign-in-card').then((mod) => mod.Component),
-  { ssr: false }
+  { ssr: true }
 )
 
 import { useUserPreferences } from '@/components/providers/user-preferences-provider'

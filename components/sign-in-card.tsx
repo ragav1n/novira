@@ -190,11 +190,11 @@ export function Component({ isSignUp = false }: { isSignUp?: boolean }) {
       <FallingPattern color="var(--primary)" className="absolute inset-0 z-0" />
 
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
+        initial={{ opacity: 0, y: 15 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.8 }}
+        transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
         className="w-full max-w-sm relative z-10"
-        style={{ perspective: 1500 }}
+        style={{ perspective: 1200 }}
       >
         <motion.div
           className="relative"
@@ -236,18 +236,13 @@ export function Component({ isSignUp = false }: { isSignUp?: boolean }) {
                 }}
                 transition={{
                   left: {
-                    duration: 2.5,
-                    ease: "easeInOut",
+                    duration: 3,
+                    ease: "linear",
                     repeat: Infinity,
-                    repeatDelay: 1
+                    repeatDelay: 1.5
                   },
                   opacity: {
-                    duration: 1.2,
-                    repeat: Infinity,
-                    repeatType: "mirror"
-                  },
-                  filter: {
-                    duration: 1.5,
+                    duration: 2,
                     repeat: Infinity,
                     repeatType: "mirror"
                   }
@@ -265,23 +260,17 @@ export function Component({ isSignUp = false }: { isSignUp?: boolean }) {
                 }}
                 transition={{
                   top: {
-                    duration: 2.5,
-                    ease: "easeInOut",
+                    duration: 3,
+                    ease: "linear",
                     repeat: Infinity,
-                    repeatDelay: 1,
-                    delay: 0.6
+                    repeatDelay: 1.5,
+                    delay: 0.8
                   },
                   opacity: {
-                    duration: 1.2,
+                    duration: 2,
                     repeat: Infinity,
                     repeatType: "mirror",
-                    delay: 0.6
-                  },
-                  filter: {
-                    duration: 1.5,
-                    repeat: Infinity,
-                    repeatType: "mirror",
-                    delay: 0.6
+                    delay: 0.8
                   }
                 }}
               />
@@ -454,9 +443,9 @@ export function Component({ isSignUp = false }: { isSignUp?: boolean }) {
                 </motion.div>
 
                 <motion.h1
-                  initial={{ opacity: 0, y: 10 }}
+                  initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.2 }}
+                  transition={{ delay: 0.1, duration: 0.3 }}
                   className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-b from-foreground to-foreground/80"
                 >
                   {isSignUp ? 'Create Account' : 'Welcome Back'}
@@ -465,7 +454,7 @@ export function Component({ isSignUp = false }: { isSignUp?: boolean }) {
                 <motion.p
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  transition={{ delay: 0.3 }}
+                  transition={{ delay: 0.15, duration: 0.3 }}
                   className="text-foreground/60 text-xs"
                 >
                   {isSignUp ? 'Start tracking your expenses today' : 'Sign in to Novira'}
