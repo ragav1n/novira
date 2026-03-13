@@ -27,7 +27,10 @@ import { LATEST_FEATURE_ANNOUNCEMENT } from '@/lib/feature-flags';
 
 const LocationPicker: any = dynamic(() => import('@/components/ui/location-picker').then(mod => mod.LocationPicker as any), { ssr: false });
 const ExpenseMapView: any = dynamic(() => import('@/components/expense-map-view').then(mod => mod.ExpenseMapView as any), { ssr: false });
-const AddFundsDialog: any = dynamic(() => import('@/components/add-funds-dialog').then(module => ({ default: module.AddFundsDialog })), { ssr: false });
+const AddFundsDialog: any = dynamic(() => import('@/components/add-funds-dialog').then(module => ({ default: module.AddFundsDialog })), { 
+    ssr: false,
+    loading: () => <div className="fixed inset-0 min-h-[300px] flex items-center justify-center bg-background/50 backdrop-blur-sm z-[150]"><div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" /></div>
+});
 const HowToUseDialog: any = dynamic(() => import('@/components/how-to-use-dialog').then(module => ({ default: module.HowToUseDialog })), { ssr: false });
 
 interface DashboardDialogsProps {
@@ -145,7 +148,7 @@ export function DashboardDialogs({
 
             {/* Edit Transaction Dialog */}
             <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-                <DialogContent className="max-w-md rounded-3xl border-white/10 bg-card/95 backdrop-blur-xl max-h-[90vh] overflow-y-auto overflow-x-hidden no-scrollbar">
+                <DialogContent className="max-w-md rounded-3xl border-white/10 bg-card/95 backdrop-blur-xl max-h-[90vh] overflow-y-auto overflow-x-hidden">
                     <DialogHeader>
                         <DialogTitle>Edit Transaction</DialogTitle>
                         <DialogDescription>Update your transaction details.</DialogDescription>

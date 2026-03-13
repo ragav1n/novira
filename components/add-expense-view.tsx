@@ -174,14 +174,21 @@ export function AddExpenseView() {
                     />
                 </div>
 
-                <div className="space-y-2 min-h-[96px]"> {/* Stabilized height for Quick Pins */}
-                    <div className="flex items-center gap-1.5 ml-1 h-3">
-                        {sortedSuggestions.length > 0 && (
-                            <label className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest flex items-center gap-1.5 animate-in fade-in duration-500">
-                                <LocateFixed className="w-2.5 h-2.5" />
-                                Quick Pins
-                            </label>
-                        )}
+                <div className="space-y-3 min-h-[105px]"> {/* Slightly increased and stabilized height for Quick Pins */}
+                    <div className="flex items-center gap-1.5 ml-1 h-4">
+                        <AnimatePresence>
+                            {sortedSuggestions.length > 0 && (
+                                <motion.label 
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    exit={{ opacity: 0 }}
+                                    className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest flex items-center gap-1.5"
+                                >
+                                    <LocateFixed className="w-3 h-3" />
+                                    Quick Pins
+                                </motion.label>
+                            )}
+                        </AnimatePresence>
                     </div>
                     <AnimatePresence mode="wait">
                         {sortedSuggestions.length > 0 && (
