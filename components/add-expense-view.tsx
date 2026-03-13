@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect } from 'react';
-import { ChevronLeft, CreditCard, Utensils, Car, Zap, ShoppingBag, HeartPulse, Clapperboard, Wallet, Banknote, HelpCircle, Calendar as CalendarIcon, Home, School, LayoutGrid, Building2, MapPin, Shirt, ShoppingCart } from 'lucide-react';
+import { ChevronLeft, CreditCard, Utensils, Car, Zap, ShoppingBag, HeartPulse, Clapperboard, Wallet, Banknote, HelpCircle, Calendar as CalendarIcon, Home, School, LayoutGrid, Building2, MapPin, Shirt, ShoppingCart, LocateFixed } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -29,6 +29,7 @@ const RecurringExpenseSection: any = dynamic(() => import('./add-expense/recurri
 import { CategorySelector, BucketSelector } from './add-expense/selectors';
 import { useExpenseForm } from '@/hooks/useExpenseForm';
 import { useExpenseSubmission } from '@/hooks/useExpenseSubmission';
+import { getDistance } from '@/lib/location';
 
 import { CATEGORY_COLORS, getIconForCategory, CATEGORIES as SYSTEM_CATEGORIES } from '@/lib/categories';
 
@@ -53,6 +54,7 @@ export function AddExpenseView() {
     const { currency, userId, CURRENCY_SYMBOLS, activeWorkspaceId } = useUserPreferences();
     const { groups, friends } = useGroups();
     const { buckets } = useBuckets();
+    const [currentPos, setCurrentPos] = React.useState<{ lat: number, lng: number } | null>(null);
 
     const activeGroup = groups.find(g => g.id === activeWorkspaceId);
     const isSharedWorkspace = activeGroup?.type === 'couple' || activeGroup?.type === 'home';
@@ -75,6 +77,27 @@ export function AddExpenseView() {
             customAmounts: formState.customAmounts, isRecurring: formState.isRecurring, frequency: formState.frequency
         });
     };
+    
+    // Detect location once for suggestion sorting
+    useEffect(() => {
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                (pos) => setCurrentPos({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+                null,
+                { enableHighAccuracy: false, timeout: 5000 }
+            );
+        }
+    }, []);
+
+    // Sorted Suggestions
+    const sortedSuggestions = React.useMemo(() => {
+        if (!currentPos) return formState.suggestedLocations;
+        return [...formState.suggestedLocations].sort((a, b) => {
+            const distA = getDistance(currentPos.lat, currentPos.lng, a.lat, a.lng);
+            const distB = getDistance(currentPos.lat, currentPos.lng, b.lat, b.lng);
+            return distA - distB;
+        });
+    }, [formState.suggestedLocations, currentPos]);
 
 
 
@@ -83,7 +106,7 @@ export function AddExpenseView() {
             initial={{ opacity: 0, scale: 0.98 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.98 }}
-            transition={{ type: 'spring', stiffness: 300, damping: 30, mass: 0.8 }}
+            transition={{ duration: 0.2, ease: "easeOut" }}
             className="relative"
         >
             <div className={cn(
@@ -151,46 +174,102 @@ export function AddExpenseView() {
                     />
                 </div>
 
-                {/* Smart Location Suggestion */}
-                <AnimatePresence>
-                    {formState.suggestedLocation && (
-                        <motion.div
-                            initial={{ opacity: 0, scale: 0.95, y: -10 }}
-                            animate={{ opacity: 1, scale: 1, y: 0 }}
-                            exit={{ opacity: 0, scale: 0.95, y: -10 }}
-                            className="flex justify-start"
-                        >
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    formState.setPlaceName(formState.suggestedLocation!.name);
-                                    formState.setPlaceAddress(formState.suggestedLocation!.address);
-                                    formState.setPlaceLat(formState.suggestedLocation!.lat);
-                                    formState.setPlaceLng(formState.suggestedLocation!.lng);
-                                    formState.setSuggestedLocation(null);
-                                }}
-                                className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/20 text-primary hover:bg-primary/20 transition-all text-[11px] font-bold"
+                <div className="space-y-2 min-h-[96px]"> {/* Stabilized height for Quick Pins */}
+                    <div className="flex items-center gap-1.5 ml-1 h-3">
+                        {sortedSuggestions.length > 0 && (
+                            <label className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest flex items-center gap-1.5 animate-in fade-in duration-500">
+                                <LocateFixed className="w-2.5 h-2.5" />
+                                Quick Pins
+                            </label>
+                        )}
+                    </div>
+                    <AnimatePresence mode="wait">
+                        {sortedSuggestions.length > 0 && (
+                            <motion.div
+                                initial={{ opacity: 0, scale: 0.98 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                exit={{ opacity: 0, scale: 0.98 }}
+                                className="overflow-hidden"
                             >
-                                <MapPin className="w-3 h-3" />
-                                Use last location: {formState.suggestedLocation.name}
-                            </button>
-                        </motion.div>
-                    )}
-                </AnimatePresence>
+                                <div className="flex gap-2.5 overflow-x-auto no-scrollbar pb-1.5 -mx-5 px-5">
+                                    {sortedSuggestions.map((loc, i) => (
+                                        <motion.button
+                                            key={`${loc.name}-${i}-${loc.type}`}
+                                        type="button"
+                                        initial={{ opacity: 0, scale: 0.9 }}
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        transition={{ delay: i * 0.05 }}
+                                        onClick={() => {
+                                            formState.setPlaceName(loc.name);
+                                            formState.setPlaceAddress(loc.address);
+                                            formState.setPlaceLat(loc.lat);
+                                            formState.setPlaceLng(loc.lng);
+                                            formState.setSuggestedLocations(prev => prev.filter(l => l.name !== loc.name));
+                                        }}
+                                            className={cn(
+                                                "flex items-center gap-3 px-4 py-3 rounded-2xl border whitespace-nowrap transition-all relative overflow-hidden group/pin",
+                                                loc.type === 'last' ? "bg-primary/10 border-primary/20 text-primary shadow-[0_4px_12px_rgba(138,43,226,0.1)]" :
+                                                loc.type === 'category' ? "bg-cyan-500/10 border-cyan-500/20 text-cyan-500 shadow-[0_4px_12px_rgba(6,182,212,0.1)]" :
+                                                "bg-secondary/20 border-white/5 text-muted-foreground hover:bg-secondary/30"
+                                            )}
+                                        >
+                                            <div className={cn(
+                                                "w-8 h-8 rounded-full flex items-center justify-center shrink-0 border transition-transform group-hover/pin:scale-110 shadow-sm",
+                                                loc.type === 'last' ? "bg-primary/20 border-primary/40 text-primary shadow-primary/20" :
+                                                loc.type === 'category' ? "bg-cyan-500/20 border-cyan-500/40 text-cyan-400 shadow-cyan-500/20" :
+                                                "bg-amber-500/20 border-amber-500/40 text-amber-400 shadow-amber-500/20"
+                                            )}>
+                                                <MapPin className="w-4 h-4" />
+                                            </div>
+                                            <div className="text-left min-w-0 flex-1">
+                                                <div className="flex items-center gap-1.5 min-w-0">
+                                                    <p className={cn(
+                                                        "text-[11px] font-bold leading-tight tracking-tight truncate flex-1",
+                                                        loc.type === 'last' ? "text-primary-foreground" :
+                                                        loc.type === 'category' ? "text-cyan-50" :
+                                                        "text-amber-50"
+                                                    )}>{loc.name}</p>
+                                                    {currentPos && (
+                                                        <span className="text-[8px] font-bold opacity-70 bg-white/10 px-1 rounded-sm shrink-0 border border-white/5">
+                                                            {getDistance(currentPos.lat, currentPos.lng, loc.lat, loc.lng) < 1 
+                                                                ? `${Math.round(getDistance(currentPos.lat, currentPos.lng, loc.lat, loc.lng) * 1000)}m` 
+                                                                : `${getDistance(currentPos.lat, currentPos.lng, loc.lat, loc.lng).toFixed(1)}km`}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <p className={cn(
+                                                    "text-[9px] font-bold mt-0.5 truncate max-w-[120px] uppercase tracking-tighter",
+                                                    loc.type === 'last' ? "text-primary/70" : 
+                                                    loc.type === 'category' ? "text-cyan-500/80" : 
+                                                    "text-amber-500/80"
+                                                )}>
+                                                    {loc.type === 'last' ? "Last used" : 
+                                                     loc.type === 'category' ? `Nearby ${formState.selectedCategory}` : 
+                                                     "Frequent Spot"}
+                                                </p>
+                                            </div>
+                                        </motion.button>
+                                    ))}
+                                </div>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+                </div>
 
-                {/* Location Picker */}
-                <LocationPicker
-                    placeName={formState.placeName}
-                    placeAddress={formState.placeAddress}
-                    placeLat={formState.placeLat}
-                    placeLng={formState.placeLng}
-                    onChange={(loc: any) => {
-                        formState.setPlaceName(loc.place_name);
-                        formState.setPlaceAddress(loc.place_address);
-                        formState.setPlaceLat(loc.place_lat);
-                        formState.setPlaceLng(loc.place_lng);
-                    }}
-                />
+                <div className="min-h-[72px]"> {/* Stabilized height for Location Picker */}
+                    <LocationPicker
+                        placeName={formState.placeName}
+                        placeAddress={formState.placeAddress}
+                        placeLat={formState.placeLat}
+                        placeLng={formState.placeLng}
+                        onChange={(loc: any) => {
+                            formState.setPlaceName(loc.place_name);
+                            formState.setPlaceAddress(loc.place_address);
+                            formState.setPlaceLat(loc.place_lat);
+                            formState.setPlaceLng(loc.place_lng);
+                        }}
+                    />
+                </div>
 
                 {/* Category Selection */}
                 <CategorySelector

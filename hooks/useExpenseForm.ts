@@ -34,45 +34,88 @@ export function useExpenseForm(userId: string | null | undefined, defaultCurrenc
     const [placeAddress, setPlaceAddress] = useState<string | null>(null);
     const [placeLat, setPlaceLat] = useState<number | null>(null);
     const [placeLng, setPlaceLng] = useState<number | null>(null);
-    const [suggestedLocation, setSuggestedLocation] = useState<{ name: string, address: string, lat: number, lng: number } | null>(null);
+    const [suggestedLocations, setSuggestedLocations] = useState<{ name: string, address: string, lat: number, lng: number, type: 'last' | 'frequent' | 'category' }[]>([]);
 
-    // Smart Location Memory: Suggest location from previous transactions with same description
+    // Smart Location Memory: Suggest locations from previous transactions
     useEffect(() => {
-        if (!description || description.length < 3 || !userId) {
-            setSuggestedLocation(null);
+        if (!userId) {
+            setSuggestedLocations([]);
             return;
         }
 
-        const timer = setTimeout(async () => {
-            const { data } = await supabase
-                .from('transactions')
-                .select('place_name, place_address, place_lat, place_lng')
-                .eq('user_id', userId)
-                .ilike('description', description)
-                .not('place_name', 'is', null)
-                .order('created_at', { ascending: false })
-                .limit(1);
+        const fetchSuggestions = async () => {
+            try {
+                const suggestions: any[] = [];
+                const seenNames = new Set<string>();
 
-            if (data && data[0]) {
-                const loc = data[0];
-                // Only suggest if it's different from the current location
-                if (loc.place_name !== placeName) {
-                    setSuggestedLocation({
-                        name: loc.place_name!,
-                        address: loc.place_address!,
-                        lat: loc.place_lat!,
-                        lng: loc.place_lng!
-                    });
-                } else {
-                    setSuggestedLocation(null);
+                // 1. Description Match (Highest relevance)
+                if (description && description.length >= 3) {
+                    const { data: descMatches } = await supabase
+                        .from('transactions')
+                        .select('place_name, place_address, place_lat, place_lng')
+                        .eq('user_id', userId)
+                        .ilike('description', description)
+                        .not('place_name', 'is', null)
+                        .order('created_at', { ascending: false })
+                        .limit(1);
+
+                    if (descMatches?.[0]) {
+                        const loc = descMatches[0];
+                        if (loc.place_name !== placeName) {
+                            suggestions.push({ ...loc, name: loc.place_name, address: loc.place_address, lat: loc.place_lat, lng: loc.place_lng, type: 'last' });
+                            seenNames.add(loc.place_name!);
+                        }
+                    }
                 }
-            } else {
-                setSuggestedLocation(null);
-            }
-        }, 500);
 
+                // 2. Category Match (Frequent for this category)
+                const { data: catMatches } = await supabase
+                    .from('transactions')
+                    .select('place_name, place_address, place_lat, place_lng')
+                    .eq('user_id', userId)
+                    .eq('category', selectedCategory)
+                    .not('place_name', 'is', null)
+                    .order('created_at', { ascending: false })
+                    .limit(3);
+
+                if (catMatches) {
+                    catMatches.forEach(loc => {
+                        if (loc.place_name && !seenNames.has(loc.place_name) && loc.place_name !== placeName) {
+                            suggestions.push({ ...loc, name: loc.place_name, address: loc.place_address, lat: loc.place_lat, lng: loc.place_lng, type: 'category' });
+                            seenNames.add(loc.place_name);
+                        }
+                    });
+                }
+
+                // 3. Frequent overall (If still space)
+                if (suggestions.length < 5) {
+                    const { data: frequent } = await supabase
+                        .from('transactions')
+                        .select('place_name, place_address, place_lat, place_lng')
+                        .eq('user_id', userId)
+                        .not('place_name', 'is', null)
+                        .limit(10); // Get more to find variety
+
+                    if (frequent) {
+                        for (const loc of frequent) {
+                            if (suggestions.length >= 5) break;
+                            if (loc.place_name && !seenNames.has(loc.place_name) && loc.place_name !== placeName) {
+                                suggestions.push({ ...loc, name: loc.place_name, address: loc.place_address, lat: loc.place_lat, lng: loc.place_lng, type: 'frequent' });
+                                seenNames.add(loc.place_name);
+                            }
+                        }
+                    }
+                }
+
+                setSuggestedLocations(suggestions);
+            } catch (error) {
+                console.error('Error fetching location suggestions:', error);
+            }
+        };
+
+        const timer = setTimeout(fetchSuggestions, 400);
         return () => clearTimeout(timer);
-    }, [description, userId, placeName]);
+    }, [description, selectedCategory, userId, placeName]);
 
     const resetForm = () => {
         setAmount('');
@@ -118,7 +161,7 @@ export function useExpenseForm(userId: string | null | undefined, defaultCurrenc
         placeAddress, setPlaceAddress,
         placeLat, setPlaceLat,
         placeLng, setPlaceLng,
-        suggestedLocation, setSuggestedLocation,
+        suggestedLocations, setSuggestedLocations,
         resetForm
     };
 }

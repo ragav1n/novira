@@ -13,6 +13,7 @@ import { useRouter } from 'next/navigation';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
+import { toast, ImpactStyle } from '@/utils/haptics';
 import { format, parseISO, isSameWeek, isSameMonth, isAfter, isBefore, startOfDay, endOfDay } from 'date-fns';
 import { WaveLoader } from '@/components/ui/wave-loader';
 import { useUserPreferences } from '@/components/providers/user-preferences-provider';
@@ -66,6 +67,35 @@ type DateRange = {
 
 type SortOption = 'date-desc' | 'date-asc' | 'amount-desc' | 'amount-asc';
 
+// Custom hook for debouncing
+function useDebounce<T>(value: T, delay: number): T {
+    const [debouncedValue, setDebouncedValue] = useState<T>(value);
+    useEffect(() => {
+        const handler = setTimeout(() => {
+            setDebouncedValue(value);
+        }, delay);
+        return () => clearTimeout(handler);
+    }, [value, delay]);
+    return debouncedValue;
+}
+
+const SearchSkeleton = () => (
+    <div className="space-y-3">
+        {[1, 2, 3, 4, 5, 6].map((i) => (
+            <div key={i} className="flex items-center justify-between p-3 rounded-2xl bg-secondary/10 border border-white/5 animate-pulse">
+                <div className="flex items-center gap-3 flex-1">
+                    <div className="w-10 h-10 rounded-full bg-secondary/20 shrink-0" />
+                    <div className="space-y-2 flex-1">
+                        <div className="h-4 w-3/4 bg-secondary/20 rounded" />
+                        <div className="h-3 w-1/2 bg-secondary/20 rounded" />
+                    </div>
+                </div>
+                <div className="w-16 h-5 bg-secondary/20 rounded shrink-0" />
+            </div>
+        ))}
+    </div>
+);
+
 export function SearchView() {
     const router = useRouter();
     const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -75,6 +105,9 @@ export function SearchView() {
     const { formatCurrency, convertAmount, currency, activeWorkspaceId } = useUserPreferences();
     const { buckets } = useBuckets();
     const { groups } = useGroups();
+    
+    // Debounce search query
+    const debouncedSearchQuery = useDebounce(searchQuery, 300);
     
     const activeWorkspace = useMemo(() => 
         activeWorkspaceId && activeWorkspaceId !== 'personal' 
@@ -148,7 +181,7 @@ export function SearchView() {
 
     useEffect(() => {
         applyFilters();
-    }, [searchQuery, priceRange, selectedCategories, selectedPayments, dateRange, selectedBucketId, sortBy, transactions]);
+    }, [debouncedSearchQuery, priceRange, selectedCategories, selectedPayments, dateRange, selectedBucketId, sortBy, transactions]);
 
     const getBucketIcon = (iconName?: string) => {
         const icons: Record<string, React.ElementType> = {
@@ -159,7 +192,8 @@ export function SearchView() {
         return <Icon className="w-full h-full" />;
     };
 
-    const fetchTransactions = async () => {
+    const fetchTransactions = async (silent = false) => {
+        if (!silent) setLoading(true);
         try {
             let query = supabase
                 .from('transactions')
@@ -186,7 +220,7 @@ export function SearchView() {
         } catch (error) {
             console.error('Error fetching transactions:', error);
         } finally {
-            setLoading(false);
+            if (!silent) setLoading(false);
         }
     };
 
@@ -272,7 +306,7 @@ export function SearchView() {
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.98 }}
             transition={{ type: 'spring', stiffness: 300, damping: 30, mass: 0.8 }}
-            className="relative min-h-screen w-full h-full"
+            className="relative min-h-[100dvh] w-full h-full"
         >
 
 
@@ -298,7 +332,10 @@ export function SearchView() {
                     <Input
                         placeholder="Search transactions"
                         value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
+                        onChange={(e) => {
+                            setSearchQuery(e.target.value);
+                            if (e.target.value.length === 0) toast.haptic(ImpactStyle.Light);
+                        }}
                         className={`pl-9 bg-secondary/10 border-white/10 h-10 rounded-xl ${themeConfig.ring}`}
                     />
                 </div>
@@ -564,12 +601,15 @@ export function SearchView() {
 
 
                 <div className={cn(
-                    "space-y-3 overflow-y-auto pr-1 -mr-1 h-full transition-all duration-300",
-                    loading ? "opacity-40 blur-[1px] pointer-events-none" : "opacity-100 blur-0"
+                    "space-y-3 overflow-y-auto pr-1 -mr-1 h-full transition-all duration-300 flex-1",
+                    loading ? "opacity-50 blur-[2px] pointer-events-none" : "opacity-100 blur-0"
                 )}>
-                    <AnimatePresence mode="popLayout">
-                        {filteredTransactions.length > 0 ? (
-                            filteredTransactions.map((tx) => (
+                    {loading ? (
+                        <SearchSkeleton />
+                    ) : (
+                        <AnimatePresence mode="popLayout">
+                            {filteredTransactions.length > 0 ? (
+                                filteredTransactions.map((tx) => (
                                 <motion.div
                                     key={tx.id}
                                     layout
@@ -645,17 +685,16 @@ export function SearchView() {
                                 </motion.div>
                             ))
                         ) : (
-                            !loading && (
-                                <motion.div
-                                    initial={{ opacity: 0 }}
-                                    animate={{ opacity: 1 }}
-                                    className="text-center py-8 text-muted-foreground text-sm"
-                                >
-                                    No transactions found.
-                                </motion.div>
-                            )
+                            <motion.div
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                className="text-center py-8 text-muted-foreground text-sm"
+                            >
+                                No transactions found.
+                            </motion.div>
                         )}
                     </AnimatePresence>
+                    )}
                 </div>
             </div>
 

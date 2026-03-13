@@ -243,41 +243,33 @@ export function DashboardView() {
 
     const activeBuckets = useMemo(() => activeWorkspaceId ? [] : buckets.filter(b => !b.is_archived), [buckets, activeWorkspaceId]);
 
-    if (!mounted) return <DashboardSkeleton />;
-
     return (
-        <motion.div 
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 8 }}
-            transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-            className="relative min-h-screen"
-        >
-            <AnimatePresence>
-                {loading ? (
-                    <motion.div 
-                        key="skeleton"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        transition={{ duration: 0.4, ease: "easeInOut" }}
-                        className="w-full px-4 pt-4"
-                    >
-                        <DashboardSkeleton />
-                    </motion.div>
-                ) : (
-                    <motion.div 
-                        key="content"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-                        className={cn(
-                            "p-5 space-y-6 max-w-md mx-auto relative",
-                            isAnyModalOpen ? "pointer-events-none overflow-hidden" : "overflow-x-hidden"
-                        )}
-                        inert={isAnyModalOpen}
-                    >
+        <div className="relative min-h-[100dvh]">
+            <div className={cn(
+                "p-5 space-y-6 max-w-md mx-auto relative",
+                mounted && !loading && isAnyModalOpen ? "pointer-events-none overflow-hidden" : "overflow-x-hidden"
+            )}>
+                <AnimatePresence mode="wait">
+                    {!mounted || loading ? (
+                        <motion.div 
+                            key="skeleton"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            transition={{ duration: 0.3 }}
+                        >
+                            <DashboardSkeleton />
+                        </motion.div>
+                    ) : (
+                        <motion.div 
+                            key="content"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+                            className="relative"
+                            inert={isAnyModalOpen ? true : undefined}
+                        >
                 <WorkspaceHeader 
                     userName={userName}
                     avatarUrl={avatarUrl}
@@ -407,9 +399,10 @@ export function DashboardView() {
                     isBucketFocused={isBucketFocused}
                     loadTransactions={loadTransactions}
                 />
-                    </motion.div>
-                )}
-            </AnimatePresence>
-        </motion.div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+            </div>
+        </div>
     );
 }
