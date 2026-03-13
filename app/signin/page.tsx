@@ -8,17 +8,8 @@ function SignInContent() {
     const router = useRouter()
     const searchParams = useSearchParams()
 
-    useEffect(() => {
-        const code = searchParams.get('code')
-        const next = searchParams.get('next')
-        if (code) {
-            // Redirect to the auth callback route to exchange the code for a session
-            const callbackUrl = new URL('/auth/callback', window.location.origin)
-            callbackUrl.searchParams.set('code', code)
-            if (next) callbackUrl.searchParams.set('next', next)
-            router.push(callbackUrl.pathname + callbackUrl.search)
-        }
-    }, [searchParams, router])
+    // Supabase auth handles redirection to /auth/callback on the server side
+    // No need for client-side redirection here which can cause loops or hydration issues
 
     return <SignInCard isSignUp={false} />
 }
