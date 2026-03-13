@@ -13,6 +13,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { useIsNative } from '@/hooks/use-native';
 import { useGroups } from '@/components/providers/groups-provider';
 import { PWAUpdater } from '@/components/pwa-updater';
+import { toast, ImpactStyle } from '@/utils/haptics';
 
 export function MobileLayout({ children }: { children: React.ReactNode }) {
     const router = useRouter();
@@ -149,9 +150,7 @@ export function MobileLayout({ children }: { children: React.ReactNode }) {
         if (index !== null) {
             // Trigger haptic feedback on tap
             if (isNative) {
-                import('@capacitor/haptics').then(({ Haptics, ImpactStyle }) => {
-                    Haptics.impact({ style: ImpactStyle.Light }).catch(() => { });
-                }).catch(() => {});
+                toast.haptic(ImpactStyle.Light);
             }
 
             const route = routes[index];
@@ -164,13 +163,9 @@ export function MobileLayout({ children }: { children: React.ReactNode }) {
 
     const showNav = !isAuthPage && !isPublicPage && isAuthenticated;
 
-    if (isLoading && !isPublicPage && !isAuthPage) {
-        return null;
-    }
-
     return (
         <div className={cn(
-            "min-h-screen w-full bg-background text-foreground relative overflow-hidden font-sans select-none flex flex-col",
+            "min-h-[100dvh] w-full bg-background text-foreground relative overflow-hidden font-sans select-none flex flex-col",
             isNative && "pt-[env(safe-area-inset-top)]",
             isCoupleWorkspace && "theme-couple",
             isHomeWorkspace && "theme-home"
@@ -198,7 +193,7 @@ export function MobileLayout({ children }: { children: React.ReactNode }) {
 
             {/* Main Content Area */}
             <main className={cn(
-                "flex-1 w-full overflow-y-auto no-scrollbar relative flex flex-col",
+                "flex-1 w-full overflow-y-auto no-scrollbar relative flex flex-col transition-[padding] duration-300",
                 showNav ? "pb-24" : "pb-0"
             )}>
                 <UIBoundary>

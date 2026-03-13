@@ -4,6 +4,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { MapPin, X, Search, Navigation, Loader2, LocateFixed } from 'lucide-react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
+import { getDistance } from '@/lib/location';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { toast } from '@/utils/haptics';
@@ -32,7 +33,11 @@ interface PlacePrediction {
     };
     _lat: string;
     _lon: string;
+    _is_nearby?: boolean;
+    _distance?: number;
 }
+
+import { motion, AnimatePresence } from 'framer-motion';
 
 export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, onChange }: LocationPickerProps) {
     const [isExpanded, setIsExpanded] = useState(false);
@@ -47,6 +52,7 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
     const mapRef = useRef<mapboxgl.Map | null>(null);
     const geolocateControlRef = useRef<mapboxgl.GeolocateControl | null>(null);
     const mapContainerRef = useRef<HTMLDivElement>(null);
+    const isSelectingCurrentRef = useRef(false);
 
     const hasLocation = !!placeName;
     const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
@@ -66,18 +72,6 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
         } catch {}
     }, []);
 
-    // Helper: calculate distance in km
-    const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-        const R = 6371; // Radius of the earth in km
-        const dLat = (lat2 - lat1) * Math.PI / 180;
-        const dLon = (lon2 - lon1) * Math.PI / 180;
-        const a = 
-            Math.sin(dLat/2) * Math.sin(dLat/2) +
-            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-            Math.sin(dLon/2) * Math.sin(dLon/2);
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-        return R * c; 
-    };
 
     // Cleanup debounce on unmount
     useEffect(() => {
@@ -100,13 +94,18 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
 
         debounceRef.current = setTimeout(async () => {
             try {
+                const params: any = {
+                    q: searchQuery,
+                    limit: '5',
+                    lang: 'en',
+                };
+                if (lastPosition) {
+                    params.lat = lastPosition.lat;
+                    params.lon = lastPosition.lng;
+                }
+
                 const response = await fetch(
-                    `https://photon.komoot.io/api/?` +
-                    new URLSearchParams({
-                        q: searchQuery,
-                        limit: '5',
-                        lang: 'en',
-                    })
+                    `https://photon.komoot.io/api/?` + new URLSearchParams(params)
                 );
 
                 if (!response.ok) throw new Error('Search failed');
@@ -117,6 +116,9 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                     const coords = f.geometry?.coordinates || [];
                     const name = props.name || props.street || 'Unknown';
                     const parts = [props.city || props.town || props.village, props.state, props.country].filter(Boolean);
+                    const lat = coords[1];
+                    const lon = coords[0];
+                    const dist = lastPosition ? getDistance(lastPosition.lat, lastPosition.lng, lat, lon) : undefined;
 
                     return {
                         place_id: String(props.osm_id || Math.random()),
@@ -125,9 +127,16 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                             main_text: name,
                             secondary_text: parts.join(', '),
                         },
-                        _lat: String(coords[1]),
-                        _lon: String(coords[0]),
+                        _lat: String(lat),
+                        _lon: String(lon),
+                        _distance: dist,
                     };
+                }).sort((a: any, b: any) => {
+                    const aNearby = (a._distance || 999) < 15;
+                    const bNearby = (b._distance || 999) < 15;
+                    if (aNearby && !bNearby) return -1;
+                    if (!aNearby && bNearby) return 1;
+                    return (a._distance || 999) - (b._distance || 999);
                 }));
             } catch {
                 setPredictions([]);
@@ -135,7 +144,7 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                 setIsSearching(false);
             }
         }, 400);
-    }, []);
+    }, [lastPosition]);
 
     // Mapbox Search Box API (better POI search with fuzzy matching)
     const sessionTokenRef = useRef(crypto.randomUUID());
@@ -152,15 +161,19 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
         setIsSearching(true);
 
         debounceRef.current = setTimeout(async () => {
-            const url = `https://api.mapbox.com/search/searchbox/v1/suggest?` +
-                new URLSearchParams({
-                    q: searchQuery,
-                    access_token: mapboxToken!,
-                    session_token: sessionTokenRef.current,
-                    limit: '5',
-                    language: 'en',
-                    proximity: lastPosition ? `${lastPosition.lng},${lastPosition.lat}` : 'ip',
-                });
+            const queryParams: Record<string, string> = {
+                q: searchQuery,
+                access_token: mapboxToken!,
+                session_token: sessionTokenRef.current,
+                limit: '5',
+                language: 'en',
+                types: 'poi,place,address'
+            };
+            if (lastPosition) {
+                queryParams.proximity = `${lastPosition.lng},${lastPosition.lat}`;
+            }
+
+            const url = `https://api.mapbox.com/search/searchbox/v1/suggest?` + new URLSearchParams(queryParams);
 
             try {
                 const response = await fetch(url);
@@ -178,12 +191,19 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                     description: s.full_address || s.address || s.place_formatted || s.name,
                     structured_formatting: {
                         main_text: s.name || s.place_formatted || 'Unknown',
-                        secondary_text: s.full_address || s.place_formatted || s.address || '',
+                        secondary_text: (s.full_address || s.address || s.place_formatted || '').split(',').map((p: string) => p.trim()).filter((p: string) => p !== s.name).slice(0, 2).join(', '),
                     },
                     _lat: '', // will be fetched on select via /retrieve
                     _lon: '',
                     _mapbox_id: s.mapbox_id,
-                })));
+                    _is_nearby: s.distance !== undefined && s.distance < 15000, // Tag as nearby if within 15km
+                    _distance: s.distance ? s.distance / 1000 : undefined, // Mapbox returns meters
+                })).sort((a: any, b: any) => {
+                    // Prioritize nearby results, then distance
+                    if (a._is_nearby && !b._is_nearby) return -1;
+                    if (!a._is_nearby && b._is_nearby) return 1;
+                    return (a._distance || 999) - (b._distance || 999);
+                }));
                 setIsSearching(false);
             } catch (err) {
                 console.warn('[LocationPicker] Mapbox error → Photon fallback:', err);
@@ -280,48 +300,59 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
             });
 
             map.addControl(geolocate);
-            
-            geolocate.on('geolocate', async (e: any) => {
-                const { latitude, longitude } = e.coords;
-                setLastPosition({ lat: latitude, lng: longitude });
-                
-                try {
-                    const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${longitude},${latitude}.json?access_token=${mapboxToken}`;
-                    const res = await fetch(url);
-                    const data = await res.json();
-                    
-                    const name = data.features?.[0]?.place_name?.split(',')[0] || 'Current Location';
-                    const address = data.features?.[0]?.place_name || 'Nearby';
+            geolocateControlRef.current = geolocate;
 
-                    onChange({
-                        place_name: name,
-                        place_address: address,
-                        place_lat: latitude,
-                        place_lng: longitude,
-                    });
-                    setIsExpanded(false);
-                } catch (err) {
-                    console.warn('Reverse geocoding failed:', err);
-                    onChange({
-                        place_name: 'Current Location',
-                        place_address: `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`,
-                        place_lat: latitude,
-                        place_lng: longitude,
-                    });
-                    setIsExpanded(false);
-                } finally {
-                    setIsLocating(false);
+            geolocate.on('geolocate', async (e: any) => {
+                const { latitude, longitude, accuracy } = e.coords;
+                setLastPosition({ lat: latitude, lng: longitude });
+                console.log(`[LocationPicker] New fix: ${latitude}, ${longitude} (acc: ${accuracy}m)`);
+                
+                // ONLY select/close if user explicitly requested current location
+                if (isSelectingCurrentRef.current) {
+                    try {
+                        const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${longitude},${latitude}.json?access_token=${mapboxToken}`;
+                        const res = await fetch(url);
+                        const data = await res.json();
+                        
+                        const name = data.features?.[0]?.place_name?.split(',')[0] || 'Current Location';
+                        const address = data.features?.[0]?.place_name || 'Nearby';
+
+                        onChange({
+                            place_name: name,
+                            place_address: address,
+                            place_lat: latitude,
+                            place_lng: longitude,
+                        });
+                        setIsExpanded(false);
+                    } catch (err) {
+                        console.warn('Reverse geocoding failed:', err);
+                        onChange({
+                            place_name: 'Current Location',
+                            place_address: `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`,
+                            place_lat: latitude,
+                            place_lng: longitude,
+                        });
+                        setIsExpanded(false);
+                    } finally {
+                        setIsLocating(false);
+                        isSelectingCurrentRef.current = false;
+                    }
                 }
+            });
+
+            // Trigger geolocate ONLY after map is ready for biasing
+            map.on('load', () => {
+                isSelectingCurrentRef.current = false;
+                geolocate.trigger();
             });
 
             geolocate.on('error', (err: any) => {
                 console.error('Mapbox Geolocate error:', err);
-                toast.error('Location access denied or unavailable');
-                setIsLocating(false);
+                // Fallback to native if mapbox fails
+                handleNativeGeolocationFallback();
             });
 
             mapRef.current = map;
-            geolocateControlRef.current = geolocate;
         }
 
         return () => {
@@ -332,32 +363,32 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
         };
     }, [isExpanded, mapboxToken]);
 
-    const handleUseCurrentLocation = async () => {
-        setIsLocating(true);
-
-        if (geolocateControlRef.current) {
-            // Use Mapbox GeolocateControl if available
-            geolocateControlRef.current.trigger();
-            return;
-        }
-
-        // Fallback for non-Mapbox cases (though we handle it above)
+    const handleNativeGeolocationFallback = () => {
         if (!navigator.geolocation) {
-            toast.error('Geolocation not supported by your browser');
+            toast.error('Geolocation not supported');
             setIsLocating(false);
             return;
         }
-
-        toast.info('Requesting location access...', { duration: 2000 });
 
         navigator.geolocation.getCurrentPosition(async (position) => {
             const { latitude, longitude } = position.coords;
-            // ... (rest of old logic as fallback)
-        }, (err) => {
-            console.error('Geolocation error:', { code: err.code, message: err.message });
-            toast.error(err.code === 1 ? 'Location permission denied' : 'Location unavailable');
+            setLastPosition({ lat: latitude, lng: longitude });
             setIsLocating(false);
-        });
+        }, (err) => {
+            console.error('Native geolocation error:', err);
+            toast.error('Location unavailable');
+            setIsLocating(false);
+        }, { enableHighAccuracy: true, timeout: 5000 });
+    };
+
+    const handleUseCurrentLocation = async () => {
+        setIsLocating(true);
+        isSelectingCurrentRef.current = true;
+        if (geolocateControlRef.current) {
+            geolocateControlRef.current.trigger();
+        } else {
+            handleNativeGeolocationFallback();
+        }
     };
 
     const handleClear = () => {
@@ -388,6 +419,52 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
         }
         return `https://staticmap.openstreetmap.de/staticmap.php?center=${lat},${lng}&zoom=15&size=400x200&markers=${lat},${lng},red-pushpin`;
     };
+
+    // Proactive Nearby Fetch
+    useEffect(() => {
+        if (isExpanded && lastPosition && query.length === 0) {
+            const fetchNearby = async () => {
+                setIsSearching(true);
+                try {
+                    // Use Geocoding v5 for reliable reverse-POI discovery (more stable than searchbox for empty queries)
+                    const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${lastPosition.lng},${lastPosition.lat}.json?` +
+                        new URLSearchParams({
+                            access_token: mapboxToken!,
+                            types: 'poi',
+                            limit: '5',
+                        });
+                    const response = await fetch(url);
+                    if (response.ok) {
+                        const data = await response.json();
+                        setPredictions((data.features || []).map((f: any) => {
+                            const name = f.text || f.place_name?.split(',')[0] || 'Unknown';
+                            const address = f.place_name || '';
+                            const secondary = address.replace(name, '').trim().replace(/^,/, '').trim();
+                            const dist = getDistance(lastPosition.lat, lastPosition.lng, f.geometry.coordinates[1], f.geometry.coordinates[0]);
+                            
+                            return {
+                                place_id: f.id,
+                                description: address,
+                                structured_formatting: {
+                                    main_text: name,
+                                    secondary_text: secondary,
+                                },
+                                _lat: String(f.geometry.coordinates[1]),
+                                _lon: String(f.geometry.coordinates[0]),
+                                _is_nearby: true,
+                                _distance: dist,
+                            };
+                        }).sort((a: any, b: any) => (a._distance || 0) - (b._distance || 0)));
+                    }
+                } catch (err) {
+                    console.warn('Nearby fetch failed:', err);
+                } finally {
+                    setIsSearching(false);
+                }
+            };
+            fetchNearby();
+        }
+    }, [isExpanded, lastPosition, query.length, mapboxToken]);
 
     // ─── Collapsed: show location card or "Add Location" button ───
     if (!isExpanded) {
@@ -458,90 +535,114 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
         );
     }
 
-    // ─── Expanded: search input + results ───
     return (
-        <div className="space-y-2 animate-in fade-in slide-in-from-top-2 duration-300">
+        <div className={cn(
+            "space-y-2 animate-in fade-in slide-in-from-top-2 duration-300 relative",
+            predictions.length > 0 ? "z-[50]" : "z-0"
+        )}>
             <div className="flex items-center justify-between">
                 <label className="text-sm font-medium">Search Location</label>
                 <button
                     type="button"
-                    onClick={() => { setIsExpanded(false); setQuery(''); setPredictions([]); }}
-                    className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+                    onClick={() => {
+                        setIsExpanded(false);
+                        setQuery('');
+                        setPredictions([]);
+                    }}
+                    className="text-[11px] font-medium text-muted-foreground hover:text-foreground transition-colors"
                 >
                     Cancel
                 </button>
             </div>
 
             <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
                 <Input
-                    ref={inputRef}
-                    type="text"
+                    autoFocus
                     placeholder="Search for a place..."
                     value={query}
                     onChange={(e) => {
                         setQuery(e.target.value);
                         handleSearch(e.target.value);
                     }}
-                    className="pl-10 h-12 bg-secondary/10 border-white/10 rounded-xl"
+                    className="h-14 pl-12 pr-4 bg-primary/5 border-primary/20 focus-visible:ring-primary/30 rounded-2xl text-base"
                 />
-                {isSearching && (
-                    <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-primary animate-spin" />
-                )}
+                <div className="absolute left-4 top-1/2 -translate-y-1/2">
+                    {isSearching ? (
+                        <div className="w-4 h-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+                    ) : (
+                        <div className="p-1 rounded-lg bg-primary/10">
+                            <Search className="w-4 h-4 text-primary" />
+                        </div>
+                    )}
+                </div>
             </div>
 
-            {/* Current Location Quick Action */}
             <button
                 type="button"
                 onClick={handleUseCurrentLocation}
-                disabled={isLocating}
-                className="w-full flex items-center gap-3 p-3 rounded-xl bg-primary/5 border border-primary/20 hover:bg-primary/10 transition-all text-left group"
+                className="w-full h-14 mt-2 flex items-center gap-4 px-4 rounded-2xl border border-primary/20 bg-primary/5 hover:bg-primary/10 transition-all group"
             >
-                <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center shrink-0 border border-primary/30">
-                    {isLocating ? (
-                        <Loader2 className="w-3.5 h-3.5 text-primary animate-spin" />
-                    ) : (
-                        <Navigation className="w-3.5 h-3.5 text-primary" />
-                    )}
+                <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                    <LocateFixed className="w-5 h-5 text-primary" />
                 </div>
-                <div>
+                <div className="text-left">
                     <p className="text-sm font-bold text-primary">Use Current Location</p>
-                    <p className="text-[10px] text-primary/60">Detect where you are right now</p>
+                    <p className="text-[10px] text-primary/60 font-medium">Detect where you are right now</p>
                 </div>
             </button>
 
-            {/* Search Results - In-flow with scroll to prevent overflow */}
-            {predictions.length > 0 && (
-                <div className="mt-2 rounded-2xl border border-white/10 bg-card/50 overflow-hidden shadow-sm">
-                    <div className="max-h-[220px] overflow-y-auto no-scrollbar">
-                        {predictions.map((prediction) => (
-                            <button
-                                key={prediction.place_id}
-                                type="button"
-                                onClick={() => handleSelectPlace(prediction)}
-                                className="w-full flex items-start gap-3 p-3 hover:bg-white/5 transition-colors border-b border-white/5 last:border-b-0 text-left"
-                            >
-                                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 border border-primary/20 mt-0.5">
-                                    <MapPin className="w-3.5 h-3.5 text-primary" />
-                                </div>
-                                <div className="min-w-0 flex-1">
-                                    <p className="text-sm font-bold break-words line-clamp-2">
-                                        {prediction.structured_formatting.main_text}
-                                    </p>
-                                    <p className="text-[11px] text-muted-foreground break-words line-clamp-2 mt-0.5">
-                                        {prediction.structured_formatting.secondary_text}
-                                    </p>
-                                </div>
-                            </button>
-                        ))}
-                    </div>
-                    {mapboxToken && (
-                        <p className="text-[9px] text-muted-foreground/40 text-right pr-2 py-1 bg-white/5">
-                            Powered by Mapbox
-                        </p>
-                    )}
-                </div>
-            )}
+            {/* Search Results - Absolute Overlay to prevent CLS */}
+            <AnimatePresence>
+                {predictions.length > 0 && (
+                    <motion.div 
+                        initial={{ opacity: 0, y: -5 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -5 }}
+                        className="absolute left-0 right-0 top-full mt-2 z-[100] rounded-2xl border border-white/10 bg-[#0A0A0A] shadow-2xl overflow-hidden ring-1 ring-white/5"
+                    >
+                        <div className="max-h-[220px] overflow-y-auto no-scrollbar">
+                            {predictions.map((prediction) => (
+                                <button
+                                    key={prediction.place_id}
+                                    type="button"
+                                    onClick={() => handleSelectPlace(prediction)}
+                                    className="w-full flex items-start gap-3 p-3 hover:bg-white/5 transition-colors border-b border-white/5 last:border-b-0 text-left"
+                                >
+                                    <div className={cn(
+                                        "w-8 h-8 rounded-full flex items-center justify-center shrink-0 border mt-0.5",
+                                        (prediction as any)._is_nearby ? "bg-emerald-500/10 border-emerald-500/20" : "bg-primary/10 border-primary/20"
+                                    )}>
+                                        <MapPin className={cn("w-3.5 h-3.5", (prediction as any)._is_nearby ? "text-emerald-500" : "text-primary")} />
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                        <p className="text-sm font-bold break-words line-clamp-2">
+                                            {prediction.structured_formatting.main_text}
+                                        </p>
+                                        <p className="text-[11px] text-muted-foreground break-words line-clamp-2 mt-0.5 flex items-center justify-between gap-1">
+                                            <span className="flex items-center gap-1">
+                                                {(prediction as any)._is_nearby && <span className="text-[9px] font-bold text-emerald-500 uppercase tracking-wider bg-emerald-500/10 px-1 rounded-sm">Nearby</span>}
+                                                {prediction.structured_formatting.secondary_text}
+                                            </span>
+                                            {prediction._distance !== undefined && (
+                                                <span className="text-[10px] text-primary/60 font-medium shrink-0">
+                                                    {prediction._distance < 1 
+                                                        ? `${Math.round(prediction._distance * 1000)}m` 
+                                                        : `${prediction._distance.toFixed(1)}km`}
+                                                </span>
+                                            )}
+                                        </p>
+                                    </div>
+                                </button>
+                            ))}
+                        </div>
+                        {mapboxToken && (
+                            <p className="text-[9px] text-muted-foreground/40 text-right pr-2 py-1 bg-white/5">
+                                Powered by Mapbox
+                            </p>
+                        )}
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
             {/* Empty state */}
             {query.length >= 2 && !isSearching && predictions.length === 0 && (

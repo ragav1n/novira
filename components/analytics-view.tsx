@@ -60,8 +60,55 @@ const paymentChartConfig: any = {
 
 
 import { supabase } from '@/lib/supabase';
+import { toast, ImpactStyle } from '@/utils/haptics';
 
 type DateRange = '1M' | 'LM' | '3M' | '6M' | '1Y' | 'ALL';
+
+const AnalyticsSkeleton = () => (
+    <div className="space-y-6">
+        {/* Header Skeleton is handled by the main layout or simple spacing */}
+        <div className="flex gap-2 px-1">
+            <div className="flex-1 h-10 rounded-xl bg-secondary/10 animate-pulse" />
+            <div className="flex-1 h-10 rounded-xl bg-secondary/10 animate-pulse" />
+        </div>
+        
+        {/* Trend Card Skeleton */}
+        <Card className="bg-card/40 border-white/5 shadow-none">
+            <CardContent className="p-4 space-y-4">
+                <div className="flex justify-between">
+                    <div className="h-4 w-24 bg-secondary/20 rounded animate-pulse" />
+                    <div className="h-4 w-12 bg-secondary/20 rounded animate-pulse" />
+                </div>
+                <div className="h-[140px] w-full bg-secondary/10 rounded-xl animate-pulse" />
+                <div className="pt-2 border-t border-white/5 flex justify-between">
+                    <div className="h-4 w-16 bg-secondary/20 rounded animate-pulse" />
+                    <div className="h-5 w-24 bg-secondary/20 rounded animate-pulse" />
+                </div>
+            </CardContent>
+        </Card>
+
+        {/* Breakdown Card Skeleton */}
+        <div className="space-y-2">
+            <div className="h-3 w-32 bg-secondary/20 rounded animate-pulse ml-1" />
+            <Card className="bg-card/40 border-none shadow-none overflow-hidden">
+                <CardContent className="p-4 flex flex-col sm:flex-row items-center gap-6">
+                    <div className="w-36 h-36 rounded-full border-8 border-secondary/10 animate-pulse shrink-0" />
+                    <div className="w-full space-y-3">
+                        {[1, 2, 3].map(i => (
+                            <div key={i} className="space-y-2">
+                                <div className="flex justify-between">
+                                    <div className="h-3 w-20 bg-secondary/20 rounded animate-pulse" />
+                                    <div className="h-3 w-16 bg-secondary/20 rounded animate-pulse" />
+                                </div>
+                                <div className="h-1 w-full bg-secondary/10 rounded-full" />
+                            </div>
+                        ))}
+                    </div>
+                </CardContent>
+            </Card>
+        </div>
+    </div>
+);
 
 export function AnalyticsView() {
     const router = useRouter();
@@ -379,13 +426,13 @@ export function AnalyticsView() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 8 }}
             transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-            className="relative min-h-screen"
+            className="relative min-h-[100dvh]"
         >
 
 
             <div className={cn(
                 "p-5 space-y-6 max-w-md mx-auto relative transition-all duration-300",
-                loading ? "opacity-40 blur-[1px] pointer-events-none" : "opacity-100 blur-0"
+                loading ? "opacity-50 blur-[2px] pointer-events-none" : "opacity-100 blur-0"
             )}>
                 {/* Header */}
                 {/* Header */}
@@ -404,7 +451,10 @@ export function AnalyticsView() {
 
                 {/* Filters Row */}
                 <div className="flex flex-wrap items-center justify-center gap-2 px-1">
-                    <Select value={selectedBucketId} onValueChange={(val) => setSelectedBucketId(val)}>
+                    <Select value={selectedBucketId} onValueChange={(val) => {
+                        setSelectedBucketId(val);
+                        toast.haptic(ImpactStyle.Light);
+                    }}>
                         <SelectTrigger className={`flex-1 min-w-[140px] px-3 h-10 text-[12px] rounded-xl font-bold ${themeConfig.bgLight} ${themeConfig.borderMedium} ${themeConfig.text}`}>
                             <SelectValue placeholder="All Spending" />
                         </SelectTrigger>
@@ -422,7 +472,10 @@ export function AnalyticsView() {
                             ))}
                         </SelectContent>
                     </Select>
-                    <Select value={dateRange} onValueChange={(val: DateRange) => setDateRange(val)}>
+                    <Select value={dateRange} onValueChange={(val: DateRange) => {
+                        setDateRange(val);
+                        toast.haptic(ImpactStyle.Medium);
+                    }}>
                         <SelectTrigger className="flex-1 min-w-[140px] px-3 h-10 text-[12px] bg-secondary/20 border-white/5 rounded-xl font-bold">
                             <SelectValue placeholder="Period" />
                         </SelectTrigger>
@@ -437,6 +490,10 @@ export function AnalyticsView() {
                     </Select>
                 </div>
 
+                {loading ? (
+                    <AnalyticsSkeleton />
+                ) : (
+                    <>
                 {/* Bucket Progress Highlight */}
                 {selectedBucketId !== 'all' && buckets.find(b => b.id === selectedBucketId) && (
                     <Card className={`${themeConfig.bgLight} ${themeConfig.borderMedium} ${themeConfig.shadowGlow}`}>
@@ -596,6 +653,8 @@ export function AnalyticsView() {
                         </CardContent>
                     </Card>
                 </div>
+                </>
+                )}
             </div>
         </motion.div>
     );

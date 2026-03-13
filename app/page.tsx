@@ -7,7 +7,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 
 // App Shell Skeleton for Dashboard
 const DashboardSkeleton = () => (
-  <div className="flex flex-col min-h-screen p-5 space-y-6 max-w-md mx-auto">
+  <div className="flex flex-col min-h-[100dvh] p-5 space-y-6 max-w-md mx-auto">
     <div className="flex justify-between items-center pt-2 gap-2 opacity-50">
       <div className="flex items-center gap-2">
         <div className="w-10 h-10 rounded-full bg-secondary/20 animate-pulse" />
@@ -46,18 +46,18 @@ export default function Page() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.4 }}
-          className="flex min-h-[100dvh] w-full flex-col items-center justify-center bg-background"
+          transition={{ duration: 0.3 }}
+          className="flex min-h-[100dvh] w-full flex-col items-center justify-center bg-background fixed inset-0 z-[100]"
         >
           {/* Instant App Shell Loading Experience */}
-          <div className="w-20 h-20 relative mb-8 opacity-50">
+          <div className="w-20 h-20 relative mb-8">
               <Image 
                   src="/Novira.png" 
                   alt="Novira" 
                   width={80} 
                   height={80} 
                   priority
-                  className="object-contain drop-shadow-[0_0_8px_rgba(138,43,226,0.5)]" 
+                  className="object-contain drop-shadow-[0_0_15px_rgba(138,43,226,0.3)] transition-opacity duration-500" 
               />
           </div>
           <WaveLoader bars={5} message="" />
