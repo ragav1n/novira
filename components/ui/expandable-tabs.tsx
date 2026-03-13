@@ -46,7 +46,7 @@ const spanVariants = {
     exit: { width: 0, opacity: 0 },
 };
 
-const transition = { delay: 0.1, type: "spring", bounce: 0, duration: 0.6 };
+const transition = { type: "spring", bounce: 0, duration: 0.3 };
 
 export function ExpandableTabs({
     tabs,
@@ -111,6 +111,7 @@ export function ExpandableTabs({
                             tabRefs.current[index] = el as HTMLButtonElement | null;
                         }}
                         variants={buttonVariants}
+                        layout
                         initial="initial"
                         animate="animate"
                         custom={{ isSelected: selected === index, hasSelected: selected !== null }}
@@ -127,6 +128,7 @@ export function ExpandableTabs({
                         <AnimatePresence initial={false}>
                             {selected === index && (
                                 <motion.span
+                                    layout
                                     variants={spanVariants}
                                     initial="initial"
                                     animate="animate"

@@ -42,7 +42,7 @@ export const DashboardTransactionsDrawer = React.memo(function DashboardTransact
                     </div>
                 </DialogHeader>
                 
-                <div className="flex-1 overflow-hidden relative">
+                <div className="flex-1 overflow-y-auto relative no-scrollbar">
                     {loading ? (
                         <div className="absolute inset-0 flex items-center justify-center bg-background/50 backdrop-blur-sm z-10">
                             <WaveLoader bars={5} message="" />
