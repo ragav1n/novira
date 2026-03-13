@@ -52,7 +52,7 @@ export function BucketSelector({ buckets, selectedBucketId, setSelectedBucketId 
     return (
         <div className="space-y-2">
             <label className="text-sm font-medium">Personal Bucket (Private)</label>
-            <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1 scrollbar-hide">
+            <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1 custom-scrollbar">
                 <div
                     onClick={() => setSelectedBucketId(null)}
                     className={cn(

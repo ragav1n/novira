@@ -191,65 +191,76 @@ export function AddExpenseView() {
                                 exit={{ opacity: 0, scale: 0.98 }}
                                 className="overflow-hidden"
                             >
-                                <div className="flex gap-2.5 overflow-x-auto no-scrollbar pb-1.5 -mx-5 px-5">
-                                    {sortedSuggestions.map((loc, i) => (
-                                        <motion.button
-                                            key={`${loc.name}-${i}-${loc.type}`}
-                                        type="button"
-                                        initial={{ opacity: 0, scale: 0.9 }}
-                                        animate={{ opacity: 1, scale: 1 }}
-                                        transition={{ delay: i * 0.05 }}
-                                        onClick={() => {
-                                            formState.setPlaceName(loc.name);
-                                            formState.setPlaceAddress(loc.address);
-                                            formState.setPlaceLat(loc.lat);
-                                            formState.setPlaceLng(loc.lng);
-                                            formState.setSuggestedLocations(prev => prev.filter(l => l.name !== loc.name));
-                                        }}
-                                            className={cn(
-                                                "flex items-center gap-3 px-4 py-3 rounded-2xl border whitespace-nowrap transition-all relative overflow-hidden group/pin",
-                                                loc.type === 'last' ? "bg-primary/10 border-primary/20 text-primary shadow-[0_4px_12px_rgba(138,43,226,0.1)]" :
-                                                loc.type === 'category' ? "bg-cyan-500/10 border-cyan-500/20 text-cyan-500 shadow-[0_4px_12px_rgba(6,182,212,0.1)]" :
-                                                "bg-secondary/20 border-white/5 text-muted-foreground hover:bg-secondary/30"
-                                            )}
-                                        >
-                                            <div className={cn(
-                                                "w-8 h-8 rounded-full flex items-center justify-center shrink-0 border transition-transform group-hover/pin:scale-110 shadow-sm",
-                                                loc.type === 'last' ? "bg-primary/20 border-primary/40 text-primary shadow-primary/20" :
-                                                loc.type === 'category' ? "bg-cyan-500/20 border-cyan-500/40 text-cyan-400 shadow-cyan-500/20" :
-                                                "bg-amber-500/20 border-amber-500/40 text-amber-400 shadow-amber-500/20"
-                                            )}>
-                                                <MapPin className="w-4 h-4" />
-                                            </div>
-                                            <div className="text-left min-w-0 flex-1">
-                                                <div className="flex items-center gap-1.5 min-w-0">
-                                                    <p className={cn(
-                                                        "text-[11px] font-bold leading-tight tracking-tight truncate flex-1",
-                                                        loc.type === 'last' ? "text-primary-foreground" :
-                                                        loc.type === 'category' ? "text-cyan-50" :
-                                                        "text-amber-50"
-                                                    )}>{loc.name}</p>
-                                                    {currentPos && (
-                                                        <span className="text-[8px] font-bold opacity-70 bg-white/10 px-1 rounded-sm shrink-0 border border-white/5">
-                                                            {getDistance(currentPos.lat, currentPos.lng, loc.lat, loc.lng) < 1 
-                                                                ? `${Math.round(getDistance(currentPos.lat, currentPos.lng, loc.lat, loc.lng) * 1000)}m` 
-                                                                : `${getDistance(currentPos.lat, currentPos.lng, loc.lat, loc.lng).toFixed(1)}km`}
-                                                        </span>
-                                                    )}
-                                                </div>
-                                                <p className={cn(
-                                                    "text-[9px] font-bold mt-0.5 truncate max-w-[120px] uppercase tracking-tighter",
-                                                    loc.type === 'last' ? "text-primary/70" : 
-                                                    loc.type === 'category' ? "text-cyan-500/80" : 
-                                                    "text-amber-500/80"
+                                <div 
+                                    className="relative -mx-5 px-5"
+                                    style={{
+                                        maskImage: 'linear-gradient(to right, black calc(100% - 40px), transparent)',
+                                        WebkitMaskImage: 'linear-gradient(to right, black calc(100% - 40px), transparent)',
+                                    }}
+                                >
+                                    <div className="flex gap-3 overflow-x-auto pb-3 pt-1 px-2 snap-x snap-mandatory custom-scrollbar">
+                                        {sortedSuggestions.map((loc, i) => (
+                                            <motion.button
+                                                key={`${loc.name}-${i}-${loc.type}`}
+                                                type="button"
+                                                initial={{ opacity: 0, scale: 0.9 }}
+                                                animate={{ opacity: 1, scale: 1 }}
+                                                transition={{ delay: i * 0.05 }}
+                                                onClick={() => {
+                                                    formState.setPlaceName(loc.name);
+                                                    formState.setPlaceAddress(loc.address);
+                                                    formState.setPlaceLat(loc.lat);
+                                                    formState.setPlaceLng(loc.lng);
+                                                    formState.setSuggestedLocations(prev => prev.filter(l => l.name !== loc.name));
+                                                }}
+                                                className={cn(
+                                                    "flex items-center gap-3 px-4 py-3 rounded-2xl border whitespace-nowrap transition-all relative overflow-hidden group/pin shrink-0 snap-start",
+                                                    loc.type === 'last' ? "bg-primary/10 border-primary/20 text-primary shadow-[0_4px_12px_rgba(138,43,226,0.1)]" :
+                                                    loc.type === 'category' ? "bg-cyan-500/10 border-cyan-500/20 text-cyan-500 shadow-[0_4px_12px_rgba(6,182,212,0.1)]" :
+                                                    "bg-secondary/20 border-white/5 text-muted-foreground hover:bg-secondary/30"
+                                                )}
+                                                style={{ width: 'auto', minWidth: '160px', maxWidth: '240px' }}
+                                            >
+                                                <div className={cn(
+                                                    "w-8 h-8 rounded-full flex items-center justify-center shrink-0 border transition-transform group-hover/pin:scale-110 shadow-sm",
+                                                    loc.type === 'last' ? "bg-primary/20 border-primary/40 text-primary shadow-primary/20" :
+                                                    loc.type === 'category' ? "bg-cyan-500/20 border-cyan-500/40 text-cyan-400 shadow-cyan-500/20" :
+                                                    "bg-amber-500/20 border-amber-500/40 text-amber-400 shadow-amber-500/20"
                                                 )}>
-                                                    {loc.type === 'last' ? "Last used" : 
-                                                     loc.type === 'category' ? `Nearby ${formState.selectedCategory}` : 
-                                                     "Frequent Spot"}
-                                                </p>
-                                            </div>
-                                        </motion.button>
-                                    ))}
+                                                    <MapPin className="w-4 h-4" />
+                                                </div>
+                                                <div className="text-left min-w-0 flex-1">
+                                                    <div className="flex items-center gap-1.5 min-w-0">
+                                                        <p className={cn(
+                                                            "text-[11px] font-bold leading-tight tracking-tight truncate flex-1",
+                                                            loc.type === 'last' ? "text-primary-foreground" :
+                                                            loc.type === 'category' ? "text-cyan-50" :
+                                                            "text-amber-50"
+                                                        )}>{loc.name}</p>
+                                                        {currentPos && (
+                                                            <span className="text-[8px] font-bold opacity-70 bg-white/10 px-1 rounded-sm shrink-0 border border-white/5">
+                                                                {getDistance(currentPos.lat, currentPos.lng, loc.lat, loc.lng) < 1 
+                                                                    ? `${Math.round(getDistance(currentPos.lat, currentPos.lng, loc.lat, loc.lng) * 1000)}m` 
+                                                                    : `${getDistance(currentPos.lat, currentPos.lng, loc.lat, loc.lng).toFixed(1)}km`}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <p className={cn(
+                                                        "text-[9px] font-bold mt-0.5 truncate max-w-[120px] uppercase tracking-tighter",
+                                                        loc.type === 'last' ? "text-primary/70" : 
+                                                        loc.type === 'category' ? "text-cyan-500/80" : 
+                                                        "text-amber-500/80"
+                                                    )}>
+                                                        {loc.type === 'last' ? "Last used" : 
+                                                         loc.type === 'category' ? `Nearby ${formState.selectedCategory}` : 
+                                                         "Frequent Spot"}
+                                                    </p>
+                                                </div>
+                                            </motion.button>
+                                        ))}
+                                        {/* Spacer for partial peek to work correctly on the last item */}
+                                        <div className="w-10 shrink-0" />
+                                    </div>
                                 </div>
                             </motion.div>
                         )}

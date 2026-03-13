@@ -76,7 +76,7 @@ export function useExpenseForm(userId: string | null | undefined, defaultCurrenc
                     .eq('category', selectedCategory)
                     .not('place_name', 'is', null)
                     .order('created_at', { ascending: false })
-                    .limit(3);
+                    .limit(5);
 
                 if (catMatches) {
                     catMatches.forEach(loc => {
@@ -88,17 +88,17 @@ export function useExpenseForm(userId: string | null | undefined, defaultCurrenc
                 }
 
                 // 3. Frequent overall (If still space)
-                if (suggestions.length < 5) {
+                if (suggestions.length < 12) {
                     const { data: frequent } = await supabase
                         .from('transactions')
                         .select('place_name, place_address, place_lat, place_lng')
                         .eq('user_id', userId)
                         .not('place_name', 'is', null)
-                        .limit(10); // Get more to find variety
+                        .limit(30); // Get more to find variety
 
                     if (frequent) {
                         for (const loc of frequent) {
-                            if (suggestions.length >= 5) break;
+                            if (suggestions.length >= 12) break;
                             if (loc.place_name && !seenNames.has(loc.place_name) && loc.place_name !== placeName) {
                                 suggestions.push({ ...loc, name: loc.place_name, address: loc.place_address, lat: loc.place_lat, lng: loc.place_lng, type: 'frequent' });
                                 seenNames.add(loc.place_name);
