@@ -17,16 +17,25 @@ export async function GET(request: Request) {
         const supabase = await createClient()
         const { error } = await supabase.auth.exchangeCodeForSession(code)
         if (!error) {
+            // Priority 1: Use specific NEXT_PUBLIC_APP_URL from env
+            const envAppUrl = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '');
+            
+            // Priority 2: Use headers for dynamic environment detection (Vercel previews, etc)
             const forwardedHost = request.headers.get('x-forwarded-host')
             const forwardedProto = request.headers.get('x-forwarded-proto') || 'https'
             
-            // In development, we want to stay on http if we're on localhost
-            const protocol = forwardedHost?.includes('localhost') ? 'http' : forwardedProto
+            // Priority 3: Use the request origin
+            
+            let redirectBase = origin;
 
-            if (forwardedHost) {
-                return NextResponse.redirect(`${protocol}://${forwardedHost}${next}`)
+            if (envAppUrl) {
+                redirectBase = envAppUrl;
+            } else if (forwardedHost) {
+                const protocol = forwardedHost.includes('localhost') ? 'http' : forwardedProto
+                redirectBase = `${protocol}://${forwardedHost}`
             }
-            return NextResponse.redirect(`${origin}${next}`)
+
+            return NextResponse.redirect(`${redirectBase}${next}`)
         }
     }
 

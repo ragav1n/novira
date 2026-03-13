@@ -758,8 +758,8 @@ export function Component({ isSignUp = false }: { isSignUp?: boolean }) {
                     setIsLoading(true);
                     try {
                       // Ensure redirectTo is a fully qualified URL
-                      const origin = window.location.origin;
-                      const redirectTo = `${origin}/auth/callback`;
+                      const appUrl = (process.env.NEXT_PUBLIC_APP_URL || window.location.origin).replace(/\/$/, '');
+                      const redirectTo = `${appUrl}/auth/callback`;
                       
                       const { error } = await supabase.auth.signInWithOAuth({
                         provider: 'google',
@@ -767,6 +767,7 @@ export function Component({ isSignUp = false }: { isSignUp?: boolean }) {
                           redirectTo,
                           queryParams: {
                             access_type: 'offline',
+                            prompt: 'select_account', // Explicitly ask for account selection to avoid auto-login issues
                           },
                         },
                       });
