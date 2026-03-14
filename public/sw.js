@@ -1,4 +1,4 @@
-const CACHE_NAME = 'novira-cache-c81ed848'; // Updated version
+const CACHE_NAME = 'novira-cache-f1132f93'; // Updated version
 const STATIC_ASSETS = [
     '/Novira.png',
     '/manifest.json',
@@ -13,6 +13,10 @@ self.addEventListener('install', (event) => {
             return cache.addAll(STATIC_ASSETS);
         })
     );
+    // Take over immediately — don't wait for old SW to be released.
+    // Without this, a broken old SW stays active until all tabs are closed,
+    // which can lock users out if the old SW breaks a critical flow (e.g. auth callback).
+    self.skipWaiting();
 });
 
 // Listen for the "SKIP_WAITING" message to trigger the update
@@ -57,6 +61,20 @@ self.addEventListener('fetch', (event) => {
 
     // Skip Supabase realtime WebSocket connections
     if (url.protocol === 'wss:' || url.protocol === 'ws:') return;
+
+    // Never intercept auth routes — the OAuth callback sets session cookies via
+    // HTTP redirect headers. If the SW intercepts and follows the redirect internally
+    // via fetch(), those cookies are never applied to the browser's cookie jar,
+    // causing ERR_FAILED and breaking the entire sign-in flow.
+    if (
+        url.pathname.startsWith('/auth/') ||
+        url.pathname.startsWith('/signin') ||
+        url.pathname.startsWith('/signup') ||
+        url.pathname.startsWith('/forgot-password') ||
+        url.pathname.startsWith('/update-password')
+    ) {
+        return;
+    }
 
     // --- 1. Supabase Auth Layer (Must always be Network-First) ---
     if (url.hostname.includes('supabase.co') && url.pathname.includes('/auth/v1/')) {

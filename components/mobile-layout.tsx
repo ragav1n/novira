@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils';
 import { useUserPreferences } from '@/components/providers/user-preferences-provider';
 import { WaveLoader } from '@/components/ui/wave-loader';
 import { UIBoundary } from '@/components/boundaries/ui-boundary';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, motion, MotionConfig } from 'framer-motion';
 import { useIsNative } from '@/hooks/use-native';
 import { useGroups } from '@/components/providers/groups-provider';
 import { PWAUpdater } from '@/components/pwa-updater';
@@ -111,6 +111,18 @@ export function MobileLayout({ children }: { children: React.ReactNode }) {
         setIsNavigating(false);
     }, [pathname, setIsNavigating]);
 
+    // Prefetch all nav routes once authenticated so first navigation is instant
+    useEffect(() => {
+        if (!isAuthenticated) return;
+        const navRoutes = ['/add', '/analytics', '/groups', '/subscriptions', '/goals', '/search', '/settings'];
+        navRoutes.forEach(route => router.prefetch(route));
+
+        // Also prefetch the view components that are dynamically imported inside their routes.
+        // router.prefetch() covers the route chunk but not nested dynamic() imports.
+        import('@/components/analytics-view').catch(() => {});
+        import('@/components/search-view').catch(() => {});
+    }, [isAuthenticated, router]);
+
     // Global error handler for ChunkLoadErrors
     useEffect(() => {
         const handleGlobalError = (event: ErrorEvent | PromiseRejectionEvent) => {
@@ -164,6 +176,7 @@ export function MobileLayout({ children }: { children: React.ReactNode }) {
     const showNav = !isAuthPage && !isPublicPage && isAuthenticated;
 
     return (
+        <MotionConfig reducedMotion="user">
         <div className={cn(
             "min-h-[100dvh] w-full bg-background text-foreground relative overflow-hidden font-sans select-none flex flex-col",
             isNative && "pt-[env(safe-area-inset-top)]",
@@ -225,5 +238,6 @@ export function MobileLayout({ children }: { children: React.ReactNode }) {
 
             <Toaster />
         </div>
+        </MotionConfig>
     );
 }
