@@ -41,23 +41,20 @@ export default function Page() {
   return (
     <AnimatePresence mode="wait">
       {isLoading ? (
-        <motion.div 
+        <motion.div
           key="loading"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.3 }}
+          transition={{ duration: 0.2 }}
           className="flex min-h-[100dvh] w-full flex-col items-center justify-center bg-background fixed inset-0 z-[100]"
         >
-          {/* Instant App Shell Loading Experience */}
           <div className="w-20 h-20 relative mb-8">
-              <Image 
-                  src="/Novira.png" 
-                  alt="Novira" 
-                  width={80} 
-                  height={80} 
+              <Image
+                  src="/Novira.png"
+                  alt="Novira"
+                  width={80}
+                  height={80}
                   priority
-                  className="object-contain drop-shadow-[0_0_15px_rgba(138,43,226,0.3)] transition-opacity duration-500" 
+                  className="object-contain drop-shadow-[0_0_15px_rgba(138,43,226,0.3)]"
               />
           </div>
           <WaveLoader bars={5} message="" />

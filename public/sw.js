@@ -1,6 +1,5 @@
-const CACHE_NAME = 'novira-cache-014e6beb'; // Updated version
+const CACHE_NAME = 'novira-cache-c81ed848'; // Updated version
 const STATIC_ASSETS = [
-    '/',
     '/Novira.png',
     '/manifest.json',
     '/offline.html',
@@ -120,12 +119,17 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
-    // --- 4. Navigation requests (Stale-While-Revalidate as before) ---
+    // --- 4. Navigation requests (Network-first with offline fallback) ---
+    // Navigation requests use redirect:'manual' by default, so we must create a new
+    // request with redirect:'follow' — otherwise redirect responses (e.g. auth middleware
+    // redirecting / → /signin) cause a network error in the service worker.
     if (request.mode === 'navigate') {
         event.respondWith(
             caches.match(request).then((cachedResponse) => {
-                const fetchPromise = fetch(request).then((response) => {
-                    if (response.ok) {
+                const followRequest = new Request(request.url, { redirect: 'follow' });
+                const fetchPromise = fetch(followRequest).then((response) => {
+                    // Only cache final, non-redirected OK responses
+                    if (response.ok && !response.redirected) {
                         const responseClone = response.clone();
                         caches.open(CACHE_NAME).then((cache) => {
                             cache.put(request, responseClone);
@@ -133,14 +137,11 @@ self.addEventListener('fetch', (event) => {
                     }
                     return response;
                 }).catch(() => {
-                    // Network failed
+                    // Network failed — fall back to cache, then offline page
                     if (cachedResponse) {
                         return cachedResponse;
                     }
-                    // If no cache for this route, try returning the root app shell
-                    return caches.match('/').then((rootCache) => {
-                        return rootCache || caches.match('/offline.html');
-                    });
+                    return caches.match('/offline.html');
                 });
 
                 return cachedResponse || fetchPromise;

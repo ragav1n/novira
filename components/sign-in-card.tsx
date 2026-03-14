@@ -33,6 +33,7 @@ export function Component({ isSignUp = false }: { isSignUp?: boolean }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const message = searchParams.get('message');
+  const urlError = searchParams.get('error');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [email, setEmail] = useState("");
@@ -70,6 +71,11 @@ export function Component({ isSignUp = false }: { isSignUp?: boolean }) {
   // Submission Lock to prevent double-firing
   const isSubmittingRef = React.useRef(false);
 
+  // Prefetch dashboard chunk while user is on signin page so post-login LCP is fast
+  React.useEffect(() => {
+    import('@/components/dashboard-view').catch(() => {});
+  }, []);
+
   // Show success toast if message exists in URL
   const toastShownRef = React.useRef(false);
   React.useEffect(() => {
@@ -82,6 +88,14 @@ export function Component({ isSignUp = false }: { isSignUp?: boolean }) {
       router.replace('/signin');
     }
   }, [message, router]);
+
+  // Show error from OAuth callback failures (e.g. ?error=auth_code_error)
+  React.useEffect(() => {
+    if (urlError) {
+      setError('Sign in failed. Please try again.');
+      router.replace('/signin');
+    }
+  }, [urlError, router]);
 
   // Rate Limiter Import (Dynamic import not needed if standard, but good to know context)
   // We'll use the imported utility
