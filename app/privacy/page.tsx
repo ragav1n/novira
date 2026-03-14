@@ -1,23 +1,17 @@
-'use client';
-
-import React from 'react';
 import Link from 'next/link';
 import { ChevronLeft } from 'lucide-react';
-import { useRouter } from 'next/navigation';
 
 export default function PrivacyPolicy() {
-    const router = useRouter();
-
     return (
-        <div className="flex-1 w-full bg-transparent text-foreground p-6 sm:p-12 relative animate-in fade-in duration-700">
+        <div className="flex-1 w-full bg-transparent text-foreground p-6 sm:p-12 relative">
             <div className="max-w-3xl mx-auto relative z-10">
-                <button
-                    onClick={() => router.back()}
+                <Link
+                    href="/"
                     className="flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors mb-8 group"
                 >
                     <ChevronLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
                     <span>Back</span>
-                </button>
+                </Link>
 
                 <div>
                     <h1 className="text-3xl font-bold mb-6 bg-clip-text text-transparent bg-gradient-to-b from-foreground to-foreground/70">
