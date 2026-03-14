@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { HelpCircle, Plus, UserCircle, Heart, Home, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -35,7 +36,7 @@ export function WorkspaceHeader({
         <div className="flex justify-between items-center pt-2 gap-2 relative z-[70]">
             <div className="flex items-center gap-2 min-w-0">
                 <div className="w-10 h-10 relative shrink-0">
-                    <img src="/Novira.png" alt="Novira" className="w-full h-full object-contain drop-shadow-[0_0_8px_rgba(138,43,226,0.5)]" />
+                    <Image src="/Novira.png" alt="Novira" width={40} height={40} priority className="object-contain drop-shadow-[0_0_8px_rgba(138,43,226,0.5)]" />
                 </div>
                 <div className="min-w-0 flex flex-col justify-center">
                     {eligibleGroups.length > 0 ? (
