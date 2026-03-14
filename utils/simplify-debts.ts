@@ -126,15 +126,12 @@ export function simplifyDebts(
         const settleAmount = Math.min(creditor.amount, debtor.amount);
 
         if (settleAmount > 0.01) {
-            // Collect split IDs: find all splits where debtor owes creditor
+            // Only include splits that directly correspond to this debtor→creditor pair.
+            // In transitive cases (A pays C because A→B→C), there is no direct edge so
+            // splitIds will be empty — that is correct and intentional. Using all debtor
+            // splits as a fallback would incorrectly mark unrelated splits as settled.
             const directEdge = `${debtor.id}→${creditor.id}`;
             const relatedSplitIds = edgeSplits[directEdge] || [];
-
-            // Also check if there are transitive splits we should include
-            // For simplicity, include all splits involving this debtor
-            const allDebtorSplits = Object.entries(edgeSplits)
-                .filter(([key]) => key.startsWith(`${debtor.id}→`))
-                .flatMap(([, ids]) => ids);
 
             payments.push({
                 from: debtor.id,
@@ -142,7 +139,7 @@ export function simplifyDebts(
                 to: creditor.id,
                 toName: nameMap[creditor.id] || 'Unknown',
                 amount: Math.round(settleAmount * 100) / 100,
-                splitIds: relatedSplitIds.length > 0 ? relatedSplitIds : allDebtorSplits,
+                splitIds: relatedSplitIds,
             });
         }
 
