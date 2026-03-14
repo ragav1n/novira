@@ -90,8 +90,8 @@ export function SpendingOverview({
                     onClick={() => setIsFocusMenuOpen(!isFocusMenuOpen)}
                     className={cn(
                         "flex items-center gap-2 px-5 py-2 rounded-full text-sm font-bold transition-all shadow-lg active:scale-95",
-                        isBucketFocused 
-                            ? "bg-cyan-500 text-white shadow-cyan-500/30" 
+                        isBucketFocused
+                            ? "bg-primary text-primary-foreground shadow-primary/30"
                             : "bg-white/10 backdrop-blur-md text-foreground shadow-black/5 border border-white/5"
                     )}
                 >
@@ -172,18 +172,18 @@ export function SpendingOverview({
                                             }}
                                             className={cn(
                                                 "relative flex w-full items-center rounded-xl py-3 px-3 transition-colors duration-200",
-                                                dashboardFocus === bucket.id ? "text-cyan-400" : "text-muted-foreground hover:text-foreground"
+                                                dashboardFocus === bucket.id ? "text-primary" : "text-muted-foreground hover:text-foreground"
                                             )}
                                         >
                                             {(dashboardFocus === bucket.id || hoveredFocusId === bucket.id) && (
-                                                <motion.div layoutId="focus-highlight" className={cn("absolute inset-0 rounded-xl -z-0", bucket.id === dashboardFocus ? "bg-cyan-500/20" : "bg-white/5")} />
+                                                <motion.div layoutId="focus-highlight" className={cn("absolute inset-0 rounded-xl -z-0", bucket.id === dashboardFocus ? "bg-primary/20" : "bg-white/5")} />
                                             )}
                                             <div className="relative z-10 flex items-center w-full">
-                                                <div className="w-7 h-7 rounded-full bg-cyan-500/20 flex items-center justify-center mr-3 text-cyan-500">
+                                                <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center mr-3 text-primary">
                                                     <div className="w-4 h-4">{getBucketIcon(bucket.icon)}</div>
                                                 </div>
                                                 <span className="font-bold flex-1 text-left">{bucket.name}</span>
-                                                {dashboardFocus === bucket.id && <Check className="w-4 h-4 text-cyan-500 ml-2" />}
+                                                {dashboardFocus === bucket.id && <Check className="w-4 h-4 text-primary ml-2" />}
                                             </div>
                                         </motion.button>
                                     ))}
@@ -203,7 +203,7 @@ export function SpendingOverview({
                         ? "bg-gradient-to-br from-rose-500 to-rose-700 shadow-rose-500/20"
                         : isHomeWorkspace
                             ? "bg-gradient-to-br from-yellow-500 to-amber-600 shadow-yellow-500/20"
-                            : "bg-gradient-to-br from-[#8A2BE2] to-[#4B0082] shadow-primary/20"
+                            : "bg-gradient-to-br from-primary to-primary/60 shadow-primary/20"
             )}>
                 <div className="absolute top-0 right-0 p-6 opacity-10">
                     <span className="text-9xl font-bold text-white leading-none translate-x-4 -translate-y-4">
@@ -217,7 +217,9 @@ export function SpendingOverview({
                                 {isBucketFocused ? "Total Mission Spent" : `Spent in ${format(new Date(), 'MMMM')}`}
                             </p>
                             <h2 className="text-4xl font-bold text-white mt-1 truncate">
-                                {isRatesLoading ? "..." : formatCurrency(totalSpent, bucketCurrency)}
+                                {isRatesLoading
+                                    ? <span className="inline-block h-9 w-36 bg-white/20 rounded-lg animate-pulse align-middle" />
+                                    : formatCurrency(totalSpent, bucketCurrency)}
                             </h2>
                         </div>
                         <div className="w-10 h-10 shrink-0 rounded-full bg-white/20 flex items-center justify-center backdrop-blur-sm shadow-sm">
@@ -242,8 +244,11 @@ export function SpendingOverview({
                                     </button>
                                 )}
                             </div>
-                            <span className={cn("shrink-0", remaining < 0 ? "text-red-200" : "")}>
-                                {remaining < 0 ? "Over by " : "Remaining: "}{isRatesLoading ? "..." : formatCurrency(Math.abs(remaining), bucketCurrency)}
+                            <span className={cn("shrink-0 flex items-center gap-1", remaining < 0 ? "text-red-200" : "")}>
+                                {remaining < 0 ? "Over by " : "Remaining: "}
+                                {isRatesLoading
+                                    ? <span className="inline-block h-3.5 w-16 bg-white/20 rounded animate-pulse align-middle" />
+                                    : formatCurrency(Math.abs(remaining), bucketCurrency)}
                             </span>
                         </div>
                         <Progress value={progress} className="h-2 bg-black/30" indicatorClassName={cn(remaining < 0 ? "bg-red-400" : "bg-white")} />
