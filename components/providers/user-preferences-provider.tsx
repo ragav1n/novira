@@ -97,6 +97,7 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
     const [user, setUser] = useState<User | null>(null);
     const [userId, setUserId] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const userIdRef = useRef<string | null>(null);
 
     // Preferences State
     const [currency, setCurrencyState] = useState<Currency>('INR');
@@ -205,6 +206,11 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
         }
     }, [loadPreferences, processRecurringExpenses]);
 
+    // Keep ref in sync so visibilitychange handler always has latest userId without re-subscribing
+    useEffect(() => {
+        userIdRef.current = userId;
+    }, [userId]);
+
     // Initialize Auth and Listen for Changes
     useEffect(() => {
         let mounted = true;
@@ -212,7 +218,7 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
         const initializeAuth = async () => {
             try {
                 // Use getSession() instead of getUser() to avoid a redundant network call.
-                // The server-side proxy.ts already validates the JWT via getUser().
+                // The server-side middleware already validates the JWT via getUser().
                 // getSession() reads from local cookies — no network round-trip.
                 const { data: { session } } = await supabase.auth.getSession();
                 if (mounted) {
@@ -220,9 +226,11 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
                 }
             } catch (error) {
                 console.error('Auth initialization error:', error);
-            } finally {
-                if (mounted) setIsLoading(false);
             }
+            // Do NOT set isLoading(false) here — onAuthStateChange fires immediately
+            // after mount and is the single source of truth for auth state.
+            // Setting isLoading(false) here causes a flash of the signin page on OAuth
+            // callbacks where getSession() returns null before cookies propagate.
         };
 
         initializeAuth();
@@ -236,9 +244,9 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
                 if (Date.now() - lastCheck < 5 * 60 * 1000) return;
                 localStorage.setItem('novira_last_visibility_check', String(Date.now()));
 
-                // Use userId from state instead of making a network call
-                if (userId) {
-                    processRecurringExpenses(userId);
+                // Use ref instead of closure so this handler doesn't force effect to re-run
+                if (userIdRef.current) {
+                    processRecurringExpenses(userIdRef.current);
                 }
             }
         };
@@ -257,7 +265,7 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
             subscription.unsubscribe();
             document.removeEventListener('visibilitychange', handleVisibilityChange);
         };
-    }, [handleSession, processRecurringExpenses, userId]);
+    }, [handleSession, processRecurringExpenses]);
 
     // Realtime subscriptions for profile and workspace budgets
     useEffect(() => {
