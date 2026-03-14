@@ -1,4 +1,4 @@
-const CACHE_NAME = 'novira-cache-f1132f93'; // Updated version
+const CACHE_NAME = 'novira-cache-a7e2b841'; // Updated version
 const STATIC_ASSETS = [
     '/Novira.png',
     '/manifest.json',
@@ -162,7 +162,10 @@ self.addEventListener('fetch', (event) => {
                     return caches.match('/offline.html');
                 });
 
-                return cachedResponse || fetchPromise;
+                // Only serve cached response if it's not a redirected response.
+                // Redirected responses cause ERR_FAILED when the SW serves them
+                // for navigate requests (redirect mode defaults to 'manual').
+                return (cachedResponse && !cachedResponse.redirected) ? cachedResponse : fetchPromise;
             })
         );
         return;
