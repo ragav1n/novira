@@ -1,6 +1,12 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   compress: true,
+  images: {
+    remotePatterns: [
+      { protocol: 'https', hostname: '*.supabase.co' },
+      { protocol: 'https', hostname: '*.googleusercontent.com' },
+    ],
+  },
   experimental: {
     optimizePackageImports: ['lucide-react', 'recharts', 'framer-motion', '@capacitor/core', '@capacitor/app'],
   },

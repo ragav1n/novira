@@ -88,7 +88,7 @@ export function SettingsView() {
 
     useEffect(() => {
         if (userId) {
-            Promise.all([getProfile(), loadRecurringTemplates()]);
+            Promise.allSettled([getProfile(), loadRecurringTemplates()]);
         } else {
             getProfile();
         }
