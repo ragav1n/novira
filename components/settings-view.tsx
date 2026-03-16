@@ -77,7 +77,7 @@ export function SettingsView() {
     const [hasPassword, setHasPassword] = useState(false);
     const [hasGoogleIdentity, setHasGoogleIdentity] = useState(false);
     const [recurringTemplates, setRecurringTemplates] = useState<any[]>([]);
-    const [loadingTemplates, setLoadingTemplates] = useState(false);
+    const [loadingTemplates, setLoadingTemplates] = useState(true);
     const [templateToDelete, setTemplateToDelete] = useState<any | null>(null);
 
     const { failedItems, pending } = useSyncQueueState();
@@ -132,7 +132,10 @@ export function SettingsView() {
     };
 
     const loadRecurringTemplates = async () => {
-        if (!userId) return;
+        if (!userId) {
+            setLoadingTemplates(false);
+            return;
+        }
         setLoadingTemplates(true);
         try {
             const { data, error } = await supabase
@@ -319,18 +322,18 @@ export function SettingsView() {
 
 
     return (
-        <motion.div 
-            initial={{ opacity: 0, scale: 0.98 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.98 }}
-            transition={{ type: 'spring', stiffness: 300, damping: 30, mass: 0.8 }}
+        <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
             className="relative min-h-screen"
         >
 
 
             <div className={cn(
-                "p-5 space-y-6 max-w-md mx-auto relative transition-all duration-300",
-                loading ? "opacity-40 blur-[1px] pointer-events-none" : "opacity-100 blur-0"
+                "p-5 space-y-6 max-w-md mx-auto relative transition-opacity duration-300",
+                loading ? "opacity-40 pointer-events-none" : "opacity-100"
             )}>
                 {/* Header */}
                 <div className="flex items-center justify-between mb-6 relative min-h-[40px]">
@@ -417,7 +420,7 @@ export function SettingsView() {
                         <RefreshCcw className="w-4 h-4" />
                         <span>Recurring Expenses</span>
                     </div>
-                    <div className="bg-secondary/5 rounded-xl border border-white/5 divide-y divide-white/5">
+                    <div className="bg-secondary/5 rounded-xl border border-white/5 divide-y divide-white/5 min-h-[48px]">
                         {loadingTemplates ? (
                             <div className="p-4 text-center text-xs text-muted-foreground">Loading...</div>
                         ) : recurringTemplates.length > 0 ? (
@@ -566,7 +569,7 @@ export function SettingsView() {
                         <span>Security & Privacy</span>
                     </div>
 
-                    <div className="bg-secondary/5 rounded-xl border border-white/5 divide-y divide-white/5">
+                    <div className="bg-secondary/5 rounded-xl border border-white/5 divide-y divide-white/5 min-h-[144px]">
                         {/* Primary Email (ReadOnly) */}
                         <div className="flex items-center justify-between p-3">
                             <div className="flex items-center gap-3">
