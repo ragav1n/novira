@@ -86,23 +86,23 @@ export function SpendingOverview({
         <div className="space-y-6">
             {/* Project Focus Selector */}
             <div className="flex justify-center mb-4 relative z-[60]" ref={focusSelectorRef}>
-                <button 
+                <button
                     onClick={() => setIsFocusMenuOpen(!isFocusMenuOpen)}
                     className={cn(
-                        "flex items-center gap-2 px-5 py-2 rounded-full text-sm font-bold transition-all shadow-lg active:scale-95",
+                        "flex items-center gap-2 px-5 py-2 rounded-full text-sm font-bold transition-all shadow-lg active:scale-95 border backdrop-blur-md",
                         isBucketFocused
-                            ? "bg-primary text-primary-foreground shadow-primary/30"
-                            : "bg-white/10 backdrop-blur-md text-foreground shadow-black/5 border border-white/5"
+                            ? "bg-cyan-500/20 border-cyan-500/30 text-cyan-300 shadow-cyan-500/10"
+                            : isCoupleWorkspace
+                                ? "bg-rose-500/20 border-rose-500/30 text-rose-300 shadow-rose-500/10"
+                                : isHomeWorkspace
+                                    ? "bg-amber-500/20 border-amber-500/30 text-amber-300 shadow-amber-500/10"
+                                    : "bg-primary/15 border-primary/30 text-primary shadow-primary/10"
                     )}
                 >
                     {isBucketFocused ? (
-                        <>
-                            {focusedBucket?.name || 'Loading'} Focus
-                        </>
+                        <>{focusedBucket?.name || 'Loading'} Focus</>
                     ) : (
-                        <>
-                            Monthly Allowance
-                        </>
+                        <>Monthly Allowance</>
                     )}
                     <motion.div
                         animate={{ rotate: isFocusMenuOpen ? 180 : 0 }}
