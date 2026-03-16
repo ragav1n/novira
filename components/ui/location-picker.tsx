@@ -47,6 +47,7 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
     const [recentLocations, setRecentLocations] = useState<LocationData[]>([]);
     const [lastPosition, setLastPosition] = useState<{ lat: number, lng: number } | null>(null);
     const [debounceRef] = useState<{ current: ReturnType<typeof setTimeout> | null }>({ current: null });
+    const abortControllerRef = useRef<AbortController | null>(null);
     const [isLocating, setIsLocating] = useState(false);
     const inputRef = useRef<HTMLInputElement>(null);
     const mapRef = useRef<mapboxgl.Map | null>(null);
@@ -73,10 +74,11 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
     }, []);
 
 
-    // Cleanup debounce on unmount
+    // Cleanup debounce and in-flight requests on unmount
     useEffect(() => {
         return () => {
             if (debounceRef.current) clearTimeout(debounceRef.current);
+            abortControllerRef.current?.abort();
         };
     }, []);
 
@@ -93,6 +95,8 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
         setIsSearching(true);
 
         debounceRef.current = setTimeout(async () => {
+            abortControllerRef.current?.abort();
+            abortControllerRef.current = new AbortController();
             try {
                 const params: any = {
                     q: searchQuery,
@@ -105,7 +109,8 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                 }
 
                 const response = await fetch(
-                    `https://photon.komoot.io/api/?` + new URLSearchParams(params)
+                    `https://photon.komoot.io/api/?` + new URLSearchParams(params),
+                    { signal: abortControllerRef.current.signal }
                 );
 
                 if (!response.ok) throw new Error('Search failed');
@@ -138,10 +143,10 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                     if (!aNearby && bNearby) return 1;
                     return (a._distance || 999) - (b._distance || 999);
                 }));
-            } catch {
-                setPredictions([]);
+            } catch (err: any) {
+                if (err?.name !== 'AbortError') setPredictions([]);
             } finally {
-                setIsSearching(false);
+                if (!abortControllerRef.current?.signal.aborted) setIsSearching(false);
             }
         }, 400);
     }, [lastPosition]);
@@ -161,6 +166,8 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
         setIsSearching(true);
 
         debounceRef.current = setTimeout(async () => {
+            abortControllerRef.current?.abort();
+            abortControllerRef.current = new AbortController();
             const queryParams: Record<string, string> = {
                 q: searchQuery,
                 access_token: mapboxToken!,
@@ -176,7 +183,7 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
             const url = `https://api.mapbox.com/search/searchbox/v1/suggest?` + new URLSearchParams(queryParams);
 
             try {
-                const response = await fetch(url);
+                const response = await fetch(url, { signal: abortControllerRef.current.signal });
 
                 if (!response.ok) {
                     console.warn('[LocationPicker] Mapbox returned', response.status, '→ falling back to Photon');
@@ -205,9 +212,11 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                     return (a._distance || 999) - (b._distance || 999);
                 }));
                 setIsSearching(false);
-            } catch (err) {
-                console.warn('[LocationPicker] Mapbox error → Photon fallback:', err);
-                searchWithPhoton(searchQuery);
+            } catch (err: any) {
+                if (err?.name !== 'AbortError') {
+                    console.warn('[LocationPicker] Mapbox error → Photon fallback:', err);
+                    searchWithPhoton(searchQuery);
+                }
             }
         }, 300);
     }, [mapboxToken, searchWithPhoton]);

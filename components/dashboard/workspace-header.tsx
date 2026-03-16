@@ -86,16 +86,17 @@ export function WorkspaceHeader({
                 </div>
             </div>
             <div className="flex items-center gap-1.5 shrink-0">
-                <div
+                <button
                     onClick={() => router.push('/settings')}
+                    aria-label="Open settings"
                     className="w-10 h-10 rounded-full bg-secondary/20 border border-white/5 overflow-hidden flex items-center justify-center text-xs font-bold text-muted-foreground uppercase shrink-0 cursor-pointer hover:border-primary/50 transition-colors"
                 >
                     {avatarUrl ? (
-                        <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                        <Image src={avatarUrl} alt="Avatar" width={40} height={40} className="w-full h-full object-cover" />
                     ) : (
                         userName.substring(0, 2)
                     )}
-                </div>
+                </button>
                 <button
                     onClick={() => setIsHowToUseOpen(true)}
                     className="w-10 h-10 rounded-full bg-secondary/20 hover:bg-secondary/40 flex items-center justify-center border border-white/5 transition-colors shrink-0"
