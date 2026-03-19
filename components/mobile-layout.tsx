@@ -236,7 +236,7 @@ export function MobileLayout({ children }: { children: React.ReactNode }) {
 
 
 
-            <Toaster />
+            <Toaster toastOptions={{ style: { zIndex: 99999 } }} />
         </div>
         </MotionConfig>
     );

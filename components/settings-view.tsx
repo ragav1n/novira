@@ -64,6 +64,7 @@ export function SettingsView() {
         setMonthlyBudget,
         userId,
         user,
+        activeWorkspaceId,
         setAvatarUrl: setAvatarUrlProvider,
         CURRENCY_DETAILS
     } = useUserPreferences();
@@ -260,7 +261,7 @@ export function SettingsView() {
 
             let query = supabase
                 .from('transactions')
-                .select('id, description, amount, category, date, payment_method, created_at, currency, bucket_id, group_id, notes, type, is_recurring')
+                .select('id, description, amount, category, date, payment_method, created_at, currency, bucket_id, group_id, notes, type, is_recurring, place_name, exclude_from_allowance, exchange_rate, base_currency, converted_amount')
                 .order('date', { ascending: false });
 
             if (dateRange?.from) {
@@ -292,9 +293,13 @@ export function SettingsView() {
                 generateCSV(transactions, currency, convertAmount, formatCurrency, buckets, groups);
                 toast.success('CSV Exported successfully');
             } else {
+                const workspaceName = activeWorkspaceId && activeWorkspaceId !== 'personal'
+                    ? groups.find((g: any) => g.id === activeWorkspaceId)?.name
+                    : 'Personal';
                 await generatePDF(transactions, currency, convertAmount, formatCurrency, buckets, groups, dateRange || undefined, {
                     email: user?.email,
-                    avatarUrl
+                    avatarUrl,
+                    workspaceName,
                 });
                 toast.success('PDF Exported successfully');
             }

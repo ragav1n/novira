@@ -101,7 +101,6 @@ type SpendingCategory = {
 import { useDashboardData } from '@/hooks/useDashboardData';
 import { useDashboardState } from '@/hooks/useDashboardState';
 import { useDashboardStats } from '@/hooks/useDashboardStats';
-import { VirtualizedTransactionList } from '@/components/virtualized-transaction-list';
 
 
 
@@ -127,11 +126,6 @@ export function DashboardView() {
         auditLogs, loadingAudit, handleDeleteTransaction, handleUpdateTransaction, loadAuditLogs, loadTransactions
     } = useDashboardData(userId, activeWorkspaceId);
 
-    useEffect(() => {
-        if (userId) {
-            loadTransactions(userId, activeWorkspaceId, true);
-        }
-    }, [userId, activeWorkspaceId, loadTransactions]);
 
     const {
         dashboardFocus, setDashboardFocus, isFocusRestored,

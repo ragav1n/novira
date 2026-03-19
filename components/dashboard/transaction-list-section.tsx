@@ -139,7 +139,6 @@ export function TransactionListSection({
                     setEditingTransaction={setEditingTransaction}
                     setIsEditOpen={setIsEditOpen}
                     handleDeleteTransaction={handleDeleteTransaction}
-                    toast={toast}
                 />
             </DashboardTransactionsDrawer>
         </div>

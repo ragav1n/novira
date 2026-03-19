@@ -17,131 +17,113 @@ interface ExportTransaction {
     group_id?: string;
     is_recurring?: boolean;
     exclude_from_allowance?: boolean;
+    place_name?: string | null;
+    notes?: string | null;
 }
 
 const CATEGORY_COLORS: Record<string, [number, number, number]> = {
-    food: [138, 43, 226],      // Electric Purple
-    groceries: [16, 185, 129],  // Emerald
-    transport: [255, 107, 107], // Coral
-    fashion: [244, 114, 182],   // Pink
-    bills: [78, 205, 196],      // Teal
-    shopping: [249, 199, 79],   // Yellow
-    healthcare: [255, 159, 28],  // Orange
-    entertainment: [255, 20, 147], // Deep Pink
-    rent: [99, 102, 241],       // Indigo
-    education: [132, 204, 22],  // Lime
-    income: [16, 185, 129],     // Emerald
-    others: [45, 212, 191],     // Turquoise
-    uncategorized: [99, 102, 241], // Indigo
+    food: [138, 43, 226],
+    groceries: [16, 185, 129],
+    transport: [255, 107, 107],
+    fashion: [244, 114, 182],
+    bills: [78, 205, 196],
+    shopping: [249, 199, 79],
+    healthcare: [255, 159, 28],
+    entertainment: [255, 20, 147],
+    rent: [99, 102, 241],
+    education: [132, 204, 22],
+    income: [16, 185, 129],
+    others: [45, 212, 191],
+    uncategorized: [99, 102, 241],
 };
 
-const getCategoryColor = (category: string): [number, number, number] => {
-    return CATEGORY_COLORS[category.toLowerCase()] || [150, 150, 150];
-};
+const getCategoryColor = (category: string): [number, number, number] =>
+    CATEGORY_COLORS[category.toLowerCase()] || [150, 150, 150];
 
 const METHOD_COLORS: Record<string, [number, number, number]> = {
-    cash: [74, 222, 128],      // Green
-    card: [96, 165, 250],      // Blue
-    online: [248, 113, 113],    // Red
-    other: [156, 163, 175],    // Gray
+    cash: [74, 222, 128],
+    card: [96, 165, 250],
+    online: [248, 113, 113],
+    other: [156, 163, 175],
     'credit card': [96, 165, 250],
     'debit card': [129, 140, 248],
-    'bank transfer': [6, 182, 212], // Cyan
-    upi: [138, 43, 226],       // Purple
+    'bank transfer': [6, 182, 212],
+    upi: [138, 43, 226],
 };
 
-const getMethodColor = (method: string): [number, number, number] => {
-    const m = (method || 'Other').toLowerCase();
-    return METHOD_COLORS[m] || METHOD_COLORS.other;
-};
+const getMethodColor = (method: string): [number, number, number] =>
+    METHOD_COLORS[(method || 'Other').toLowerCase()] || METHOD_COLORS.other;
 
-// Helper: Draw Pie Chart
 const drawPieChart = (doc: jsPDF, data: { label: string, value: number, color: [number, number, number] }[], x: number, y: number, radius: number) => {
     const total = data.reduce((sum, item) => sum + item.value, 0);
     if (total <= 0) {
-        doc.setFontSize(8);
-        doc.setTextColor(150, 150, 150);
+        doc.setFontSize(8); doc.setTextColor(150, 150, 150);
         doc.text('No data', x, y, { align: 'center' });
         return;
     }
-
     let startAngle = 0;
     data.forEach((item) => {
         if (item.value <= 0) return;
-
         const sliceAngle = (item.value / total) * 2 * Math.PI;
         doc.setFillColor(item.color[0], item.color[1], item.color[2]);
-
-        const segments = 30; // Quality
-        const step = sliceAngle / segments;
-
+        const segments = 30, step = sliceAngle / segments;
         for (let i = 0; i < segments; i++) {
-            const angle1 = startAngle + i * step;
-            const angle2 = startAngle + (i + 1) * step;
-
-            const x1 = x + radius * Math.cos(angle1);
-            const y1 = y + radius * Math.sin(angle1);
-            const x2 = x + radius * Math.cos(angle2);
-            const y2 = y + radius * Math.sin(angle2);
-
-            doc.triangle(x, y, x1, y1, x2, y2, 'F');
+            const a1 = startAngle + i * step, a2 = startAngle + (i + 1) * step;
+            doc.triangle(x, y, x + radius * Math.cos(a1), y + radius * Math.sin(a1), x + radius * Math.cos(a2), y + radius * Math.sin(a2), 'F');
         }
-
         startAngle += sliceAngle;
     });
-
-    // Legend
     let legendY = y - radius;
-    data.filter(item => item.value > 0).slice(0, 6).forEach((item, i) => {
+    data.filter(i => i.value > 0).slice(0, 6).forEach((item, i) => {
         doc.setFillColor(item.color[0], item.color[1], item.color[2]);
         doc.rect(x + radius + 5, legendY + (i * 6), 3, 3, 'F');
-        doc.setFontSize(7);
-        doc.setTextColor(50, 50, 50);
-        const percent = ((item.value / total) * 100).toFixed(0);
+        doc.setFontSize(7); doc.setTextColor(50, 50, 50);
+        const pct = ((item.value / total) * 100).toFixed(0);
         const label = item.label.length > 12 ? item.label.substring(0, 10) + '..' : item.label;
-        doc.text(`${label} (${percent}%)`, x + radius + 10, legendY + (i * 6) + 2.5);
+        doc.text(`${label} (${pct}%)`, x + radius + 10, legendY + (i * 6) + 2.5);
     });
 };
 
-// Helper: Draw Bar Chart
 const drawBarChart = (doc: jsPDF, data: { label: string, value: number }[], x: number, y: number, width: number, height: number, color: [number, number, number]) => {
     if (data.length === 0) return;
     const maxValue = Math.max(...data.map(d => d.value), 1);
-    
-    // Calculate reasonable bar width
-    const maxBarWidth = 15;
-    const calculatedBarWidth = (width / data.length) * 0.7;
-    const barWidth = Math.min(calculatedBarWidth, maxBarWidth);
-    
-    // Generate flexible spacing based on exactly how many items we have
-    const spacing = data.length > 1 ? (width - (barWidth * data.length)) / (data.length - 1) : 0;
-    
-    // Calculate the start offset to center the graph elements inside the requested container block
-    const totalContentWidth = (barWidth * data.length) + (spacing * (data.length - 1));
+    const barWidth = Math.min((width / data.length) * 0.7, 15);
+    const spacing = data.length > 1 ? (width - barWidth * data.length) / (data.length - 1) : 0;
+    const totalContentWidth = barWidth * data.length + spacing * (data.length - 1);
     const startX = x + (width - totalContentWidth) / 2;
-
     doc.setDrawColor(200, 200, 200);
-    doc.line(x, y + height, x + width, y + height); // X-axis
-
+    doc.line(x, y + height, x + width, y + height);
     data.forEach((item, i) => {
-        const barHeight = (item.value / maxValue) * height;
+        const bh = (item.value / maxValue) * height;
         doc.setFillColor(color[0], color[1], color[2]);
-        doc.rect(startX + (i * (barWidth + spacing)), y + height - barHeight, barWidth, barHeight, 'F');
-
-        doc.setFontSize(6);
-        doc.setTextColor(100, 100, 100);
-        doc.text(item.label, startX + (i * (barWidth + spacing)) + barWidth / 2, y + height + 5, { align: 'center' });
+        doc.rect(startX + i * (barWidth + spacing), y + height - bh, barWidth, bh, 'F');
+        doc.setFontSize(6); doc.setTextColor(100, 100, 100);
+        doc.text(item.label, startX + i * (barWidth + spacing) + barWidth / 2, y + height + 5, { align: 'center' });
     });
 };
 
-// Helper: Draw Progress Bar
 const drawProgressBar = (doc: jsPDF, percent: number, x: number, y: number, width: number, height: number, color: [number, number, number]) => {
     doc.setFillColor(240, 240, 240);
     doc.rect(x, y, width, height, 'F');
-
-    const fillWidth = Math.min(width, (percent / 100) * width);
     doc.setFillColor(color[0], color[1], color[2]);
-    doc.rect(x, y, fillWidth, height, 'F');
+    doc.rect(x, y, Math.min(width, (percent / 100) * width), height, 'F');
+};
+
+const drawInsightBox = (doc: jsPDF, x: number, y: number, w: number, h: number, label: string, value: string, color: [number, number, number]) => {
+    doc.setFillColor(color[0], color[1], color[2]);
+    doc.setGState(new (doc as any).GState({ opacity: 0.08 }));
+    doc.rect(x, y, w, h, 'F');
+    doc.setGState(new (doc as any).GState({ opacity: 1 }));
+    doc.setDrawColor(color[0], color[1], color[2]);
+    doc.setLineWidth(0.4);
+    doc.rect(x, y, w, h);
+    doc.setLineWidth(0.2);
+    doc.setFontSize(6.5); doc.setTextColor(100, 100, 100);
+    doc.text(label.toUpperCase(), x + 3, y + 5);
+    doc.setFontSize(9); doc.setFont('helvetica', 'bold');
+    doc.setTextColor(color[0], color[1], color[2]);
+    doc.text(value, x + 3, y + 11);
+    doc.setFont('helvetica', 'normal');
 };
 
 export const generateCSV = (
@@ -154,13 +136,11 @@ export const generateCSV = (
 ) => {
     const bucketMap = Object.fromEntries(buckets.map(b => [b.id, b]));
     const groupMap = Object.fromEntries(groups.map(g => [g.id, g]));
-
-    const headers = ['Date', 'Description', 'Category', 'Bucket', 'Group', 'Payment Method', 'Amount', 'Currency', 'Converted Amount', 'Recurring', 'Excluded from Allowance'];
+    const headers = ['Date', 'Description', 'Category', 'Bucket', 'Group', 'Payment Method', 'Amount', 'Currency', 'Converted Amount', 'Location', 'Notes', 'Recurring', 'Excluded from Allowance'];
     const rows = transactions.map(tx => {
         const converted = tx.converted_amount || convertAmount(Number(tx.amount), tx.currency || 'USD');
         const bucket = tx.bucket_id ? bucketMap[tx.bucket_id] : null;
         const group = tx.group_id ? groupMap[tx.group_id] : null;
-
         return [
             format(new Date(tx.date), 'yyyy-MM-dd'),
             `"${tx.description.replace(/"/g, '""')}"`,
@@ -171,11 +151,12 @@ export const generateCSV = (
             tx.amount,
             tx.currency || 'USD',
             converted.toFixed(2),
+            tx.place_name || '',
+            tx.notes ? `"${tx.notes.replace(/"/g, '""')}"` : '',
             tx.is_recurring ? 'Yes' : 'No',
             tx.exclude_from_allowance ? 'Yes' : 'No'
         ].join(',');
     });
-
     const csvContent = [headers.join(','), ...rows].join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -185,15 +166,14 @@ export const generateCSV = (
     link.click();
 };
 
-const loadImage = (url: string): Promise<HTMLImageElement> => {
-    return new Promise((resolve, reject) => {
+const loadImage = (url: string): Promise<HTMLImageElement> =>
+    new Promise((resolve, reject) => {
         const img = new Image();
         img.crossOrigin = 'Anonymous';
         img.onload = () => resolve(img);
-        img.onerror = (e) => reject(e);
+        img.onerror = reject;
         img.src = url;
     });
-};
 
 export const generatePDF = async (
     transactions: ExportTransaction[],
@@ -203,7 +183,7 @@ export const generatePDF = async (
     buckets: any[] = [],
     groups: any[] = [],
     reportRange?: DateRange,
-    ownerInfo?: { email?: string; avatarUrl?: string | null }
+    ownerInfo?: { email?: string; avatarUrl?: string | null; workspaceName?: string }
 ) => {
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.width;
@@ -211,311 +191,407 @@ export const generatePDF = async (
     const bucketMap = Object.fromEntries(buckets.map(b => [b.id, b]));
     const groupMap = Object.fromEntries(groups.map(g => [g.id, g]));
 
-    // Sort transactions by date
     const sortedTx = [...transactions].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-    // Calculations
-    let totalExpenses = 0;
-    let totalIncome = 0;
+    const formatForPDF = (amount: number, cur?: string) =>
+        formatCurrency(amount, cur)
+            .replace('₹', 'Rs. ').replace('₫', ' VND ').replace('₩', ' KRW ')
+            .replace('¥', ' JPY ').replace('฿', ' THB ').replace('₱', ' PHP ')
+            .replace('NT$', ' TWD ').replace('S$', ' SGD ').replace('HK$', ' HKD ')
+            .replace('Mex$', ' MXN ').replace('C$', ' CAD ').replace('A$', ' AUD ')
+            .replace('RM', ' MYR ').replace('R$', ' BRL ').replace('Rp', ' IDR ');
 
-    transactions.forEach(tx => {
-        const amount = tx.converted_amount || convertAmount(Number(tx.amount), tx.currency || 'USD');
-        if (amount < 0) {
-            totalIncome += Math.abs(amount);
-        } else {
-            totalExpenses += amount;
-        }
-    });
-    const netCashFlow = totalIncome - totalExpenses;
-
+    // ── Calculations ──────────────────────────────────────────────────────────
+    let totalExpenses = 0, totalIncome = 0, recurringTotal = 0;
     const categoryTotals: Record<string, number> = {};
     const methodTotals: Record<string, number> = {};
     const bucketTotals: Record<string, { spent: number, budget: number }> = {};
     const dailyTotals: Record<string, number> = {};
     const monthlyTotals: Record<string, number> = {};
+    const dowTotals: number[] = [0, 0, 0, 0, 0, 0, 0]; // Sun=0..Sat=6
+    const locationTotals: Record<string, { count: number, total: number }> = {};
 
     transactions.forEach(tx => {
         const rawAmount = tx.converted_amount || convertAmount(Number(tx.amount), tx.currency || 'USD');
         const isIncome = rawAmount < 0 || tx.category === 'income';
-        const amount = Math.abs(rawAmount); 
+        const amount = Math.abs(rawAmount);
         const bucket = tx.bucket_id ? bucketMap[tx.bucket_id] : null;
+
+        if (isIncome) { totalIncome += amount; return; }
+
+        totalExpenses += amount;
+        if (tx.is_recurring) recurringTotal += amount;
 
         categoryTotals[tx.category] = (categoryTotals[tx.category] || 0) + amount;
         methodTotals[tx.payment_method || 'Other'] = (methodTotals[tx.payment_method || 'Other'] || 0) + amount;
 
-        if (bucket && !isIncome) {
-            // Calculate budget for this bucket
+        const dateKey = format(new Date(tx.date), 'MMM d');
+        dailyTotals[dateKey] = (dailyTotals[dateKey] || 0) + amount;
+
+        const monthKey = format(new Date(tx.date), 'MMM yyyy');
+        monthlyTotals[monthKey] = (monthlyTotals[monthKey] || 0) + amount;
+
+        const dow = new Date(tx.date).getDay();
+        dowTotals[dow] += amount;
+
+        if (tx.place_name) {
+            if (!locationTotals[tx.place_name]) locationTotals[tx.place_name] = { count: 0, total: 0 };
+            locationTotals[tx.place_name].count++;
+            locationTotals[tx.place_name].total += amount;
+        }
+
+        if (bucket) {
             let effectiveBudget = bucket.budget;
-
-            // If bucket has dates, and report has a range, calculate allocation
             if (bucket.start_date && bucket.end_date && reportRange?.from && reportRange?.to) {
-                const bStart = new Date(bucket.start_date);
-                const bEnd = new Date(bucket.end_date);
-                const rStart = reportRange.from;
-                const rEnd = reportRange.to;
-
-                // Calculate overlap
-                const overlapStart = new Date(Math.max(bStart.getTime(), rStart.getTime()));
-                const overlapEnd = new Date(Math.min(bEnd.getTime(), rEnd.getTime()));
-
+                const bStart = new Date(bucket.start_date), bEnd = new Date(bucket.end_date);
+                const overlapStart = new Date(Math.max(bStart.getTime(), reportRange.from.getTime()));
+                const overlapEnd = new Date(Math.min(bEnd.getTime(), reportRange.to.getTime()));
                 if (overlapEnd > overlapStart) {
-                    // Proportional allocation for the overlapping period
                     const bucketDays = Math.max(1, differenceInDays(bEnd, bStart));
                     const overlapDays = Math.max(1, differenceInDays(overlapEnd, overlapStart) + 1);
                     effectiveBudget = (bucket.budget / bucketDays) * overlapDays;
-                } else if (rEnd < bStart) {
-                    // Pre-trip phase: use full budget as reference so pre-spending is tracked correctly
-                    effectiveBudget = bucket.budget;
-                } else {
-                    // Post-trip or other: default to total budget
-                    effectiveBudget = bucket.budget;
                 }
             }
-
-            if (!bucketTotals[bucket.name]) {
-                bucketTotals[bucket.name] = { spent: 0, budget: effectiveBudget };
-            }
+            if (!bucketTotals[bucket.name]) bucketTotals[bucket.name] = { spent: 0, budget: effectiveBudget };
             bucketTotals[bucket.name].spent += amount;
-        }
-
-        if (!isIncome) {
-            const dateKey = format(new Date(tx.date), 'MMM d');
-            dailyTotals[dateKey] = (dailyTotals[dateKey] || 0) + amount;
-
-            const monthKey = format(new Date(tx.date), 'MMM yyyy');
-            monthlyTotals[monthKey] = (monthlyTotals[monthKey] || 0) + amount;
         }
     });
 
+    const expenseTxCount = transactions.filter(tx => {
+        const a = tx.converted_amount || convertAmount(Number(tx.amount), tx.currency || 'USD');
+        return a >= 0 && tx.category !== 'income';
+    }).length;
+
+    const netCashFlow = totalIncome - totalExpenses;
+    const daysCovered = reportRange?.from && reportRange?.to
+        ? Math.max(1, differenceInDays(reportRange.to, reportRange.from) + 1)
+        : Object.keys(dailyTotals).length || 1;
+    const avgPerTransaction = expenseTxCount > 0 ? totalExpenses / expenseTxCount : 0;
+    const avgPerDay = totalExpenses / daysCovered;
+    const savingsRate = totalIncome > 0 ? ((totalIncome - totalExpenses) / totalIncome) * 100 : null;
+
     const topExpenses = [...transactions]
-        .filter(tx => (tx.converted_amount || convertAmount(Number(tx.amount), tx.currency || 'USD')) > 0)
+        .filter(tx => (tx.converted_amount || convertAmount(Number(tx.amount), tx.currency || 'USD')) > 0 && tx.category !== 'income')
         .map(tx => ({ ...tx, converted: tx.converted_amount || convertAmount(Number(tx.amount), tx.currency || 'USD') }))
         .sort((a, b) => b.converted - a.converted)
         .slice(0, 5);
 
-    const formatForPDF = (amount: number, cur?: string) => {
-        let text = formatCurrency(amount, cur);
-        // Standard jsPDF fonts have limited Unicode support. Replace symbols with text codes.
-        return text
-            .replace('₹', 'Rs. ')
-            .replace('₫', ' VND ')
-            .replace('₩', ' KRW ')
-            .replace('¥', ' JPY ')
-            .replace('฿', ' THB ')
-            .replace('₱', ' PHP ')
-            .replace('NT$', ' TWD ')
-            .replace('S$', ' SGD ')
-            .replace('HK$', ' HKD ')
-            .replace('Mex$', ' MXN ')
-            .replace('C$', ' CAD ')
-            .replace('A$', ' AUD ')
-            .replace('RM', ' MYR ')
-            .replace('R$', ' BRL ')
-            .replace('Rp', ' IDR ');
-    };
+    const topLocations = Object.entries(locationTotals)
+        .sort((a, b) => b[1].count - a[1].count)
+        .slice(0, 5);
 
-    // --- PAGE 1: RECAP & ANALYTICS ---
+    const topCategory = Object.entries(categoryTotals).sort((a, b) => b[1] - a[1])[0];
+    const busiestDay = Object.entries(dailyTotals).sort((a, b) => b[1] - a[1])[0];
+    const recurringPct = totalExpenses > 0 ? (recurringTotal / totalExpenses) * 100 : 0;
+
+    // ── PAGE 1 ────────────────────────────────────────────────────────────────
     doc.setFillColor(138, 43, 226);
-    doc.rect(0, 0, pageWidth, 40, 'F');
+    doc.rect(0, 0, pageWidth, 44, 'F');
 
     doc.setTextColor(255, 255, 255);
-    doc.setFontSize(24);
-    doc.text('Expense Audit Report', 14, 25);
+    doc.setFontSize(22); doc.setFont('helvetica', 'bold');
+    doc.text('Expense Audit Report', 14, 18);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
 
-    doc.setFontSize(10);
-    doc.text(`Generated on: ${format(new Date(), 'PPP')}`, 14, 32);
+    if (ownerInfo?.workspaceName) {
+        doc.setTextColor(220, 200, 255);
+        doc.setFontSize(10); doc.setFont('helvetica', 'bold');
+        doc.text(ownerInfo.workspaceName, 14, 26);
+        doc.setFont('helvetica', 'normal');
+    }
 
-    // Header with User Identity
+    doc.setTextColor(200, 185, 240); doc.setFontSize(8);
+    doc.text(`Generated: ${format(new Date(), 'PPP')}`, 14, 33);
+
+    if (reportRange?.from) {
+        const rangeText = reportRange.to
+            ? `Period: ${format(reportRange.from, 'MMM d, yyyy')} – ${format(reportRange.to, 'MMM d, yyyy')}`
+            : `From: ${format(reportRange.from, 'MMM d, yyyy')}`;
+        doc.setTextColor(220, 200, 255);
+        doc.text(rangeText, 14, 39);
+    }
+
+    // Currency disclaimer — top-right of header
+    doc.setTextColor(200, 185, 240); doc.setFontSize(7.5);
+    doc.text(`All amounts in ${currency}`, pageWidth - 14, 33, { align: 'right' });
+
     if (ownerInfo) {
         if (ownerInfo.avatarUrl) {
             try {
                 const img = await loadImage(ownerInfo.avatarUrl);
-                // Draw avatar without the border circle
-                doc.addImage(img, 'JPEG', pageWidth - 28, 10, 14, 14, undefined, 'FAST');
-            } catch (e) {
-                console.warn('Failed to load avatar for PDF', e);
-            }
+                doc.addImage(img, 'JPEG', pageWidth - 28, 8, 14, 14, undefined, 'FAST');
+            } catch {}
         }
-        doc.setFontSize(9);
-        doc.setTextColor(230, 230, 230);
-        doc.text(ownerInfo.email || '', pageWidth - 14, 32, { align: 'right' });
+        doc.setFontSize(8); doc.setTextColor(200, 185, 240);
+        doc.text(ownerInfo.email || '', pageWidth - 14, 39, { align: 'right' });
     }
 
-    // Summary Boxes
-    doc.setTextColor(50, 50, 50);
-    doc.setFontSize(12);
+    // ── Summary row 1: Spent / Income / Net ──────────────────────────────────
+    doc.setTextColor(50, 50, 50); doc.setFontSize(11); doc.setFont('helvetica', 'bold');
     doc.text('Financial Overview', 14, 55);
-
-    doc.setDrawColor(240, 240, 240);
-    doc.rect(14, 60, 55, 30); // Total
-    doc.rect(79, 60, 55, 30); // Avg Daily
-    doc.rect(144, 60, 55, 30); // Transactions
-
-    doc.setFontSize(8);
-    doc.setTextColor(100, 100, 100);
-    doc.text('TOTAL SPENT', 18, 68);
-    doc.text('TOTAL INCOME', 83, 68);
-    doc.text('NET CASH FLOW', 148, 68);
-
-    doc.setFontSize(12);
-    doc.setTextColor(138, 43, 226);
-    doc.setFont('helvetica', 'bold');
-    doc.text(formatForPDF(totalExpenses, currency), 18, 80);
-
-    doc.setTextColor(16, 185, 129); // Emerald for income
-    doc.text(formatForPDF(totalIncome, currency), 83, 80);
-
-    const [r, g, b] = netCashFlow >= 0 ? [16, 185, 129] : [255, 107, 107];
-    doc.setTextColor(r, g, b);
-    doc.text(formatForPDF(netCashFlow, currency), 148, 80);
     doc.setFont('helvetica', 'normal');
 
-    // Pie Charts Row
-    doc.setTextColor(50, 50, 50);
-    doc.setFontSize(11);
-    doc.text('Category Breakdown', 14, 105);
-    doc.text('Payment Methods', 110, 105);
+    const box = (bx: number, label: string, value: string, rgb: [number, number, number]) => {
+        doc.setDrawColor(230, 230, 230); doc.rect(bx, 59, 56, 22);
+        doc.setFontSize(7); doc.setTextColor(120, 120, 120);
+        doc.text(label, bx + 3, 66);
+        doc.setFontSize(11); doc.setFont('helvetica', 'bold');
+        doc.setTextColor(rgb[0], rgb[1], rgb[2]);
+        doc.text(value, bx + 3, 76);
+        doc.setFont('helvetica', 'normal');
+    };
+    box(14,  'TOTAL SPENT',    formatForPDF(totalExpenses, currency), [138, 43, 226]);
+    box(73,  'TOTAL INCOME',   formatForPDF(totalIncome, currency),   [16, 185, 129]);
+    box(132, 'NET CASH FLOW',  formatForPDF(netCashFlow, currency),   netCashFlow >= 0 ? [16, 185, 129] : [255, 107, 107]);
+
+    // ── Summary row 2: Count / Avg tx / Avg day ───────────────────────────────
+    const sbox = (bx: number, label: string, value: string) => {
+        doc.setDrawColor(240, 240, 240); doc.rect(bx, 84, 56, 18);
+        doc.setFontSize(7); doc.setTextColor(130, 130, 130);
+        doc.text(label, bx + 3, 90);
+        doc.setFontSize(10); doc.setFont('helvetica', 'bold');
+        doc.setTextColor(80, 80, 80);
+        doc.text(value, bx + 3, 98);
+        doc.setFont('helvetica', 'normal');
+    };
+    sbox(14,  'TRANSACTIONS',        `${expenseTxCount} expenses`);
+    sbox(73,  'AVG PER TRANSACTION', formatForPDF(avgPerTransaction, currency));
+    sbox(132, 'AVG DAILY SPEND',     formatForPDF(avgPerDay, currency));
+
+    // ── Pie Charts ────────────────────────────────────────────────────────────
+    doc.setTextColor(50, 50, 50); doc.setFontSize(10); doc.setFont('helvetica', 'bold');
+    doc.text('Category Breakdown', 14, 116);
+    doc.text('Payment Methods', 110, 116);
+    doc.setFont('helvetica', 'normal');
 
     const pieData = Object.entries(categoryTotals).map(([label, value]) => ({
-        label: label.charAt(0).toUpperCase() + label.slice(1),
-        value,
-        color: getCategoryColor(label)
+        label: label.charAt(0).toUpperCase() + label.slice(1), value, color: getCategoryColor(label)
     })).sort((a, b) => b.value - a.value);
-
-    drawPieChart(doc, pieData, 35, 130, 20);
+    drawPieChart(doc, pieData, 35, 140, 20);
 
     const methodData = Object.entries(methodTotals).map(([label, value]) => ({
-        label: label.charAt(0).toUpperCase() + label.slice(1),
-        value,
-        color: getMethodColor(label)
+        label: label.charAt(0).toUpperCase() + label.slice(1), value, color: getMethodColor(label)
     })).sort((a, b) => b.value - a.value);
+    drawPieChart(doc, methodData, 130, 140, 20);
 
-    drawPieChart(doc, methodData, 130, 130, 20);
+    // ── Spending Trend + Top Expenses ─────────────────────────────────────────
+    doc.setFontSize(10); doc.setFont('helvetica', 'bold');
+    doc.text('Spending Trend (Last 7 Days)', 14, 176);
+    doc.text('Top 5 Expenses', 110, 176);
+    doc.setFont('helvetica', 'normal');
 
-    // Bar Chart & Top Expenses Row
-    doc.setFontSize(11);
-    doc.text('Spending Trend', 14, 185);
     const barData = Object.entries(dailyTotals).map(([label, value]) => ({ label, value })).slice(-7);
-    drawBarChart(doc, barData, 14, 195, 80, 40, [138, 43, 226]);
+    drawBarChart(doc, barData, 14, 182, 85, 38, [138, 43, 226]);
 
-    doc.text('Top 5 Expenses', 110, 185);
     topExpenses.forEach((tx, i) => {
-        const y = 195 + (i * 9);
-        doc.setFontSize(8);
-        doc.setTextColor(80, 80, 80);
-
-        const description = tx.is_recurring
-            ? `${tx.description} (Rec)`
-            : tx.description;
-
-        doc.text(description.length > 25 ? description.substring(0, 23) + '..' : description, 110, y);
+        const y = 184 + i * 9;
+        const desc = (tx.is_recurring ? `${tx.description} (R)` : tx.description);
+        doc.setFontSize(8); doc.setTextColor(80, 80, 80);
+        doc.text(desc.length > 26 ? desc.substring(0, 24) + '..' : desc, 110, y);
         doc.setTextColor(138, 43, 226);
         doc.text(formatForPDF(tx.converted, currency), pageWidth - 14, y, { align: 'right' });
         doc.setDrawColor(245, 245, 245);
         doc.line(110, y + 2, pageWidth - 14, y + 2);
     });
 
-    // --- PAGE 2: BUCKETS & DETAILED LIST ---
+    // ── Top Locations (bottom of page 1, if data exists) ─────────────────────
+    if (topLocations.length > 0) {
+        doc.setFontSize(10); doc.setFont('helvetica', 'bold');
+        doc.text('Top Locations', 14, 232);
+        doc.setFont('helvetica', 'normal');
+        topLocations.forEach(([name, data], i) => {
+            const y = 239 + i * 8;
+            doc.setFontSize(8); doc.setTextColor(80, 80, 80);
+            const shortName = name.length > 28 ? name.substring(0, 26) + '..' : name;
+            doc.text(shortName, 14, y);
+            doc.setTextColor(100, 100, 100);
+            const avgVisit = data.count > 0 ? data.total / data.count : 0;
+            doc.text(`${data.count}x · avg ${formatForPDF(avgVisit, currency)}/visit`, 120, y);
+            doc.setTextColor(138, 43, 226);
+            doc.text(formatForPDF(data.total, currency), pageWidth - 14, y, { align: 'right' });
+            doc.setDrawColor(245, 245, 245);
+            doc.line(14, y + 2, pageWidth - 14, y + 2);
+        });
+    }
+
+    // ── PAGE 2 ────────────────────────────────────────────────────────────────
     doc.addPage();
 
-    doc.setTextColor(50, 50, 50);
-    doc.setFontSize(14);
-    doc.text('Bucket Performance', 14, 20);
+    // ── Spending Insights ─────────────────────────────────────────────────────
+    doc.setFontSize(13); doc.setFont('helvetica', 'bold'); doc.setTextColor(50, 50, 50);
+    doc.text('Spending Insights', 14, 18);
+    doc.setFont('helvetica', 'normal');
 
-    doc.setFontSize(8);
-    doc.setTextColor(100, 100, 100);
-    doc.text('Comparing your actual spending against the budgets set for each bucket.', 14, 26);
+    const insightW = 42, insightH = 16, insightGap = 3;
+    const insightStartX = 14;
 
-    let bucketY = 40;
+    drawInsightBox(doc, insightStartX,                         22, insightW, insightH, 'Top Category',
+        topCategory ? `${topCategory[0].charAt(0).toUpperCase() + topCategory[0].slice(1)} (${((topCategory[1] / totalExpenses) * 100).toFixed(0)}%)` : 'N/A',
+        [138, 43, 226]);
+
+    drawInsightBox(doc, insightStartX + insightW + insightGap, 22, insightW, insightH, 'Busiest Day',
+        busiestDay ? `${busiestDay[0]} — ${formatForPDF(busiestDay[1], currency)}` : 'N/A',
+        [255, 107, 107]);
+
+    drawInsightBox(doc, insightStartX + (insightW + insightGap) * 2, 22, insightW, insightH, 'Recurring Spend',
+        `${recurringPct.toFixed(0)}% of total`,
+        [78, 205, 196]);
+
+    drawInsightBox(doc, insightStartX + (insightW + insightGap) * 3, 22, insightW, insightH,
+        savingsRate !== null ? 'Savings Rate' : 'Period Covered',
+        savingsRate !== null ? `${savingsRate.toFixed(1)}%` : `${daysCovered} days`,
+        [16, 185, 129]);
+
+    // ── Day-of-Week Pattern ───────────────────────────────────────────────────
+    doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(50, 50, 50);
+    doc.text('Spending by Day of Week', 14, 50);
+    doc.setFont('helvetica', 'normal');
+    const dowLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const dowData = dowLabels.map((label, i) => ({ label, value: dowTotals[i] }));
+    drawBarChart(doc, dowData, 14, 56, 85, 30, [138, 43, 226]);
+
+    // ── Bucket Performance ────────────────────────────────────────────────────
+    doc.setFontSize(13); doc.setFont('helvetica', 'bold'); doc.setTextColor(50, 50, 50);
+    doc.text('Bucket Performance', 110, 50);
+    doc.setFont('helvetica', 'normal');
+
+    let bucketY = 57;
     const bucketEntries = Object.entries(bucketTotals);
     if (bucketEntries.length === 0) {
-        doc.setFontSize(10);
-        doc.setTextColor(150, 150, 150);
-        doc.text('No buckets associated with these transactions.', 14, bucketY);
+        doc.setFontSize(9); doc.setTextColor(150, 150, 150);
+        doc.text('No buckets in this report.', 110, bucketY);
         bucketY += 10;
     } else {
         bucketEntries.forEach(([name, data]) => {
-            if (bucketY > 260) { doc.addPage(); bucketY = 20; }
+            if (bucketY > 88) return; // keep within the right column space
             const hasBudget = data.budget > 0;
-            const percent = hasBudget ? (data.spent / data.budget) * 100 : 0;
-
-            doc.setFontSize(10);
-            doc.setTextColor(50, 50, 50);
-            doc.text(name, 14, bucketY);
-
-            doc.setFontSize(8);
-            doc.setTextColor(100, 100, 100);
-            const budgetText = hasBudget ? formatForPDF(data.budget, currency) : 'No Budget Set';
+            const pct = hasBudget ? (data.spent / data.budget) * 100 : 0;
+            doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(50, 50, 50);
+            doc.text(name.length > 20 ? name.substring(0, 18) + '..' : name, 110, bucketY);
+            doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(100, 100, 100);
+            const budgetText = hasBudget ? formatForPDF(data.budget, currency) : 'No Budget';
             doc.text(`${formatForPDF(data.spent, currency)} / ${budgetText}`, pageWidth - 14, bucketY, { align: 'right' });
-
-            const progressColor = !hasBudget ? [200, 200, 200] : (percent > 100 ? [255, 107, 107] : [74, 222, 128]);
-            drawProgressBar(doc, hasBudget ? percent : 100, 14, bucketY + 3, pageWidth - 28, 4, progressColor as [number, number, number]);
-
-            if (hasBudget && percent > 100) {
-                doc.setTextColor(255, 107, 107);
-                doc.setFontSize(7);
-                doc.text(`Over budget by ${formatForPDF(data.spent - data.budget, currency)}!`, 14, bucketY + 10);
+            const progressColor: [number, number, number] = !hasBudget ? [200, 200, 200] : (pct > 100 ? [255, 107, 107] : [74, 222, 128]);
+            drawProgressBar(doc, hasBudget ? pct : 100, 110, bucketY + 2, pageWidth - 124, 3.5, progressColor);
+            if (hasBudget && pct > 100) {
+                doc.setTextColor(255, 107, 107); doc.setFontSize(6.5);
+                doc.text(`Over by ${formatForPDF(data.spent - data.budget, currency)}`, 110, bucketY + 9);
             }
-
-            bucketY += hasBudget && percent > 100 ? 20 : 15;
+            bucketY += hasBudget && pct > 100 ? 16 : 12;
         });
     }
 
+    // ── Category Breakdown Table ──────────────────────────────────────────────
+    let tableStartY = 100;
+    const categoryRows = Object.entries(categoryTotals)
+        .sort((a, b) => b[1] - a[1])
+        .map(([cat, amt]) => {
+            const pct = totalExpenses > 0 ? ((amt / totalExpenses) * 100).toFixed(1) : '0.0';
+            return [cat.charAt(0).toUpperCase() + cat.slice(1), formatForPDF(amt, currency), `${pct}%`];
+        });
+    if (categoryRows.length > 0) {
+        doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(50, 50, 50);
+        doc.text('Category Breakdown', 14, tableStartY);
+        doc.setFont('helvetica', 'normal');
+        autoTable(doc as any, {
+            head: [['Category', 'Amount', '% of Total']],
+            body: categoryRows,
+            startY: tableStartY + 4,
+            theme: 'striped',
+            headStyles: { fillColor: [138, 43, 226], textColor: [255, 255, 255] },
+            styles: { fontSize: 8 },
+            columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' } },
+            tableWidth: 'auto',
+            margin: { left: 14, right: pageWidth / 2 + 5 },
+        });
+        tableStartY = (doc as any).lastAutoTable.finalY + 10;
+    }
+
+    // ── Monthly Recap ─────────────────────────────────────────────────────────
     if (Object.keys(monthlyTotals).length > 1) {
-        doc.setFontSize(14);
-        doc.setTextColor(50, 50, 50);
-        doc.text('Monthly Recap', 14, bucketY + 10);
-        
+        doc.setFontSize(13); doc.setFont('helvetica', 'bold'); doc.setTextColor(50, 50, 50);
+        doc.text('Monthly Recap', 14, tableStartY);
+        doc.setFont('helvetica', 'normal');
         const monthRows = Object.entries(monthlyTotals)
             .sort((a, b) => new Date(a[0]).getTime() - new Date(b[0]).getTime())
             .map(([month, amount]) => [month, formatForPDF(amount, currency)]);
-
         autoTable(doc as any, {
             head: [['Month', 'Total Spent']],
             body: monthRows,
-            startY: bucketY + 15,
+            startY: tableStartY + 4,
             theme: 'striped',
             headStyles: { fillColor: [138, 43, 226], textColor: [255, 255, 255] },
+            styles: { fontSize: 8 },
+            tableWidth: 80,
         });
-        
-        bucketY = (doc as any).lastAutoTable.finalY + 10;
+        tableStartY = (doc as any).lastAutoTable.finalY + 10;
     }
 
-    // Detailed Table
-    doc.setFontSize(14);
-    doc.setTextColor(50, 50, 50);
-    doc.text('Transaction Details', 14, bucketY + 10);
+    // ── Transaction Details ───────────────────────────────────────────────────
+    doc.setFontSize(13); doc.setFont('helvetica', 'bold'); doc.setTextColor(50, 50, 50);
+    doc.text('Transaction Details', 14, tableStartY);
+    doc.setFont('helvetica', 'normal');
 
-    const tableColumn = ["Date", "Description", "Category", "Payment", "Group", "Rec", "Exc", "Amount"];
+    const hasNotes = transactions.some(tx => tx.notes);
+    const tableColumns = ['Date', 'Description', 'Category', 'Bucket', 'Payment', 'Amount'];
+    if (hasNotes) tableColumns.push('Notes');
+
     const tableRows = sortedTx.map(tx => {
-        const group = tx.group_id ? groupMap[tx.group_id] : null;
+        const bucket = tx.bucket_id ? bucketMap[tx.bucket_id] : null;
         const rawAmount = tx.converted_amount || convertAmount(Number(tx.amount), tx.currency || 'USD');
         const isIncome = rawAmount < 0 || tx.category === 'income';
-        const displayAmount = isIncome 
-            ? `+ ${formatForPDF(Math.abs(rawAmount), currency)}` 
+        const displayAmount = isIncome
+            ? `+${formatForPDF(Math.abs(rawAmount), currency)}`
             : formatForPDF(rawAmount, currency);
-
-        return [
+        const row = [
             format(new Date(tx.date), 'MMM d, yy'),
-            tx.description.length > 25 ? tx.description.substring(0, 23) + '..' : tx.description,
-            tx.category,
+            (tx.is_recurring ? '[R] ' : '') + (tx.description.length > 22 ? tx.description.substring(0, 20) + '..' : tx.description),
+            tx.category.charAt(0).toUpperCase() + tx.category.slice(1),
+            bucket?.name || '-',
             tx.payment_method || '-',
-            group?.name || '-',
-            tx.is_recurring ? 'Yes' : 'No',
-            tx.exclude_from_allowance ? 'Yes' : 'No',
-            displayAmount
-        ]
+            displayAmount,
+        ];
+        if (hasNotes) row.push(tx.notes ? (tx.notes.length > 20 ? tx.notes.substring(0, 18) + '..' : tx.notes) : '');
+        return row;
     });
 
     autoTable(doc as any, {
-        head: [tableColumn],
+        head: [tableColumns],
         body: tableRows,
-        startY: bucketY + 15,
+        startY: tableStartY + 5,
         theme: 'striped',
         headStyles: { fillColor: [138, 43, 226], textColor: [255, 255, 255] },
-        styles: { fontSize: 8, cellPadding: 2 },
+        styles: { fontSize: 7.5, cellPadding: 2 },
+        columnStyles: { 5: { halign: 'right' } },
         margin: { top: 20 },
     });
+
+    // ── Footnotes below transaction table ─────────────────────────────────────
+    const footnotesY = (doc as any).lastAutoTable.finalY + 5;
+    const hasMultiCurrency = transactions.some(tx => tx.currency && tx.currency !== currency);
+    const footnotes: string[] = [
+        '[R] = Recurring transaction',
+        'Income rows are shown with a + prefix',
+    ];
+    if (hasMultiCurrency) footnotes.push(`* Amounts converted to ${currency} using rates at time of import`);
+
+    doc.setFontSize(7); doc.setTextColor(150, 150, 150);
+    footnotes.forEach((note, i) => {
+        doc.text(note, 14, footnotesY + i * 5);
+    });
+
+    // ── Page numbers ──────────────────────────────────────────────────────────
+    const totalPages = doc.getNumberOfPages();
+    for (let p = 1; p <= totalPages; p++) {
+        doc.setPage(p);
+        doc.setFontSize(7.5); doc.setTextColor(180, 180, 180);
+        doc.text(
+            `Page ${p} of ${totalPages}  ·  Novira Financial Audit`,
+            pageWidth / 2,
+            doc.internal.pageSize.height - 6,
+            { align: 'center' }
+        );
+    }
 
     doc.save(`novira_financial_audit_${format(new Date(), 'yyyyMMdd')}.pdf`);
 };
