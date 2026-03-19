@@ -145,11 +145,22 @@ export function useExpenseSubmission() {
 
             let recurringRecordToInsert = null;
             if (isRecurring) {
+                const intendedDay = date.getDate();
                 const nextDate = new Date(date);
-                if (frequency === 'daily') nextDate.setDate(nextDate.getDate() + 1);
-                else if (frequency === 'weekly') nextDate.setDate(nextDate.getDate() + 7);
-                else if (frequency === 'monthly') nextDate.setMonth(nextDate.getMonth() + 1);
-                else if (frequency === 'yearly') nextDate.setFullYear(nextDate.getFullYear() + 1);
+                if (frequency === 'daily') {
+                    nextDate.setDate(nextDate.getDate() + 1);
+                } else if (frequency === 'weekly') {
+                    nextDate.setDate(nextDate.getDate() + 7);
+                } else if (frequency === 'monthly') {
+                    // JS setMonth overflows short months (e.g. Jan 31 → Mar 3).
+                    // Fix: step to the 1st, advance the month, then clamp to intended day.
+                    nextDate.setDate(1);
+                    nextDate.setMonth(nextDate.getMonth() + 1);
+                    const lastDayOfMonth = new Date(nextDate.getFullYear(), nextDate.getMonth() + 1, 0).getDate();
+                    nextDate.setDate(Math.min(intendedDay, lastDayOfMonth));
+                } else if (frequency === 'yearly') {
+                    nextDate.setFullYear(nextDate.getFullYear() + 1);
+                }
 
                 recurringRecordToInsert = {
                     user_id: userId,
@@ -161,6 +172,7 @@ export function useExpenseSubmission() {
                     payment_method: paymentMethod,
                     frequency,
                     next_occurrence: format(nextDate, 'yyyy-MM-dd'),
+                    intended_day: intendedDay,
                     exclude_from_allowance: excludeFromAllowance,
                     metadata: {
                         is_split: isSplitEnabled,
