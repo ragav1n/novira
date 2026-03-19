@@ -8,7 +8,20 @@ const nextConfig = {
     ],
   },
   experimental: {
-    optimizePackageImports: ['lucide-react', 'recharts', 'framer-motion', '@capacitor/core', '@capacitor/app'],
+    optimizePackageImports: [
+      'lucide-react',
+      'recharts',
+      'framer-motion',
+      '@capacitor/core',
+      '@capacitor/app',
+      '@capacitor/haptics',
+      '@radix-ui/react-dialog',
+      '@radix-ui/react-popover',
+      '@radix-ui/react-select',
+      '@radix-ui/react-tabs',
+      '@radix-ui/react-tooltip',
+      'date-fns',
+    ],
   },
   async headers() {
     return [

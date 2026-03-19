@@ -4,7 +4,6 @@ import React, { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useDropzone } from 'react-dropzone';
 import Papa from 'papaparse';
-import ExcelJS from 'exceljs';
 import { parse, isValid, format } from 'date-fns';
 import { Upload, ChevronRight, Check, AlertCircle, X, ArrowLeft, FileSpreadsheet, Loader2 } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -208,6 +207,7 @@ export function ImportView() {
             const arrayBuffer = async () => {
                 try {
                     const buffer = await file.arrayBuffer();
+                    const ExcelJS = (await import('exceljs')).default;
                     const workbook = new ExcelJS.Workbook();
                     await workbook.xlsx.load(buffer);
                     const sheet = workbook.worksheets[0];
