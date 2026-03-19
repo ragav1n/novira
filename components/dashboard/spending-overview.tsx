@@ -308,7 +308,7 @@ export function SpendingOverview({
             </motion.button>
 
             {/* Run Rate Widget */}
-            {runRateData && !isBucketFocused && runRateData.currentDayOfMoth > 1 && (
+            {runRateData && !isBucketFocused && runRateData.currentDayOfMonth > 1 && (
                 <motion.div
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -331,7 +331,7 @@ export function SpendingOverview({
                                 <h3 className="text-sm font-bold">Month Forecasting</h3>
                             </div>
                             <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground bg-secondary/30 px-2 py-0.5 rounded-full">
-                                Day {runRateData.currentDayOfMoth}/{runRateData.daysInMonth}
+                                Day {runRateData.currentDayOfMonth}/{runRateData.daysInMonth}
                             </span>
                         </div>
 
