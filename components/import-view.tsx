@@ -483,7 +483,7 @@ export function ImportView() {
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             <div className="space-y-1">
-                                <label className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Date Column <span className="text-rose-500">*</span></label>
+                                <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Date Column <span className="text-rose-500">*</span></p>
                                 <Select value={mapping.date} onValueChange={(val) => setMapping({ ...mapping, date: val })}>
                                     <SelectTrigger className="h-10 text-sm"><SelectValue placeholder="Select column" /></SelectTrigger>
                                     <SelectContent>
@@ -492,7 +492,7 @@ export function ImportView() {
                                 </Select>
                             </div>
                             <div className="space-y-1">
-                                <label className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Description Column <span className="text-rose-500">*</span></label>
+                                <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Description Column <span className="text-rose-500">*</span></p>
                                 <Select value={mapping.description} onValueChange={(val) => setMapping({ ...mapping, description: val })}>
                                     <SelectTrigger className="h-10 text-sm"><SelectValue placeholder="Select column" /></SelectTrigger>
                                     <SelectContent>
@@ -503,7 +503,7 @@ export function ImportView() {
                         </div>
 
                         <div className="space-y-1">
-                            <label className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Currency of File <span className="text-rose-500">*</span></label>
+                            <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Currency of File <span className="text-rose-500">*</span></p>
                             <Select value={importCurrency} onValueChange={(val) => setImportCurrency(val)}>
                                 <SelectTrigger className="w-full h-10 text-sm"><SelectValue placeholder="Select currency" /></SelectTrigger>
                                 <SelectContent>
@@ -534,7 +534,7 @@ export function ImportView() {
 
                             {amountMode === 'single' ? (
                                 <div className="space-y-1">
-                                    <label className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Amount Column <span className="text-rose-500">*</span></label>
+                                    <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Amount Column <span className="text-rose-500">*</span></p>
                                     <Select value={mapping.amount} onValueChange={(val) => setMapping({ ...mapping, amount: val })}>
                                         <SelectTrigger className="h-10 text-sm"><SelectValue placeholder="Select column" /></SelectTrigger>
                                         <SelectContent>
@@ -545,7 +545,7 @@ export function ImportView() {
                             ) : (
                                 <div className="grid grid-cols-2 gap-3">
                                     <div className="space-y-1">
-                                        <label className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Debit</label>
+                                        <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Debit</p>
                                         <Select value={mapping.debit || "none"} onValueChange={(val) => setMapping({ ...mapping, debit: val === "none" ? "" : val })}>
                                             <SelectTrigger className="h-10 text-sm"><SelectValue placeholder="Select column" /></SelectTrigger>
                                             <SelectContent>
@@ -555,7 +555,7 @@ export function ImportView() {
                                         </Select>
                                     </div>
                                     <div className="space-y-1">
-                                        <label className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Credit</label>
+                                        <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Credit</p>
                                         <Select value={mapping.credit || "none"} onValueChange={(val) => setMapping({ ...mapping, credit: val === "none" ? "" : val })}>
                                             <SelectTrigger className="h-10 text-sm"><SelectValue placeholder="Select column" /></SelectTrigger>
                                             <SelectContent>
@@ -571,7 +571,7 @@ export function ImportView() {
                         <Separator />
 
                         <div className="space-y-1">
-                            <label className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Category Column (Optional)</label>
+                            <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Category Column (Optional)</p>
                             <Select value={mapping.category || ''} onValueChange={(val) => setMapping({ ...mapping, category: val })}>
                                 <SelectTrigger className="h-10 text-sm"><SelectValue placeholder="Select column" /></SelectTrigger>
                                 <SelectContent>

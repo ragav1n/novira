@@ -185,7 +185,7 @@ export const generatePDF = async (
     reportRange?: DateRange,
     ownerInfo?: { email?: string; avatarUrl?: string | null; workspaceName?: string }
 ) => {
-    const doc = new jsPDF();
+    const doc = new jsPDF({ putOnlyUsedFonts: true, compress: true });
     const pageWidth = doc.internal.pageSize.width;
 
     const bucketMap = Object.fromEntries(buckets.map(b => [b.id, b]));

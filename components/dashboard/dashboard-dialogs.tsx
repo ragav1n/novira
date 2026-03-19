@@ -122,12 +122,15 @@ export function DashboardDialogs({
                     </DialogHeader>
                     <div className="space-y-4">
                         <div className="space-y-2">
-                            <Label>Monthly Allowance ({currency})</Label>
-                            <Input 
-                                type="number" 
-                                value={tempBudgetInput} 
-                                onChange={(e) => setTempBudgetInput(e.target.value)} 
+                            <Label htmlFor="monthly-budget">Monthly Allowance ({currency})</Label>
+                            <Input
+                                id="monthly-budget"
+                                name="monthly-budget"
+                                type="number"
+                                value={tempBudgetInput}
+                                onChange={(e) => setTempBudgetInput(e.target.value)}
                                 placeholder="e.g. 5000"
+                                autoComplete="off"
                                 className="bg-secondary/50 border-white/10 h-12 rounded-xl text-lg font-bold"
                             />
                         </div>
