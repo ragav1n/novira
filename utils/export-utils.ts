@@ -247,7 +247,7 @@ export const generatePDF = async (
                 const overlapStart = new Date(Math.max(bStart.getTime(), reportRange.from.getTime()));
                 const overlapEnd = new Date(Math.min(bEnd.getTime(), reportRange.to.getTime()));
                 if (overlapEnd > overlapStart) {
-                    const bucketDays = Math.max(1, differenceInDays(bEnd, bStart));
+                    const bucketDays = Math.max(1, differenceInDays(bEnd, bStart) + 1);
                     const overlapDays = Math.max(1, differenceInDays(overlapEnd, overlapStart) + 1);
                     effectiveBudget = (bucket.budget / bucketDays) * overlapDays;
                 }
@@ -463,21 +463,36 @@ export const generatePDF = async (
         bucketY += 10;
     } else {
         bucketEntries.forEach(([name, data]) => {
-            if (bucketY > 88) return; // keep within the right column space
+            if (bucketY > 88) return;
             const hasBudget = data.budget > 0;
             const pct = hasBudget ? (data.spent / data.budget) * 100 : 0;
+
+            // Name + % used
             doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(50, 50, 50);
             doc.text(name.length > 20 ? name.substring(0, 18) + '..' : name, 110, bucketY);
-            doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(100, 100, 100);
-            const budgetText = hasBudget ? formatForPDF(data.budget, currency) : 'No Budget';
-            doc.text(`${formatForPDF(data.spent, currency)} / ${budgetText}`, pageWidth - 14, bucketY, { align: 'right' });
+            if (hasBudget) {
+                doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor(130, 130, 130);
+                doc.text(`${pct.toFixed(1)}% used`, pageWidth - 14, bucketY, { align: 'right' });
+            }
+
+            // Spent / Budget on second line
+            doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5);
+            doc.setTextColor(80, 80, 80);
+            doc.text(`Spent: ${formatForPDF(data.spent, currency)}`, 110, bucketY + 5);
+            if (hasBudget) {
+                doc.setTextColor(120, 120, 120);
+                doc.text(`Budget: ${formatForPDF(data.budget, currency)}`, pageWidth - 14, bucketY + 5, { align: 'right' });
+            }
+
+            // Progress bar
             const progressColor: [number, number, number] = !hasBudget ? [200, 200, 200] : (pct > 100 ? [255, 107, 107] : [74, 222, 128]);
-            drawProgressBar(doc, hasBudget ? pct : 100, 110, bucketY + 2, pageWidth - 124, 3.5, progressColor);
+            drawProgressBar(doc, hasBudget ? pct : 100, 110, bucketY + 7, pageWidth - 124, 3, progressColor);
+
             if (hasBudget && pct > 100) {
                 doc.setTextColor(255, 107, 107); doc.setFontSize(6.5);
-                doc.text(`Over by ${formatForPDF(data.spent - data.budget, currency)}`, 110, bucketY + 9);
+                doc.text(`Over budget by ${formatForPDF(data.spent - data.budget, currency)}`, 110, bucketY + 14);
             }
-            bucketY += hasBudget && pct > 100 ? 16 : 12;
+            bucketY += hasBudget && pct > 100 ? 20 : 15;
         });
     }
 

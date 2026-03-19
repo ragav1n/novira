@@ -17,7 +17,7 @@ interface CategorySelectorProps {
 export function CategorySelector({ categories, selectedCategory, onSelect }: CategorySelectorProps) {
     return (
         <div className="space-y-2">
-            <label className="text-sm font-medium">Category *</label>
+            <p className="text-sm font-medium">Category *</p>
             <FluidDropdown
                 items={categories}
                 onSelect={(cat) => onSelect(cat.id)}
@@ -51,7 +51,7 @@ export function BucketSelector({ buckets, selectedBucketId, setSelectedBucketId 
 
     return (
         <div className="space-y-2">
-            <label className="text-sm font-medium">Personal Bucket (Private)</label>
+            <p className="text-sm font-medium">Personal Bucket (Private)</p>
             <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1 custom-scrollbar">
                 <div
                     onClick={() => setSelectedBucketId(null)}

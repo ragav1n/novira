@@ -97,7 +97,7 @@ export function BucketDialog({ isOpen, onClose, editingBucket }: BucketDialogPro
                     </DialogHeader>
                     <div className="space-y-4 py-4">
                         <div className="space-y-3 w-full overflow-hidden">
-                            <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest pl-1">Select Icon</label>
+                            <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest pl-1">Select Icon</p>
                             <div className="flex gap-2 overflow-x-auto pb-4 px-1 w-full scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
                                 {[
                                     { name: 'Tag', label: 'Tag', icon: Tag },
@@ -140,8 +140,10 @@ export function BucketDialog({ isOpen, onClose, editingBucket }: BucketDialogPro
                             </div>
                         </div>
                         <div className="space-y-2 text-left w-full">
-                            <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest pl-1">Bucket Name</label>
+                            <label htmlFor="bucket-name" className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest pl-1">Bucket Name</label>
                             <Input
+                                id="bucket-name"
+                                name="bucket-name"
                                 placeholder="e.g. Trip, New iPhone, Gift..."
                                 value={newBucketName}
                                 onChange={(e) => setNewBucketName(e.target.value)}
@@ -152,7 +154,7 @@ export function BucketDialog({ isOpen, onClose, editingBucket }: BucketDialogPro
                         <div className="space-y-4">
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div className="space-y-2 text-left w-full">
-                                    <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest pl-1">Currency</label>
+                                    <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest pl-1">Currency</p>
                                     <Select value={newBucketCurrency} onValueChange={setNewBucketCurrency}>
                                         <SelectTrigger className="bg-secondary/20 border-white/5 h-12 rounded-2xl w-full">
                                             <div className="flex items-center gap-2">
@@ -174,9 +176,11 @@ export function BucketDialog({ isOpen, onClose, editingBucket }: BucketDialogPro
                                 </div>
 
                                 <div className="space-y-2 text-left w-full">
-                                    <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest pl-1">Total Budget</label>
+                                    <label htmlFor="bucket-budget" className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest pl-1">Total Budget</label>
                                     <div className="relative w-full">
                                         <Input
+                                            id="bucket-budget"
+                                            name="bucket-budget"
                                             type="number"
                                             placeholder="0.00"
                                             value={newBucketTarget}
@@ -191,7 +195,7 @@ export function BucketDialog({ isOpen, onClose, editingBucket }: BucketDialogPro
                             </div>
 
                             <div className="space-y-2 text-left w-full">
-                                <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest pl-1">Dates</label>
+                                <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest pl-1">Dates</p>
                                 <DateRangePicker
                                     date={bucketDateRange}
                                     setDate={setBucketDateRange}

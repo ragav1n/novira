@@ -132,7 +132,7 @@ export function ExportDateRangeModal({
                     </div>
 
                     <div className="space-y-1">
-                        <label className="text-[9px] uppercase font-bold text-muted-foreground tracking-widest opacity-70">Custom Range</label>
+                        <p className="text-[9px] uppercase font-bold text-muted-foreground tracking-widest opacity-70">Custom Range</p>
                         <DateRangePicker
                             date={dateRange}
                             setDate={handleCustomDateChange}
@@ -143,7 +143,7 @@ export function ExportDateRangeModal({
 
                     {/* Workspace Filter */}
                     <div className="space-y-1">
-                        <label className="text-[9px] uppercase font-bold text-muted-foreground tracking-widest opacity-70">Context</label>
+                        <p className="text-[9px] uppercase font-bold text-muted-foreground tracking-widest opacity-70">Context</p>
                         <div className="flex gap-1 overflow-x-auto pb-1 scrollbar-hide">
                             <div
                                 onClick={() => setSelectedGroupId(null)}
@@ -187,7 +187,7 @@ export function ExportDateRangeModal({
                     {/* Bucket Filter */}
                     {buckets.length > 0 && (
                         <div className="space-y-1">
-                            <label className="text-[9px] uppercase font-bold text-muted-foreground tracking-widest opacity-70">Bucket (Optional)</label>
+                            <p className="text-[9px] uppercase font-bold text-muted-foreground tracking-widest opacity-70">Bucket (Optional)</p>
                             <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide">
                                 <div
                                     onClick={() => setSelectedBucketId(null)}
