@@ -47,7 +47,7 @@ export function useDashboardStats({
         projectedSpend: number;
         isExceeding: boolean;
         daysInMonth: number;
-        currentDayOfMoth: number;
+        currentDayOfMonth: number;
     } | null;
 } {
     const focusedBucket = isBucketFocused && Array.isArray(buckets) ? buckets.find(b => b.id === effectiveFocus) : null;
@@ -194,13 +194,13 @@ export function useDashboardStats({
         const firstDay = startOfMonth(today);
         const lastDay = endOfMonth(today);
         const daysInMonth = differenceInDays(lastDay, firstDay) + 1;
-        const currentDayOfMoth = today.getDate();
+        const currentDayOfMonth = today.getDate();
 
         // Calculate total spend strictly for this month (excluding future scheduled ones if any)
         const spentThisMonth = totalSpent;
 
         // Daily average spend so far
-        const dailyAverage = currentDayOfMoth > 0 ? spentThisMonth / currentDayOfMoth : 0;
+        const dailyAverage = currentDayOfMonth > 0 ? spentThisMonth / currentDayOfMonth : 0;
 
         // Projected spend for the entire month
         const projectedSpend = dailyAverage * daysInMonth;
@@ -210,7 +210,7 @@ export function useDashboardStats({
             projectedSpend,
             isExceeding: projectedSpend > displayBudget,
             daysInMonth,
-            currentDayOfMoth
+            currentDayOfMonth
         };
     }, [isBucketFocused, totalSpent, displayBudget]);
 

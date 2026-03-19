@@ -109,7 +109,7 @@ export const TransactionService = {
                     const response = await fetch(url);
                     if (response.ok) {
                         const data = await response.json();
-                        rate = isToday ? data.conversion_rates[to] : data.conversion_rate;
+                        rate = data.conversion_rates?.[to] ?? null;
                     }
                 }
             }
