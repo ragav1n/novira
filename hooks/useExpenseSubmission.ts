@@ -162,17 +162,17 @@ export function useExpenseSubmission() {
                     frequency,
                     next_occurrence: format(nextDate, 'yyyy-MM-dd'),
                     exclude_from_allowance: excludeFromAllowance,
-                    ...(placeName ? {
-                        place_name: placeName,
-                        place_address: placeAddress,
-                        place_lat: placeLat,
-                        place_lng: placeLng,
-                    } : {}),
                     metadata: {
                         is_split: isSplitEnabled,
                         friend_ids: selectedFriendIds,
                         notes,
-                        bucket_id: selectedBucketId
+                        bucket_id: selectedBucketId,
+                        ...(placeName ? {
+                            place_name: placeName,
+                            place_address: placeAddress,
+                            place_lat: placeLat,
+                            place_lng: placeLng,
+                        } : {})
                     }
                 };
             }
