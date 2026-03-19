@@ -144,7 +144,7 @@ export function GroupsProvider({ children }: { children: React.ReactNode }) {
                         profile:profiles(full_name, avatar_url),
                         transaction:transactions!inner(description, date, user_id, currency, exchange_rate, base_currency, profile:profiles(full_name, avatar_url))
                     `)
-                    .eq('transactions.user_id', userId)
+                    .eq('transaction.user_id', userId)
                     .eq('is_paid', false)
             ]);
 
