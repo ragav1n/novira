@@ -54,7 +54,7 @@ export function useExpenseForm(userId: string | null | undefined, defaultCurrenc
                         .from('transactions')
                         .select('place_name, place_address, place_lat, place_lng')
                         .eq('user_id', userId)
-                        .ilike('description', description)
+                        .ilike('description', `%${description}%`)
                         .not('place_name', 'is', null)
                         .order('created_at', { ascending: false })
                         .limit(1);
@@ -76,7 +76,7 @@ export function useExpenseForm(userId: string | null | undefined, defaultCurrenc
                     .eq('category', selectedCategory)
                     .not('place_name', 'is', null)
                     .order('created_at', { ascending: false })
-                    .limit(5);
+                    .limit(20);
 
                 if (catMatches) {
                     catMatches.forEach(loc => {

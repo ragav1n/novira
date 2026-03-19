@@ -169,12 +169,12 @@ export function useDashboardStats({
         });
     }, [transactions, userId, isBucketFocused, effectiveFocus, currentMonthPrefix]);
 
-    // Truly recent transactions (top 5 overall) to prevent empty state at start of month
+    // All relevant transactions for the feed (preview slice happens in TransactionListSection)
     const recentFeed = useMemo(() => {
-        if (isBucketFocused) return displayTransactions.slice(0, 5);
-        
+        if (isBucketFocused) return displayTransactions;
+
         if (!Array.isArray(transactions)) return [];
-        
+
         return transactions
             .filter(tx => tx && !tx.exclude_from_allowance)
             .filter(tx => {
@@ -182,8 +182,7 @@ export function useDashboardStats({
                 if (tx.user_id === userId) return true;
                 if (tx.splits && tx.splits.some(s => s.user_id === userId)) return true;
                 return false;
-            })
-            .slice(0, 5);
+            });
     }, [transactions, isBucketFocused, displayTransactions, userId]);
 
     // Run Rate Calculation
