@@ -2,6 +2,16 @@ import { useMemo } from 'react';
 import { CATEGORY_COLORS } from '@/lib/categories';
 import { Transaction } from '@/components/expense-map-view';
 
+// Controls how finely lat/lng is snapped to group nearby transactions into the same pin.
+// Higher = finer grouping (more pins); lower = coarser grouping (fewer, merged pins).
+const LOCATION_SNAP_PRECISION = 5000;
+
+// Radius of each tower polygon in degrees (~3m on the ground). Kept small so pins don't overlap.
+const TOWER_POLYGON_RADIUS = 0.00003;
+
+// Number of sides for tower polygons. Reduced from 32 for faster generation.
+const TOWER_POLYGON_SIDES = 24;
+
 // Helper for radial offsets (approx meters to degrees)
 export function getGridOffsetCoords(lng: number, lat: number, offsetX: number, offsetY: number) {
     const radiusEarth = 6378137;
@@ -27,7 +37,7 @@ export function useMapData(
         }>();
 
         filteredTransactions.forEach(tx => {
-            const key = `${(Math.round(tx.place_lat! * 5000) / 5000).toFixed(4)},${(Math.round(tx.place_lng! * 5000) / 5000).toFixed(4)}`;
+            const key = `${(Math.round(tx.place_lat! * LOCATION_SNAP_PRECISION) / LOCATION_SNAP_PRECISION).toFixed(4)},${(Math.round(tx.place_lng! * LOCATION_SNAP_PRECISION) / LOCATION_SNAP_PRECISION).toFixed(4)}`;
             
             // Convert to base currency for aggregation!
             const amountInBase = convertAmount(Number(tx.amount), tx.currency || 'USD', baseCurrency);
@@ -71,8 +81,8 @@ export function useMapData(
                 
                 center = getGridOffsetCoords(group.lng, group.lat, offsetX, offsetY);
 
-                const radius = 0.00003; 
-                const sides = 24; // Optimized from 32 down to 24 for faster polygon generation
+                const radius = TOWER_POLYGON_RADIUS;
+                const sides = TOWER_POLYGON_SIDES;
                 const coordinates = [];
                 for (let i = 0; i < sides; i++) {
                     const ang = (i * 360) / sides;
