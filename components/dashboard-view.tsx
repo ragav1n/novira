@@ -245,7 +245,7 @@ export function DashboardView() {
 
     return (
         <div className="relative min-h-[100dvh]">
-            <BudgetAlertManager totalSpent={totalSpent} />
+            <BudgetAlertManager totalSpent={totalSpent} currency={bucketCurrency} />
             <div className={cn(
                 "p-5 space-y-6 max-w-md mx-auto relative",
                 mounted && !loading && isAnyModalOpen ? "pointer-events-none overflow-hidden" : "overflow-x-hidden"
