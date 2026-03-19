@@ -10,6 +10,7 @@ import { BucketsProvider } from '@/components/providers/buckets-provider'
 import { SyncIndicator } from '@/components/pwa-sync-indicator'
 import { WorkspaceThemeProvider } from '@/components/providers/workspace-theme-provider'
 import { ErrorBoundary } from '@/components/error-boundary'
+import { ServiceWorkerRegistrar } from '@/components/service-worker-registrar'
 
 const geist = Geist({
   subsets: ["latin"],
@@ -82,20 +83,9 @@ export default function RootLayout({
             </GroupsProvider>
           </UserPreferencesProvider>
         </ErrorBoundary>
+        <ServiceWorkerRegistrar />
         <Analytics />
         <SpeedInsights />
-        <script
-          suppressHydrationWarning={true}
-          dangerouslySetInnerHTML={{
-            __html: `
-              if ('serviceWorker' in navigator) {
-                window.addEventListener('load', function() {
-                  navigator.serviceWorker.register('/sw.js');
-                });
-              }
-            `,
-          }}
-        />
       </body>
     </html>
   )

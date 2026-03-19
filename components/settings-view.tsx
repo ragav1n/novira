@@ -261,7 +261,7 @@ export function SettingsView() {
 
             let query = supabase
                 .from('transactions')
-                .select('id, description, amount, category, date, payment_method, created_at, currency, bucket_id, group_id, notes, type, is_recurring, place_name, exclude_from_allowance, exchange_rate, base_currency, converted_amount')
+                .select('id, description, amount, category, date, payment_method, created_at, currency, bucket_id, group_id, notes, is_recurring, place_name, exclude_from_allowance, exchange_rate, base_currency, converted_amount')
                 .order('date', { ascending: false });
 
             if (dateRange?.from) {
@@ -389,23 +389,29 @@ export function SettingsView() {
 
                         <div className="flex-1 space-y-3">
                             <div className="space-y-1">
-                                <label className="text-[11px] uppercase font-bold text-muted-foreground tracking-wider">Full Name</label>
+                                <label htmlFor="full-name" className="text-[11px] uppercase font-bold text-muted-foreground tracking-wider">Full Name</label>
                                 <Input
+                                    id="full-name"
+                                    name="full-name"
                                     value={fullName}
                                     onChange={(e) => setFullName(e.target.value)}
                                     className="bg-secondary/10 border-white/5 h-10 rounded-xl"
                                     placeholder="e.g. John Doe"
+                                    autoComplete="name"
                                 />
                             </div>
                             <div className="space-y-1">
-                                <label className="text-[11px] uppercase font-bold text-muted-foreground tracking-wider">Monthly Allowance</label>
+                                <label htmlFor="monthly-allowance" className="text-[11px] uppercase font-bold text-muted-foreground tracking-wider">Monthly Allowance</label>
                                 <Input
+                                    id="monthly-allowance"
+                                    name="monthly-allowance"
                                     ref={budgetInputRef}
                                     value={localBudget}
                                     onChange={(e) => setLocalBudget(e.target.value)}
                                     className="bg-secondary/10 border-white/5 h-10 rounded-xl"
                                     placeholder="e.g. 3000"
                                     type="number"
+                                    autoComplete="off"
                                 />
                             </div>
                             <Button

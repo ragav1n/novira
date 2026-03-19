@@ -95,8 +95,10 @@ export function GroupCreationDialog() {
                     ) : (
                         <div className="space-y-4 py-4">
                             <div className="space-y-2">
-                                <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider pl-1">Name</label>
+                                <label htmlFor="group-name" className="text-xs font-bold text-muted-foreground uppercase tracking-wider pl-1">Name</label>
                                 <Input
+                                    id="group-name"
+                                    name="group-name"
                                     placeholder={selectedType === 'trip' ? "e.g. Trip" : "e.g. Apartment, Utilities"}
                                     value={newGroupName}
                                     onChange={(e) => setNewGroupName(e.target.value)}
@@ -106,7 +108,7 @@ export function GroupCreationDialog() {
 
                             {selectedType === 'trip' && (
                                 <div className="space-y-2">
-                                    <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider pl-1">Dates</label>
+                                    <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider pl-1">Dates</p>
                                     <DateRangePicker
                                         date={dateRange}
                                         setDate={setDateRange}

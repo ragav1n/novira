@@ -143,9 +143,11 @@ export function AddExpenseView() {
 
                 {/* Amount Input */}
                 <div className="space-y-2">
-                    <label className="text-sm font-medium">Amount *</label>
+                    <label htmlFor="expense-amount" className="text-sm font-medium">Amount *</label>
                     <div className="relative">
                         <Input
+                            id="expense-amount"
+                            name="amount"
                             value={formState.amount}
                             type="number"
                             min="0"
@@ -306,7 +308,7 @@ export function AddExpenseView() {
                 {/* Date & Payment */}
                 <div className="space-y-4">
                     <div className="space-y-2">
-                        <label className="text-sm font-medium">Date *</label>
+                        <p className="text-sm font-medium">Date *</p>
                         <Popover modal={true}>
                             <PopoverTrigger asChild>
                                 <Button
@@ -337,7 +339,7 @@ export function AddExpenseView() {
                         </Popover>
                     </div>
                     <div className="space-y-2">
-                        <label className="text-sm font-medium">Payment Method</label>
+                        <p className="text-sm font-medium">Payment Method</p>
                         <div className="grid grid-cols-2 gap-2">
                             {(['Cash', 'UPI', 'Debit Card', 'Credit Card', 'Bank Transfer'] as const).map((method, index) => {
                                 const isSelected = formState.paymentMethod === method;
@@ -435,8 +437,10 @@ export function AddExpenseView() {
 
                 {/* Notes */}
                 <div className="space-y-2">
-                    <label className="text-sm font-medium">Notes (Optional)</label>
+                    <label htmlFor="expense-notes" className="text-sm font-medium">Notes (Optional)</label>
                     <Textarea
+                        id="expense-notes"
+                        name="notes"
                         placeholder="Add notes..."
                         value={formState.notes}
                         onChange={(e) => formState.setNotes(e.target.value)}
