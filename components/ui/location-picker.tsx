@@ -225,9 +225,15 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
     const handleSearch = mapboxToken ? searchWithMapbox : searchWithPhoton;
 
     const handleSelectPlace = async (prediction: PlacePrediction | LocationData) => {
-        // Handle direct LocationData (from Recent)
+        // Handle direct LocationData (from Recent) — move to front of recents
         if ('place_name' in prediction) {
-            onChange(prediction as LocationData);
+            const item = prediction as LocationData;
+            onChange(item);
+            setRecentLocations(prev => {
+                const next = [item, ...prev.filter(l => l.place_name !== item.place_name)].slice(0, 5);
+                localStorage.setItem('novira_recent_locations', JSON.stringify(next));
+                return next;
+            });
             setIsExpanded(false);
             setQuery('');
             return;
@@ -247,11 +253,18 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                 const feature = data.features?.[0];
 
                 if (feature?.geometry?.coordinates) {
-                    onChange({
+                    const selectedLoc: LocationData = {
                         place_name: prediction.structured_formatting.main_text,
                         place_address: prediction.description,
                         place_lat: feature.geometry.coordinates[1],
                         place_lng: feature.geometry.coordinates[0],
+                    };
+                    onChange(selectedLoc);
+                    // Add to recent locations
+                    setRecentLocations(prev => {
+                        const next = [selectedLoc, ...prev.filter(l => l.place_name !== selectedLoc.place_name)].slice(0, 5);
+                        localStorage.setItem('novira_recent_locations', JSON.stringify(next));
+                        return next;
                     });
                     // Reset session token after successful retrieve (Mapbox billing)
                     sessionTokenRef.current = crypto.randomUUID();
@@ -266,11 +279,17 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
         }
 
         // Direct coords (Photon results or fallback)
+        const lat = parseFloat((prediction as PlacePrediction)._lat);
+        const lng = parseFloat((prediction as PlacePrediction)._lon);
+        if (isNaN(lat) || isNaN(lng)) {
+            toast.error('Could not get location coordinates');
+            return;
+        }
         const finalLoc = {
             place_name: (prediction as PlacePrediction).structured_formatting.main_text,
             place_address: (prediction as PlacePrediction).description,
-            place_lat: parseFloat((prediction as PlacePrediction)._lat),
-            place_lng: parseFloat((prediction as PlacePrediction)._lon),
+            place_lat: lat,
+            place_lng: lng,
         };
 
         onChange(finalLoc);
@@ -376,18 +395,51 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
         if (!navigator.geolocation) {
             toast.error('Geolocation not supported');
             setIsLocating(false);
+            isSelectingCurrentRef.current = false;
             return;
         }
 
         navigator.geolocation.getCurrentPosition(async (position) => {
             const { latitude, longitude } = position.coords;
             setLastPosition({ lat: latitude, lng: longitude });
+
+            if (isSelectingCurrentRef.current) {
+                isSelectingCurrentRef.current = false;
+                try {
+                    if (mapboxToken) {
+                        const res = await fetch(
+                            `https://api.mapbox.com/geocoding/v5/mapbox.places/${longitude},${latitude}.json?access_token=${mapboxToken}`
+                        );
+                        const data = await res.json();
+                        const name = data.features?.[0]?.place_name?.split(',')[0] || 'Current Location';
+                        const address = data.features?.[0]?.place_name || 'Nearby';
+                        onChange({ place_name: name, place_address: address, place_lat: latitude, place_lng: longitude });
+                    } else {
+                        onChange({
+                            place_name: 'Current Location',
+                            place_address: `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`,
+                            place_lat: latitude,
+                            place_lng: longitude,
+                        });
+                    }
+                } catch {
+                    onChange({
+                        place_name: 'Current Location',
+                        place_address: `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`,
+                        place_lat: latitude,
+                        place_lng: longitude,
+                    });
+                }
+                setIsExpanded(false);
+            }
+
             setIsLocating(false);
         }, (err) => {
             console.error('Native geolocation error:', err);
             toast.error('Location unavailable');
             setIsLocating(false);
-        }, { enableHighAccuracy: true, timeout: 5000 });
+            isSelectingCurrentRef.current = false;
+        }, { enableHighAccuracy: true, timeout: 8000 });
     };
 
     const handleUseCurrentLocation = async () => {
@@ -431,7 +483,7 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
 
     // Proactive Nearby Fetch
     useEffect(() => {
-        if (isExpanded && lastPosition && query.length === 0) {
+        if (isExpanded && lastPosition && query.length === 0 && mapboxToken) {
             const fetchNearby = async () => {
                 setIsSearching(true);
                 try {
