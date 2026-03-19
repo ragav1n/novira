@@ -83,8 +83,8 @@ export function AddExpenseView() {
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(
                 (pos) => setCurrentPos({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-                null,
-                { enableHighAccuracy: false, timeout: 5000 }
+                () => { /* Location denied or unavailable — suggestions shown unsorted */ },
+                { enableHighAccuracy: true, timeout: 8000 }
             );
         }
     }, []);

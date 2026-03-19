@@ -61,8 +61,8 @@ export function useExpenseForm(userId: string | null | undefined, defaultCurrenc
 
                     if (descMatches?.[0]) {
                         const loc = descMatches[0];
-                        if (loc.place_name !== placeName) {
-                            suggestions.push({ ...loc, name: loc.place_name, address: loc.place_address, lat: loc.place_lat, lng: loc.place_lng, type: 'last' });
+                        if (loc.place_name !== placeName && loc.place_lat && loc.place_lng) {
+                            suggestions.push({ name: loc.place_name!, address: loc.place_address!, lat: loc.place_lat, lng: loc.place_lng, type: 'last' });
                             seenNames.add(loc.place_name!);
                         }
                     }
@@ -80,29 +80,39 @@ export function useExpenseForm(userId: string | null | undefined, defaultCurrenc
 
                 if (catMatches) {
                     catMatches.forEach(loc => {
-                        if (loc.place_name && !seenNames.has(loc.place_name) && loc.place_name !== placeName) {
-                            suggestions.push({ ...loc, name: loc.place_name, address: loc.place_address, lat: loc.place_lat, lng: loc.place_lng, type: 'category' });
+                        if (loc.place_name && !seenNames.has(loc.place_name) && loc.place_name !== placeName && loc.place_lat && loc.place_lng) {
+                            suggestions.push({ name: loc.place_name, address: loc.place_address!, lat: loc.place_lat, lng: loc.place_lng, type: 'category' });
                             seenNames.add(loc.place_name);
                         }
                     });
                 }
 
-                // 3. Frequent overall (If still space)
+                // 3. Frequent overall ranked by visit count (If still space)
                 if (suggestions.length < 12) {
                     const { data: frequent } = await supabase
                         .from('transactions')
                         .select('place_name, place_address, place_lat, place_lng')
                         .eq('user_id', userId)
                         .not('place_name', 'is', null)
-                        .limit(30); // Get more to find variety
+                        .limit(60);
 
                     if (frequent) {
+                        // Count how often each place appears to rank by true frequency
+                        const placeCounts = new Map<string, { name: string; address: string; lat: number; lng: number; count: number }>();
                         for (const loc of frequent) {
-                            if (suggestions.length >= 12) break;
-                            if (loc.place_name && !seenNames.has(loc.place_name) && loc.place_name !== placeName) {
-                                suggestions.push({ ...loc, name: loc.place_name, address: loc.place_address, lat: loc.place_lat, lng: loc.place_lng, type: 'frequent' });
-                                seenNames.add(loc.place_name);
+                            if (!loc.place_name || seenNames.has(loc.place_name) || loc.place_name === placeName || !loc.place_lat || !loc.place_lng) continue;
+                            const existing = placeCounts.get(loc.place_name);
+                            if (existing) {
+                                existing.count++;
+                            } else {
+                                placeCounts.set(loc.place_name, { name: loc.place_name, address: loc.place_address!, lat: loc.place_lat, lng: loc.place_lng, count: 1 });
                             }
+                        }
+                        const sortedByFrequency = [...placeCounts.values()].sort((a, b) => b.count - a.count);
+                        for (const place of sortedByFrequency) {
+                            if (suggestions.length >= 12) break;
+                            suggestions.push({ name: place.name, address: place.address, lat: place.lat, lng: place.lng, type: 'frequent' });
+                            seenNames.add(place.name);
                         }
                     }
                 }
