@@ -20,15 +20,13 @@ export function useDashboardState(userId: string | null) {
 
     // Handle modal sequencing and initial focus load
     useEffect(() => {
-        if (userId) {
+        if (userId && !isFocusRestored) {
             // 1. Sync Restoration
-            if (!isFocusRestored) {
-                const savedFocus = localStorage.getItem(`dashboard_focus_${userId}`);
-                setDashboardFocus(savedFocus || 'allowance');
-                setIsFocusRestored(true);
-            }
+            const savedFocus = localStorage.getItem(`dashboard_focus_${userId}`);
+            setDashboardFocus(savedFocus || 'allowance');
+            setIsFocusRestored(true);
 
-            // Modal Sequencing Logic
+            // Modal Sequencing Logic — runs once per login, guarded by isFocusRestored
             const hasSeenWelcome = localStorage.getItem(`welcome_seen_${userId}`);
             const lastSeenFeatureId = localStorage.getItem(`last_seen_feature_id_${userId}`) || localStorage.getItem('last_seen_feature_id');
             const hasNewAnnouncement = lastSeenFeatureId !== LATEST_FEATURE_ANNOUNCEMENT.id;

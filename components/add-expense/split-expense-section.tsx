@@ -243,10 +243,14 @@ export function SplitExpenseSection({
                     {splitMode === 'even' && (selectedFriendIds.length > 0 || selectedGroupId) && amount && (
                         <div className="pt-2 border-t border-white/5">
                             <p className="text-[11px] text-muted-foreground text-center">
-                                Each person pays <span className="font-medium text-primary">
-                                    {CURRENCY_SYMBOLS[currency] || '$'}
-                                    {(parseFloat(amount) / ((selectedGroupId ? 2 : selectedFriendIds.length) + 1)).toFixed(2)}
-                                </span>
+                                {selectedGroupId ? (
+                                    <>Split <span className="font-medium text-primary">equally</span> among all group members</>
+                                ) : (
+                                    <>Each person pays <span className="font-medium text-primary">
+                                        {CURRENCY_SYMBOLS[currency] || '$'}
+                                        {(parseFloat(amount) / (selectedFriendIds.length + 1)).toFixed(2)}
+                                    </span></>
+                                )}
                             </p>
                         </div>
                     )}

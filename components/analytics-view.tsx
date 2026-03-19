@@ -23,6 +23,7 @@ import { WaveLoader } from '@/components/ui/wave-loader';
 import { AnimatePresence, motion } from 'framer-motion';
 import { LineChart, Line, XAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { Transaction } from '@/types/transaction';
+import { toast } from '@/utils/haptics';
 
 
 
@@ -198,6 +199,7 @@ export function AnalyticsView() {
             }
         } catch (error) {
             console.error("Error fetching analytics:", error);
+            toast.error('Failed to load analytics data');
         } finally {
             setLoading(false);
         }

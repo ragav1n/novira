@@ -122,6 +122,14 @@ export const TransactionService = {
             console.error('Error fetching exchange rate:', e);
         }
 
+        if (!rate) {
+            console.warn(`[TransactionService] Exchange rate unavailable for ${from}→${to}, using 1:1 fallback`);
+            toast('Exchange rate unavailable — using 1:1 conversion', {
+                icon: '⚠️',
+                style: { background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.2)', color: '#F59E0B' }
+            });
+        }
+
         return rate || 1;
     },
 
