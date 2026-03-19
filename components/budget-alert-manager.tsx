@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useUserPreferences } from '@/components/providers/user-preferences-provider';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
@@ -8,12 +9,14 @@ import { AlertTriangle, X, ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useIsNative } from '@/hooks/use-native';
 import { toast, ImpactStyle } from '@/utils/haptics';
+import type { Currency } from '@/components/providers/user-preferences-provider';
 
 interface BudgetAlertManagerProps {
     totalSpent: number;
+    currency?: Currency;
 }
 
-export function BudgetAlertManager({ totalSpent }: BudgetAlertManagerProps) {
+export function BudgetAlertManager({ totalSpent, currency }: BudgetAlertManagerProps) {
     const { budgetAlertsEnabled, monthlyBudget, formatCurrency } = useUserPreferences();
     const [showAlert, setShowAlert] = useState(false);
     const [hasTriggered, setHasTriggered] = useState(false);
@@ -44,7 +47,9 @@ export function BudgetAlertManager({ totalSpent }: BudgetAlertManagerProps) {
     const percentage = Math.min((totalSpent / monthlyBudget) * 100, 100);
     const isOverBudget = totalSpent > monthlyBudget;
 
-    return (
+    if (typeof document === 'undefined') return null;
+
+    return createPortal(
         <AnimatePresence>
             {showAlert && (
                 <motion.div
@@ -56,7 +61,7 @@ export function BudgetAlertManager({ totalSpent }: BudgetAlertManagerProps) {
                         transition: { type: 'spring', stiffness: 380, damping: 22, mass: 0.8 }
                     }}
                     exit={{ opacity: 0, y: 20, scale: 0.95, transition: { duration: 0.2 } }}
-                    className="fixed bottom-24 left-4 right-4 z-50 md:left-1/2 md:-translate-x-1/2 md:max-w-md"
+                    className="fixed bottom-24 left-4 right-4 z-[9999] md:left-1/2 md:-translate-x-1/2 md:max-w-md"
                 >
                     <div className={cn(
                         "relative overflow-hidden rounded-2xl border p-4 shadow-2xl backdrop-blur-xl",
@@ -117,8 +122,8 @@ export function BudgetAlertManager({ totalSpent }: BudgetAlertManagerProps) {
                                 </p>
                                 <p className="text-xs text-white/60 mt-0.5 leading-relaxed">
                                     {isOverBudget
-                                        ? `You've spent ${formatCurrency(totalSpent)}, which is ${formatCurrency(totalSpent - monthlyBudget)} over your budget.`
-                                        : `You've used ${percentage.toFixed(0)}% of your ${formatCurrency(monthlyBudget)} monthly budget.`
+                                        ? `You've spent ${formatCurrency(totalSpent, currency)}, which is ${formatCurrency(totalSpent - monthlyBudget, currency)} over your budget.`
+                                        : `You've used ${percentage.toFixed(0)}% of your ${formatCurrency(monthlyBudget, currency)} monthly budget.`
                                     }
                                 </p>
                                 <button
@@ -135,6 +140,7 @@ export function BudgetAlertManager({ totalSpent }: BudgetAlertManagerProps) {
                     </div>
                 </motion.div>
             )}
-        </AnimatePresence>
+        </AnimatePresence>,
+        document.body
     );
 }
