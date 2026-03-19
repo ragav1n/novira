@@ -208,7 +208,7 @@ export function AddExpenseView() {
                                     <div className="flex gap-3 overflow-x-auto pb-3 pt-1 px-2 snap-x snap-mandatory custom-scrollbar">
                                         {sortedSuggestions.map((loc, i) => (
                                             <motion.button
-                                                key={`${loc.name}-${i}-${loc.type}`}
+                                                key={`${loc.name}-${loc.type}`}
                                                 type="button"
                                                 initial={{ opacity: 0, scale: 0.9 }}
                                                 animate={{ opacity: 1, scale: 1 }}
