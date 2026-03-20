@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 
 import React, { useEffect, useState, useMemo } from 'react';
 import { useUserPreferences, CURRENCY_SYMBOLS, type Currency } from '@/components/providers/user-preferences-provider';
-import { useGroups } from '@/components/providers/groups-provider';
+import { useWorkspaceTheme } from '@/hooks/useWorkspaceTheme';
 import { supabase } from '@/lib/supabase';
 import { Card, CardContent } from '@/components/ui/card';
 import { Target, Plus, Search, HelpCircle, ArrowLeft, TrendingUp, Calendar, PiggyBank, MoreVertical, Edit2, Trash2, CheckCircle2 } from 'lucide-react';
@@ -36,70 +36,7 @@ interface SavingsGoal {
 export function GoalsView() {
     const { userId, formatCurrency, currency, activeWorkspaceId, convertAmount } = useUserPreferences();
     const router = useRouter();
-    const { groups } = useGroups();
-    
-    const activeWorkspace = useMemo(() => 
-        activeWorkspaceId && activeWorkspaceId !== 'personal' 
-            ? groups.find((g: any) => g.id === activeWorkspaceId) 
-            : null
-    , [activeWorkspaceId, groups]);
-
-    const themeConfig = useMemo(() => {
-        if (activeWorkspace?.type === 'couple') {
-            return {
-                text: 'text-rose-500',
-                textLight: 'text-rose-400',
-                textOpacity: 'text-rose-100/80',
-                bg: 'bg-rose-500/20',
-                bgLight: 'bg-rose-500/10',
-                bgSolid: 'bg-rose-500',
-                border: 'border-rose-500/20',
-                borderGlow: 'border-rose-500/30',
-                gradient: 'from-rose-600/20 to-pink-800/20',
-                hoverBg: 'hover:bg-rose-500/30',
-                hoverBtnBg: 'hover:bg-rose-600',
-                shadowGlow: 'shadow-rose-500/20',
-                shadowStrong: 'shadow-[0_0_15px_rgba(244,63,94,0.3)]',
-                indicatorEmpty: 'bg-rose-500',
-                indicatorFull: 'bg-rose-400',
-            }
-        } else if (activeWorkspace?.type === 'home') {
-            return {
-                text: 'text-amber-500',
-                textLight: 'text-amber-400',
-                textOpacity: 'text-amber-100/80',
-                bg: 'bg-amber-500/20',
-                bgLight: 'bg-amber-500/10',
-                bgSolid: 'bg-amber-500',
-                border: 'border-amber-500/20',
-                borderGlow: 'border-amber-500/30',
-                gradient: 'from-amber-600/20 to-yellow-800/20',
-                hoverBg: 'hover:bg-amber-500/30',
-                hoverBtnBg: 'hover:bg-amber-600',
-                shadowGlow: 'shadow-amber-500/20',
-                shadowStrong: 'shadow-[0_0_15px_rgba(245,158,11,0.3)]',
-                indicatorEmpty: 'bg-amber-500',
-                indicatorFull: 'bg-amber-400',
-            }
-        }
-        return {
-            text: 'text-emerald-500',
-            textLight: 'text-emerald-400',
-            textOpacity: 'text-emerald-100/80',
-            bg: 'bg-emerald-500/20',
-            bgLight: 'bg-emerald-500/10',
-            bgSolid: 'bg-emerald-500',
-            border: 'border-emerald-500/20',
-            borderGlow: 'border-emerald-500/30',
-            gradient: 'from-emerald-600/20 to-teal-800/20',
-            hoverBg: 'hover:bg-emerald-500/30',
-            hoverBtnBg: 'hover:bg-emerald-600',
-            shadowGlow: 'shadow-emerald-500/20',
-            shadowStrong: 'shadow-[0_0_15px_rgba(16,185,129,0.3)]',
-            indicatorEmpty: 'bg-emerald-500',
-            indicatorFull: 'bg-emerald-400',
-        }
-    }, [activeWorkspace]);
+    const { theme: themeConfig } = useWorkspaceTheme('emerald');
 
     const [goals, setGoals] = useState<SavingsGoal[]>([]);
     const [loading, setLoading] = useState(true);

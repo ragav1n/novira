@@ -37,15 +37,7 @@ import { BudgetAlertManager } from '@/components/budget-alert-manager';
 import { useSyncQueueState } from '@/hooks/use-sync-queue-state';
 import { retryFailedItem, discardFailedItem } from '@/lib/sync-manager';
 import { CurrencyDropdown } from '@/components/ui/currency-dropdown';
-
-type RecurringTemplate = {
-    id: string;
-    description: string;
-    amount: number;
-    currency: string;
-    frequency: string;
-    created_at: string;
-};
+import type { RecurringTemplate } from '@/types/transaction';
 
 export function SettingsView() {
     const router = useRouter();
@@ -150,7 +142,7 @@ export function SettingsView() {
         try {
             const { data, error } = await supabase
                 .from('recurring_templates')
-                .select('id, description, amount, currency, frequency, created_at')
+                .select('id, description, amount, currency, frequency, created_at, next_occurrence, last_processed, category, is_active')
                 .eq('user_id', userId)
                 .eq('is_active', true)
                 .order('created_at', { ascending: false });

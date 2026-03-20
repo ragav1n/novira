@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
     ChevronLeft, Search, SlidersHorizontal, CircleDollarSign, Tag, Plane, Home, Gift, 
     Car, Utensils, ShoppingCart, Heart, Gamepad2, School, Laptop, Music, RefreshCcw, 
@@ -18,7 +18,7 @@ import { format, parseISO } from 'date-fns';
 import { WaveLoader } from '@/components/ui/wave-loader';
 import { useUserPreferences } from '@/components/providers/user-preferences-provider';
 import { useBuckets } from '@/components/providers/buckets-provider';
-import { useGroups } from '@/components/providers/groups-provider';
+import { useWorkspaceTheme } from '@/hooks/useWorkspaceTheme';
 import {
     Sheet,
     SheetContent,
@@ -103,64 +103,10 @@ export function SearchView() {
     const [loading, setLoading] = useState(true);
     const { formatCurrency, convertAmount, currency, activeWorkspaceId } = useUserPreferences();
     const { buckets } = useBuckets();
-    const { groups } = useGroups();
+    const { theme: themeConfig } = useWorkspaceTheme();
 
     // Debounce search query
     const debouncedSearchQuery = useDebounce(searchQuery, 300);
-    
-    const activeWorkspace = useMemo(() => 
-        activeWorkspaceId && activeWorkspaceId !== 'personal'
-            ? groups.find(g => g.id === activeWorkspaceId)
-            : null
-    , [activeWorkspaceId, groups]);
-
-    const themeConfig = useMemo(() => {
-        if (activeWorkspace?.type === 'couple') {
-            return {
-                bgSolid: 'bg-rose-500',
-                bgLight: 'bg-rose-500/10',
-                bgMedium: 'bg-rose-500/20',
-                text: 'text-rose-500',
-                textWhite: 'text-white',
-                borderLight: 'border-rose-500/10',
-                borderMedium: 'border-rose-500/20',
-                borderSolid: 'border-rose-500',
-                ring: 'focus-visible:ring-rose-500/50',
-                hoverBg: 'hover:bg-rose-500/90',
-                shadowGlow: 'shadow-rose-500/20',
-                gradient: 'from-rose-500/20',
-            }
-        } else if (activeWorkspace?.type === 'home') {
-            return {
-                bgSolid: 'bg-amber-500',
-                bgLight: 'bg-amber-500/10',
-                bgMedium: 'bg-amber-500/20',
-                text: 'text-amber-500',
-                textWhite: 'text-white',
-                borderLight: 'border-amber-500/10',
-                borderMedium: 'border-amber-500/20',
-                borderSolid: 'border-amber-500',
-                ring: 'focus-visible:ring-amber-500/50',
-                hoverBg: 'hover:bg-amber-500/90',
-                shadowGlow: 'shadow-amber-500/20',
-                gradient: 'from-amber-500/20',
-            }
-        }
-        return {
-            bgSolid: 'bg-primary',
-            bgLight: 'bg-primary/10',
-            bgMedium: 'bg-primary/20',
-            text: 'text-primary',
-            textWhite: 'text-white',
-            borderLight: 'border-primary/10',
-            borderMedium: 'border-primary/20',
-            borderSolid: 'border-primary',
-            ring: 'focus-visible:ring-primary/50',
-            hoverBg: 'hover:bg-primary/90',
-            shadowGlow: 'shadow-primary/20',
-            gradient: 'from-primary/20',
-        }
-    }, [activeWorkspace]);
 
     // Advanced Filter State
     const [priceRange, setPriceRange] = useState<[number, number]>([0, 1000]);

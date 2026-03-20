@@ -1,7 +1,7 @@
 'use client';
 
 import React, { memo } from 'react';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { History, MoreVertical, Users, RefreshCcw, Ban, MapPin } from 'lucide-react';
 import type { Transaction } from '@/types/transaction';
 import {
@@ -25,6 +25,14 @@ interface TransactionRowProps {
   onHistory: () => void; // Keeping original type
   onEdit: () => void; // Keeping original type
   onDelete: () => void; // Keeping original type
+}
+
+function CategoryIcon({ icon, color }: { icon: React.ReactNode; color: string }) {
+  if (!React.isValidElement(icon)) return <>{icon}</>;
+  return React.cloneElement(icon as React.ReactElement<{ style?: React.CSSProperties; className?: string }>, {
+    style: { color },
+    className: cn((icon as React.ReactElement<{ className?: string }>).props.className, 'transition-colors duration-300'),
+  });
 }
 
 export const TransactionRow = memo(function TransactionRow({
@@ -60,17 +68,11 @@ export const TransactionRow = memo(function TransactionRow({
         <div
           className="w-10 h-10 rounded-full flex items-center justify-center border shadow-inner transition-colors duration-300"
           style={{
-            backgroundColor: `${color}20`, // 20% opacity background
-            borderColor: `${color}40`,     // 40% opacity border
+            backgroundColor: `${color}20`,
+            borderColor: `${color}40`,
           }}
         >
-          {React.isValidElement(icon)
-            ? React.cloneElement(icon as React.ReactElement<any>, {
-                style: { color: color },
-                className: cn((icon as React.ReactElement<any>).props.className, "transition-colors duration-300")
-              })
-            : icon
-          }
+          <CategoryIcon icon={icon} color={color} />
         </div>
         {hasSplits && (
           <div className="absolute -bottom-1 -right-1 w-4.5 h-4.5 rounded-full bg-primary flex items-center justify-center border border-background shadow-sm">
@@ -122,7 +124,7 @@ export const TransactionRow = memo(function TransactionRow({
                 : `Paid by ${tx.profile?.full_name?.split(' ')[0] || 'Unknown'}`}
             </span>
             <span className="shrink-0 opacity-20">•</span>
-            <span className="shrink-0">{format(new Date(tx.date), 'MMM d')}</span>
+            <span className="shrink-0">{format(parseISO(tx.date.slice(0, 10)), 'MMM d')}</span>
           </div>
 
           {/* Action buttons — optimized for the new row height */}

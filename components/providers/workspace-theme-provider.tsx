@@ -1,18 +1,10 @@
 'use client';
 
-import { useEffect, useMemo } from 'react';
-import { useUserPreferences } from './user-preferences-provider';
-import { useGroups } from './groups-provider';
+import { useEffect } from 'react';
+import { useWorkspaceTheme } from '@/hooks/useWorkspaceTheme';
 
 export function WorkspaceThemeProvider() {
-    const { activeWorkspaceId } = useUserPreferences();
-    const { groups } = useGroups();
-
-    const activeWorkspace = useMemo(() => 
-        activeWorkspaceId && activeWorkspaceId !== 'personal' 
-            ? groups.find((g: any) => g.id === activeWorkspaceId) 
-            : null
-    , [activeWorkspaceId, groups]);
+    const { activeWorkspace } = useWorkspaceTheme();
 
     useEffect(() => {
         const root = document.documentElement;

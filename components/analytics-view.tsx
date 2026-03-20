@@ -11,7 +11,7 @@ import { CHART_CONFIG, CATEGORY_COLORS, getIconForCategory, getCategoryLabel } f
 import { format, startOfMonth, endOfMonth, subMonths, subYears, isSameMonth, parseISO } from 'date-fns';
 import { useUserPreferences } from '@/components/providers/user-preferences-provider';
 import { useBuckets } from '@/components/providers/buckets-provider';
-import { useGroups } from '@/components/providers/groups-provider';
+import { useWorkspaceTheme } from '@/hooks/useWorkspaceTheme';
 import {
     Select,
     SelectContent,
@@ -117,46 +117,7 @@ export function AnalyticsView() {
     const [dateRange, setDateRange] = useState<DateRange>('1M');
     const [selectedBucketId, setSelectedBucketId] = useState<string | 'all'>('all');
     const { formatCurrency, currency, convertAmount, userId, activeWorkspaceId } = useUserPreferences();
-    const { groups } = useGroups();
-    
-    const activeWorkspace = useMemo(() => 
-        activeWorkspaceId && activeWorkspaceId !== 'personal'
-            ? groups.find(g => g.id === activeWorkspaceId)
-            : null
-    , [activeWorkspaceId, groups]);
-
-    const themeConfig = useMemo(() => {
-        if (activeWorkspace?.type === 'couple') {
-            return {
-                text: 'text-rose-500',
-                textOpacity: 'text-rose-500/60',
-                bgLight: 'bg-rose-500/10',
-                bgMedium: 'bg-rose-500/20',
-                borderLight: 'border-rose-500/10',
-                borderMedium: 'border-rose-500/20',
-                shadowGlow: 'shadow-[0_0_20px_rgba(244,63,94,0.05)]',
-            }
-        } else if (activeWorkspace?.type === 'home') {
-            return {
-                text: 'text-amber-500',
-                textOpacity: 'text-amber-500/60',
-                bgLight: 'bg-amber-500/10',
-                bgMedium: 'bg-amber-500/20',
-                borderLight: 'border-amber-500/10',
-                borderMedium: 'border-amber-500/20',
-                shadowGlow: 'shadow-[0_0_20px_rgba(245,158,11,0.05)]',
-            }
-        }
-        return {
-            text: 'text-cyan-500',
-            textOpacity: 'text-cyan-500/60',
-            bgLight: 'bg-cyan-500/10',
-            bgMedium: 'bg-cyan-500/20',
-            borderLight: 'border-cyan-500/10',
-            borderMedium: 'border-cyan-500/20',
-            shadowGlow: 'shadow-[0_0_20px_rgba(6,182,212,0.05)]',
-        }
-    }, [activeWorkspace]);
+    const { activeWorkspace, theme: themeConfig } = useWorkspaceTheme('cyan');
 
     // getIconForCategory is now imported from lib/categories.ts
     const getBucketIcon = (iconName?: string) => {
