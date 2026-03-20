@@ -176,6 +176,15 @@
     animation: page-in 0.25s cubic-bezier(0.32, 0.72, 0, 1) forwards;
   }
 
+  /* Hide scrollbars while keeping scroll functionality */
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
   /* Custom subtle scrollbar for horizontal lists */
   .custom-scrollbar::-webkit-scrollbar {
     height: 3px;

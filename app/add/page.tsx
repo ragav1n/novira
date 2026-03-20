@@ -1,6 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
+import { DataBoundary } from '@/components/boundaries/data-boundary';
 
 const AddExpenseView = dynamic(
     () => import('@/components/add-expense-view').then(mod => mod.AddExpenseView),
@@ -8,5 +9,9 @@ const AddExpenseView = dynamic(
 );
 
 export default function AddExpensePage() {
-    return <AddExpenseView />;
+    return (
+        <DataBoundary>
+            <AddExpenseView />
+        </DataBoundary>
+    );
 }
