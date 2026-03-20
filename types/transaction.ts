@@ -81,6 +81,19 @@ export type RecurringRecord = {
     metadata?: Record<string, unknown>;
 };
 
+export type RecurringTemplate = {
+    id: string;
+    description: string;
+    amount: number;
+    currency: string;
+    frequency: 'daily' | 'weekly' | 'monthly' | 'yearly';
+    next_occurrence: string;
+    last_processed: string | null;
+    category: string;
+    is_active: boolean;
+    created_at: string;
+};
+
 export type AuditLog = {
     id: string;
     action: 'INSERT' | 'UPDATE' | 'DELETE';

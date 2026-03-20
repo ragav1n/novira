@@ -2,9 +2,9 @@
 
 import { motion } from 'framer-motion';
 
-import React, { useEffect, useState, useMemo, useCallback } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useUserPreferences } from '@/components/providers/user-preferences-provider';
-import { useGroups } from '@/components/providers/groups-provider';
+import { useWorkspaceTheme } from '@/hooks/useWorkspaceTheme';
 import { supabase } from '@/lib/supabase';
 import { Card, CardContent } from '@/components/ui/card';
 import { Calendar, CreditCard, RotateCw, Trash2, ArrowLeft } from 'lucide-react';
@@ -13,55 +13,11 @@ import { format, parseISO } from 'date-fns';
 import { useRouter } from 'next/navigation';
 import { toast } from '@/utils/haptics';
 import { getCategoryLabel, getIconForCategory, CATEGORY_COLORS } from '@/lib/categories';
-
-interface RecurringTemplate {
-    id: string;
-    description: string;
-    amount: number;
-    currency: string;
-    frequency: 'daily' | 'weekly' | 'monthly' | 'yearly';
-    next_occurrence: string;
-    last_processed: string | null;
-    category: string;
-    is_active: boolean;
-}
+import type { RecurringTemplate } from '@/types/transaction';
 
 export function SubscriptionsView() {
     const { userId, formatCurrency, convertAmount, currency, activeWorkspaceId } = useUserPreferences();
-    const { groups } = useGroups();
-    
-    const activeWorkspace = useMemo(() => 
-        activeWorkspaceId && activeWorkspaceId !== 'personal' 
-            ? groups.find((g: any) => g.id === activeWorkspaceId) 
-            : null
-    , [activeWorkspaceId, groups]);
-
-    const themeConfig = useMemo(() => {
-        if (activeWorkspace?.type === 'couple') {
-            return {
-                text: 'text-rose-500',
-                bg: 'bg-rose-500/10',
-                border: 'border-rose-500/20',
-                gradient: 'from-rose-500/20 to-pink-600/20',
-                headerBg: 'bg-rose-500/20',
-            }
-        } else if (activeWorkspace?.type === 'home') {
-            return {
-                text: 'text-amber-500',
-                bg: 'bg-amber-500/10',
-                border: 'border-amber-500/20',
-                gradient: 'from-amber-500/20 to-yellow-600/20',
-                headerBg: 'bg-amber-500/20',
-            }
-        }
-        return {
-            text: 'text-primary',
-            bg: 'bg-primary/10',
-            border: 'border-primary/20',
-            gradient: 'from-[#8A2BE2]/20 to-[#4B0082]/20',
-            headerBg: 'bg-primary/20',
-        }
-    }, [activeWorkspace]);
+    const { theme: themeConfig } = useWorkspaceTheme();
 
     const router = useRouter();
     const [templates, setTemplates] = useState<RecurringTemplate[]>([]);
