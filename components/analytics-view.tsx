@@ -253,7 +253,7 @@ export function AnalyticsView() {
             if (dateRange === '1M' || dateRange === 'LM') {
                 // We need day-level groupings for short ranges
                 // Reconstruct to 'd MMM' (e.g., "1 Mar") using lightweight Date just for the matched string
-                const d = new Date(tx.date.slice(0, 10));
+                const d = parseISO(tx.date.slice(0, 10));
                 timeKey = format(d, 'd MMM');
             } else {
                 // For long ranges, group by month
@@ -268,7 +268,7 @@ export function AnalyticsView() {
 
             if (monthsBack === -1 && !monthsMap[timeKey]) {
                 // Create dummy date for sorting purposes if all time
-                monthsMap[timeKey] = { month: timeKey, rawDate: new Date(tx.date.slice(0, 10)) };
+                monthsMap[timeKey] = { month: timeKey, rawDate: parseISO(tx.date.slice(0, 10)) };
                 Object.keys(CATEGORY_COLORS).forEach(c => monthsMap[timeKey][c] = 0);
             }
 

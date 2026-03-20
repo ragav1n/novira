@@ -476,7 +476,7 @@ export function GoalsView() {
                                     className="bg-secondary/20 border-white/10 h-14 text-2xl font-bold pl-10"
                                 />
                                 <span className={`absolute left-4 top-1/2 -translate-y-1/2 text-xl font-bold ${themeConfig.text}`}>
-                                    {selectedGoalId ? CURRENCY_SYMBOLS[goals.find((g: any) => g.id === selectedGoalId)?.currency as Currency] || '$' : '$'}
+                                    {selectedGoalId ? CURRENCY_SYMBOLS[goals.find(g => g.id === selectedGoalId)?.currency as Currency] || '$' : '$'}
                                 </span>
                             </div>
                         </div>

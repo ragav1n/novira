@@ -797,7 +797,7 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency, 
                                             <div className="min-w-0">
                                                 <p className="text-sm font-bold truncate max-w-[150px]">{tx.description}</p>
                                                 <p className="text-[10px] text-emerald-400 truncate">{tx.place_name || 'Location'}</p>
-                                                <p className="text-[10px] text-muted-foreground">{new Date(tx.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
+                                                <p className="text-[10px] text-muted-foreground">{new Date(tx.date.slice(0, 10) + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
                                             </div>
                                         </div>
                                         <span className="font-black text-sm shrink-0 pl-2">{formatCurrency(tx.amount, tx.currency)}</span>
