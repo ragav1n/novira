@@ -52,12 +52,12 @@ function toastFn(message: MessageArg, options?: ExternalToast) {
 // Forward all static methods from Sonner, override `success`
 toastFn.success = (message: MessageArg, options?: ExternalToast) => {
     triggerHaptic(ImpactStyle.Light);
-    return sonnerToast.success(message, options);
+    return sonnerToast.success(message, { duration: 3000, ...options });
 };
 
 toastFn.error = (message: MessageArg, options?: ExternalToast) => {
     triggerHaptic(ImpactStyle.Heavy);
-    return sonnerToast.error(message, options);
+    return sonnerToast.error(message, { duration: 4000, ...options });
 };
 
 // Custom haptic triggers

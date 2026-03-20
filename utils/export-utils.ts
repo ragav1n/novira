@@ -1,6 +1,6 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { format, parseISO, differenceInDays } from 'date-fns';
+import { format, differenceInDays } from 'date-fns';
 import { DateRange } from 'react-day-picker';
 
 interface ExportTransaction {
@@ -132,38 +132,213 @@ export const generateCSV = (
     convertAmount: (amount: number, fromCurrency: string) => number,
     formatCurrency: (amount: number, currency?: string) => string,
     buckets: any[] = [],
-    groups: any[] = []
+    groups: any[] = [],
+    reportRange?: DateRange,
+    ownerInfo?: { email?: string; workspaceName?: string }
 ) => {
+    // RFC 4180-compliant quoting — always quote strings
+    const q = (val: string | number | null | undefined): string => {
+        if (val === null || val === undefined) return '';
+        if (typeof val === 'number') return String(val);
+        return `"${String(val).replace(/"/g, '""')}"`;
+    };
+    const row = (...cols: (string | number | null | undefined)[]) => cols.map(q).join(',');
+    const blank = () => '';
+    const heading = (title: string) => `${q(title)}`;
+
     const bucketMap = Object.fromEntries(buckets.map(b => [b.id, b]));
     const groupMap = Object.fromEntries(groups.map(g => [g.id, g]));
-    const headers = ['Date', 'Description', 'Category', 'Bucket', 'Group', 'Payment Method', 'Amount', 'Currency', 'Converted Amount', 'Location', 'Notes', 'Recurring', 'Excluded from Allowance'];
-    const rows = transactions.map(tx => {
-        const converted = tx.converted_amount || convertAmount(Number(tx.amount), tx.currency || 'USD');
+    const sorted = [...transactions].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+    // ── Calculations (mirrors PDF logic) ──────────────────────────────────────
+    let totalExpenses = 0, totalIncome = 0, recurringTotal = 0;
+    const categoryTotals: Record<string, number> = {};
+    const methodTotals: Record<string, number> = {};
+    const monthlyTotals: Record<string, number> = {};
+    const dowTotals: number[] = [0, 0, 0, 0, 0, 0, 0];
+    const locationTotals: Record<string, { count: number; total: number }> = {};
+    const bucketTotals: Record<string, { spent: number; budget: number; name: string }> = {};
+
+    transactions.forEach(tx => {
+        const amt = tx.converted_amount ?? convertAmount(Number(tx.amount), tx.currency || currency);
+        const isIncome = amt < 0 || tx.category === 'income';
+        const abs = Math.abs(amt);
+        if (isIncome) { totalIncome += abs; return; }
+        totalExpenses += abs;
+        if (tx.is_recurring) recurringTotal += abs;
+        categoryTotals[tx.category] = (categoryTotals[tx.category] || 0) + abs;
+        methodTotals[tx.payment_method || 'Other'] = (methodTotals[tx.payment_method || 'Other'] || 0) + abs;
+        const mKey = format(new Date(tx.date), 'MMM yyyy');
+        monthlyTotals[mKey] = (monthlyTotals[mKey] || 0) + abs;
+        dowTotals[new Date(tx.date).getDay()] += abs;
+        if (tx.place_name) {
+            if (!locationTotals[tx.place_name]) locationTotals[tx.place_name] = { count: 0, total: 0 };
+            locationTotals[tx.place_name].count++;
+            locationTotals[tx.place_name].total += abs;
+        }
+        if (tx.bucket_id) {
+            const bucket = bucketMap[tx.bucket_id];
+            if (bucket) {
+                if (!bucketTotals[tx.bucket_id]) bucketTotals[tx.bucket_id] = { spent: 0, budget: bucket.budget || 0, name: bucket.name };
+                bucketTotals[tx.bucket_id].spent += abs;
+            }
+        }
+    });
+
+    const expenseTxCount = transactions.filter(tx => {
+        const a = tx.converted_amount ?? convertAmount(Number(tx.amount), tx.currency || currency);
+        return a >= 0 && tx.category !== 'income';
+    }).length;
+    const daysCovered = reportRange?.from && reportRange?.to
+        ? Math.max(1, differenceInDays(reportRange.to, reportRange.from) + 1)
+        : Object.keys(monthlyTotals).length > 0 ? 30 : 1;
+    const avgPerTx = expenseTxCount > 0 ? totalExpenses / expenseTxCount : 0;
+    const avgPerDay = totalExpenses / daysCovered;
+    const savingsRate = totalIncome > 0 ? ((totalIncome - totalExpenses) / totalIncome) * 100 : null;
+    const recurringPct = totalExpenses > 0 ? (recurringTotal / totalExpenses) * 100 : 0;
+    const topCategory = Object.entries(categoryTotals).sort((a, b) => b[1] - a[1])[0];
+    const dowLabels = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+    const lines: string[] = [];
+
+    // ── Section 1: Report Info ─────────────────────────────────────────────────
+    lines.push(heading('NOVIRA FINANCIAL REPORT'));
+    if (ownerInfo?.workspaceName) lines.push(row('Workspace', ownerInfo.workspaceName));
+    if (ownerInfo?.email)         lines.push(row('Account', ownerInfo.email));
+    if (reportRange?.from) {
+        const period = reportRange.to
+            ? `${format(reportRange.from, 'MMM d, yyyy')} – ${format(reportRange.to, 'MMM d, yyyy')}`
+            : `From ${format(reportRange.from, 'MMM d, yyyy')}`;
+        lines.push(row('Period', period));
+    }
+    lines.push(row('Generated', format(new Date(), 'PPP p')));
+    lines.push(row('All amounts in', currency));
+    lines.push(blank());
+
+    // ── Section 2: Financial Summary ──────────────────────────────────────────
+    lines.push(heading('FINANCIAL SUMMARY'));
+    lines.push(row('Metric', 'Value'));
+    lines.push(row('Total Expenses', totalExpenses.toFixed(2)));
+    lines.push(row('Total Income', totalIncome.toFixed(2)));
+    lines.push(row('Net Cash Flow', (totalIncome - totalExpenses).toFixed(2)));
+    lines.push(row('Expense Transactions', expenseTxCount));
+    lines.push(row('Avg Per Transaction', avgPerTx.toFixed(2)));
+    lines.push(row('Avg Daily Spend', avgPerDay.toFixed(2)));
+    lines.push(row('Days Covered', daysCovered));
+    lines.push(row('Savings Rate', savingsRate !== null ? `${savingsRate.toFixed(1)}%` : 'N/A'));
+    lines.push(row('Recurring Spend', `${recurringPct.toFixed(1)}% of total`));
+    if (topCategory) lines.push(row('Top Category', `${topCategory[0]} (${((topCategory[1] / totalExpenses) * 100).toFixed(1)}%)`));
+    lines.push(blank());
+
+    // ── Section 3: Category Breakdown ─────────────────────────────────────────
+    lines.push(heading('CATEGORY BREAKDOWN'));
+    lines.push(row('Category', `Amount (${currency})`, '% of Total'));
+    Object.entries(categoryTotals)
+        .sort((a, b) => b[1] - a[1])
+        .forEach(([cat, amt]) => {
+            const pct = totalExpenses > 0 ? ((amt / totalExpenses) * 100).toFixed(1) : '0.0';
+            lines.push(row(cat.charAt(0).toUpperCase() + cat.slice(1), amt.toFixed(2), `${pct}%`));
+        });
+    lines.push(blank());
+
+    // ── Section 4: Payment Method Breakdown ───────────────────────────────────
+    lines.push(heading('PAYMENT METHOD BREAKDOWN'));
+    lines.push(row('Method', `Amount (${currency})`, '% of Total'));
+    Object.entries(methodTotals)
+        .sort((a, b) => b[1] - a[1])
+        .forEach(([method, amt]) => {
+            const pct = totalExpenses > 0 ? ((amt / totalExpenses) * 100).toFixed(1) : '0.0';
+            lines.push(row(method, amt.toFixed(2), `${pct}%`));
+        });
+    lines.push(blank());
+
+    // ── Section 5: Spending by Day of Week ────────────────────────────────────
+    lines.push(heading('SPENDING BY DAY OF WEEK'));
+    lines.push(row('Day', `Total Spent (${currency})`));
+    dowLabels.forEach((day, i) => lines.push(row(day, dowTotals[i].toFixed(2))));
+    lines.push(blank());
+
+    // ── Section 6: Monthly Recap ──────────────────────────────────────────────
+    if (Object.keys(monthlyTotals).length > 1) {
+        lines.push(heading('MONTHLY RECAP'));
+        lines.push(row('Month', `Total Spent (${currency})`));
+        Object.entries(monthlyTotals)
+            .sort((a, b) => new Date(a[0]).getTime() - new Date(b[0]).getTime())
+            .forEach(([month, amt]) => lines.push(row(month, amt.toFixed(2))));
+        lines.push(blank());
+    }
+
+    // ── Section 7: Bucket Performance ─────────────────────────────────────────
+    if (Object.keys(bucketTotals).length > 0) {
+        lines.push(heading('BUCKET PERFORMANCE'));
+        lines.push(row('Bucket', `Spent (${currency})`, `Budget (${currency})`, '% Used', 'Status'));
+        Object.values(bucketTotals).forEach(({ name, spent, budget }) => {
+            const hasBudget = budget > 0;
+            const pct = hasBudget ? (spent / budget) * 100 : null;
+            const status = !hasBudget ? 'No Budget' : pct! > 100 ? 'Over Budget' : pct! > 80 ? 'Near Limit' : 'On Track';
+            lines.push(row(name, spent.toFixed(2), hasBudget ? budget.toFixed(2) : '', pct !== null ? `${pct.toFixed(1)}%` : '', status));
+        });
+        lines.push(blank());
+    }
+
+    // ── Section 8: Top Locations ──────────────────────────────────────────────
+    const topLocations = Object.entries(locationTotals).sort((a, b) => b[1].count - a[1].count).slice(0, 10);
+    if (topLocations.length > 0) {
+        lines.push(heading('TOP LOCATIONS'));
+        lines.push(row('Location', 'Visits', `Total Spent (${currency})`, `Avg Per Visit (${currency})`));
+        topLocations.forEach(([name, data]) => {
+            lines.push(row(name, data.count, data.total.toFixed(2), (data.total / data.count).toFixed(2)));
+        });
+        lines.push(blank());
+    }
+
+    // ── Section 9: Transaction Details ────────────────────────────────────────
+    lines.push(heading('TRANSACTION DETAILS'));
+    lines.push(row(
+        'Date', 'Time', 'Description', 'Category', 'Type',
+        'Bucket', 'Group', 'Payment Method',
+        `Amount (Original)`, 'Original Currency',
+        `Converted Amount (${currency})`,
+        'Location', 'Notes', 'Recurring', 'Excluded from Allowance'
+    ));
+    sorted.forEach(tx => {
+        const converted = tx.converted_amount ?? convertAmount(Number(tx.amount), tx.currency || currency);
+        const isIncome = converted < 0 || tx.category === 'income';
         const bucket = tx.bucket_id ? bucketMap[tx.bucket_id] : null;
         const group = tx.group_id ? groupMap[tx.group_id] : null;
-        return [
-            format(new Date(tx.date), 'yyyy-MM-dd'),
-            `"${tx.description.replace(/"/g, '""')}"`,
-            tx.category,
+        const dateObj = new Date(tx.date);
+        lines.push(row(
+            format(dateObj, 'yyyy-MM-dd'),
+            format(dateObj, 'HH:mm'),
+            tx.description,
+            tx.category.charAt(0).toUpperCase() + tx.category.slice(1),
+            isIncome ? 'Income' : 'Expense',
             bucket?.name || '',
             group?.name || '',
-            tx.payment_method || '-',
-            tx.amount,
-            tx.currency || 'USD',
-            converted.toFixed(2),
+            tx.payment_method || '',
+            Number(tx.amount).toFixed(2),
+            tx.currency || currency,
+            Math.abs(converted).toFixed(2),
             tx.place_name || '',
-            tx.notes ? `"${tx.notes.replace(/"/g, '""')}"` : '',
+            tx.notes || '',
             tx.is_recurring ? 'Yes' : 'No',
-            tx.exclude_from_allowance ? 'Yes' : 'No'
-        ].join(',');
+            tx.exclude_from_allowance ? 'Yes' : 'No',
+        ));
     });
-    const csvContent = [headers.join(','), ...rows].join('\n');
+
+    // UTF-8 BOM ensures Excel opens the file with correct encoding (fixes €, ₹, etc.)
+    const BOM = '\uFEFF';
+    const csvContent = BOM + lines.join('\n');
+
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
-    link.setAttribute('href', url);
-    link.setAttribute('download', `expense_report_${format(new Date(), 'yyyyMMdd')}.csv`);
+    link.href = url;
+    link.download = `novira_export_${format(new Date(), 'yyyyMMdd_HHmm')}.csv`;
+    document.body.appendChild(link);
     link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
 };
 
 const loadImage = (url: string): Promise<HTMLImageElement> =>
