@@ -1,6 +1,6 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { format, differenceInDays } from 'date-fns';
+import { format, differenceInDays, parseISO } from 'date-fns';
 import { DateRange } from 'react-day-picker';
 
 interface ExportTransaction {
@@ -170,9 +170,9 @@ export const generateCSV = (
         if (tx.is_recurring) recurringTotal += abs;
         categoryTotals[tx.category] = (categoryTotals[tx.category] || 0) + abs;
         methodTotals[tx.payment_method || 'Other'] = (methodTotals[tx.payment_method || 'Other'] || 0) + abs;
-        const mKey = format(new Date(tx.date), 'MMM yyyy');
+        const mKey = format(parseISO(tx.date.slice(0, 10)), 'MMM yyyy');
         monthlyTotals[mKey] = (monthlyTotals[mKey] || 0) + abs;
-        dowTotals[new Date(tx.date).getDay()] += abs;
+        dowTotals[parseISO(tx.date.slice(0, 10)).getDay()] += abs;
         if (tx.place_name) {
             if (!locationTotals[tx.place_name]) locationTotals[tx.place_name] = { count: 0, total: 0 };
             locationTotals[tx.place_name].count++;
@@ -308,7 +308,7 @@ export const generateCSV = (
         const isIncome = converted < 0 || tx.category === 'income';
         const bucket = tx.bucket_id ? bucketMap[tx.bucket_id] : null;
         const group = tx.group_id ? groupMap[tx.group_id] : null;
-        const dateObj = new Date(tx.date);
+        const dateObj = parseISO(tx.date.slice(0, 10));
         lines.push(row(
             format(dateObj, 'yyyy-MM-dd'),
             format(dateObj, 'HH:mm'),
@@ -405,13 +405,13 @@ export const generatePDF = async (
         categoryTotals[tx.category] = (categoryTotals[tx.category] || 0) + amount;
         methodTotals[tx.payment_method || 'Other'] = (methodTotals[tx.payment_method || 'Other'] || 0) + amount;
 
-        const dateKey = format(new Date(tx.date), 'MMM d');
+        const dateKey = format(parseISO(tx.date.slice(0, 10)), 'MMM d');
         dailyTotals[dateKey] = (dailyTotals[dateKey] || 0) + amount;
 
-        const monthKey = format(new Date(tx.date), 'MMM yyyy');
+        const monthKey = format(parseISO(tx.date.slice(0, 10)), 'MMM yyyy');
         monthlyTotals[monthKey] = (monthlyTotals[monthKey] || 0) + amount;
 
-        const dow = new Date(tx.date).getDay();
+        const dow = parseISO(tx.date.slice(0, 10)).getDay();
         dowTotals[dow] += amount;
 
         if (tx.place_name) {
@@ -739,7 +739,7 @@ export const generatePDF = async (
             ? `+${formatForPDF(Math.abs(rawAmount), currency)}`
             : formatForPDF(rawAmount, currency);
         const row = [
-            format(new Date(tx.date), 'MMM d, yy'),
+            format(parseISO(tx.date.slice(0, 10)), 'MMM d, yy'),
             (tx.is_recurring ? '[R] ' : '') + (tx.description.length > 22 ? tx.description.substring(0, 20) + '..' : tx.description),
             tx.category.charAt(0).toUpperCase() + tx.category.slice(1),
             bucket?.name || '-',
