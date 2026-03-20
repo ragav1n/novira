@@ -15,10 +15,12 @@ import { ServiceWorkerRegistrar } from '@/components/service-worker-registrar'
 const geist = Geist({
   subsets: ["latin"],
   variable: "--font-sans",
+  display: 'swap',
 });
 const geistMono = Geist_Mono({
   subsets: ["latin"],
   variable: "--font-mono",
+  display: 'swap',
 });
 
 export const metadata: Metadata = {
@@ -68,6 +70,8 @@ export default function RootLayout({
       <head>
         <link rel="preconnect" href={process.env.NEXT_PUBLIC_SUPABASE_URL} crossOrigin="anonymous" />
         <link rel="dns-prefetch" href={process.env.NEXT_PUBLIC_SUPABASE_URL} />
+        <link rel="preconnect" href="https://vitals.vercel-analytics.com" />
+        <link rel="dns-prefetch" href="https://cdn.vercel-analytics.com" />
       </head>
       <body suppressHydrationWarning className={`${geist.variable} ${geistMono.variable} font-sans antialiased`}>
         <ErrorBoundary>

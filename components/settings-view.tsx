@@ -176,10 +176,17 @@ export function SettingsView() {
         try {
             if (!userId) return;
 
+            const parsedBudget = parseFloat(localBudget);
+            if (isNaN(parsedBudget) || parsedBudget < 0) {
+                toast.error('Please enter a valid budget amount.');
+                setSaving(false);
+                return;
+            }
+
             const updates = {
                 id: userId,
                 full_name: fullName,
-                monthly_budget: parseFloat(localBudget),
+                monthly_budget: parsedBudget,
                 updated_at: new Date().toISOString(),
             };
 

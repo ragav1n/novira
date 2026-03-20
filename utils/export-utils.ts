@@ -148,6 +148,8 @@ export const generateCSV = (
 
     const bucketMap = Object.fromEntries(buckets.map(b => [b.id, b]));
     const groupMap = Object.fromEntries(groups.map(g => [g.id, g]));
+    // Drop rows that would produce NaN/undefined in the report
+    transactions = transactions.filter(tx => tx.date && tx.amount != null && !isNaN(Number(tx.amount)));
     const sorted = [...transactions].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
     // ── Calculations (mirrors PDF logic) ──────────────────────────────────────
@@ -365,6 +367,9 @@ export const generatePDF = async (
 
     const bucketMap = Object.fromEntries(buckets.map(b => [b.id, b]));
     const groupMap = Object.fromEntries(groups.map(g => [g.id, g]));
+
+    // Drop rows that would produce NaN/undefined in the report
+    transactions = transactions.filter(tx => tx.date && tx.amount != null && !isNaN(Number(tx.amount)));
 
     const sortedTx = [...transactions].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
