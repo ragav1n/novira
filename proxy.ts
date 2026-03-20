@@ -2,17 +2,14 @@ import { type NextRequest } from 'next/server'
 import { updateSession } from '@/utils/supabase/middleware'
 
 export async function proxy(request: NextRequest) {
-    const nonce = Buffer.from(crypto.randomUUID()).toString('base64')
-    const isDev = process.env.NODE_ENV === 'development'
-
     const csp = [
         "default-src 'self'",
-        `script-src 'self' 'nonce-${nonce}' 'wasm-unsafe-eval' blob: https://unpkg.com https://cdn.jsdelivr.net https://va.vercel-scripts.com ${isDev ? "'unsafe-eval'" : ''}`,
-        `style-src 'self' 'unsafe-inline'`,
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://unpkg.com https://cdn.jsdelivr.net https://va.vercel-scripts.com",
+        "style-src 'self' 'unsafe-inline'",
         "img-src 'self' blob: data: https://*.supabase.co https://*.mapbox.com https://*.googleusercontent.com",
         "media-src 'self' blob: data:",
         "font-src 'self'",
-        "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.frankfurter.dev https://unpkg.com https://cdn.jsdelivr.net https://*.gstatic.com https://cdnjs.cloudflare.com https://va.vercel-scripts.com https://*.mapbox.com",
+        "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.frankfurter.dev https://v6.exchangerate-api.com https://unpkg.com https://cdn.jsdelivr.net https://*.gstatic.com https://cdnjs.cloudflare.com https://va.vercel-scripts.com https://*.mapbox.com",
         "worker-src 'self' blob: https://unpkg.com https://cdn.jsdelivr.net",
         "child-src 'self' blob: https://unpkg.com https://cdn.jsdelivr.net",
         "frame-ancestors 'none'",
@@ -22,10 +19,6 @@ export async function proxy(request: NextRequest) {
         "upgrade-insecure-requests",
     ].join('; ')
 
-    // Set nonce directly on the NextRequest headers
-    request.headers.set('x-nonce', nonce)
-
-    // Pass the original NextRequest (now with nonce header) to Supabase
     const response = await updateSession(request)
 
     // Set CSP and security headers ON that same response
