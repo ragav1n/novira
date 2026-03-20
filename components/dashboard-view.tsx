@@ -266,13 +266,14 @@ export function DashboardView() {
                     balances={balances}
                     setIsAddFundsOpen={setIsAddFundsOpen}
                 />
-                <TransactionListSection 
+                <TransactionListSection
                     isBucketFocused={isBucketFocused}
                     isMapOpen={isMapOpen}
                     setIsMapOpen={setIsMapOpen}
                     setIsViewAllOpen={setIsViewAllOpen}
                     isViewAllOpen={isViewAllOpen}
                     displayTransactions={recentFeed}
+                    allTransactions={transactions}
                     userId={userId}
                     currency={currency}
                     buckets={buckets}

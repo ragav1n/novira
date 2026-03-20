@@ -3,6 +3,7 @@ import { differenceInDays, endOfMonth, startOfMonth } from 'date-fns';
 import type { Transaction } from '@/types/transaction';
 import { CATEGORY_COLORS } from '@/lib/categories';
 import type { Currency } from '@/components/providers/user-preferences-provider';
+import type { Bucket } from '@/components/providers/buckets-provider';
 
 type SpendingCategory = {
     name: string;
@@ -30,9 +31,9 @@ export function useDashboardStats({
     currency: string;
     convertAmount: (amount: number, fromCurrency: string, toCurrency?: string) => number;
     monthlyBudget: number;
-    buckets: any[];
+    buckets: Bucket[];
 }): {
-    focusedBucket: any;
+    focusedBucket: Bucket | null;
     displayBudget: number;
     calculateUserShare: (tx: Transaction, currentUserId: string | null) => number;
     totalSpent: number;
@@ -50,7 +51,7 @@ export function useDashboardStats({
         currentDayOfMonth: number;
     } | null;
 } {
-    const focusedBucket = isBucketFocused && Array.isArray(buckets) ? buckets.find(b => b.id === effectiveFocus) : null;
+    const focusedBucket = (isBucketFocused && Array.isArray(buckets) ? buckets.find(b => b.id === effectiveFocus) : null) ?? null;
     const displayBudget = isBucketFocused && focusedBucket ? Number(focusedBucket.budget) : (monthlyBudget || 0);
 
     const currentMonthPrefix = useMemo(() => {
