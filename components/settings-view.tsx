@@ -38,6 +38,15 @@ import { useSyncQueueState } from '@/hooks/use-sync-queue-state';
 import { retryFailedItem, discardFailedItem } from '@/lib/sync-manager';
 import { CurrencyDropdown } from '@/components/ui/currency-dropdown';
 
+type RecurringTemplate = {
+    id: string;
+    description: string;
+    amount: number;
+    currency: string;
+    frequency: string;
+    created_at: string;
+};
+
 export function SettingsView() {
     const router = useRouter();
     const budgetInputRef = React.useRef<HTMLInputElement>(null);
@@ -77,9 +86,9 @@ export function SettingsView() {
 
     const [hasPassword, setHasPassword] = useState(false);
     const [hasGoogleIdentity, setHasGoogleIdentity] = useState(false);
-    const [recurringTemplates, setRecurringTemplates] = useState<any[]>([]);
+    const [recurringTemplates, setRecurringTemplates] = useState<RecurringTemplate[]>([]);
     const [loadingTemplates, setLoadingTemplates] = useState(true);
-    const [templateToDelete, setTemplateToDelete] = useState<any | null>(null);
+    const [templateToDelete, setTemplateToDelete] = useState<RecurringTemplate | null>(null);
 
     const { failedItems, pending } = useSyncQueueState();
 
@@ -297,7 +306,7 @@ export function SettingsView() {
             }
 
             const workspaceName = activeWorkspaceId && activeWorkspaceId !== 'personal'
-                ? groups.find((g: any) => g.id === activeWorkspaceId)?.name
+                ? groups.find(g => g.id === activeWorkspaceId)?.name
                 : 'Personal';
 
             if (exportType === 'csv') {

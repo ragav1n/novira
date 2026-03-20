@@ -18,6 +18,7 @@ interface TransactionListSectionProps {
     setIsViewAllOpen: (open: boolean) => void;
     isViewAllOpen: boolean;
     displayTransactions: Transaction[];
+    allTransactions?: Transaction[];
     userId: string | null;
     currency: string;
     buckets: any[];
@@ -41,6 +42,7 @@ export function TransactionListSection({
     setIsViewAllOpen,
     isViewAllOpen,
     displayTransactions,
+    allTransactions,
     userId,
     currency,
     buckets,
@@ -125,7 +127,7 @@ export function TransactionListSection({
                 onOpenChange={setIsViewAllOpen}
             >
                 <VirtualizedTransactionList
-                    transactions={displayTransactions}
+                    transactions={allTransactions ?? displayTransactions}
                     userId={userId}
                     currency={currency}
                     buckets={buckets}

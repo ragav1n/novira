@@ -14,7 +14,7 @@ import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
 import { toast, ImpactStyle } from '@/utils/haptics';
-import { format, parseISO, isSameWeek, isSameMonth, isAfter, isBefore, startOfDay, endOfDay } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { WaveLoader } from '@/components/ui/wave-loader';
 import { useUserPreferences } from '@/components/providers/user-preferences-provider';
 import { useBuckets } from '@/components/providers/buckets-provider';
@@ -98,20 +98,19 @@ const SearchSkeleton = () => (
 
 export function SearchView() {
     const router = useRouter();
-    const [transactions, setTransactions] = useState<Transaction[]>([]);
     const [filteredTransactions, setFilteredTransactions] = useState<Transaction[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
     const [loading, setLoading] = useState(true);
     const { formatCurrency, convertAmount, currency, activeWorkspaceId } = useUserPreferences();
     const { buckets } = useBuckets();
     const { groups } = useGroups();
-    
+
     // Debounce search query
     const debouncedSearchQuery = useDebounce(searchQuery, 300);
     
     const activeWorkspace = useMemo(() => 
-        activeWorkspaceId && activeWorkspaceId !== 'personal' 
-            ? groups.find((g: any) => g.id === activeWorkspaceId) 
+        activeWorkspaceId && activeWorkspaceId !== 'personal'
+            ? groups.find(g => g.id === activeWorkspaceId)
             : null
     , [activeWorkspaceId, groups]);
 
@@ -175,14 +174,6 @@ export function SearchView() {
     // Dynamic Max Price calculation
     const [maxPossiblePrice, setMaxPossiblePrice] = useState(1000);
 
-    useEffect(() => {
-        fetchTransactions();
-    }, [activeWorkspaceId]);
-
-    useEffect(() => {
-        applyFilters();
-    }, [debouncedSearchQuery, priceRange, selectedCategories, selectedPayments, dateRange, selectedBucketId, sortBy, transactions]);
-
     const getBucketIcon = (iconName?: string) => {
         const icons: Record<string, React.ElementType> = {
             Tag, Plane, Home, Gift, Car, Utensils, ShoppingCart,
@@ -192,89 +183,86 @@ export function SearchView() {
         return <Icon className="w-full h-full" />;
     };
 
-    const fetchTransactions = async (silent = false) => {
-        if (!silent) setLoading(true);
-        try {
-            let query = supabase
-                .from('transactions')
-                .select('id, description, amount, category, date, payment_method, created_at, currency, is_recurring, bucket_id')
-                .order('date', { ascending: false });
+    useEffect(() => {
+        const fetchAndFilter = async () => {
+            setLoading(true);
+            try {
+                let query = supabase
+                    .from('transactions')
+                    .select('id, description, amount, category, date, payment_method, created_at, currency, is_recurring, bucket_id');
 
-            if (activeWorkspaceId && activeWorkspaceId !== 'personal') {
-                query = query.eq('group_id', activeWorkspaceId);
-            } else if (activeWorkspaceId === 'personal') {
-                query = query.is('group_id', null);
+                // Workspace filter
+                if (activeWorkspaceId && activeWorkspaceId !== 'personal') {
+                    query = query.eq('group_id', activeWorkspaceId);
+                } else if (activeWorkspaceId === 'personal') {
+                    query = query.is('group_id', null);
+                }
+
+                // Text search
+                if (debouncedSearchQuery) {
+                    query = query.ilike('description', `%${debouncedSearchQuery}%`);
+                }
+
+                // Category filter
+                if (selectedCategories.length > 0) {
+                    query = query.in('category', selectedCategories);
+                }
+
+                // Payment method filter
+                if (selectedPayments.length > 0) {
+                    query = query.in('payment_method', selectedPayments);
+                }
+
+                // Date range filter
+                if (dateRange.from) {
+                    query = query.gte('date', format(dateRange.from, 'yyyy-MM-dd'));
+                }
+                if (dateRange.to) {
+                    query = query.lte('date', format(dateRange.to, 'yyyy-MM-dd'));
+                }
+
+                // Price range filter
+                if (priceRange[0] > 0) {
+                    query = query.gte('amount', priceRange[0]);
+                }
+                if (priceRange[1] < maxPossiblePrice) {
+                    query = query.lte('amount', priceRange[1]);
+                }
+
+                // Bucket filter
+                if (selectedBucketId) {
+                    query = query.eq('bucket_id', selectedBucketId);
+                }
+
+                // Sorting
+                const ascending = sortBy === 'date-asc' || sortBy === 'amount-asc';
+                const sortColumn = sortBy.startsWith('date') ? 'date' : 'amount';
+                query = query.order(sortColumn, { ascending });
+
+                const { data } = await query;
+
+                if (data) {
+                    setFilteredTransactions(data);
+
+                    // Update max price on first load (no filters active)
+                    if (!debouncedSearchQuery && selectedCategories.length === 0 && selectedPayments.length === 0 && !dateRange.from && !dateRange.to && !selectedBucketId && priceRange[0] === 0 && priceRange[1] >= maxPossiblePrice) {
+                        const max = Math.max(...data.map(tx => tx.amount), 1000);
+                        const rounded = Math.ceil(max / 100) * 100;
+                        if (rounded !== maxPossiblePrice) {
+                            setMaxPossiblePrice(rounded);
+                            setPriceRange([0, rounded]);
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('Error fetching transactions:', error);
+            } finally {
+                setLoading(false);
             }
+        };
 
-            const { data } = await query;
-
-            if (data) {
-                setTransactions(data);
-                setFilteredTransactions(data);
-
-                // Set max price based on actual data
-                const max = Math.max(...data.map((tx: any) => tx.amount), 1000);
-                setMaxPossiblePrice(Math.ceil(max / 100) * 100);
-                setPriceRange([0, Math.ceil(max / 100) * 100]);
-            }
-        } catch (error) {
-            console.error('Error fetching transactions:', error);
-        } finally {
-            if (!silent) setLoading(false);
-        }
-    };
-
-    const applyFilters = () => {
-        let result = [...transactions];
-
-        // 1. Text Search
-        if (searchQuery) {
-            const query = searchQuery.toLowerCase();
-            result = result.filter(tx =>
-                tx.description.toLowerCase().includes(query) ||
-                tx.category.toLowerCase().includes(query)
-            );
-        }
-
-        // 2. Price Range
-        result = result.filter(tx => tx.amount >= priceRange[0] && tx.amount <= priceRange[1]);
-
-        // 3. Categories
-        if (selectedCategories.length > 0) {
-            result = result.filter(tx => selectedCategories.includes(tx.category.toLowerCase()));
-        }
-
-        // 4. Payment Methods
-        if (selectedPayments.length > 0) {
-            result = result.filter(tx => selectedPayments.includes(tx.payment_method));
-        }
-
-        // 5. Date Range (using string comparison on YYYY-MM-DD instead of Date parsing)
-        if (dateRange.from) {
-            const fromStr = format(dateRange.from, 'yyyy-MM-dd');
-            result = result.filter(tx => tx.date.slice(0, 10) >= fromStr);
-        }
-        if (dateRange.to) {
-            const toStr = format(dateRange.to, 'yyyy-MM-dd');
-            result = result.filter(tx => tx.date.slice(0, 10) <= toStr);
-        }
-
-        // 6. Buckets
-        if (selectedBucketId) {
-            result = result.filter(tx => tx.bucket_id === selectedBucketId);
-        }
-
-        // 7. Sorting
-        result.sort((a, b) => {
-            if (sortBy === 'date-desc') return new Date(b.date).getTime() - new Date(a.date).getTime();
-            if (sortBy === 'date-asc') return new Date(a.date).getTime() - new Date(b.date).getTime();
-            if (sortBy === 'amount-desc') return b.amount - a.amount;
-            if (sortBy === 'amount-asc') return a.amount - b.amount;
-            return 0;
-        });
-
-        setFilteredTransactions(result);
-    };
+        fetchAndFilter();
+    }, [activeWorkspaceId, debouncedSearchQuery, selectedCategories, selectedPayments, dateRange, priceRange, selectedBucketId, sortBy]);
 
     const resetFilters = () => {
         setPriceRange([0, maxPossiblePrice]);

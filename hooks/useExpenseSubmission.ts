@@ -4,6 +4,7 @@ import { toast } from '@/utils/haptics';
 import { Haptics, NotificationType } from '@capacitor/haptics';
 import { TransactionService } from '@/lib/services/transaction-service';
 import type { AppRouterInstance } from 'next/dist/shared/lib/app-router-context.shared-runtime';
+import type { TransactionRecord, SplitRecord, RecurringRecord } from '@/types/transaction';
 
 interface ExpenseSubmissionParams {
     userId: string | null | undefined;
@@ -36,6 +37,117 @@ interface ExpenseSubmissionParams {
     frequency: 'daily' | 'weekly' | 'monthly' | 'yearly';
 }
 
+function validateExpenseForm(amount: string, description: string, date: Date | undefined): boolean {
+    if (!amount || parseFloat(amount) <= 0 || !description || !date) {
+        if (amount && parseFloat(amount) <= 0) {
+            toast.error('Amount must be greater than 0');
+        } else {
+            toast.error('Please fill in all required fields');
+        }
+        return false;
+    }
+    return true;
+}
+
+async function buildSplitRecords(
+    amount: string,
+    userId: string,
+    isSplitEnabled: boolean,
+    selectedGroupId: string | null,
+    selectedFriendIds: string[],
+    splitMode: 'even' | 'custom',
+    customAmounts: Record<string, string>
+): Promise<{ records: SplitRecord[] | undefined; error?: string }> {
+    if (!isSplitEnabled) return { records: undefined };
+
+    let debtors: string[] = [];
+    if (selectedGroupId) {
+        const { data: members } = await TransactionService.getGroupMembers(selectedGroupId);
+        if (!members || members.length === 0) {
+            return { records: undefined, error: 'No group members found to split with' };
+        }
+        debtors = (members as { user_id: string }[]).map(m => m.user_id).filter(id => id !== userId);
+    } else {
+        debtors = selectedFriendIds;
+    }
+
+    if (debtors.length === 0) return { records: undefined };
+
+    if (splitMode === 'custom') {
+        const totalCustom = debtors.reduce((sum, id) => sum + (parseFloat(customAmounts[id] || '0') || 0), 0);
+        if (totalCustom <= 0) return { records: undefined, error: 'Please enter split amounts' };
+        if (totalCustom > parseFloat(amount)) return { records: undefined, error: 'Split amounts exceed the total expense' };
+
+        return {
+            records: debtors
+                .filter(id => parseFloat(customAmounts[id] || '0') > 0)
+                .map(id => ({ user_id: id, amount: parseFloat(customAmounts[id]) }))
+        };
+    } else {
+        const splitAmount = parseFloat(amount) / (debtors.length + 1);
+        return { records: debtors.map(id => ({ user_id: id, amount: splitAmount })) };
+    }
+}
+
+function buildRecurringRecord(
+    userId: string,
+    description: string,
+    amount: string,
+    selectedCategory: string,
+    txCurrency: string,
+    selectedGroupId: string | null,
+    paymentMethod: string,
+    frequency: RecurringRecord['frequency'],
+    date: Date,
+    excludeFromAllowance: boolean,
+    isSplitEnabled: boolean,
+    selectedFriendIds: string[],
+    notes: string,
+    selectedBucketId: string | null,
+    placeName: string | null,
+    placeAddress: string | null,
+    placeLat: number | null,
+    placeLng: number | null
+): RecurringRecord {
+    const intendedDay = date.getDate();
+    const nextDate = new Date(date);
+    if (frequency === 'daily') {
+        nextDate.setDate(nextDate.getDate() + 1);
+    } else if (frequency === 'weekly') {
+        nextDate.setDate(nextDate.getDate() + 7);
+    } else if (frequency === 'monthly') {
+        // JS setMonth overflows short months (e.g. Jan 31 → Mar 3).
+        // Fix: step to the 1st, advance the month, then clamp to intended day.
+        nextDate.setDate(1);
+        nextDate.setMonth(nextDate.getMonth() + 1);
+        const lastDayOfMonth = new Date(nextDate.getFullYear(), nextDate.getMonth() + 1, 0).getDate();
+        nextDate.setDate(Math.min(intendedDay, lastDayOfMonth));
+    } else if (frequency === 'yearly') {
+        nextDate.setFullYear(nextDate.getFullYear() + 1);
+    }
+
+    return {
+        user_id: userId,
+        description,
+        amount: parseFloat(amount),
+        category: selectedCategory,
+        currency: txCurrency,
+        group_id: selectedGroupId,
+        payment_method: paymentMethod,
+        frequency,
+        next_occurrence: format(nextDate, 'yyyy-MM-dd'),
+        intended_day: intendedDay,
+        exclude_from_allowance: excludeFromAllowance,
+        metadata: {
+            is_split: isSplitEnabled,
+            friend_ids: selectedFriendIds,
+            notes,
+            bucket_id: selectedBucketId,
+            ...(placeName ? { place_name: placeName, place_address: placeAddress, place_lat: placeLat, place_lng: placeLng } : {})
+        }
+    };
+}
+
 export function useExpenseSubmission() {
     const [loading, setLoading] = useState(false);
 
@@ -49,14 +161,7 @@ export function useExpenseSubmission() {
             splitMode, customAmounts, isRecurring, frequency
         } = params;
 
-        if (!amount || parseFloat(amount) <= 0 || !description || !date) {
-            if (amount && parseFloat(amount) <= 0) {
-                toast.error('Amount must be greater than 0');
-                return;
-            }
-            toast.error('Please fill in all required fields');
-            return;
-        }
+        if (!validateExpenseForm(amount, description, date)) return;
 
         const idempotencyKey = crypto.randomUUID();
         setLoading(true);
@@ -67,15 +172,15 @@ export function useExpenseSubmission() {
                 return;
             }
 
-            let exchangeRate = await TransactionService.getExchangeRate(txCurrency, currency, date);
-            let convertedAmount = parseFloat(amount) * exchangeRate;
+            const exchangeRate = await TransactionService.getExchangeRate(txCurrency, currency, date!);
+            const convertedAmount = parseFloat(amount) * exchangeRate;
 
-            const transactionRecord = {
+            const transactionRecord: TransactionRecord = {
                 user_id: userId,
                 amount: parseFloat(amount),
                 description,
                 category: selectedCategory,
-                date: format(date, 'yyyy-MM-dd'),
+                date: format(date!, 'yyyy-MM-dd'),
                 payment_method: paymentMethod,
                 notes,
                 currency: txCurrency,
@@ -87,111 +192,23 @@ export function useExpenseSubmission() {
                 is_recurring: isRecurring,
                 exclude_from_allowance: excludeFromAllowance,
                 idempotency_key: idempotencyKey,
-                ...(placeName ? {
-                    place_name: placeName,
-                    place_address: placeAddress,
-                    place_lat: placeLat,
-                    place_lng: placeLng,
-                } : {})
+                ...(placeName ? { place_name: placeName, place_address: placeAddress, place_lat: placeLat, place_lng: placeLng } : {})
             };
 
-            let splitRecordsToInsert: any[] | undefined = undefined;
-
-            if (isSplitEnabled) {
-                let debtors: string[] = [];
-                if (selectedGroupId) {
-                    const { data: members } = await TransactionService.getGroupMembers(selectedGroupId);
-                    if (!members || members.length === 0) {
-                        toast.error('No group members found to split with');
-                        setLoading(false);
-                        return;
-                    }
-                    debtors = members.map((m: any) => m.user_id).filter((id: string) => id !== userId);
-                } else {
-                    debtors = selectedFriendIds;
-                }
-
-                if (debtors.length > 0) {
-                    if (splitMode === 'custom') {
-                        const totalCustom = debtors.reduce((sum, id) => sum + (parseFloat(customAmounts[id] || '0') || 0), 0);
-                        if (totalCustom <= 0) {
-                            toast.error('Please enter split amounts');
-                            setLoading(false);
-                            return;
-                        }
-                        if (totalCustom > parseFloat(amount)) {
-                            toast.error('Split amounts exceed the total expense');
-                            setLoading(false);
-                            return;
-                        }
-                        
-                        splitRecordsToInsert = debtors
-                            .filter(debtorId => parseFloat(customAmounts[debtorId] || '0') > 0)
-                            .map(debtorId => ({
-                                user_id: debtorId,
-                                amount: parseFloat(customAmounts[debtorId]),
-                                is_paid: false
-                            }));
-                    } else {
-                        const splitAmount = parseFloat(amount) / (debtors.length + 1);
-                        splitRecordsToInsert = debtors.map(debtorId => ({
-                            user_id: debtorId,
-                            amount: splitAmount,
-                            is_paid: false
-                        }));
-                    }
-                }
+            const splitResult = await buildSplitRecords(amount, userId, isSplitEnabled, selectedGroupId, selectedFriendIds, splitMode, customAmounts);
+            if (splitResult.error) {
+                toast.error(splitResult.error);
+                setLoading(false);
+                return;
             }
 
-            let recurringRecordToInsert = null;
-            if (isRecurring) {
-                const intendedDay = date.getDate();
-                const nextDate = new Date(date);
-                if (frequency === 'daily') {
-                    nextDate.setDate(nextDate.getDate() + 1);
-                } else if (frequency === 'weekly') {
-                    nextDate.setDate(nextDate.getDate() + 7);
-                } else if (frequency === 'monthly') {
-                    // JS setMonth overflows short months (e.g. Jan 31 → Mar 3).
-                    // Fix: step to the 1st, advance the month, then clamp to intended day.
-                    nextDate.setDate(1);
-                    nextDate.setMonth(nextDate.getMonth() + 1);
-                    const lastDayOfMonth = new Date(nextDate.getFullYear(), nextDate.getMonth() + 1, 0).getDate();
-                    nextDate.setDate(Math.min(intendedDay, lastDayOfMonth));
-                } else if (frequency === 'yearly') {
-                    nextDate.setFullYear(nextDate.getFullYear() + 1);
-                }
-
-                recurringRecordToInsert = {
-                    user_id: userId,
-                    description,
-                    amount: parseFloat(amount),
-                    category: selectedCategory,
-                    currency: txCurrency,
-                    group_id: selectedGroupId,
-                    payment_method: paymentMethod,
-                    frequency,
-                    next_occurrence: format(nextDate, 'yyyy-MM-dd'),
-                    intended_day: intendedDay,
-                    exclude_from_allowance: excludeFromAllowance,
-                    metadata: {
-                        is_split: isSplitEnabled,
-                        friend_ids: selectedFriendIds,
-                        notes,
-                        bucket_id: selectedBucketId,
-                        ...(placeName ? {
-                            place_name: placeName,
-                            place_address: placeAddress,
-                            place_lat: placeLat,
-                            place_lng: placeLng,
-                        } : {})
-                    }
-                };
-            }
+            const recurringRecordToInsert = isRecurring
+                ? buildRecurringRecord(userId, description, amount, selectedCategory, txCurrency, selectedGroupId, paymentMethod, frequency, date!, excludeFromAllowance, isSplitEnabled, selectedFriendIds, notes, selectedBucketId, placeName, placeAddress, placeLat, placeLng)
+                : null;
 
             const result = await TransactionService.createTransaction({
                 transaction: transactionRecord,
-                splits: splitRecordsToInsert,
+                splits: splitResult.records,
                 recurring: recurringRecordToInsert
             });
 

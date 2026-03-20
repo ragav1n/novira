@@ -35,7 +35,7 @@ const PAYMENT_COLORS: Record<string, string> = {
     other: '#EC4899',         // Hot Pink
 };
 
-const paymentChartConfig: any = {
+const paymentChartConfig: ChartConfig = {
     cash: { label: "Cash", color: PAYMENT_COLORS.cash },
     'debit card': { label: "Debit Card", color: PAYMENT_COLORS['debit card'] },
     'credit card': { label: "Credit Card", color: PAYMENT_COLORS['credit card'] },
@@ -120,8 +120,8 @@ export function AnalyticsView() {
     const { groups } = useGroups();
     
     const activeWorkspace = useMemo(() => 
-        activeWorkspaceId && activeWorkspaceId !== 'personal' 
-            ? groups.find((g: any) => g.id === activeWorkspaceId) 
+        activeWorkspaceId && activeWorkspaceId !== 'personal'
+            ? groups.find(g => g.id === activeWorkspaceId)
             : null
     , [activeWorkspaceId, groups]);
 

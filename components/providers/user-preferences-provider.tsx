@@ -4,6 +4,7 @@ import React, { createContext, useContext, useEffect, useState, useCallback, use
 import { supabase } from '@/lib/supabase';
 import { toast } from '@/utils/haptics';
 import { User, Session } from '@supabase/supabase-js';
+import { useExchangeRates } from '@/hooks/useExchangeRates';
 
 export type Currency = 'USD' | 'EUR' | 'INR' | 'GBP' | 'SGD' | 'VND' | 'TWD' | 'JPY' | 'KRW' | 'HKD' | 'MYR' | 'PHP' | 'THB' | 'CAD' | 'AUD' | 'MXN' | 'BRL' | 'IDR';
 
@@ -106,7 +107,7 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
     const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
     const [fullName, setFullName] = useState<string>('User');
     const [budgets, setBudgets] = useState<Record<string, number>>({});
-    const [exchangeRates, setExchangeRates] = useState<Record<string, number>>({});
+    const exchangeRates = useExchangeRates(currency);
     const [isNavigating, setIsNavigating] = useState(false);
     
     // Joint Workspaces State
@@ -199,7 +200,6 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
             setBudgetAlertsEnabledState(false);
             setMonthlyBudgetState(DEFAULT_BUDGETS.INR);
             setBudgets({});
-            setExchangeRates({});
             setAvatarUrl(null);
             setActiveWorkspaceId(null);
             setWorkspaceBudgets({});
@@ -307,92 +307,6 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
             supabase.removeChannel(workspaceChannel);
         };
     }, [userId, loadPreferences]);
-
-    // Fetch Exchange Rates when currency changes (with localStorage caching)
-    useEffect(() => {
-        const CACHE_TTL = 60 * 60 * 1000; // 1 hour
-        const cacheKey = `novira_rates_${currency}`;
-        const API_KEY = process.env.NEXT_PUBLIC_EXCHANGERATE_API_KEY;
-
-        const FRANKFURTER_SUPPORTED = [
-            'AUD', 'BRL', 'CAD', 'CHF', 'CNY', 'CZK', 'DKK', 'EUR', 'GBP', 'HKD',
-            'HUF', 'IDR', 'ILS', 'INR', 'ISK', 'JPY', 'KRW', 'MXN', 'MYR', 'NOK',
-            'NZD', 'PHP', 'PLN', 'RON', 'SEK', 'SGD', 'THB', 'TRY', 'USD', 'ZAR'
-        ];
-
-        const fetchRates = async () => {
-            // Check cache first
-            try {
-                const cached = localStorage.getItem(cacheKey);
-                if (cached) {
-                    const { rates, timestamp } = JSON.parse(cached);
-                    if (Date.now() - timestamp < CACHE_TTL) {
-                        setExchangeRates(rates);
-                        return;
-                    }
-                }
-            } catch (e) {
-                console.warn('[UserPreferences] Cache read failed:', e);
-            }
-
-            let ratesRes: Record<string, number> | null = null;
-
-            // Step 1: Try Frankfurter if currency is supported
-            if (FRANKFURTER_SUPPORTED.includes(currency)) {
-                try {
-                    const response = await fetch(`https://api.frankfurter.dev/v1/latest?base=${currency}`);
-                    if (response.ok) {
-                        const data = await response.json();
-                        ratesRes = data.rates;
-                        // Frankfurter doesn't include the base currency in the rates object, add it
-                        if (ratesRes) ratesRes[currency] = 1;
-                    }
-                } catch (e) {
-                    console.warn('Frankfurter fetch failed, trying fallback...');
-                }
-            }
-
-            // Step 2: Try ExchangeRate-API if Frankfurter failed or doesn't support the currency (TWD/VND)
-            if (!ratesRes && API_KEY) {
-                try {
-                    const response = await fetch(`https://v6.exchangerate-api.com/v6/${API_KEY}/latest/${currency}`);
-                    if (response.ok) {
-                        const data = await response.json();
-                        if (data.result === 'success') {
-                            ratesRes = data.conversion_rates;
-                        }
-                    }
-                } catch (e) {
-                    console.warn('ExchangeRate-API fetch failed');
-                }
-            }
-
-            if (ratesRes) {
-                setExchangeRates(ratesRes);
-                try {
-                    localStorage.setItem(cacheKey, JSON.stringify({
-                        rates: ratesRes,
-                        timestamp: Date.now()
-                    }));
-                } catch (e) {
-                    console.warn('[UserPreferences] Cache write failed:', e);
-                }
-            } else {
-                // Try to use stale cache as absolute last resort
-                try {
-                    const cached = localStorage.getItem(cacheKey);
-                    if (cached) {
-                        const { rates } = JSON.parse(cached);
-                        setExchangeRates(rates);
-                    }
-                } catch (e) {
-                    console.warn('[UserPreferences] Stale cache read failed:', e);
-                }
-            }
-        };
-
-        fetchRates();
-    }, [currency]);
 
     const refreshPreferences = useCallback(async () => {
         if (userId) {
