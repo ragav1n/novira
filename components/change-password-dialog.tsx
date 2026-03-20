@@ -161,8 +161,11 @@ export function ChangePasswordDialog({ trigger, mode = 'change', onSuccess }: Ch
                                         <Lock className={`absolute left-3 w-4 h-4 transition-all duration-300 ${focusedInput === "currentPassword" ? 'text-primary' : 'text-muted-foreground'}`} />
 
                                         <Input
+                                            id="current-password"
+                                            name="current-password"
                                             type={showCurrentPassword ? "text" : "password"}
                                             placeholder="Current Password"
+                                            autoComplete="current-password"
                                             value={currentPassword}
                                             onChange={(e) => setCurrentPassword(e.target.value)}
                                             onFocus={() => setFocusedInput("currentPassword")}
@@ -197,8 +200,11 @@ export function ChangePasswordDialog({ trigger, mode = 'change', onSuccess }: Ch
                                     <Lock className={`absolute left-3 w-4 h-4 transition-all duration-300 ${focusedInput === "password" ? 'text-primary' : 'text-muted-foreground'}`} />
 
                                     <Input
+                                        id="new-password"
+                                        name="new-password"
                                         type={showPassword ? "text" : "password"}
                                         placeholder={mode === 'change' ? "New Password" : "Password"}
+                                        autoComplete="new-password"
                                         value={password}
                                         onChange={(e) => setPassword(e.target.value)}
                                         onFocus={() => setFocusedInput("password")}
@@ -232,8 +238,11 @@ export function ChangePasswordDialog({ trigger, mode = 'change', onSuccess }: Ch
                                     <Lock className={`absolute left-3 w-4 h-4 transition-all duration-300 ${focusedInput === "confirmPassword" ? 'text-primary' : 'text-muted-foreground'}`} />
 
                                     <Input
+                                        id="confirm-password"
+                                        name="confirm-password"
                                         type={showConfirmPassword ? "text" : "password"}
                                         placeholder="Confirm Password"
+                                        autoComplete="new-password"
                                         value={confirmPassword}
                                         onChange={(e) => setConfirmPassword(e.target.value)}
                                         onFocus={() => setFocusedInput("confirmPassword")}

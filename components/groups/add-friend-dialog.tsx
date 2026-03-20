@@ -64,6 +64,9 @@ export function AddFriendDialog({ userId }: AddFriendDialogProps) {
                         <TabsContent value="email" className="space-y-4 py-4">
                             <div className="space-y-2">
                                 <Input
+                                    id="friend-email"
+                                    name="friend-email"
+                                    autoComplete="email"
                                     placeholder="friend@example.com or User ID"
                                     value={friendEmail}
                                     onChange={(e) => setFriendEmail(e.target.value)}

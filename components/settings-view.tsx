@@ -289,18 +289,23 @@ export function SettingsView() {
                 return;
             }
 
+            const workspaceName = activeWorkspaceId && activeWorkspaceId !== 'personal'
+                ? groups.find((g: any) => g.id === activeWorkspaceId)?.name
+                : 'Personal';
+
             if (exportType === 'csv') {
-                generateCSV(transactions, currency, convertAmount, formatCurrency, buckets, groups);
+                generateCSV(transactions, currency, convertAmount, formatCurrency, buckets, groups, dateRange || undefined, {
+                    email: user?.email,
+                    workspaceName,
+                });
                 toast.success('CSV Exported successfully');
             } else {
-                const workspaceName = activeWorkspaceId && activeWorkspaceId !== 'personal'
-                    ? groups.find((g: any) => g.id === activeWorkspaceId)?.name
-                    : 'Personal';
                 await generatePDF(transactions, currency, convertAmount, formatCurrency, buckets, groups, dateRange || undefined, {
                     email: user?.email,
                     avatarUrl,
                     workspaceName,
                 });
+
                 toast.success('PDF Exported successfully');
             }
             setExportModalOpen(false);
