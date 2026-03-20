@@ -38,7 +38,6 @@ const nextConfig = {
             key: 'Content-Security-Policy',
             value: [
               "img-src 'self' blob: data: https://*.supabase.co https://*.mapbox.com https://*.googleusercontent.com",
-              "script-src 'self' 'unsafe-eval' https://vercel.live",
               "worker-src 'self' blob:",
             ].join('; '),
           },
