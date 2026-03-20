@@ -42,7 +42,9 @@ export function MobileLayout({ children }: { children: React.ReactNode }) {
                         try {
                             const url = new URL(data.url);
                             path = url.pathname + url.search;
-                        } catch (e) {}
+                        } catch (e) {
+                            console.warn('[MobileLayout] Failed to parse deep link URL:', e);
+                        }
                     }
 
                     if (path) {
@@ -62,7 +64,9 @@ export function MobileLayout({ children }: { children: React.ReactNode }) {
                         try {
                             const parsed = new URL(url);
                             path = parsed.pathname + parsed.search;
-                        } catch (e) {}
+                        } catch (e) {
+                            console.warn('[MobileLayout] Failed to parse launch URL:', e);
+                        }
                     }
 
                     if (path && path !== '/') {
@@ -71,13 +75,17 @@ export function MobileLayout({ children }: { children: React.ReactNode }) {
                         }, 500);
                     }
                 }
-            } catch (error) {}
+            } catch (error) {
+                console.error('[MobileLayout] Native initialization failed:', error);
+            }
         };
 
         initNative();
 
         return () => {
-            import('@capacitor/app').then(({ App }) => App.removeAllListeners()).catch(() => {});
+            import('@capacitor/app').then(({ App }) => App.removeAllListeners()).catch((e) => {
+                console.warn('[MobileLayout] Failed to remove App listeners:', e);
+            });
         };
     }, [isNative, router]);
 

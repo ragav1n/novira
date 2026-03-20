@@ -331,7 +331,9 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
                         return;
                     }
                 }
-            } catch {}
+            } catch (e) {
+                console.warn('[UserPreferences] Cache read failed:', e);
+            }
 
             let ratesRes: Record<string, number> | null = null;
 
@@ -372,7 +374,9 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
                         rates: ratesRes,
                         timestamp: Date.now()
                     }));
-                } catch {}
+                } catch (e) {
+                    console.warn('[UserPreferences] Cache write failed:', e);
+                }
             } else {
                 // Try to use stale cache as absolute last resort
                 try {
@@ -381,7 +385,9 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
                         const { rates } = JSON.parse(cached);
                         setExchangeRates(rates);
                     }
-                } catch {}
+                } catch (e) {
+                    console.warn('[UserPreferences] Stale cache read failed:', e);
+                }
             }
         };
 

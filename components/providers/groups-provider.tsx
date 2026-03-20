@@ -45,6 +45,7 @@ interface Split {
         currency?: string;
         exchange_rate?: number;
         base_currency?: string;
+        profile?: { full_name?: string; avatar_url?: string | null } | null;
     };
 }
 
@@ -71,6 +72,15 @@ interface GroupsContextType {
     leaveGroup: (groupId: string) => Promise<void>;
     removeFriend: (friendshipId: string) => Promise<void>;
     simplifiedDebts: SimplifiedPayment[];
+}
+
+interface RawGroupMember {
+    user_id: string;
+    profile?: {
+        full_name: string;
+        avatar_url: string | null;
+        email: string;
+    } | null;
 }
 
 const GroupsContext = createContext<GroupsContextType | undefined>(undefined);
@@ -153,15 +163,15 @@ export function GroupsProvider({ children }: { children: React.ReactNode }) {
             if (groupsResult.data) {
                 const formattedGroups = groupsResult.data.map(g => ({
                     ...g,
-                    members: (g.members || []).map((m: any) => ({
+                    members: (g.members || []).map((m: RawGroupMember) => ({
                         user_id: m.user_id,
                         full_name: m.profile?.full_name || 'Unknown',
-                        avatar_url: m.profile?.avatar_url,
+                        avatar_url: m.profile?.avatar_url ?? null,
                         email: m.profile?.email || ''
                     }))
                 }));
                 setGroups(formattedGroups.filter(g =>
-                    g.members.some((m: any) => m.user_id === userId)
+                    g.members.some((m: RawGroupMember) => m.user_id === userId)
                 ));
             }
 
@@ -202,20 +212,20 @@ export function GroupsProvider({ children }: { children: React.ReactNode }) {
             if (myDebtsResult.error) throw myDebtsResult.error;
             if (myCreditsResult.error) throw myCreditsResult.error;
 
-            const totalOwed = (myDebtsResult.data || []).reduce((acc: number, s: any) => {
+            const totalOwed = (myDebtsResult.data || []).reduce((acc: number, s: Split) => {
                 const amount = Number(s.amount);
                 const tx = s.transaction;
                 if (!tx) return acc + amount;
                 if (tx.currency === userCurrency) return acc + amount;
-                return acc + convertAmount(amount, tx.currency);
+                return acc + convertAmount(amount, tx.currency ?? userCurrency);
             }, 0);
 
-            const totalOwedToMe = (myCreditsResult.data || []).reduce((acc: number, s: any) => {
+            const totalOwedToMe = (myCreditsResult.data || []).reduce((acc: number, s: Split) => {
                 const amount = Number(s.amount);
                 const tx = s.transaction;
                 if (!tx) return acc + amount;
                 if (tx.currency === userCurrency) return acc + amount;
-                return acc + convertAmount(amount, tx.currency);
+                return acc + convertAmount(amount, tx.currency ?? userCurrency);
             }, 0);
 
             setBalances({ totalOwed, totalOwedToMe });
@@ -225,7 +235,11 @@ export function GroupsProvider({ children }: { children: React.ReactNode }) {
             const uniquePending = Array.from(new Map(allPending.map(item => [item.id, item])).values());
 
             if (uniquePending.length > 0) {
-                const formatted = uniquePending.map((s: any) => {
+                type SplitWithJoins = Split & {
+                    profile?: { full_name?: string } | null;
+                    created_at?: string;
+                };
+                const formatted = uniquePending.map((s: SplitWithJoins) => {
                     const isCreditor = s.transaction?.user_id === userId;
                     const payerName = isCreditor
                         ? (s.profile?.full_name || 'Friend')
@@ -238,13 +252,14 @@ export function GroupsProvider({ children }: { children: React.ReactNode }) {
                             payer_name: payerName
                         } : {
                             description: 'Unknown Transaction',
-                            date: s.created_at,
+                            date: s.created_at ?? new Date().toISOString(),
+                            user_id: '',
                             payer_name: payerName
                         }
-                    };
+                    } as Split;
                 });
 
-                formatted.sort((a, b) => new Date(b.transaction.date).getTime() - new Date(a.transaction.date).getTime());
+                formatted.sort((a, b) => new Date(b.transaction!.date).getTime() - new Date(a.transaction!.date).getTime());
                 setPendingSplits(formatted);
             } else {
                 setPendingSplits([]);

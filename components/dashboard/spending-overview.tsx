@@ -10,7 +10,23 @@ import { Card, CardContent } from '@/components/ui/card';
 import { BasePieChart } from '@/components/charts/base-pie-chart';
 import { CHART_CONFIG } from '@/lib/categories';
 import { Currency, CURRENCY_SYMBOLS } from '@/components/providers/user-preferences-provider';
+import { Bucket } from '@/components/providers/buckets-provider';
 import { toast } from '@/utils/haptics';
+
+type SpendingCategory = {
+    name: string;
+    value: number;
+    color: string;
+    fill: string;
+};
+
+type RunRateData = {
+    dailyAverage: number;
+    projectedSpend: number;
+    isExceeding: boolean;
+    daysInMonth: number;
+    currentDayOfMonth: number;
+};
 
 interface SpendingOverviewProps {
     totalSpent: number;
@@ -18,25 +34,25 @@ interface SpendingOverviewProps {
     remaining: number;
     progress: number;
     isBucketFocused: boolean;
-    focusedBucket: any | null;
+    focusedBucket: Bucket | null;
     bucketCurrency: Currency;
     formatCurrency: (val: number, cur: Currency) => string;
     isRatesLoading: boolean;
     isCoupleWorkspace: boolean;
     isHomeWorkspace: boolean;
-    runRateData: any;
+    runRateData: RunRateData | null;
     dashboardFocus: string;
     setDashboardFocus: (focus: string) => void;
     isFocusMenuOpen: boolean;
     setIsFocusMenuOpen: (open: boolean) => void;
-    activeBuckets: any[];
+    activeBuckets: Bucket[];
     getBucketIcon: (iconName?: string) => React.ReactNode;
     setIsBudgetEditOpen: (open: boolean) => void;
     setTempBudgetInput: (val: string) => void;
     hoveredFocusId: string | null;
     setHoveredFocusId: (id: string | null) => void;
     focusSelectorRef: React.RefObject<HTMLDivElement | null>;
-    spendingData: any[];
+    spendingData: SpendingCategory[];
     balances: {
         totalOwedToMe: number;
         totalOwed: number;
@@ -54,7 +70,7 @@ const itemVariants = {
     visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: [0.32, 0.725, 0.32, 1] } }
 };
 
-export function SpendingOverview({
+export const SpendingOverview = React.memo(function SpendingOverview({
     totalSpent,
     displayBudget,
     remaining,
@@ -416,7 +432,7 @@ export function SpendingOverview({
                                     />
                                 </motion.div>
                                 <div className="w-full flex-1 space-y-2">
-                                    {spendingData.map((item: any) => (
+                                    {spendingData.map((item: SpendingCategory) => (
                                         <div key={item.name} className="flex items-center justify-between text-[11px]">
                                             <div className="flex items-center gap-2">
                                                 <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
@@ -440,4 +456,5 @@ export function SpendingOverview({
             </div>
         </div>
     );
-}
+});
+SpendingOverview.displayName = 'SpendingOverview';

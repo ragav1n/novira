@@ -1,5 +1,5 @@
 import { supabase } from '../supabase';
-import { Transaction } from '@/types/transaction';
+import { Transaction, TransactionRecord, SplitRecord, RecurringRecord } from '@/types/transaction';
 import { enqueueMutation } from '../sync-manager';
 import { toast } from '@/utils/haptics';
 import { format } from 'date-fns';
@@ -134,9 +134,9 @@ export const TransactionService = {
     },
 
     async createTransaction(params: {
-        transaction: any;
-        splits?: any[];
-        recurring?: any;
+        transaction: TransactionRecord;
+        splits?: SplitRecord[];
+        recurring?: RecurringRecord | null;
     }) {
         const { transaction, splits, recurring } = params;
 
