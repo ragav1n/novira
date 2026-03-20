@@ -5,6 +5,8 @@ const nextConfig = {
     remotePatterns: [
       { protocol: 'https', hostname: '*.supabase.co' },
       { protocol: 'https', hostname: '*.googleusercontent.com' },
+      { protocol: 'https', hostname: 'api.mapbox.com' },
+      { protocol: 'https', hostname: 'staticmap.openstreetmap.de' },
     ],
   },
   experimental: {

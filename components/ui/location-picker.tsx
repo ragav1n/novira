@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import Image from 'next/image';
 import { MapPin, X, Search, Navigation, LocateFixed, Clock } from 'lucide-react';
 import { getDistance } from '@/lib/location';
 import { cn } from '@/lib/utils';
@@ -70,12 +71,12 @@ const getMakiEmoji = (maki?: string): string => {
 
 function HighlightedText({ text, query }: { text: string; query: string }) {
     if (!query.trim()) return <>{text}</>;
-    const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
-    const parts = text.split(regex);
+    // Split with capturing group → odd indices are the matched portions
+    const parts = text.split(new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi'));
     return (
         <>
             {parts.map((part, i) =>
-                regex.test(part)
+                i % 2 === 1
                     ? <span key={i} className="font-extrabold text-foreground">{part}</span>
                     : <span key={i}>{part}</span>
             )}
@@ -97,11 +98,21 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
     const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const abortControllerRef = useRef<AbortController | null>(null);
     const searchCacheRef = useRef<Map<string, PlacePrediction[]>>(new Map());
+    const searchCacheKeysRef = useRef<string[]>([]); // FIFO order for eviction
     const coordsCacheRef = useRef<Map<string, { lat: number; lng: number }>>(new Map());
+    const coordsCacheKeysRef = useRef<string[]>([]); // FIFO order for eviction
     const nearbyFetchedRef = useRef(false);
     const isSelectingCurrentRef = useRef(false);
-    const sessionTokenRef = useRef(crypto.randomUUID());
+    const sessionTokenRef = useRef({ token: crypto.randomUUID(), createdAt: Date.now() });
     const listRef = useRef<HTMLDivElement>(null);
+
+    const getSessionToken = useCallback(() => {
+        // Rotate session token after 30 minutes per Mapbox billing guidelines
+        if (Date.now() - sessionTokenRef.current.createdAt > 30 * 60 * 1000) {
+            sessionTokenRef.current = { token: crypto.randomUUID(), createdAt: Date.now() };
+        }
+        return sessionTokenRef.current.token;
+    }, []);
 
     const [isLocating, setIsLocating] = useState(false);
     const hasLocation = !!placeName;
@@ -163,17 +174,25 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
 
     const prefetchCoords = useCallback(async (results: PlacePrediction[]) => {
         if (!mapboxToken) return;
-        // Pre-fetch top 2 results that don't have coords yet
-        const toFetch = results.filter(r => r._mapbox_id && !coordsCacheRef.current.has(r._mapbox_id!)).slice(0, 2);
+        // Pre-fetch top 5 results that don't have coords yet
+        const toFetch = results.filter(r => r._mapbox_id && !coordsCacheRef.current.has(r._mapbox_id!)).slice(0, 5);
         toFetch.forEach(async (r) => {
             try {
                 const res = await fetch(
                     `https://api.mapbox.com/search/searchbox/v1/retrieve/${r._mapbox_id}?` +
-                    new URLSearchParams({ access_token: mapboxToken, session_token: sessionTokenRef.current })
+                    new URLSearchParams({ access_token: mapboxToken, session_token: getSessionToken() })
                 );
                 const data = await res.json();
                 const coords = data.features?.[0]?.geometry?.coordinates;
-                if (coords) coordsCacheRef.current.set(r._mapbox_id!, { lat: coords[1], lng: coords[0] });
+                if (coords) {
+                    const key = r._mapbox_id!;
+                    if (coordsCacheKeysRef.current.length >= 100) {
+                        const evicted = coordsCacheKeysRef.current.shift()!;
+                        coordsCacheRef.current.delete(evicted);
+                    }
+                    coordsCacheKeysRef.current.push(key);
+                    coordsCacheRef.current.set(key, { lat: coords[1], lng: coords[0] });
+                }
             } catch {}
         });
     }, [mapboxToken]);
@@ -216,6 +235,11 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                         _is_nearby: dist !== undefined && dist < 15,
                     };
                 }).sort((a: any, b: any) => (a._distance || 999) - (b._distance || 999));
+                if (searchCacheKeysRef.current.length >= 50) {
+                    const evicted = searchCacheKeysRef.current.shift()!;
+                    searchCacheRef.current.delete(evicted);
+                }
+                searchCacheKeysRef.current.push(cacheKey);
                 searchCacheRef.current.set(cacheKey, results);
                 setPredictions(results);
                 setActiveIndex(-1);
@@ -245,7 +269,7 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
             abortControllerRef.current?.abort();
             abortControllerRef.current = new AbortController();
             const queryParams: Record<string, string> = {
-                q: searchQuery, access_token: mapboxToken!, session_token: sessionTokenRef.current,
+                q: searchQuery, access_token: mapboxToken!, session_token: getSessionToken(),
                 limit: '8', language: 'en', types: 'poi,place,address',
             };
             if (lastPosition) queryParams.proximity = `${lastPosition.lng},${lastPosition.lat}`;
@@ -269,6 +293,11 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                     _is_nearby: s.distance !== undefined && s.distance < 15000,
                     _distance: s.distance ? s.distance / 1000 : undefined,
                 })).sort((a: any, b: any) => (a._distance || 999) - (b._distance || 999));
+                if (searchCacheKeysRef.current.length >= 50) {
+                    const evicted = searchCacheKeysRef.current.shift()!;
+                    searchCacheRef.current.delete(evicted);
+                }
+                searchCacheKeysRef.current.push(cacheKey);
                 searchCacheRef.current.set(cacheKey, results);
                 setPredictions(results);
                 setActiveIndex(-1);
@@ -334,7 +363,7 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
             const { lat, lng } = coordsCacheRef.current.get(pred._mapbox_id)!;
             const loc: LocationData = { place_name: pred.structured_formatting.main_text, place_address: pred.description, place_lat: lat, place_lng: lng };
             onChange(loc); saveToRecent(loc);
-            sessionTokenRef.current = crypto.randomUUID();
+            sessionTokenRef.current = { token: crypto.randomUUID(), createdAt: Date.now() };
             setIsExpanded(false); setQuery(''); setPredictions([]);
             return;
         }
@@ -344,14 +373,14 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
             try {
                 const res = await fetch(
                     `https://api.mapbox.com/search/searchbox/v1/retrieve/${pred._mapbox_id}?` +
-                    new URLSearchParams({ access_token: mapboxToken, session_token: sessionTokenRef.current })
+                    new URLSearchParams({ access_token: mapboxToken, session_token: getSessionToken() })
                 );
                 const data = await res.json();
                 const coords = data.features?.[0]?.geometry?.coordinates;
                 if (coords) {
                     const loc: LocationData = { place_name: pred.structured_formatting.main_text, place_address: pred.description, place_lat: coords[1], place_lng: coords[0] };
                     onChange(loc); saveToRecent(loc);
-                    sessionTokenRef.current = crypto.randomUUID();
+                    sessionTokenRef.current = { token: crypto.randomUUID(), createdAt: Date.now() };
                     setIsExpanded(false); setQuery(''); setPredictions([]);
                     return;
                 }
@@ -369,11 +398,13 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
     // ── Keyboard navigation (desktop PWA / bluetooth keyboard on mobile) ────
 
     const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-        if (predictions.length === 0) return;
+        const isShowingRecents = query.length === 0 && recentLocations.length > 0 && predictions.length === 0;
+        const activeList = predictions.length > 0 ? predictions : isShowingRecents ? recentLocations : [];
+        if (activeList.length === 0) return;
         if (e.key === 'ArrowDown') {
             e.preventDefault();
             setActiveIndex(i => {
-                const next = Math.min(i + 1, predictions.length - 1);
+                const next = Math.min(i + 1, activeList.length - 1);
                 listRef.current?.children[next]?.scrollIntoView({ block: 'nearest' });
                 return next;
             });
@@ -386,11 +417,11 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
             });
         } else if (e.key === 'Enter' && activeIndex >= 0) {
             e.preventDefault();
-            handleSelectPlace(predictions[activeIndex]);
+            handleSelectPlace(activeList[activeIndex]);
         } else if (e.key === 'Escape') {
             setIsExpanded(false); setQuery(''); setPredictions([]);
         }
-    }, [predictions, activeIndex, handleSelectPlace]);
+    }, [predictions, recentLocations, activeIndex, handleSelectPlace, query.length]);
 
     // ── Current location ────────────────────────────────────────────────────
 
@@ -417,8 +448,14 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                 onChange(loc); saveToRecent(loc);
             }
             setIsExpanded(false); setIsLocating(false);
-        }, () => {
-            toast.error('Location unavailable'); setIsLocating(false);
+        }, (err) => {
+            const msg = err.code === err.PERMISSION_DENIED
+                ? 'Location permission denied. Enable in device settings.'
+                : err.code === err.TIMEOUT
+                    ? 'Location request timed out. Try again.'
+                    : 'Unable to get your location.';
+            toast.error(msg);
+            setIsLocating(false);
         }, { enableHighAccuracy: true, timeout: 8000 });
     }, [mapboxToken, onChange, saveToRecent]);
 
@@ -445,7 +482,7 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                         {placeLat && placeLng && (
                             <div onClick={() => window.open(`https://www.google.com/maps/dir/?api=1&destination=${placeLat},${placeLng}`, '_blank')}
                                 className="w-full h-[100px] bg-secondary/20 cursor-pointer relative overflow-hidden active:opacity-80 transition-opacity">
-                                <img src={getStaticMapUrl(placeLat, placeLng)} alt="Map" className="w-full h-full object-cover opacity-80" loading="lazy" />
+                                <Image src={getStaticMapUrl(placeLat, placeLng)} alt="Map" fill className="object-cover opacity-80" sizes="400px" />
                                 <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
                                 <div className="absolute bottom-2 right-2 flex items-center gap-1 text-[10px] font-bold text-white bg-black/40 backdrop-blur-sm rounded-full px-2 py-1">
                                     <Navigation className="w-2.5 h-2.5" /> Directions
@@ -501,9 +538,10 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
             {/* Search input */}
             <div className="relative">
                 <Input
-                    id="location-search" name="location-search" ref={(el) => { (el as any); }}
+                    id="location-search" name="location-search"
                     autoFocus autoComplete="off" inputMode="search"
-                    role="combobox" aria-expanded={predictions.length > 0} aria-haspopup="listbox"
+                    role="combobox" aria-expanded={predictions.length > 0 || showRecents} aria-haspopup="listbox"
+                    aria-controls="loc-listbox"
                     aria-activedescendant={activeIndex >= 0 ? `loc-option-${activeIndex}` : undefined}
                     placeholder="Search for a place..."
                     value={query}
@@ -535,6 +573,7 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
             <AnimatePresence>
                 {showRecents && (
                     <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
+                        id="loc-listbox" role="listbox" aria-label="Recent locations"
                         className="absolute left-0 right-0 top-full mt-2 z-[100] rounded-2xl border border-white/10 bg-[#0A0A0A] shadow-2xl overflow-hidden ring-1 ring-white/5">
                         <p className="text-[9px] font-bold text-muted-foreground/50 uppercase tracking-widest px-3 pt-2.5 pb-1">Recent</p>
                         <div className="max-h-[260px] overflow-y-auto no-scrollbar" ref={listRef}>
@@ -569,8 +608,8 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
             <AnimatePresence>
                 {predictions.length > 0 && (
                     <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
-                        className="absolute left-0 right-0 top-full mt-2 z-[100] rounded-2xl border border-white/10 bg-[#0A0A0A] shadow-2xl overflow-hidden ring-1 ring-white/5"
-                        role="listbox" aria-label="Location suggestions">
+                        id="loc-listbox" role="listbox" aria-label="Location suggestions"
+                        className="absolute left-0 right-0 top-full mt-2 z-[100] rounded-2xl border border-white/10 bg-[#0A0A0A] shadow-2xl overflow-hidden ring-1 ring-white/5">
                         <div className="max-h-[280px] overflow-y-auto no-scrollbar" ref={listRef}>
                             {predictions.map((prediction, i) => {
                                 const emoji = getMakiEmoji(prediction._maki);
