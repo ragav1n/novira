@@ -260,8 +260,15 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
             }
         });
 
+        // Safety net: if onAuthStateChange hasn't fired within 5s (network/SDK issue),
+        // unblock the loading screen so the user isn't permanently stuck.
+        const loadingTimeout = setTimeout(() => {
+            if (mounted) setIsLoading(false);
+        }, 5000);
+
         return () => {
             mounted = false;
+            clearTimeout(loadingTimeout);
             subscription.unsubscribe();
             document.removeEventListener('visibilitychange', handleVisibilityChange);
         };
