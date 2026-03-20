@@ -35,6 +35,52 @@ export type Transaction = {
     group_id?: string | null;
 };
 
+export type TransactionRecord = {
+    user_id: string;
+    amount: number;
+    description: string;
+    category: string;
+    date: string;
+    payment_method: string;
+    notes: string;
+    currency: string;
+    group_id: string | null;
+    bucket_id: string | null;
+    exchange_rate: number;
+    base_currency: string;
+    converted_amount: number;
+    is_recurring: boolean;
+    exclude_from_allowance: boolean;
+    idempotency_key?: string;
+    place_name?: string;
+    place_address?: string | null;
+    place_lat?: number | null;
+    place_lng?: number | null;
+};
+
+export type SplitRecord = {
+    user_id: string;
+    amount: number;
+    idempotency_key?: string;
+};
+
+export type RecurringRecord = {
+    frequency: 'daily' | 'weekly' | 'monthly' | 'yearly';
+    next_due_date?: string;
+    next_occurrence?: string;
+    is_active?: boolean;
+    user_id?: string;
+    description?: string;
+    amount?: number;
+    category?: string;
+    currency?: string;
+    group_id?: string | null;
+    payment_method?: string;
+    intended_day?: number;
+    exclude_from_allowance?: boolean;
+    metadata?: Record<string, unknown>;
+};
+
 export type AuditLog = {
     id: string;
     action: 'INSERT' | 'UPDATE' | 'DELETE';

@@ -35,6 +35,11 @@ interface BucketsContextType {
 
 const BucketsContext = createContext<BucketsContextType | undefined>(undefined);
 
+interface BucketSplit {
+    user_id: string;
+    amount: number | string;
+}
+
 export function BucketsProvider({ children }: { children: React.ReactNode }) {
     const { userId, currency, convertAmount, activeWorkspaceId } = useUserPreferences();
     const [buckets, setBuckets] = useState<Bucket[]>([]);
@@ -66,10 +71,10 @@ export function BucketsProvider({ children }: { children: React.ReactNode }) {
                     let shareAmount = Number(tx.amount);
                     if (tx.splits && tx.splits.length > 0) {
                         if (tx.user_id === userId) {
-                            const othersOwe = tx.splits.reduce((sum: number, s: any) => sum + Number(s.amount || 0), 0);
+                            const othersOwe = tx.splits.reduce((sum: number, s: BucketSplit) => sum + Number(s.amount || 0), 0);
                             shareAmount = Number(tx.amount) - othersOwe;
                         } else {
-                            const mySplit = tx.splits.find((s: any) => s.user_id === userId);
+                            const mySplit = tx.splits.find((s: BucketSplit) => s.user_id === userId);
                             shareAmount = mySplit ? Number(mySplit.amount || 0) : 0;
                         }
                     } else if (tx.user_id !== userId) {
@@ -98,17 +103,72 @@ export function BucketsProvider({ children }: { children: React.ReactNode }) {
         }
     }, [userId, activeWorkspaceId, currency, convertAmount]);
 
-    // Debounced refresh to batch rapid realtime events
+    // Separate spending-only refresh — avoids re-fetching the bucket list when only tx/splits change
+    const bucketsRef = useRef<Bucket[]>([]);
+    bucketsRef.current = buckets;
+
+    const fetchSpendingOnly = useCallback(async () => {
+        if (!userId) return;
+        try {
+            const spendingData = await BucketService.getBucketSpending(userId, activeWorkspaceId);
+            const currentBuckets = bucketsRef.current;
+            if (spendingData) {
+                const bucketMap = new Map(currentBuckets.map(b => [b.id, b]));
+                const spending: Record<string, number> = {};
+                spendingData.forEach(tx => {
+                    const bId = tx.bucket_id;
+                    if (!bId) return;
+                    const bucketConfig = bucketMap.get(bId);
+                    const bucketCurrency = (bucketConfig?.currency || currency).toUpperCase();
+                    let shareAmount = Number(tx.amount);
+                    if (tx.splits && tx.splits.length > 0) {
+                        if (tx.user_id === userId) {
+                            const othersOwe = tx.splits.reduce((sum: number, s: BucketSplit) => sum + Number(s.amount || 0), 0);
+                            shareAmount = Number(tx.amount) - othersOwe;
+                        } else {
+                            const mySplit = tx.splits.find((s: BucketSplit) => s.user_id === userId);
+                            shareAmount = mySplit ? Number(mySplit.amount || 0) : 0;
+                        }
+                    } else if (tx.user_id !== userId) {
+                        shareAmount = 0;
+                    }
+                    if (shareAmount <= 0) return;
+                    let amountInBucketCurrency = 0;
+                    if (tx.currency === bucketCurrency) {
+                        amountInBucketCurrency = shareAmount;
+                    } else if (tx.exchange_rate && tx.base_currency === bucketCurrency) {
+                        amountInBucketCurrency = shareAmount * Number(tx.exchange_rate);
+                    } else {
+                        amountInBucketCurrency = convertAmount(shareAmount, tx.currency || 'USD', bucketCurrency);
+                    }
+                    spending[bId] = (spending[bId] || 0) + amountInBucketCurrency;
+                });
+                setBucketSpending(spending);
+            }
+        } catch (error) {
+            console.error('Error refreshing bucket spending:', error);
+        }
+    }, [userId, activeWorkspaceId, currency, convertAmount]);
+
+    // Debounced refresh helpers
     const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const spendingDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
     const debouncedFetchBuckets = useCallback(() => {
         if (debounceRef.current) clearTimeout(debounceRef.current);
         debounceRef.current = setTimeout(() => fetchBuckets(), 300);
     }, [fetchBuckets]);
 
-    // Clean up debounce timer on unmount
+    const debouncedFetchSpending = useCallback(() => {
+        if (spendingDebounceRef.current) clearTimeout(spendingDebounceRef.current);
+        spendingDebounceRef.current = setTimeout(() => fetchSpendingOnly(), 300);
+    }, [fetchSpendingOnly]);
+
+    // Clean up debounce timers on unmount
     useEffect(() => {
         return () => {
             if (debounceRef.current) clearTimeout(debounceRef.current);
+            if (spendingDebounceRef.current) clearTimeout(spendingDebounceRef.current);
         };
     }, []);
 
@@ -116,7 +176,8 @@ export function BucketsProvider({ children }: { children: React.ReactNode }) {
         if (userId) {
             fetchBuckets();
 
-            // Realtime subscription with debounce and workspace scoping
+            // Buckets table changes → full refresh (config may have changed)
+            // Transactions/splits table changes → spending only (bucket config unchanged)
             const channel = supabase
                 .channel(`buckets-updates-${userId}-${activeWorkspaceId || 'personal'}`)
                 .on('postgres_changes', {
@@ -131,14 +192,14 @@ export function BucketsProvider({ children }: { children: React.ReactNode }) {
                     schema: 'public',
                     table: 'transactions'
                 }, () => {
-                    debouncedFetchBuckets();
+                    debouncedFetchSpending();
                 })
                 .on('postgres_changes', {
                     event: '*',
                     schema: 'public',
                     table: 'splits'
                 }, () => {
-                    debouncedFetchBuckets();
+                    debouncedFetchSpending();
                 })
                 .subscribe();
 
@@ -149,7 +210,7 @@ export function BucketsProvider({ children }: { children: React.ReactNode }) {
             setBuckets([]);
             setLoading(false);
         }
-    }, [userId, fetchBuckets, debouncedFetchBuckets]);
+    }, [userId, fetchBuckets, debouncedFetchBuckets, debouncedFetchSpending]);
 
     const createBucket = useCallback(async (data: Partial<Bucket>) => {
         if (!userId) {

@@ -124,7 +124,9 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
         try {
             const cached = localStorage.getItem('novira_recent_locations_v2');
             if (cached) setRecentLocations(JSON.parse(cached));
-        } catch {}
+        } catch (e) {
+            console.warn('[LocationPicker] Failed to load recent locations:', e);
+        }
     }, []);
 
     const saveToRecent = useCallback((loc: LocationData) => {
@@ -193,7 +195,9 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                     coordsCacheKeysRef.current.push(key);
                     coordsCacheRef.current.set(key, { lat: coords[1], lng: coords[0] });
                 }
-            } catch {}
+            } catch (e) {
+                console.warn('[LocationPicker] Coord prefetch failed:', e);
+            }
         });
     }, [mapboxToken]);
 
@@ -337,8 +341,11 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                         };
                     }).sort((a: any, b: any) => (a._distance || 0) - (b._distance || 0)));
                 }
-            } catch {}
-            finally { setIsSearching(false); }
+            } catch (e) {
+                console.warn('[LocationPicker] Nearby POI fetch failed:', e);
+            } finally {
+                setIsSearching(false);
+            }
         })();
     }, [isExpanded, lastPosition, query.length, mapboxToken]);
 
@@ -384,7 +391,9 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                     setIsExpanded(false); setQuery(''); setPredictions([]);
                     return;
                 }
-            } catch {}
+            } catch (e) {
+                console.warn('[LocationPicker] Mapbox retrieve failed:', e);
+            }
         }
 
         // Photon / direct coords

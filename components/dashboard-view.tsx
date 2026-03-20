@@ -1,91 +1,23 @@
 'use client';
 
-import { useUserPreferences, CURRENCY_SYMBOLS, type Currency } from '@/components/providers/user-preferences-provider';
+import { useUserPreferences, type Currency } from '@/components/providers/user-preferences-provider';
 import { BudgetAlertManager } from '@/components/budget-alert-manager';
-import React, { useEffect, useState, useRef, useCallback, useMemo, startTransition, lazy, Suspense } from 'react';
-import { useVirtualizer } from '@tanstack/react-virtual';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, Utensils, Car, Zap, ShoppingBag, HeartPulse, Clapperboard, CircleDollarSign, ArrowUpRight, ArrowDownLeft, Users, MoreVertical, Pencil, Trash2, X, History, Clock, HelpCircle, Tag, Plane, Home, Gift, ShoppingCart, Stethoscope, Gamepad2, School, Laptop, Music, Heart, RefreshCcw, Wallet, ChevronRight, Check, Shirt, LayoutGrid, MapPin, Target, ChevronDown, UserCircle, Building2 } from 'lucide-react';
-import { format, isSameMonth, parseISO, differenceInDays } from 'date-fns';
-import { WaveLoader } from '@/components/ui/wave-loader';
+import { Tag, Plane, Home, Gift, Car, Utensils, ShoppingCart, Heart, Gamepad2, School, Laptop, Music, Users, Plus } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { CATEGORY_COLORS, getIconForCategory, CHART_CONFIG } from '@/lib/categories';
 import { Card, CardContent } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
-import dynamic from 'next/dynamic';
-const ChartContainer: any = dynamic(() => import("@/components/ui/pie-chart").then(mod => mod.ChartContainer as any), { ssr: false });
-const ChartTooltip: any = dynamic(() => import("@/components/ui/pie-chart").then(mod => mod.ChartTooltip as any), { ssr: false });
-const ChartTooltipContent: any = dynamic(() => import("@/components/ui/pie-chart").then(mod => mod.ChartTooltipContent as any), { ssr: false });
-import { BasePieChart } from '@/components/charts/base-pie-chart';
 import { TransactionService } from '@/lib/services/transaction-service';
 import { Transaction, AuditLog } from '@/types/transaction';
 import { useGroups } from './providers/groups-provider';
 import { useBuckets } from './providers/buckets-provider';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-    DialogFooter,
-    DialogClose,
-} from "@/components/ui/dialog"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuTrigger,
-    DropdownMenuSeparator,
-    DropdownMenuLabel,
-} from "@/components/ui/dropdown-menu"
-import { Input } from "@/components/ui/input"
-import { Button } from "@/components/ui/button"
-import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Switch } from "@/components/ui/switch"
 import { toast } from '@/utils/haptics';
 import { cn } from '@/lib/utils';
-import { FeatureAnnouncementModal } from '@/components/feature-announcement-modal';
-import { WelcomeModal } from '@/components/welcome-modal';
-import { LATEST_FEATURE_ANNOUNCEMENT } from '@/lib/feature-flags';
-import { TransactionRow } from '@/components/transaction-row';
-import { DashboardTransactionsDrawer } from '@/components/dashboard-transactions-drawer';
-import { TransactionHistoryDialog } from '@/components/transaction-history-dialog';
 import { WorkspaceHeader } from './dashboard/workspace-header';
 import { SpendingOverview } from './dashboard/spending-overview';
 import { TransactionListSection } from './dashboard/transaction-list-section';
 import { DashboardDialogs } from './dashboard/dashboard-dialogs';
 import { DashboardSkeleton } from './dashboard/dashboard-skeleton';
-
-// Lazy load non-critical dialogs
-const AddFundsDialog = lazy(() => import('@/components/add-funds-dialog').then(module => ({ default: module.AddFundsDialog })));
-const HowToUseDialog = lazy(() => import('@/components/how-to-use-dialog').then(module => ({ default: module.HowToUseDialog })));
-
-// Animation variants
-const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: {
-        opacity: 1,
-        transition: {
-            when: "beforeChildren",
-            staggerChildren: 0.05,
-        },
-    },
-};
-
-const itemVariants = {
-    hidden: { opacity: 0, y: -10 },
-    visible: {
-        opacity: 1,
-        y: 0,
-        transition: {
-            duration: 0.4,
-            ease: [0.32, 0.725, 0.32, 1],
-        },
-    },
-};
 
 
 

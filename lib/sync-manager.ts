@@ -1,13 +1,13 @@
 import { get, set } from 'idb-keyval';
 import { supabase } from '@/lib/supabase';
-import { 
-    SyncPayload, 
-    addToQueue, 
-    startSyncing, 
-    markSynced, 
-    markFailed, 
-    resetToPending, 
-    removeSynced 
+import {
+    SyncPayload,
+    addToQueue,
+    startSyncing,
+    markSynced,
+    markFailed,
+    incrementRetry,
+    removeSynced
 } from './offline-sync-queue';
 import { TransactionService } from './services/transaction-service';
 
@@ -67,7 +67,13 @@ export async function attemptSync() {
     if (isSyncingLoopActive) return;
     
     let queue = (await get<SyncPayload[]>(QUEUE_KEY)) || [];
-    const pendingItems = queue.filter(item => item.status === 'pending');
+    // Migrate legacy items that don't have retryCount
+    queue = queue.map(item => ({ ...item, retryCount: item.retryCount ?? 0 }));
+    const now = Date.now();
+    const pendingItems = queue.filter(item =>
+        item.status === 'pending' &&
+        (!item.nextRetryAt || item.nextRetryAt <= now)
+    );
     
     if (pendingItems.length === 0) return;
 
@@ -127,8 +133,8 @@ export async function attemptSync() {
             // Add other types as needed
             
         } catch (e) {
-            // Temporary network failure during the specific request
-            queue = resetToPending(queue, item.id);
+            // Temporary network failure — apply exponential backoff
+            queue = incrementRetry(queue, item.id);
         }
 
         await set(QUEUE_KEY, queue);
@@ -147,7 +153,10 @@ export async function attemptSync() {
 // 4. Manual Retry for Failed Items
 export async function retryFailedItem(id: string) {
     let queue = (await get<SyncPayload[]>(QUEUE_KEY)) || [];
-    queue = resetToPending(queue, id);
+    queue = queue.map(item => item.id === id
+        ? { ...item, status: 'pending', retryCount: 0, nextRetryAt: undefined, errorReason: undefined, failedAt: undefined }
+        : item
+    );
     await set(QUEUE_KEY, queue);
     window.dispatchEvent(new CustomEvent('novira-queue-updated', { detail: { queue } }));
     attemptSync();

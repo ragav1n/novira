@@ -22,9 +22,18 @@ import { Switch } from '@/components/ui/switch';
 import { CurrencyDropdown } from '@/components/ui/currency-dropdown';
 import dynamic from 'next/dynamic';
 
-const LocationPicker: any = dynamic(() => import('@/components/ui/location-picker').then(mod => mod.LocationPicker as any), { ssr: false });
-const SplitExpenseSection: any = dynamic(() => import('./add-expense/split-expense-section').then(mod => mod.SplitExpenseSection as any), { ssr: false });
-const RecurringExpenseSection: any = dynamic(() => import('./add-expense/recurring-expense-section').then(mod => mod.RecurringExpenseSection as any), { ssr: false });
+const LocationPicker = dynamic(
+    () => import('@/components/ui/location-picker').then(mod => mod.LocationPicker),
+    { ssr: false, loading: () => <div className="h-[72px] rounded-2xl bg-secondary/10 animate-pulse" /> }
+);
+const SplitExpenseSection = dynamic(
+    () => import('./add-expense/split-expense-section').then(mod => mod.SplitExpenseSection),
+    { ssr: false, loading: () => <div className="h-16 rounded-2xl bg-secondary/10 animate-pulse" /> }
+);
+const RecurringExpenseSection = dynamic(
+    () => import('./add-expense/recurring-expense-section').then(mod => mod.RecurringExpenseSection),
+    { ssr: false, loading: () => <div className="h-16 rounded-2xl bg-secondary/10 animate-pulse" /> }
+);
 
 import { CategorySelector, BucketSelector } from './add-expense/selectors';
 import { useExpenseForm } from '@/hooks/useExpenseForm';
@@ -36,7 +45,7 @@ import { CATEGORY_COLORS, getIconForCategory, CATEGORIES as SYSTEM_CATEGORIES } 
 const dropdownCategories = SYSTEM_CATEGORIES.map(cat => ({
     id: cat.id,
     label: cat.label,
-    icon: (props: any) => getIconForCategory(cat.id, props.className || "w-4 h-4", props),
+    icon: (props: { className?: string }) => getIconForCategory(cat.id, props.className || "w-4 h-4", props),
     color: CATEGORY_COLORS[cat.id] || '#8A2BE2'
 }));
 
@@ -161,7 +170,7 @@ export function AddExpenseView() {
                         </span>
                     </div>
                     <div className="mt-2">
-                        <CurrencyDropdown value={formState.txCurrency} onValueChange={(val) => formState.setTxCurrency(val as any)} />
+                        <CurrencyDropdown value={formState.txCurrency} onValueChange={(val) => formState.setTxCurrency(val)} />
                     </div>
                 </div>
 
@@ -282,7 +291,7 @@ export function AddExpenseView() {
                         placeAddress={formState.placeAddress}
                         placeLat={formState.placeLat}
                         placeLng={formState.placeLng}
-                        onChange={(loc: any) => {
+                        onChange={(loc) => {
                             formState.setPlaceName(loc.place_name);
                             formState.setPlaceAddress(loc.place_address);
                             formState.setPlaceLat(loc.place_lat);
@@ -293,7 +302,7 @@ export function AddExpenseView() {
 
                 {/* Category Selection */}
                 <CategorySelector
-                    categories={dropdownCategories as any}
+                    categories={dropdownCategories}
                     selectedCategory={formState.selectedCategory}
                     onSelect={formState.setSelectedCategory}
                 />
@@ -348,7 +357,7 @@ export function AddExpenseView() {
                                 return (
                                     <div
                                         key={method}
-                                        onClick={() => formState.setPaymentMethod(method as any)}
+                                        onClick={() => formState.setPaymentMethod(method)}
                                         className={cn(
                                             "flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all",
                                             isSelected

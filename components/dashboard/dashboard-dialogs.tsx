@@ -2,6 +2,7 @@
 
 import React, { Suspense } from 'react';
 import { Transaction, AuditLog } from '@/types/transaction';
+import { Bucket } from '@/components/providers/buckets-provider';
 import { TransactionHistoryDialog } from '@/components/transaction-history-dialog';
 import {
     Dialog,
@@ -25,13 +26,22 @@ import { WelcomeModal } from '@/components/welcome-modal';
 import { FeatureAnnouncementModal } from '@/components/feature-announcement-modal';
 import { LATEST_FEATURE_ANNOUNCEMENT } from '@/lib/feature-flags';
 
-const LocationPicker: any = dynamic(() => import('@/components/ui/location-picker').then(mod => mod.LocationPicker as any), { ssr: false });
-const ExpenseMapView: any = dynamic(() => import('@/components/expense-map-view').then(mod => mod.ExpenseMapView as any), { ssr: false });
-const AddFundsDialog: any = dynamic(() => import('@/components/add-funds-dialog').then(module => ({ default: module.AddFundsDialog })), { 
-    ssr: false,
-    loading: () => <div className="fixed inset-0 min-h-[300px] flex items-center justify-center bg-background/50 backdrop-blur-sm z-[150]"><div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" /></div>
-});
-const HowToUseDialog: any = dynamic(() => import('@/components/how-to-use-dialog').then(module => ({ default: module.HowToUseDialog })), { ssr: false });
+const LocationPicker = dynamic(
+    () => import('@/components/ui/location-picker').then(mod => mod.LocationPicker),
+    { ssr: false }
+);
+const ExpenseMapView = dynamic(
+    () => import('@/components/expense-map-view').then(mod => mod.ExpenseMapView),
+    { ssr: false, loading: () => <div className="fixed inset-0 flex items-center justify-center bg-background/50 backdrop-blur-sm z-[150]"><div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" /></div> }
+);
+const AddFundsDialog = dynamic(
+    () => import('@/components/add-funds-dialog').then(module => ({ default: module.AddFundsDialog })),
+    { ssr: false, loading: () => <div className="fixed inset-0 min-h-[300px] flex items-center justify-center bg-background/50 backdrop-blur-sm z-[150]"><div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" /></div> }
+);
+const HowToUseDialog = dynamic(
+    () => import('@/components/how-to-use-dialog').then(module => ({ default: module.HowToUseDialog })),
+    { ssr: false }
+);
 
 interface DashboardDialogsProps {
     userId: string | null;
@@ -52,9 +62,9 @@ interface DashboardDialogsProps {
     isEditOpen: boolean;
     setIsEditOpen: (open: boolean) => void;
     editingTransaction: Transaction | null;
-    setEditingTransaction: (tx: any) => void;
+    setEditingTransaction: (tx: Transaction | null) => void;
     handleUpdateTransaction: (e: React.FormEvent) => void;
-    activeBuckets: any[];
+    activeBuckets: Bucket[];
     getBucketIcon: (iconName?: string) => React.ReactNode;
     // Map View
     isMapOpen: boolean;
@@ -253,12 +263,12 @@ export function DashboardDialogs({
                                 placeAddress={editingTransaction.place_address || null}
                                 placeLat={editingTransaction.place_lat || null}
                                 placeLng={editingTransaction.place_lng || null}
-                                onChange={(loc: any) => setEditingTransaction({
+                                onChange={(loc) => setEditingTransaction({
                                     ...editingTransaction,
                                     place_name: loc.place_name || undefined,
                                     place_address: loc.place_address || undefined,
-                                    place_lat: loc.place_lat || undefined,
-                                    place_lng: loc.place_lng || undefined,
+                                    place_lat: loc.place_lat ?? undefined,
+                                    place_lng: loc.place_lng ?? undefined,
                                 })}
                             />
                             <DialogFooter className="pt-4 gap-2 sm:gap-0">
