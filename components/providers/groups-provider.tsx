@@ -66,7 +66,7 @@ interface GroupsContextType {
     addFriendByEmail: (email: string) => Promise<boolean>;
     addFriendById: (friendId: string) => Promise<boolean>;
     addMemberToGroup: (groupId: string, userId: string) => Promise<boolean>;
-    settleSplit: (splitId: string) => Promise<boolean>;
+    settleSplit: (splitId: string, creditorId?: string) => Promise<boolean>;
     acceptFriendRequest: (requestId: string) => Promise<void>;
     declineFriendRequest: (requestId: string) => Promise<void>;
     leaveGroup: (groupId: string) => Promise<void>;
@@ -299,6 +299,15 @@ export function GroupsProvider({ children }: { children: React.ReactNode }) {
         const handleExpenseAdded = () => refreshData();
         window.addEventListener('novira:expense-added', handleExpenseAdded);
 
+        // Listen for settlement broadcasts from other users
+        const settlementChannel = supabase
+            .channel(`settlement-notify-${userId}`)
+            .on('broadcast', { event: 'settled' }, () => {
+                debouncedRefresh();
+                window.dispatchEvent(new Event('novira:expense-added'));
+            })
+            .subscribe();
+
         let channel: ReturnType<typeof supabase.channel> | null = null;
 
         const timer = setTimeout(() => {
@@ -327,6 +336,7 @@ export function GroupsProvider({ children }: { children: React.ReactNode }) {
 
         return () => {
             window.removeEventListener('novira:expense-added', handleExpenseAdded);
+            supabase.removeChannel(settlementChannel);
             clearTimeout(timer);
             if (channel) supabase.removeChannel(channel);
         };
@@ -491,7 +501,7 @@ export function GroupsProvider({ children }: { children: React.ReactNode }) {
         return true;
     }, [refreshData]);
 
-    const settleSplit = useCallback(async (splitId: string) => {
+    const settleSplit = useCallback(async (splitId: string, creditorId?: string) => {
         if (!userId) throw new Error('Not authenticated');
 
         const { error } = await supabase.rpc('settle_split', { split_id: splitId });
@@ -499,6 +509,23 @@ export function GroupsProvider({ children }: { children: React.ReactNode }) {
         if (error) throw error;
 
         refreshData();
+
+        // Refresh dashboard transactions on the debtor's side
+        sessionStorage.setItem('novira_expense_added', '1');
+        window.dispatchEvent(new Event('novira:expense-added'));
+
+        // Notify the creditor's screen via broadcast so they don't need to refresh
+        if (creditorId) {
+            const notifyChannel = supabase.channel(`settlement-notify-${creditorId}`);
+            notifyChannel.subscribe((status) => {
+                if (status === 'SUBSCRIBED') {
+                    notifyChannel
+                        .send({ type: 'broadcast', event: 'settled', payload: { splitId } })
+                        .finally(() => supabase.removeChannel(notifyChannel));
+                }
+            });
+        }
+
         return true;
     }, [userId, refreshData]);
 
