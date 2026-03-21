@@ -295,12 +295,16 @@ export function GroupsProvider({ children }: { children: React.ReactNode }) {
         // Initial fetch
         refreshData();
 
+        // Listen for expense-added event (fires before navigation, so we catch it here too)
+        const handleExpenseAdded = () => refreshData();
+        window.addEventListener('novira:expense-added', handleExpenseAdded);
+
         let channel: ReturnType<typeof supabase.channel> | null = null;
 
-        // Debounce subscription to prevent rapid reconnects during strict mode or auth state settling
         const timer = setTimeout(() => {
             channel = supabase.channel(`realtime-groups-${userId}`)
-                .on('postgres_changes', { event: '*', schema: 'public', table: 'splits', filter: `user_id=eq.${userId}` }, () => {
+                // splits: no filter — a split can belong to any user involved in the transaction
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'splits' }, () => {
                     debouncedRefresh();
                 })
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions', filter: `user_id=eq.${userId}` }, () => {
@@ -316,20 +320,15 @@ export function GroupsProvider({ children }: { children: React.ReactNode }) {
                     debouncedRefresh();
                 })
                 .subscribe((status, err) => {
-                    if (status === 'CHANNEL_ERROR') {
-                        console.error('Realtime Channel Error:', err);
-                    }
-                    if (status === 'TIMED_OUT') {
-                        console.error('Realtime Connection Timed Out');
-                    }
+                    if (status === 'CHANNEL_ERROR') console.error('Realtime Channel Error:', err);
+                    if (status === 'TIMED_OUT') console.error('Realtime Connection Timed Out');
                 });
         }, 500);
 
         return () => {
+            window.removeEventListener('novira:expense-added', handleExpenseAdded);
             clearTimeout(timer);
-            if (channel) {
-                supabase.removeChannel(channel);
-            }
+            if (channel) supabase.removeChannel(channel);
         };
     }, [userId, userCurrency, convertAmount, refreshData, debouncedRefresh]);
 
