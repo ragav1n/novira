@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import Image from 'next/image';
-import { MapPin, X, Search, Navigation, LocateFixed, Clock } from 'lucide-react';
+import { MapPin, X, Search, Navigation, LocateFixed, Clock, Globe } from 'lucide-react';
 import { getDistance } from '@/lib/location';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
@@ -484,11 +484,15 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
 
     if (!isExpanded) {
         if (hasLocation) {
+            const isOnline = placeName === 'Online';
             return (
                 <div className="space-y-2">
                     <p className="text-sm font-medium">Location</p>
-                    <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 overflow-hidden">
-                        {placeLat && placeLng && (
+                    <div className={cn(
+                        "rounded-2xl border overflow-hidden",
+                        isOnline ? "border-blue-500/20 bg-blue-500/5" : "border-emerald-500/20 bg-emerald-500/5"
+                    )}>
+                        {!isOnline && placeLat && placeLng && (
                             <div onClick={() => window.open(`https://www.google.com/maps/dir/?api=1&destination=${placeLat},${placeLng}`, '_blank')}
                                 className="w-full h-[100px] bg-secondary/20 cursor-pointer relative overflow-hidden active:opacity-80 transition-opacity">
                                 <Image src={getStaticMapUrl(placeLat, placeLng)} alt="Map" fill className="object-cover opacity-80" sizes="400px" />
@@ -500,11 +504,17 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                         )}
                         <div className="p-3 flex items-start justify-between gap-2">
                             <div className="flex items-start gap-2.5 min-w-0">
-                                <div className="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center shrink-0 border border-emerald-500/20 mt-0.5">
-                                    <MapPin className="w-4 h-4 text-emerald-500" />
+                                <div className={cn(
+                                    "w-8 h-8 rounded-full flex items-center justify-center shrink-0 border mt-0.5",
+                                    isOnline ? "bg-blue-500/20 border-blue-500/20" : "bg-emerald-500/20 border-emerald-500/20"
+                                )}>
+                                    {isOnline
+                                        ? <Globe className="w-4 h-4 text-blue-400" />
+                                        : <MapPin className="w-4 h-4 text-emerald-500" />
+                                    }
                                 </div>
                                 <div className="min-w-0 flex-1">
-                                    <p className="text-sm font-bold text-emerald-400 break-words line-clamp-2">{placeName}</p>
+                                    <p className={cn("text-sm font-bold break-words line-clamp-2", isOnline ? "text-blue-400" : "text-emerald-400")}>{placeName}</p>
                                     {placeAddress && <p className="text-[10px] text-muted-foreground break-words line-clamp-2 mt-0.5">{placeAddress}</p>}
                                 </div>
                             </div>
@@ -566,17 +576,32 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                 </div>
             </div>
 
-            {/* Current location button — large touch target */}
-            <button type="button" onClick={handleUseCurrentLocation}
-                className="w-full h-14 flex items-center gap-4 px-4 rounded-2xl border border-primary/20 bg-primary/5 active:bg-primary/10 transition-all touch-manipulation">
-                <div className={cn('w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center shrink-0 transition-transform', isLocating && 'animate-pulse')}>
-                    <LocateFixed className="w-5 h-5 text-primary" />
-                </div>
-                <div className="text-left">
-                    <p className="text-sm font-bold text-primary">{isLocating ? 'Locating…' : 'Use Current Location'}</p>
-                    <p className="text-[10px] text-primary/60 font-medium">Detect where you are right now</p>
-                </div>
-            </button>
+            {/* Quick-select buttons */}
+            <div className="grid grid-cols-2 gap-2">
+                <button type="button" onClick={handleUseCurrentLocation}
+                    className="h-14 flex items-center gap-3 px-4 rounded-2xl border border-primary/20 bg-primary/5 active:bg-primary/10 transition-all touch-manipulation">
+                    <div className={cn('w-9 h-9 rounded-full bg-primary/20 flex items-center justify-center shrink-0', isLocating && 'animate-pulse')}>
+                        <LocateFixed className="w-4 h-4 text-primary" />
+                    </div>
+                    <div className="text-left min-w-0">
+                        <p className="text-xs font-bold text-primary leading-none">{isLocating ? 'Locating…' : 'Current Location'}</p>
+                        <p className="text-[10px] text-primary/50 font-medium mt-0.5">Where you are now</p>
+                    </div>
+                </button>
+                <button type="button" onClick={() => {
+                    onChange({ place_name: 'Online', place_address: null, place_lat: null, place_lng: null });
+                    setIsExpanded(false); setQuery(''); setPredictions([]);
+                }}
+                    className="h-14 flex items-center gap-3 px-4 rounded-2xl border border-blue-500/20 bg-blue-500/5 active:bg-blue-500/10 transition-all touch-manipulation">
+                    <div className="w-9 h-9 rounded-full bg-blue-500/20 flex items-center justify-center shrink-0">
+                        <Globe className="w-4 h-4 text-blue-400" />
+                    </div>
+                    <div className="text-left min-w-0">
+                        <p className="text-xs font-bold text-blue-400 leading-none">Online</p>
+                        <p className="text-[10px] text-blue-400/50 font-medium mt-0.5">No physical location</p>
+                    </div>
+                </button>
+            </div>
 
             {/* Recent locations */}
             <AnimatePresence>

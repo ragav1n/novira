@@ -1,17 +1,18 @@
-import { 
-    Utensils, 
-    ShoppingCart, 
-    Shirt, 
-    Car, 
-    Zap, 
-    ShoppingBag, 
-    HeartPulse, 
-    Clapperboard, 
-    Home, 
-    School, 
-    LayoutGrid, 
+import {
+    Utensils,
+    ShoppingCart,
+    Shirt,
+    Car,
+    Zap,
+    ShoppingBag,
+    HeartPulse,
+    Clapperboard,
+    Home,
+    School,
+    LayoutGrid,
     HelpCircle,
-    CircleDollarSign
+    CircleDollarSign,
+    Sparkles
 } from 'lucide-react';
 import React from 'react';
 
@@ -20,16 +21,22 @@ import React from 'react';
  * Import this instead of redefining category arrays in individual components.
  */
 export const CATEGORIES = [
+    // Daily essentials
     { id: 'food', label: 'Food' },
     { id: 'groceries', label: 'Groceries' },
-    { id: 'fashion', label: 'Fashion' },
     { id: 'transport', label: 'Transport' },
-    { id: 'bills', label: 'Bills' },
-    { id: 'shopping', label: 'Shopping' },
+    // Personal
+    { id: 'fashion', label: 'Fashion' },
+    { id: 'beauty', label: 'Beauty' },
     { id: 'healthcare', label: 'Healthcare' },
-    { id: 'entertainment', label: 'Entertainment' },
+    // Fixed costs
     { id: 'rent', label: 'Rent' },
+    { id: 'bills', label: 'Bills' },
+    // Discretionary
+    { id: 'shopping', label: 'Shopping' },
+    { id: 'entertainment', label: 'Entertainment' },
     { id: 'education', label: 'Education' },
+    // Catch-all
     { id: 'others', label: 'Others' },
     { id: 'uncategorized', label: 'Uncategorized' },
 ] as const;
@@ -46,6 +53,7 @@ export const CATEGORY_COLORS: Record<string, string> = {
     entertainment: '#EC4899', // Pink
     rent: '#6366F1',      // Indigo
     education: '#84CC16', // Lime
+    beauty: '#E879F9',    // Fuchsia
     others: '#14B8A6',    // Teal
     uncategorized: '#94A3B8' // Slate
 };
@@ -61,6 +69,7 @@ export const CHART_CONFIG = {
     entertainment: { label: "Entertainment", color: CATEGORY_COLORS.entertainment },
     rent: { label: "Rent", color: CATEGORY_COLORS.rent },
     education: { label: "Education", color: CATEGORY_COLORS.education },
+    beauty: { label: "Beauty", color: CATEGORY_COLORS.beauty },
     others: { label: "Others", color: CATEGORY_COLORS.others },
     uncategorized: { label: "Uncategorized", color: CATEGORY_COLORS.uncategorized },
 };
@@ -80,6 +89,7 @@ export const getIconForCategory = (category: string, className: string = "w-5 h-
         case 'entertainment': return React.createElement(Clapperboard, iconProps);
         case 'rent': return React.createElement(Home, iconProps);
         case 'education': return React.createElement(School, iconProps);
+        case 'beauty': return React.createElement(Sparkles, iconProps);
         case 'others': return React.createElement(LayoutGrid, iconProps);
         case 'uncategorized': return React.createElement(HelpCircle, iconProps);
         default: return React.createElement(CircleDollarSign, iconProps);
@@ -109,6 +119,7 @@ export const autoCategorize = (description: string): string => {
     if (lowerDesc.includes('bill') || lowerDesc.includes('electricity') || lowerDesc.includes('recharge') || lowerDesc.includes('utility') || lowerDesc.includes('gas')) return 'bills';
     if (lowerDesc.includes('rent') || lowerDesc.includes('lease') || lowerDesc.includes('landlord') || lowerDesc.includes('maintenance')) return 'rent';
     if (lowerDesc.includes('school') || lowerDesc.includes('tuition') || lowerDesc.includes('course') || lowerDesc.includes('education') || lowerDesc.includes('college') || lowerDesc.includes('university') || lowerDesc.includes('udemy') || lowerDesc.includes('coursera')) return 'education';
+    if (lowerDesc.includes('skincare') || lowerDesc.includes('skin care') || lowerDesc.includes('shampoo') || lowerDesc.includes('conditioner') || lowerDesc.includes('moisturizer') || lowerDesc.includes('serum') || lowerDesc.includes('perfume') || lowerDesc.includes('lotion') || lowerDesc.includes('nykaa') || lowerDesc.includes('sephora') || lowerDesc.includes('bath') || lowerDesc.includes('body wash') || lowerDesc.includes('face wash') || lowerDesc.includes('makeup') || lowerDesc.includes('cosmetic') || lowerDesc.includes('sunscreen')) return 'beauty';
     if (lowerDesc.includes('shop') || lowerDesc.includes('amazon') || lowerDesc.includes('flipkart')) return 'shopping';
     
     return 'uncategorized';
@@ -131,6 +142,7 @@ export const getIconSvgForCategory = (category: string) => {
         case 'entertainment': return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 20v-2a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v2"/><rect width="20" height="12" x="2" y="4" rx="2"/><path d="m9 8 5 3-5 3Z"/></svg>';
         case 'rent': return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>';
         case 'education': return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>';
+        case 'beauty': return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/><path d="M5 3v4"/><path d="M19 17v4"/><path d="M3 5h4"/><path d="M17 19h4"/></svg>';
         case 'others': return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></svg>';
         default: return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 18V6"/></svg>';
     }

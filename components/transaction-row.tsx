@@ -2,7 +2,7 @@
 
 import React, { memo, useState, useEffect } from 'react';
 import { format, parseISO } from 'date-fns';
-import { History, MoreVertical, Users, RefreshCcw, Ban, MapPin, Pencil, Trash2 } from 'lucide-react';
+import { History, MoreVertical, Users, RefreshCcw, Ban, MapPin, Pencil, Trash2, Globe } from 'lucide-react';
 import type { Transaction } from '@/types/transaction';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
@@ -189,9 +189,11 @@ export const TransactionRow = memo(function TransactionRow({
               <span className="shrink-0 text-[11px] text-white/35 font-medium tabular-nums leading-none">
                 {format(parseISO(tx.date.slice(0, 10)), 'MMM d')}
               </span>
-              {/* Location dot — icon only to save space */}
+              {/* Location indicator */}
               {tx.place_name && (
-                <MapPin className="shrink-0 w-3 h-3 text-emerald-400/50 ml-0.5" aria-label="Has location" />
+                tx.place_name === 'Online'
+                  ? <Globe className="shrink-0 w-3 h-3 text-blue-400/60 ml-0.5" aria-label="Online purchase" />
+                  : <MapPin className="shrink-0 w-3 h-3 text-emerald-400/50 ml-0.5" aria-label="Has location" />
               )}
             </div>
 
