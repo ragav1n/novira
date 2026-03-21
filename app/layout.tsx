@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { Geist, Geist_Mono } from 'next/font/google'
+import { Plus_Jakarta_Sans, Geist_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { SpeedInsights } from '@vercel/speed-insights/next'
 import './globals.css'
@@ -12,7 +12,7 @@ import { WorkspaceThemeProvider } from '@/components/providers/workspace-theme-p
 import { ErrorBoundary } from '@/components/error-boundary'
 import { ServiceWorkerRegistrar } from '@/components/service-worker-registrar'
 
-const geist = Geist({
+const geist = Plus_Jakarta_Sans({
   subsets: ["latin"],
   variable: "--font-sans",
   display: 'swap',
