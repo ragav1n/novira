@@ -88,25 +88,13 @@ export function GoalsView() {
             .channel(`goals-changes-${userId}-${activeWorkspaceId || 'personal'}`)
             .on(
                 'postgres_changes',
-                {
-                    event: '*',
-                    schema: 'public',
-                    table: 'savings_goals'
-                },
-                () => {
-                    loadGoals();
-                }
+                { event: '*', schema: 'public', table: 'savings_goals', filter: `user_id=eq.${userId}` },
+                () => { loadGoals(); }
             )
             .on(
                 'postgres_changes',
-                {
-                    event: '*',
-                    schema: 'public',
-                    table: 'savings_deposits'
-                },
-                () => {
-                    loadGoals();
-                }
+                { event: '*', schema: 'public', table: 'savings_deposits', filter: `user_id=eq.${userId}` },
+                () => { loadGoals(); }
             )
             .subscribe();
 

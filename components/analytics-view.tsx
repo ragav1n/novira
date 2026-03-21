@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useMemo, useCallback } from 'react';
+import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { ChevronLeft, MoreHorizontal, Filter, Shirt } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -180,31 +180,33 @@ export function AnalyticsView() {
     }, [fetchData, userId, currency]);
 
     // Real-time subscription for transactions
+    const analyticsDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const debouncedFetchData = useCallback(() => {
+        if (analyticsDebounceRef.current) clearTimeout(analyticsDebounceRef.current);
+        analyticsDebounceRef.current = setTimeout(() => fetchData(), 300);
+    }, [fetchData]);
+
     useEffect(() => {
         if (!userId) return;
+
+        const txFilter = activeWorkspaceId
+            ? `group_id=eq.${activeWorkspaceId}`
+            : `user_id=eq.${userId}`;
 
         const channel = supabase
             .channel(`analytics-updates-${userId}-${activeWorkspaceId || 'personal'}`)
             .on('postgres_changes', {
-                event: '*',
-                schema: 'public',
-                table: 'transactions'
-            }, () => {
-                fetchData();
-            })
+                event: '*', schema: 'public', table: 'transactions', filter: txFilter
+            }, () => { debouncedFetchData(); })
             .on('postgres_changes', {
-                event: '*',
-                schema: 'public',
-                table: 'splits'
-            }, () => {
-                fetchData();
-            })
+                event: '*', schema: 'public', table: 'splits', filter: `user_id=eq.${userId}`
+            }, () => { debouncedFetchData(); })
             .subscribe();
 
         return () => {
             supabase.removeChannel(channel);
         };
-    }, [userId, activeWorkspaceId, fetchData]);
+    }, [userId, activeWorkspaceId, debouncedFetchData]);
 
     const { categoryTrendData, categoryBreakdown, paymentBreakdown, totalSpentInRange } = useMemo(() => {
         if (!transactions.length || !userId) return {

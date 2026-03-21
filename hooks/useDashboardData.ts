@@ -112,40 +112,26 @@ export function useDashboardData(userId: string | null, activeWorkspaceId: strin
     useEffect(() => {
         if (!userId) return;
 
+        const txFilter = activeWorkspaceId
+            ? `group_id=eq.${activeWorkspaceId}`
+            : `user_id=eq.${userId}`;
+
         const channel = supabase
             .channel(`dashboard-sync-${userId}-${activeWorkspaceId || 'personal'}`)
             .on(
                 'postgres_changes',
-                {
-                    event: '*',
-                    schema: 'public',
-                    table: 'transactions',
-                },
-                () => {
-                    debouncedLoadTx(userId, activeWorkspaceId, true);
-                }
+                { event: '*', schema: 'public', table: 'transactions', filter: txFilter },
+                () => { debouncedLoadTx(userId, activeWorkspaceId, true); }
             )
             .on(
                 'postgres_changes',
-                {
-                    event: '*',
-                    schema: 'public',
-                    table: 'splits',
-                },
-                () => {
-                    debouncedLoadTx(userId, activeWorkspaceId, true);
-                }
+                { event: '*', schema: 'public', table: 'splits', filter: `user_id=eq.${userId}` },
+                () => { debouncedLoadTx(userId, activeWorkspaceId, true); }
             )
             .on(
                 'postgres_changes',
-                {
-                    event: 'UPDATE',
-                    schema: 'public',
-                    table: 'profiles',
-                },
-                () => {
-                    debouncedLoadTx(userId, activeWorkspaceId, true);
-                }
+                { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${userId}` },
+                () => { debouncedLoadTx(userId, activeWorkspaceId, true); }
             )
             .subscribe();
 
