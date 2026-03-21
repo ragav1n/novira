@@ -84,12 +84,13 @@ export function BucketsProvider({ children }: { children: React.ReactNode }) {
                     if (shareAmount <= 0) return;
 
                     let amountInBucketCurrency = 0;
-                    if (tx.currency === bucketCurrency) {
+                    const txCurrency = (tx.currency || 'USD').toUpperCase();
+                    if (txCurrency === bucketCurrency) {
                         amountInBucketCurrency = shareAmount;
                     } else if (tx.exchange_rate && tx.base_currency === bucketCurrency) {
                         amountInBucketCurrency = shareAmount * Number(tx.exchange_rate);
                     } else {
-                        amountInBucketCurrency = convertAmount(shareAmount, tx.currency || 'USD', bucketCurrency);
+                        amountInBucketCurrency = convertAmount(shareAmount, txCurrency, bucketCurrency);
                     }
 
                     spending[bId] = (spending[bId] || 0) + amountInBucketCurrency;
@@ -134,12 +135,13 @@ export function BucketsProvider({ children }: { children: React.ReactNode }) {
                     }
                     if (shareAmount <= 0) return;
                     let amountInBucketCurrency = 0;
-                    if (tx.currency === bucketCurrency) {
+                    const txCurrency = (tx.currency || 'USD').toUpperCase();
+                    if (txCurrency === bucketCurrency) {
                         amountInBucketCurrency = shareAmount;
                     } else if (tx.exchange_rate && tx.base_currency === bucketCurrency) {
                         amountInBucketCurrency = shareAmount * Number(tx.exchange_rate);
                     } else {
-                        amountInBucketCurrency = convertAmount(shareAmount, tx.currency || 'USD', bucketCurrency);
+                        amountInBucketCurrency = convertAmount(shareAmount, txCurrency, bucketCurrency);
                     }
                     spending[bId] = (spending[bId] || 0) + amountInBucketCurrency;
                 });

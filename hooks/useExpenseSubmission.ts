@@ -38,8 +38,9 @@ interface ExpenseSubmissionParams {
 }
 
 function validateExpenseForm(amount: string, description: string, date: Date | undefined): boolean {
-    if (!amount || parseFloat(amount) <= 0 || !description || !date) {
-        if (amount && parseFloat(amount) <= 0) {
+    const parsed = parseFloat(amount);
+    if (!amount || isNaN(parsed) || parsed <= 0 || !description || !date) {
+        if (amount && (!isNaN(parsed) && parsed <= 0)) {
             toast.error('Amount must be greater than 0');
         } else {
             toast.error('Please fill in all required fields');

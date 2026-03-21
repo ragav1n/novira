@@ -50,11 +50,12 @@ export function useExpenseForm(userId: string | null | undefined, defaultCurrenc
 
                 // 1. Description Match (Highest relevance)
                 if (description && description.length >= 3) {
+                    const escapedDesc = description.replace(/[%_\\]/g, '\\$&');
                     const { data: descMatches } = await supabase
                         .from('transactions')
                         .select('place_name, place_address, place_lat, place_lng')
                         .eq('user_id', userId)
-                        .ilike('description', `%${description}%`)
+                        .ilike('description', `%${escapedDesc}%`)
                         .not('place_name', 'is', null)
                         .order('created_at', { ascending: false })
                         .limit(1);
