@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ChevronLeft, User, Download, AlertTriangle, Shield, Lock, ChevronRight, SlidersHorizontal, LogOut, Banknote, FileSpreadsheet, ShieldCheck, RefreshCcw, Camera, Trash2, Plus, Save, Wallet, Bell, Mail, Moon, Sun, Smartphone, Globe, CreditCard } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -155,6 +155,26 @@ export function SettingsView() {
             setLoadingTemplates(false);
         }
     };
+
+    // Realtime subscriptions for profile and recurring templates
+    const getProfileRef = useRef(getProfile);
+    getProfileRef.current = getProfile;
+    const loadTemplatesRef = useRef(loadRecurringTemplates);
+    loadTemplatesRef.current = loadRecurringTemplates;
+
+    useEffect(() => {
+        if (!userId) return;
+
+        const channel = supabase
+            .channel(`settings-sync-${userId}`)
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles', filter: `id=eq.${userId}` },
+                () => getProfileRef.current())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'recurring_templates', filter: `user_id=eq.${userId}` },
+                () => loadTemplatesRef.current())
+            .subscribe();
+
+        return () => { supabase.removeChannel(channel); };
+    }, [userId]);
 
     const deleteRecurringTemplate = async (templateId: string) => {
         try {

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
     ChevronLeft, Search, SlidersHorizontal, CircleDollarSign, Tag, Plane, Home, Gift, 
     Car, Utensils, ShoppingCart, Heart, Gamepad2, School, Laptop, Music, RefreshCcw, 
@@ -101,7 +101,7 @@ export function SearchView() {
     const [filteredTransactions, setFilteredTransactions] = useState<Transaction[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
     const [loading, setLoading] = useState(true);
-    const { formatCurrency, convertAmount, currency, activeWorkspaceId } = useUserPreferences();
+    const { formatCurrency, convertAmount, currency, activeWorkspaceId, userId } = useUserPreferences();
     const { buckets } = useBuckets();
     const { theme: themeConfig } = useWorkspaceTheme();
 
@@ -129,86 +129,115 @@ export function SearchView() {
         return <Icon className="w-full h-full" />;
     };
 
-    useEffect(() => {
-        const fetchAndFilter = async () => {
-            setLoading(true);
-            try {
-                let query = supabase
-                    .from('transactions')
-                    .select('id, description, amount, category, date, payment_method, created_at, currency, is_recurring, bucket_id');
+    const fetchAndFilter = useCallback(async () => {
+        setLoading(true);
+        try {
+            let query = supabase
+                .from('transactions')
+                .select('id, description, amount, category, date, payment_method, created_at, currency, is_recurring, bucket_id');
 
-                // Workspace filter
-                if (activeWorkspaceId && activeWorkspaceId !== 'personal') {
-                    query = query.eq('group_id', activeWorkspaceId);
-                } else if (activeWorkspaceId === 'personal') {
-                    query = query.is('group_id', null);
-                }
+            // Workspace filter
+            if (activeWorkspaceId && activeWorkspaceId !== 'personal') {
+                query = query.eq('group_id', activeWorkspaceId);
+            } else if (activeWorkspaceId === 'personal') {
+                query = query.is('group_id', null);
+            }
 
-                // Text search
-                if (debouncedSearchQuery) {
-                    query = query.ilike('description', `%${debouncedSearchQuery}%`);
-                }
+            // Text search
+            if (debouncedSearchQuery) {
+                query = query.ilike('description', `%${debouncedSearchQuery}%`);
+            }
 
-                // Category filter
-                if (selectedCategories.length > 0) {
-                    query = query.in('category', selectedCategories);
-                }
+            // Category filter
+            if (selectedCategories.length > 0) {
+                query = query.in('category', selectedCategories);
+            }
 
-                // Payment method filter
-                if (selectedPayments.length > 0) {
-                    query = query.in('payment_method', selectedPayments);
-                }
+            // Payment method filter
+            if (selectedPayments.length > 0) {
+                query = query.in('payment_method', selectedPayments);
+            }
 
-                // Date range filter
-                if (dateRange.from) {
-                    query = query.gte('date', format(dateRange.from, 'yyyy-MM-dd'));
-                }
-                if (dateRange.to) {
-                    query = query.lte('date', format(dateRange.to, 'yyyy-MM-dd'));
-                }
+            // Date range filter
+            if (dateRange.from) {
+                query = query.gte('date', format(dateRange.from, 'yyyy-MM-dd'));
+            }
+            if (dateRange.to) {
+                query = query.lte('date', format(dateRange.to, 'yyyy-MM-dd'));
+            }
 
-                // Price range filter
-                if (priceRange[0] > 0) {
-                    query = query.gte('amount', priceRange[0]);
-                }
-                if (priceRange[1] < maxPossiblePrice) {
-                    query = query.lte('amount', priceRange[1]);
-                }
+            // Price range filter
+            if (priceRange[0] > 0) {
+                query = query.gte('amount', priceRange[0]);
+            }
+            if (priceRange[1] < maxPossiblePrice) {
+                query = query.lte('amount', priceRange[1]);
+            }
 
-                // Bucket filter
-                if (selectedBucketId) {
-                    query = query.eq('bucket_id', selectedBucketId);
-                }
+            // Bucket filter
+            if (selectedBucketId) {
+                query = query.eq('bucket_id', selectedBucketId);
+            }
 
-                // Sorting
-                const ascending = sortBy === 'date-asc' || sortBy === 'amount-asc';
-                const sortColumn = sortBy.startsWith('date') ? 'date' : 'amount';
-                query = query.order(sortColumn, { ascending });
+            // Sorting
+            const ascending = sortBy === 'date-asc' || sortBy === 'amount-asc';
+            const sortColumn = sortBy.startsWith('date') ? 'date' : 'amount';
+            query = query.order(sortColumn, { ascending });
 
-                const { data } = await query;
+            const { data } = await query;
 
-                if (data) {
-                    setFilteredTransactions(data);
+            if (data) {
+                setFilteredTransactions(data);
 
-                    // Update max price on first load (no filters active)
-                    if (!debouncedSearchQuery && selectedCategories.length === 0 && selectedPayments.length === 0 && !dateRange.from && !dateRange.to && !selectedBucketId && priceRange[0] === 0 && priceRange[1] >= maxPossiblePrice) {
-                        const max = Math.max(...data.map(tx => tx.amount), 1000);
-                        const rounded = Math.ceil(max / 100) * 100;
-                        if (rounded !== maxPossiblePrice) {
-                            setMaxPossiblePrice(rounded);
-                            setPriceRange([0, rounded]);
-                        }
+                // Update max price on first load (no filters active)
+                if (!debouncedSearchQuery && selectedCategories.length === 0 && selectedPayments.length === 0 && !dateRange.from && !dateRange.to && !selectedBucketId && priceRange[0] === 0 && priceRange[1] >= maxPossiblePrice) {
+                    const max = Math.max(...data.map(tx => tx.amount), 1000);
+                    const rounded = Math.ceil(max / 100) * 100;
+                    if (rounded !== maxPossiblePrice) {
+                        setMaxPossiblePrice(rounded);
+                        setPriceRange([0, rounded]);
                     }
                 }
-            } catch (error) {
-                console.error('Error fetching transactions:', error);
-            } finally {
-                setLoading(false);
             }
+        } catch (error) {
+            console.error('Error fetching transactions:', error);
+        } finally {
+            setLoading(false);
+        }
+    }, [activeWorkspaceId, debouncedSearchQuery, selectedCategories, selectedPayments, dateRange, priceRange, selectedBucketId, sortBy, maxPossiblePrice]);
+
+    useEffect(() => {
+        fetchAndFilter();
+    }, [fetchAndFilter]);
+
+    // Realtime subscription — re-fetch when transactions or splits change
+    const fetchRef = useRef(fetchAndFilter);
+    fetchRef.current = fetchAndFilter;
+    const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    useEffect(() => {
+        if (!userId) return;
+
+        const txFilter = activeWorkspaceId && activeWorkspaceId !== 'personal'
+            ? `group_id=eq.${activeWorkspaceId}`
+            : `user_id=eq.${userId}`;
+
+        const debouncedFetch = () => {
+            if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+            searchDebounceRef.current = setTimeout(() => fetchRef.current(), 300);
         };
 
-        fetchAndFilter();
-    }, [activeWorkspaceId, debouncedSearchQuery, selectedCategories, selectedPayments, dateRange, priceRange, selectedBucketId, sortBy]);
+        const channel = supabase
+            .channel(`search-sync-${userId}-${activeWorkspaceId || 'personal'}`)
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions', filter: txFilter }, debouncedFetch)
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'splits', filter: `user_id=eq.${userId}` }, debouncedFetch)
+            .subscribe();
+
+        return () => {
+            if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+            supabase.removeChannel(channel);
+        };
+    }, [userId, activeWorkspaceId]);
 
     const resetFilters = () => {
         setPriceRange([0, maxPossiblePrice]);

@@ -436,7 +436,7 @@ export function AddExpenseView() {
                     customAmounts={formState.customAmounts}
                     setCustomAmounts={formState.setCustomAmounts}
                     amount={formState.amount}
-                    currency={currency}
+                    currency={formState.txCurrency}
                     CURRENCY_SYMBOLS={CURRENCY_SYMBOLS}
                 />
 

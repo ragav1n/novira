@@ -406,6 +406,8 @@ export function ImportView() {
             if (error) throw error;
 
             toast.success(`Successfully imported ${validTransactions.length} transactions!`);
+            sessionStorage.setItem('novira_expense_added', '1');
+            window.dispatchEvent(new Event('novira:expense-added'));
             router.push('/');
         } catch (error: any) {
             toast.error(`Import failed: ${error.message}`);
