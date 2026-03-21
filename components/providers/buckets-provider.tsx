@@ -160,6 +160,10 @@ export function BucketsProvider({ children }: { children: React.ReactNode }) {
         if (userId) {
             fetchBuckets();
 
+            // Immediately re-fetch spending when an expense is added (handles post-navigation timing)
+            const handleExpenseAdded = () => fetchSpendingOnly();
+            window.addEventListener('novira:expense-added', handleExpenseAdded);
+
             // Buckets table changes → full refresh (config may have changed)
             // Transactions/splits table changes → spending only (bucket config unchanged)
             const txFilter = activeWorkspaceId
@@ -189,13 +193,14 @@ export function BucketsProvider({ children }: { children: React.ReactNode }) {
                 .subscribe();
 
             return () => {
+                window.removeEventListener('novira:expense-added', handleExpenseAdded);
                 supabase.removeChannel(channel);
             };
         } else {
             setBuckets([]);
             setLoading(false);
         }
-    }, [userId, fetchBuckets, debouncedFetchBuckets, debouncedFetchSpending]);
+    }, [userId, activeWorkspaceId, fetchBuckets, fetchSpendingOnly, debouncedFetchBuckets, debouncedFetchSpending]);
 
     const createBucket = useCallback(async (data: Partial<Bucket>) => {
         if (!userId) {

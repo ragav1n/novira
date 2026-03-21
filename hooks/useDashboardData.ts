@@ -142,6 +142,13 @@ export function useDashboardData(userId: string | null, activeWorkspaceId: strin
 
     useEffect(() => {
         if (!userId) return;
+
+        // Handle case where expense was added before this component mounted (post-navigation)
+        if (sessionStorage.getItem('novira_expense_added')) {
+            sessionStorage.removeItem('novira_expense_added');
+            loadTxRef.current?.(userId, activeWorkspaceId, true);
+        }
+
         const handleExpenseAdded = () => loadTxRef.current?.(userId, activeWorkspaceId, true);
         window.addEventListener('novira:expense-added', handleExpenseAdded);
         return () => window.removeEventListener('novira:expense-added', handleExpenseAdded);
