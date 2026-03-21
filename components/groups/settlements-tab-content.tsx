@@ -12,7 +12,7 @@ interface SettlementsTabContentProps {
     currency: string;
     formatCurrency: (amount: number, currencyCode?: string) => string;
     convertAmount: (amount: number, fromCurrency: string, toCurrency?: string) => number;
-    settleSplit: (splitId: string) => Promise<boolean | void>;
+    settleSplit: (splitId: string, creditorId?: string) => Promise<boolean | void>;
 }
 
 export function SettlementsTabContent({
@@ -71,7 +71,7 @@ export function SettlementsTabContent({
                                                     setSettlingPaymentIndex(index);
                                                     try {
                                                         for (const splitId of payment.splitIds) {
-                                                            await settleSplit(splitId);
+                                                            await settleSplit(splitId, payment.to);
                                                         }
                                                         toast.success(`Settled ${payment.splitIds.length} split${payment.splitIds.length !== 1 ? 's' : ''} with ${payment.toName}!`);
                                                     } catch (error: any) {
@@ -137,7 +137,7 @@ export function SettlementsTabContent({
                                         className="h-7 text-[11px] rounded-full bg-primary/20 text-primary border border-primary/20 hover:bg-primary/30"
                                         onClick={async () => {
                                             try {
-                                                await settleSplit(split.id);
+                                                await settleSplit(split.id, split.transaction?.user_id);
                                                 toast.success('Split settled!');
                                             } catch (error: any) {
                                                 toast.error(error.message || 'Failed to settle split');
