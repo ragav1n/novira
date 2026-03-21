@@ -166,7 +166,7 @@ export function BucketsProvider({ children }: { children: React.ReactNode }) {
 
             // Buckets table changes → full refresh (config may have changed)
             // Transactions/splits table changes → spending only (bucket config unchanged)
-            const txFilter = activeWorkspaceId
+            const txFilter = activeWorkspaceId && activeWorkspaceId !== 'personal'
                 ? `group_id=eq.${activeWorkspaceId}`
                 : `user_id=eq.${userId}`;
 
