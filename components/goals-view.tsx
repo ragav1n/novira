@@ -125,6 +125,7 @@ export function GoalsView() {
 
     const handleSaveGoal = async () => {
         if (!goalName || !goalTarget || !userId) return;
+        if (isNaN(parseFloat(goalTarget)) || parseFloat(goalTarget) <= 0) return;
 
         if (goalModalMode === 'add') {
             const { error } = await supabase
@@ -190,6 +191,7 @@ export function GoalsView() {
         if (!selectedGoalId || !depositAmount || !userId) return;
 
         const amount = parseFloat(depositAmount);
+        if (isNaN(amount) || amount <= 0) return;
         const goal = goals.find(g => g.id === selectedGoalId);
         if (!goal) return;
 
@@ -360,7 +362,7 @@ export function GoalsView() {
                                             <div className="flex justify-between text-[11px]">
                                                 <span className="text-muted-foreground">{progress.toFixed(1)}% funded</span>
                                                 <span className={`font-bold ${themeConfig.textOpacity}`}>
-                                                    {isCompleted ? 'Goal Reached! 🎉' : `${formatCurrency(targetAmount - currentAmount, goal.currency)} to go`}
+                                                    {isCompleted ? 'Goal Reached! 🎉' : `${formatCurrency(Math.max(0, targetAmount - currentAmount), goal.currency)} to go`}
                                                 </span>
                                             </div>
                                         </div>

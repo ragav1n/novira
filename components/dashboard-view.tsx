@@ -266,6 +266,7 @@ export function DashboardView() {
                     spendingData={spendingData}
                     balances={balances}
                     setIsAddFundsOpen={setIsAddFundsOpen}
+                    baseCurrency={currency}
                 />
                 <TransactionListSection
                     isBucketFocused={isBucketFocused}

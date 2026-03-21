@@ -58,6 +58,7 @@ interface SpendingOverviewProps {
         totalOwed: number;
     };
     setIsAddFundsOpen: (open: boolean) => void;
+    baseCurrency: Currency;
 }
 
 const containerVariants = {
@@ -96,7 +97,8 @@ export const SpendingOverview = React.memo(function SpendingOverview({
     focusSelectorRef,
     spendingData,
     balances,
-    setIsAddFundsOpen
+    setIsAddFundsOpen,
+    baseCurrency
 }: SpendingOverviewProps) {
     return (
         <div className="space-y-6">
@@ -386,7 +388,7 @@ export const SpendingOverview = React.memo(function SpendingOverview({
                         </div>
                         <p className="text-[11px] text-emerald-500 font-bold uppercase tracking-wider">You are owed</p>
                         <h4 className="text-lg font-bold text-emerald-500 whitespace-nowrap overflow-hidden text-ellipsis w-full">
-                            {formatCurrency(balances.totalOwedToMe, bucketCurrency)}
+                            {formatCurrency(balances.totalOwedToMe, baseCurrency)}
                         </h4>
                     </CardContent>
                 </Card>
@@ -397,7 +399,7 @@ export const SpendingOverview = React.memo(function SpendingOverview({
                         </div>
                         <p className="text-[11px] text-rose-500 font-bold uppercase tracking-wider">You owe</p>
                         <h4 className="text-lg font-bold text-rose-500 whitespace-nowrap overflow-hidden text-ellipsis w-full">
-                            {formatCurrency(balances.totalOwed, bucketCurrency)}
+                            {formatCurrency(balances.totalOwed, baseCurrency)}
                         </h4>
                     </CardContent>
                 </Card>
