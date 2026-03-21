@@ -32,9 +32,13 @@ export async function enqueueMutation(type: string, data: any): Promise<string> 
     await set(QUEUE_KEY, newQueue);
     
     window.dispatchEvent(new CustomEvent('novira-queue-updated', { detail: { queue: newQueue } }));
-    
+
     if (navigator.onLine) {
         attemptSync();
+    } else if ('serviceWorker' in navigator && 'SyncManager' in window) {
+        navigator.serviceWorker.ready.then(reg => {
+            (reg as any).sync.register('novira-sync-queue').catch(() => {});
+        });
     }
     return id;
 }
@@ -169,9 +173,36 @@ export async function discardFailedItem(id: string) {
     window.dispatchEvent(new CustomEvent('novira-queue-updated', { detail: { queue } }));
 }
 
-// 5. Initialize Online Listeners
+// 5. Initialize Online Listeners + Background Sync
 if (typeof window !== 'undefined') {
     window.addEventListener('online', () => {
         attemptSync();
+        // Re-register background sync tag whenever we come back online
+        if ('serviceWorker' in navigator && 'SyncManager' in window) {
+            navigator.serviceWorker.ready.then(reg => {
+                (reg as any).sync.register('novira-sync-queue').catch(() => {});
+            });
+        }
     });
+
+    // Handle BG_SYNC_TRIGGERED message from service worker
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.addEventListener('message', (event) => {
+            if (event.data?.type === 'BG_SYNC_TRIGGERED') {
+                attemptSync();
+            }
+        });
+    }
+}
+
+/** Register a background sync tag (call after queuing an item) */
+export async function registerBackgroundSync(): Promise<void> {
+    if ('serviceWorker' in navigator && 'SyncManager' in window) {
+        try {
+            const reg = await navigator.serviceWorker.ready;
+            await (reg as any).sync.register('novira-sync-queue');
+        } catch {
+            // SyncManager not available — graceful fallback
+        }
+    }
 }

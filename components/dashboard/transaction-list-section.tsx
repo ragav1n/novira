@@ -33,6 +33,9 @@ interface TransactionListSectionProps {
     isHomeWorkspace: boolean;
     formatCurrency: (amount: number, currency?: string) => string;
     convertAmount: (amount: number, fromCurrency: string, toCurrency?: string) => number;
+    hasMore?: boolean;
+    loadingMore?: boolean;
+    onLoadMore?: () => void;
 }
 
 export function TransactionListSection({
@@ -56,7 +59,10 @@ export function TransactionListSection({
     isCoupleWorkspace,
     isHomeWorkspace,
     formatCurrency,
-    convertAmount
+    convertAmount,
+    hasMore,
+    loadingMore,
+    onLoadMore
 }: TransactionListSectionProps) {
     return (
         <div className="space-y-4">
@@ -141,6 +147,9 @@ export function TransactionListSection({
                     setEditingTransaction={setEditingTransaction}
                     setIsEditOpen={setIsEditOpen}
                     handleDeleteTransaction={handleDeleteTransaction}
+                    hasMore={hasMore}
+                    loadingMore={loadingMore}
+                    onLoadMore={onLoadMore}
                 />
             </DashboardTransactionsDrawer>
         </div>

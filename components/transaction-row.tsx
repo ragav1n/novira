@@ -1,14 +1,14 @@
 'use client';
 
-import React, { memo } from 'react';
+import React, { memo, useState } from 'react';
 import { format, parseISO } from 'date-fns';
-import { History, MoreVertical, Users, RefreshCcw, Ban, MapPin } from 'lucide-react';
+import { History, MoreVertical, Users, RefreshCcw, Ban, MapPin, Pencil, Trash2 } from 'lucide-react';
 import type { Transaction } from '@/types/transaction';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
-import { motion } from 'framer-motion';
+import { motion, useMotionValue, animate } from 'framer-motion';
 import { getCategoryLabel } from '@/lib/categories';
 
 interface TransactionRowProps {
@@ -35,6 +35,8 @@ function CategoryIcon({ icon, color }: { icon: React.ReactNode; color: string })
   });
 }
 
+const SWIPE_THRESHOLD = 72; // px to trigger action reveal
+
 export const TransactionRow = memo(function TransactionRow({
   tx,
   userId,
@@ -54,14 +56,66 @@ export const TransactionRow = memo(function TransactionRow({
   const isSettlement = tx.is_settlement;
   const showDropdown = canEdit && !isSettlement && !hasSplits;
 
+  const x = useMotionValue(0);
+  const [swiped, setSwiped] = useState(false);
+
+  const snapTo = (target: number) => {
+    animate(x, target, { type: 'spring', stiffness: 400, damping: 40 });
+  };
+
+  // Only allow swipe when canEdit
+  const handleDragEnd = (_: any, info: { offset: { x: number } }) => {
+    if (!canEdit) return;
+    if (info.offset.x < -SWIPE_THRESHOLD) {
+      snapTo(-SWIPE_THRESHOLD);
+      setSwiped(true);
+    } else {
+      snapTo(0);
+      setSwiped(false);
+    }
+  };
+
+  const closeSwipe = () => {
+    snapTo(0);
+    setSwiped(false);
+  };
+
   return (
-    <motion.div 
+    <div className="relative overflow-hidden rounded-2xl mt-2 first:mt-0">
+      {/* Swipe action buttons revealed underneath */}
+      {canEdit && (
+        <div className="absolute inset-y-0 right-0 flex items-stretch">
+          <button
+            onClick={() => { closeSwipe(); onEdit(); }}
+            className="w-16 flex flex-col items-center justify-center bg-blue-600 text-white text-[10px] font-bold gap-1 transition-opacity"
+            aria-label="Edit transaction"
+          >
+            <Pencil className="w-4 h-4" />
+            Edit
+          </button>
+          <button
+            onClick={() => { closeSwipe(); onDelete(); }}
+            className="w-16 flex flex-col items-center justify-center bg-red-600 text-white text-[10px] font-bold gap-1 rounded-r-2xl transition-opacity"
+            aria-label="Delete transaction"
+          >
+            <Trash2 className="w-4 h-4" />
+            Delete
+          </button>
+        </div>
+      )}
+    <motion.div
       layout
+      drag={canEdit ? "x" : false}
+      dragConstraints={{ left: -SWIPE_THRESHOLD * 2, right: 0 }}
+      dragElastic={0.1}
+      onDragEnd={handleDragEnd}
+      style={{ x }}
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.95 }}
       transition={{ duration: 0.3, ease: [0.32, 0.725, 0.32, 1] }}
-      className="flex items-start gap-4 p-4.5 rounded-2xl bg-card/30 border border-white/5 hover:bg-card/50 transition-all duration-300 group shadow-md relative mt-2 first:mt-0"
+      className="flex items-start gap-4 p-4.5 rounded-2xl bg-card/30 border border-white/5 hover:bg-card/50 transition-colors duration-300 group shadow-md relative"
+      onClick={swiped ? closeSwipe : undefined}
     >
       {/* Icon */}
       <div className="relative shrink-0 mt-0.5">
@@ -133,8 +187,9 @@ export const TransactionRow = memo(function TransactionRow({
               onClick={(e) => { e.stopPropagation(); onHistory(); }}
               className="p-2 rounded-full hover:bg-white/10 text-white/30 hover:text-primary transition-colors active:scale-90"
               title="View History"
+              aria-label="View transaction history"
             >
-              <History className="w-4 h-4" />
+              <History className="w-4 h-4" aria-hidden="true" />
             </button>
 
             {showDropdown && (
@@ -204,5 +259,6 @@ export const TransactionRow = memo(function TransactionRow({
         )}
       </div>
     </motion.div>
+    </div>
   );
 });

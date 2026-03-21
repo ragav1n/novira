@@ -129,6 +129,7 @@ export function AddExpenseView() {
                             if (isNative) Haptics.impact({ style: ImpactStyle.Light }).catch(() => { });
                             router.back();
                         }}
+                        aria-label="Go back"
                         className="p-2 rounded-full bg-secondary/30 hover:bg-secondary/50 transition-colors shrink-0 z-10"
                     >
                         <ChevronLeft className="w-5 h-5" />
@@ -162,6 +163,8 @@ export function AddExpenseView() {
                             min="0"
                             step="0.01"
                             placeholder="0.00"
+                            required
+                            aria-required="true"
                             onChange={(e) => formState.setAmount(e.target.value)}
                             className="h-16 text-3xl font-bold pl-12 bg-secondary/10 border-primary/50 focus-visible:ring-primary/50"
                         />
@@ -180,6 +183,8 @@ export function AddExpenseView() {
                         id="description"
                         label="Description *"
                         value={formState.description}
+                        required
+                        aria-required="true"
                         onChange={(e) => formState.setDescription(e.target.value)}
                         className="bg-secondary/10 border-white/10 h-14"
                     />

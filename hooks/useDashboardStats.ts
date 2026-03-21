@@ -1,5 +1,5 @@
 import { useMemo, useCallback } from 'react';
-import { differenceInDays, endOfMonth, startOfMonth } from 'date-fns';
+import { differenceInDays, endOfMonth, startOfMonth, format } from 'date-fns';
 import type { Transaction } from '@/types/transaction';
 import { CATEGORY_COLORS } from '@/lib/categories';
 import type { Currency } from '@/components/providers/user-preferences-provider';
@@ -186,23 +186,42 @@ export function useDashboardStats({
             });
     }, [transactions, isBucketFocused, displayTransactions, userId]);
 
-    // Run Rate Calculation
+    // Run Rate Calculation — weighted toward recent 7 days to reflect current spending trend
     const runRateData = useMemo(() => {
-        if (isBucketFocused) return null; // Run rate is only for monthly allowance right now
+        if (isBucketFocused) return null;
 
         const today = new Date();
         const firstDay = startOfMonth(today);
         const lastDay = endOfMonth(today);
         const daysInMonth = differenceInDays(lastDay, firstDay) + 1;
         const currentDayOfMonth = today.getDate();
-
-        // Calculate total spend strictly for this month (excluding future scheduled ones if any)
         const spentThisMonth = totalSpent;
 
-        // Daily average spend so far
-        const dailyAverage = currentDayOfMonth > 0 ? spentThisMonth / currentDayOfMonth : 0;
+        // Recent 7-day spend (current month only)
+        const sevenDaysAgo = new Date(today);
+        sevenDaysAgo.setDate(today.getDate() - 6);
+        const sevenDaysAgoStr = format(sevenDaysAgo, 'yyyy-MM-dd');
+        const todayStr = format(today, 'yyyy-MM-dd');
 
-        // Projected spend for the entire month
+        const recentSpent = transactions.reduce((acc, tx) => {
+            if (tx.exclude_from_allowance) return acc;
+            if (!tx.date.startsWith(currentMonthPrefix)) return acc;
+            const txDate = tx.date.slice(0, 10);
+            if (txDate < sevenDaysAgoStr || txDate > todayStr) return acc;
+            const myShare = calculateUserShare(tx, userId);
+            if (myShare === 0) return acc;
+            const txCurr = (tx.currency || 'USD').toUpperCase();
+            if (tx.exchange_rate && tx.exchange_rate !== 1 && tx.base_currency === bucketCurrency) {
+                return acc + myShare * Number(tx.exchange_rate);
+            }
+            return acc + convertAmount(myShare, txCurr, bucketCurrency);
+        }, 0);
+
+        // Blend: 60% recent daily rate + 40% month-to-date daily rate
+        const recentDays = Math.min(7, currentDayOfMonth);
+        const recentDailyRate = recentDays > 0 ? recentSpent / recentDays : 0;
+        const mtdDailyRate = currentDayOfMonth > 0 ? spentThisMonth / currentDayOfMonth : 0;
+        const dailyAverage = 0.6 * recentDailyRate + 0.4 * mtdDailyRate;
         const projectedSpend = dailyAverage * daysInMonth;
 
         return {
@@ -212,7 +231,7 @@ export function useDashboardStats({
             daysInMonth,
             currentDayOfMonth
         };
-    }, [isBucketFocused, totalSpent, displayBudget]);
+    }, [isBucketFocused, totalSpent, displayBudget, transactions, currentMonthPrefix, calculateUserShare, userId, bucketCurrency, convertAmount]);
 
     return {
         focusedBucket,

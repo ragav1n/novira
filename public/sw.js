@@ -1,4 +1,4 @@
-const CACHE_NAME = 'novira-cache-a1b2c3d4'; // Updated version
+const CACHE_NAME = 'novira-cache-cec586f4'; // Updated version
 const STATIC_ASSETS = [
     '/Novira.png',
     '/manifest.json',
@@ -19,12 +19,61 @@ self.addEventListener('install', (event) => {
     self.skipWaiting();
 });
 
-// Listen for the "SKIP_WAITING" message to trigger the update
+// Listen for messages from the page
 self.addEventListener('message', (event) => {
     if (event.data && event.data.type === 'SKIP_WAITING') {
         self.skipWaiting();
     }
 });
+
+// Push Notifications
+self.addEventListener('push', (event) => {
+    let payload = { title: 'Novira', body: 'You have a new notification', icon: '/Novira.png', url: '/' };
+    if (event.data) {
+        try { payload = { ...payload, ...JSON.parse(event.data.text()) }; } catch {}
+    }
+
+    event.waitUntil(
+        self.registration.showNotification(payload.title, {
+            body: payload.body,
+            icon: payload.icon,
+            badge: '/Novira.png',
+            data: { url: payload.url },
+            vibrate: [100, 50, 100],
+        })
+    );
+});
+
+// Notification click — open/focus the app
+self.addEventListener('notificationclick', (event) => {
+    event.notification.close();
+    const url = event.notification.data?.url || '/';
+    event.waitUntil(
+        self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clients => {
+            const match = clients.find(c => c.url.includes(self.location.origin) && 'focus' in c);
+            if (match) {
+                match.focus();
+                match.navigate(url);
+            } else {
+                self.clients.openWindow(url);
+            }
+        })
+    );
+});
+
+// Background Sync: wake up all open clients so they can run the sync queue
+self.addEventListener('sync', (event) => {
+    if (event.tag === 'novira-sync-queue') {
+        event.waitUntil(notifyClientsToSync());
+    }
+});
+
+async function notifyClientsToSync() {
+    const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    if (clients.length > 0) {
+        clients.forEach(client => client.postMessage({ type: 'BG_SYNC_TRIGGERED' }));
+    }
+}
 
 // Activate: clean up old caches
 self.addEventListener('activate', (event) => {

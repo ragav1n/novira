@@ -8,7 +8,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { ChartConfig, BasePieChart } from "@/components/charts/base-pie-chart";
 import { TransactionService } from '@/lib/services/transaction-service';
 import { CHART_CONFIG, CATEGORY_COLORS, getIconForCategory, getCategoryLabel } from '@/lib/categories';
-import { format, startOfMonth, endOfMonth, subMonths, subYears, isSameMonth, parseISO } from 'date-fns';
+import { format, startOfMonth, endOfMonth, subMonths, subYears, isSameMonth, parseISO, startOfDay, endOfDay } from 'date-fns';
 import { useUserPreferences } from '@/components/providers/user-preferences-provider';
 import { useBuckets } from '@/components/providers/buckets-provider';
 import { useWorkspaceTheme } from '@/hooks/useWorkspaceTheme';
@@ -62,7 +62,7 @@ const paymentChartConfig: ChartConfig = {
 import { supabase } from '@/lib/supabase';
 import { toast, ImpactStyle } from '@/utils/haptics';
 
-type DateRange = '1M' | 'LM' | '3M' | '6M' | '1Y' | 'ALL';
+type DateRange = '1M' | 'LM' | '3M' | '6M' | '1Y' | 'ALL' | 'CUSTOM';
 
 const AnalyticsSkeleton = () => (
     <div className="space-y-6">
@@ -116,6 +116,8 @@ export function AnalyticsView() {
     const [transactions, setTransactions] = useState<Transaction[]>([]);
     const [dateRange, setDateRange] = useState<DateRange>('1M');
     const [selectedBucketId, setSelectedBucketId] = useState<string | 'all'>('all');
+    const [customStart, setCustomStart] = useState<string>('');
+    const [customEnd, setCustomEnd] = useState<string>('');
     const { formatCurrency, currency, convertAmount, userId, activeWorkspaceId } = useUserPreferences();
     const { activeWorkspace, theme: themeConfig } = useWorkspaceTheme('cyan');
 
@@ -145,6 +147,12 @@ export function AnalyticsView() {
             else if (dateRange === '3M') startDate = startOfMonth(subMonths(now, 2));
             else if (dateRange === '6M') startDate = startOfMonth(subMonths(now, 5));
             else if (dateRange === '1Y') startDate = startOfMonth(subYears(now, 1));
+            else if (dateRange === 'CUSTOM') {
+                if (customStart) startDate = startOfDay(new Date(customStart));
+                if (customEnd) endDate = endOfDay(new Date(customEnd));
+                // If custom range not yet set, don't fetch
+                if (!customStart && !customEnd) { setLoading(false); return; }
+            }
 
             const data = await TransactionService.getTransactions({
                 userId,
@@ -163,7 +171,7 @@ export function AnalyticsView() {
         } finally {
             setLoading(false);
         }
-    }, [userId, activeWorkspaceId, dateRange, selectedBucketId]);
+    }, [userId, activeWorkspaceId, dateRange, selectedBucketId, customStart, customEnd]);
 
     useEffect(() => {
         if (userId) {
@@ -215,7 +223,7 @@ export function AnalyticsView() {
         else if (dateRange === '3M') monthsBack = 2;
         else if (dateRange === '6M') monthsBack = 5;
         else if (dateRange === '1Y') monthsBack = 11;
-        else if (dateRange === 'ALL') monthsBack = -1;
+        else if (dateRange === 'ALL' || dateRange === 'CUSTOM') monthsBack = -1;
 
         if (monthsBack !== -1 && monthsBack !== -2) {
             for (let i = monthsBack; i >= 0; i--) {
@@ -309,7 +317,7 @@ export function AnalyticsView() {
         const sortedTrendData = Object.values(monthsMap).sort((a: any, b: any) => a.rawDate - b.rawDate);
         const displayTrendData = sortedTrendData.map((item: any) => ({
             ...item,
-            month: dateRange === '1Y' || dateRange === 'ALL'
+            month: dateRange === '1Y' || dateRange === 'ALL' || dateRange === 'CUSTOM'
                 ? format(item.rawDate, 'MMM yy')
                 : (dateRange === '1M' || dateRange === 'LM' ? format(item.rawDate, 'MMM d') : format(item.rawDate, 'MMM'))
         }));
@@ -448,9 +456,36 @@ export function AnalyticsView() {
                             <SelectItem value="6M">Last 6 Months</SelectItem>
                             <SelectItem value="1Y">Last Year</SelectItem>
                             <SelectItem value="ALL">All Time</SelectItem>
+                            <SelectItem value="CUSTOM">Custom Range</SelectItem>
                         </SelectContent>
                     </Select>
                 </div>
+
+                {/* Custom date range inputs */}
+                {dateRange === 'CUSTOM' && (
+                    <div className="flex gap-2 px-1">
+                        <div className="flex-1">
+                            <label className="text-[10px] font-bold uppercase tracking-wider text-white/40 mb-1 block">From</label>
+                            <input
+                                type="date"
+                                value={customStart}
+                                max={customEnd || undefined}
+                                onChange={(e) => setCustomStart(e.target.value)}
+                                className="w-full h-10 px-3 rounded-xl bg-secondary/20 border border-white/5 text-[12px] font-bold text-white focus:outline-none focus:ring-1 focus:ring-primary/50 [color-scheme:dark]"
+                            />
+                        </div>
+                        <div className="flex-1">
+                            <label className="text-[10px] font-bold uppercase tracking-wider text-white/40 mb-1 block">To</label>
+                            <input
+                                type="date"
+                                value={customEnd}
+                                min={customStart || undefined}
+                                onChange={(e) => setCustomEnd(e.target.value)}
+                                className="w-full h-10 px-3 rounded-xl bg-secondary/20 border border-white/5 text-[12px] font-bold text-white focus:outline-none focus:ring-1 focus:ring-primary/50 [color-scheme:dark]"
+                            />
+                        </div>
+                    </div>
+                )}
 
                 {loading ? (
                     <AnalyticsSkeleton />
