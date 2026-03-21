@@ -162,26 +162,27 @@ export function BucketsProvider({ children }: { children: React.ReactNode }) {
 
             // Buckets table changes → full refresh (config may have changed)
             // Transactions/splits table changes → spending only (bucket config unchanged)
+            const txFilter = activeWorkspaceId
+                ? `group_id=eq.${activeWorkspaceId}`
+                : `user_id=eq.${userId}`;
+
             const channel = supabase
                 .channel(`buckets-updates-${userId}-${activeWorkspaceId || 'personal'}`)
                 .on('postgres_changes', {
-                    event: '*',
-                    schema: 'public',
-                    table: 'buckets'
+                    event: '*', schema: 'public', table: 'buckets',
+                    filter: `user_id=eq.${userId}`
                 }, () => {
                     debouncedFetchBuckets();
                 })
                 .on('postgres_changes', {
-                    event: '*',
-                    schema: 'public',
-                    table: 'transactions'
+                    event: '*', schema: 'public', table: 'transactions',
+                    filter: txFilter
                 }, () => {
                     debouncedFetchSpending();
                 })
                 .on('postgres_changes', {
-                    event: '*',
-                    schema: 'public',
-                    table: 'splits'
+                    event: '*', schema: 'public', table: 'splits',
+                    filter: `user_id=eq.${userId}`
                 }, () => {
                     debouncedFetchSpending();
                 })

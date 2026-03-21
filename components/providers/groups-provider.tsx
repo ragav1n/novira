@@ -300,23 +300,19 @@ export function GroupsProvider({ children }: { children: React.ReactNode }) {
         // Debounce subscription to prevent rapid reconnects during strict mode or auth state settling
         const timer = setTimeout(() => {
             channel = supabase.channel(`realtime-groups-${userId}`)
-                .on('postgres_changes', { event: '*', schema: 'public', table: 'splits' }, () => {
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'splits', filter: `user_id=eq.${userId}` }, () => {
                     debouncedRefresh();
                 })
-                .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' }, () => {
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions', filter: `user_id=eq.${userId}` }, () => {
                     debouncedRefresh();
                 })
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'groups' }, () => {
                     debouncedRefresh();
                 })
-                .on('postgres_changes', { event: '*', schema: 'public', table: 'group_members' }, () => {
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'group_members', filter: `user_id=eq.${userId}` }, () => {
                     debouncedRefresh();
                 })
-                .on('postgres_changes', {
-                    event: '*',
-                    schema: 'public',
-                    table: 'friendships'
-                }, () => {
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'friendships', filter: `user_id=eq.${userId}` }, () => {
                     debouncedRefresh();
                 })
                 .subscribe((status, err) => {

@@ -58,14 +58,8 @@ export function SubscriptionsView() {
             .channel(`templates-changes-${userId}-${activeWorkspaceId || 'personal'}`)
             .on(
                 'postgres_changes',
-                {
-                    event: '*',
-                    schema: 'public',
-                    table: 'recurring_templates'
-                },
-                () => {
-                    loadTemplates();
-                }
+                { event: '*', schema: 'public', table: 'recurring_templates', filter: `user_id=eq.${userId}` },
+                () => { loadTemplates(); }
             )
             .subscribe();
 
