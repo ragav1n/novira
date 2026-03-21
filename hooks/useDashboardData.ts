@@ -3,9 +3,14 @@ import { supabase } from '@/lib/supabase';
 import { toast } from '@/utils/haptics';
 import type { Transaction, AuditLog } from '@/types/transaction';
 
+const PAGE_SIZE = 100;
+
 export function useDashboardData(userId: string | null, activeWorkspaceId: string | null = null) {
     const [transactions, setTransactions] = useState<Transaction[]>([]);
     const [loading, setLoading] = useState(true);
+    const [loadingMore, setLoadingMore] = useState(false);
+    const [hasMore, setHasMore] = useState(false);
+    const [loadLimit, setLoadLimit] = useState(PAGE_SIZE);
 
     const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
     const [isEditOpen, setIsEditOpen] = useState(false);
@@ -14,17 +19,18 @@ export function useDashboardData(userId: string | null, activeWorkspaceId: strin
     const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
     const [loadingAudit, setLoadingAudit] = useState(false);
 
-    const loadTxRef = useRef<((uid: string, workspaceId: string | null, bypassCache?: boolean) => Promise<void>) | null>(null);
+    const loadTxRef = useRef<((uid: string, workspaceId: string | null, bypassCache?: boolean, limit?: number) => Promise<void>) | null>(null);
+    const loadLimitRef = useRef(PAGE_SIZE);
     const mutatingRef = useRef(false);
 
-    const loadTransactions = async (currentUserId: string, workspaceId: string | null = null, bypassCache = false) => {
+    const loadTransactions = async (currentUserId: string, workspaceId: string | null = null, bypassCache = false, limit = loadLimitRef.current) => {
         try {
             let query = supabase
                 .from('transactions')
                 .select('id, description, amount, category, date, created_at, user_id, group_id, currency, exchange_rate, base_currency, bucket_id, exclude_from_allowance, is_recurring, place_name, place_address, place_lat, place_lng, profile:profiles(full_name, avatar_url), splits(user_id, amount, is_paid)')
                 .order('date', { ascending: false })
                 .order('created_at', { ascending: false })
-                .limit(200);
+                .limit(limit);
 
             if (workspaceId && workspaceId !== 'personal') {
                 query = query.eq('group_id', workspaceId);
@@ -48,6 +54,7 @@ export function useDashboardData(userId: string | null, activeWorkspaceId: strin
                     splits: tx.splits || []
                 })) as Transaction[];
                 setTransactions(formattedTxs);
+                setHasMore(txs.length >= limit);
             }
         } catch (error) {
             console.error("Error loading transactions:", error);
@@ -55,6 +62,20 @@ export function useDashboardData(userId: string | null, activeWorkspaceId: strin
     };
 
     loadTxRef.current = loadTransactions;
+    loadLimitRef.current = loadLimit;
+
+    const loadMore = useCallback(async () => {
+        if (!userId || loadingMore || !hasMore) return;
+        const nextLimit = loadLimitRef.current + PAGE_SIZE;
+        setLoadLimit(nextLimit);
+        loadLimitRef.current = nextLimit;
+        setLoadingMore(true);
+        try {
+            await loadTxRef.current?.(userId, activeWorkspaceId, false, nextLimit);
+        } finally {
+            setLoadingMore(false);
+        }
+    }, [userId, activeWorkspaceId, loadingMore, hasMore]);
 
     const txDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const debouncedLoadTx = useCallback((uid: string, workspaceId: string | null = null, bypassCache = false) => {
@@ -70,14 +91,16 @@ export function useDashboardData(userId: string | null, activeWorkspaceId: strin
         };
     }, []);
 
-    // Initial data fetch and workspace change listener
+    // Reset pagination and re-fetch when user or workspace changes
     useEffect(() => {
         if (!userId) return;
-        
+        setLoadLimit(PAGE_SIZE);
+        loadLimitRef.current = PAGE_SIZE;
+
         const fetchInitialData = async () => {
             setLoading(true);
             try {
-                await loadTxRef.current?.(userId, activeWorkspaceId, false);
+                await loadTxRef.current?.(userId, activeWorkspaceId, false, PAGE_SIZE);
             } finally {
                 setLoading(false);
             }
@@ -269,6 +292,9 @@ export function useDashboardData(userId: string | null, activeWorkspaceId: strin
         setTransactions,
         loading,
         setLoading,
+        hasMore,
+        loadingMore,
+        loadMore,
         editingTransaction,
         setEditingTransaction,
         isEditOpen,

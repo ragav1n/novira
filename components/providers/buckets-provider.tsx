@@ -40,6 +40,57 @@ interface BucketSplit {
     amount: number | string;
 }
 
+interface SpendingTx {
+    bucket_id: string | null;
+    user_id: string;
+    amount: number | string;
+    currency: string | null;
+    exchange_rate: number | null;
+    base_currency: string | null;
+    splits?: BucketSplit[];
+}
+
+function computeBucketSpending(
+    spendingData: SpendingTx[],
+    buckets: Bucket[],
+    userId: string,
+    currency: string,
+    convertAmount: (amount: number, from: string, to?: string) => number
+): Record<string, number> {
+    const bucketMap = new Map(buckets.map(b => [b.id, b]));
+    const spending: Record<string, number> = {};
+    spendingData.forEach(tx => {
+        const bId = tx.bucket_id;
+        if (!bId) return;
+        const bucketConfig = bucketMap.get(bId);
+        const bucketCurrency = (bucketConfig?.currency || currency).toUpperCase();
+        let shareAmount = Number(tx.amount);
+        if (tx.splits && tx.splits.length > 0) {
+            if (tx.user_id === userId) {
+                const othersOwe = tx.splits.reduce((sum: number, s: BucketSplit) => sum + Number(s.amount || 0), 0);
+                shareAmount = Number(tx.amount) - othersOwe;
+            } else {
+                const mySplit = tx.splits.find((s: BucketSplit) => s.user_id === userId);
+                shareAmount = mySplit ? Number(mySplit.amount || 0) : 0;
+            }
+        } else if (tx.user_id !== userId) {
+            shareAmount = 0;
+        }
+        if (shareAmount <= 0) return;
+        const txCurrency = (tx.currency || 'USD').toUpperCase();
+        let amountInBucketCurrency: number;
+        if (txCurrency === bucketCurrency) {
+            amountInBucketCurrency = shareAmount;
+        } else if (tx.exchange_rate && tx.base_currency === bucketCurrency) {
+            amountInBucketCurrency = shareAmount * Number(tx.exchange_rate);
+        } else {
+            amountInBucketCurrency = convertAmount(shareAmount, txCurrency, bucketCurrency);
+        }
+        spending[bId] = (spending[bId] || 0) + amountInBucketCurrency;
+    });
+    return spending;
+}
+
 export function BucketsProvider({ children }: { children: React.ReactNode }) {
     const { userId, currency, convertAmount, activeWorkspaceId } = useUserPreferences();
     const [buckets, setBuckets] = useState<Bucket[]>([]);
@@ -57,45 +108,8 @@ export function BucketsProvider({ children }: { children: React.ReactNode }) {
 
             setBuckets(fetchedBuckets);
 
-            // Process spending
             if (spendingData) {
-                const bucketMap = new Map(fetchedBuckets.map(b => [b.id, b]));
-                const spending: Record<string, number> = {};
-                spendingData.forEach(tx => {
-                    const bId = tx.bucket_id;
-                    if (!bId) return;
-
-                    const bucketConfig = bucketMap.get(bId);
-                    const bucketCurrency = (bucketConfig?.currency || currency).toUpperCase();
-
-                    let shareAmount = Number(tx.amount);
-                    if (tx.splits && tx.splits.length > 0) {
-                        if (tx.user_id === userId) {
-                            const othersOwe = tx.splits.reduce((sum: number, s: BucketSplit) => sum + Number(s.amount || 0), 0);
-                            shareAmount = Number(tx.amount) - othersOwe;
-                        } else {
-                            const mySplit = tx.splits.find((s: BucketSplit) => s.user_id === userId);
-                            shareAmount = mySplit ? Number(mySplit.amount || 0) : 0;
-                        }
-                    } else if (tx.user_id !== userId) {
-                        shareAmount = 0;
-                    }
-
-                    if (shareAmount <= 0) return;
-
-                    let amountInBucketCurrency = 0;
-                    const txCurrency = (tx.currency || 'USD').toUpperCase();
-                    if (txCurrency === bucketCurrency) {
-                        amountInBucketCurrency = shareAmount;
-                    } else if (tx.exchange_rate && tx.base_currency === bucketCurrency) {
-                        amountInBucketCurrency = shareAmount * Number(tx.exchange_rate);
-                    } else {
-                        amountInBucketCurrency = convertAmount(shareAmount, txCurrency, bucketCurrency);
-                    }
-
-                    spending[bId] = (spending[bId] || 0) + amountInBucketCurrency;
-                });
-                setBucketSpending(spending);
+                setBucketSpending(computeBucketSpending(spendingData, fetchedBuckets, userId, currency, convertAmount));
             }
         } catch (error) {
             console.error('Error fetching buckets:', error);
@@ -112,40 +126,8 @@ export function BucketsProvider({ children }: { children: React.ReactNode }) {
         if (!userId) return;
         try {
             const spendingData = await BucketService.getBucketSpending(userId, activeWorkspaceId);
-            const currentBuckets = bucketsRef.current;
             if (spendingData) {
-                const bucketMap = new Map(currentBuckets.map(b => [b.id, b]));
-                const spending: Record<string, number> = {};
-                spendingData.forEach(tx => {
-                    const bId = tx.bucket_id;
-                    if (!bId) return;
-                    const bucketConfig = bucketMap.get(bId);
-                    const bucketCurrency = (bucketConfig?.currency || currency).toUpperCase();
-                    let shareAmount = Number(tx.amount);
-                    if (tx.splits && tx.splits.length > 0) {
-                        if (tx.user_id === userId) {
-                            const othersOwe = tx.splits.reduce((sum: number, s: BucketSplit) => sum + Number(s.amount || 0), 0);
-                            shareAmount = Number(tx.amount) - othersOwe;
-                        } else {
-                            const mySplit = tx.splits.find((s: BucketSplit) => s.user_id === userId);
-                            shareAmount = mySplit ? Number(mySplit.amount || 0) : 0;
-                        }
-                    } else if (tx.user_id !== userId) {
-                        shareAmount = 0;
-                    }
-                    if (shareAmount <= 0) return;
-                    let amountInBucketCurrency = 0;
-                    const txCurrency = (tx.currency || 'USD').toUpperCase();
-                    if (txCurrency === bucketCurrency) {
-                        amountInBucketCurrency = shareAmount;
-                    } else if (tx.exchange_rate && tx.base_currency === bucketCurrency) {
-                        amountInBucketCurrency = shareAmount * Number(tx.exchange_rate);
-                    } else {
-                        amountInBucketCurrency = convertAmount(shareAmount, txCurrency, bucketCurrency);
-                    }
-                    spending[bId] = (spending[bId] || 0) + amountInBucketCurrency;
-                });
-                setBucketSpending(spending);
+                setBucketSpending(computeBucketSpending(spendingData, bucketsRef.current, userId, currency, convertAmount));
             }
         } catch (error) {
             console.error('Error refreshing bucket spending:', error);

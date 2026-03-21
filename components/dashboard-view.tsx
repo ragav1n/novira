@@ -53,7 +53,8 @@ export function DashboardView() {
     const { buckets } = useBuckets();
 
     const {
-        transactions, loading, editingTransaction, setEditingTransaction,
+        transactions, loading, hasMore, loadingMore, loadMore,
+        editingTransaction, setEditingTransaction,
         isEditOpen, setIsEditOpen, selectedAuditTx, setSelectedAuditTx,
         auditLogs, loadingAudit, handleDeleteTransaction, handleUpdateTransaction, loadAuditLogs, loadTransactions
     } = useDashboardData(userId, activeWorkspaceId);
@@ -288,6 +289,9 @@ export function DashboardView() {
                     isHomeWorkspace={isHomeWorkspace}
                     formatCurrency={formatCurrency}
                     convertAmount={convertAmount}
+                    hasMore={hasMore}
+                    loadingMore={loadingMore}
+                    onLoadMore={loadMore}
                 />
 
                 <DashboardDialogs 

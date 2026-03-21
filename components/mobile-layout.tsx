@@ -213,7 +213,7 @@ export function MobileLayout({ children }: { children: React.ReactNode }) {
             )} />
 
             {/* Main Content Area */}
-            <main className={cn(
+            <main id="main-content" tabIndex={-1} className={cn(
                 "flex-1 w-full overflow-y-auto no-scrollbar relative flex flex-col",
                 (!isAuthPage && !isPublicPage) ? "pb-24" : "pb-0"
             )}>

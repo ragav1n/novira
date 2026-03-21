@@ -18,6 +18,9 @@ interface VirtualizedTransactionListProps {
   getBucketChip: (tx: Transaction) => React.ReactNode;
   loadAuditLogs: (tx: Transaction) => void;
   canEditTransaction: (tx: Transaction) => boolean;
+  hasMore?: boolean;
+  loadingMore?: boolean;
+  onLoadMore?: () => void;
 }
 
 export const VirtualizedTransactionList = React.memo(function VirtualizedTransactionList({
@@ -25,7 +28,7 @@ export const VirtualizedTransactionList = React.memo(function VirtualizedTransac
   calculateUserShare, getIconForCategory, formatCurrency,
   convertAmount, setEditingTransaction, setIsEditOpen,
   handleDeleteTransaction, getBucketChip, loadAuditLogs,
-  canEditTransaction
+  canEditTransaction, hasMore, loadingMore, onLoadMore
 }: VirtualizedTransactionListProps) {
   if (transactions.length === 0) {
     return (
@@ -66,6 +69,15 @@ export const VirtualizedTransactionList = React.memo(function VirtualizedTransac
           />
         );
       })}
+      {hasMore && onLoadMore && (
+        <button
+          onClick={onLoadMore}
+          disabled={loadingMore}
+          className="w-full py-3 text-sm font-bold text-primary/70 hover:text-primary transition-colors disabled:opacity-50"
+        >
+          {loadingMore ? 'Loading...' : 'Load more transactions'}
+        </button>
+      )}
     </div>
   );
 });
