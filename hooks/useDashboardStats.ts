@@ -129,7 +129,7 @@ export function useDashboardStats({
             if (myShare > 0) {
                 if (!acc[cat]) acc[cat] = 0;
 
-                const txCurr = tx.currency || 'USD';
+                const txCurr = (tx.currency || 'USD').toUpperCase();
                 // When bucket focused, we should probably convert to bucketCurrency for the pie chart
                 const targetCurr = isBucketFocused ? bucketCurrency : currency;
                 const isSameCurrency = txCurr === targetCurr;

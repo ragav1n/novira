@@ -112,7 +112,7 @@ export function useDashboardData(userId: string | null, activeWorkspaceId: strin
     useEffect(() => {
         if (!userId) return;
 
-        const txFilter = activeWorkspaceId
+        const txFilter = activeWorkspaceId && activeWorkspaceId !== 'personal'
             ? `group_id=eq.${activeWorkspaceId}`
             : `user_id=eq.${userId}`;
 

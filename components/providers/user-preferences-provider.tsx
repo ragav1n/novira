@@ -135,13 +135,17 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
             const cacheKey = `novira_profile_${uid}`;
             const cached = localStorage.getItem(cacheKey);
             if (cached) {
-                const parsed = JSON.parse(cached);
-                if (parsed.currency) setCurrencyState(parsed.currency);
-                if (parsed.budget_alerts !== null) setBudgetAlertsEnabledState(parsed.budget_alerts);
-                if (parsed.monthly_budget) setMonthlyBudgetState(parsed.monthly_budget);
-                if (parsed.avatar_url) setAvatarUrl(parsed.avatar_url);
-                if (parsed.budgets) setBudgets(parsed.budgets);
-                if (parsed.active_workspace_id) setActiveWorkspaceId(parsed.active_workspace_id);
+                try {
+                    const parsed = JSON.parse(cached);
+                    if (parsed.currency) setCurrencyState(parsed.currency);
+                    if (parsed.budget_alerts !== null) setBudgetAlertsEnabledState(parsed.budget_alerts);
+                    if (parsed.monthly_budget != null) setMonthlyBudgetState(parsed.monthly_budget);
+                    if (parsed.avatar_url) setAvatarUrl(parsed.avatar_url);
+                    if (parsed.budgets) setBudgets(parsed.budgets);
+                    if (parsed.active_workspace_id) setActiveWorkspaceId(parsed.active_workspace_id);
+                } catch {
+                    localStorage.removeItem(cacheKey);
+                }
             }
 
             const { data, error } = await supabase
@@ -153,7 +157,7 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
             if (data) {
                 if (data.currency) setCurrencyState(data.currency as Currency);
                 if (data.budget_alerts !== null) setBudgetAlertsEnabledState(data.budget_alerts);
-                if (data.monthly_budget) setMonthlyBudgetState(data.monthly_budget);
+                if (data.monthly_budget != null) setMonthlyBudgetState(data.monthly_budget);
                 if (data.avatar_url) setAvatarUrl(data.avatar_url);
                 if (data.budgets) setBudgets(data.budgets as Record<string, number>);
                 if (data.full_name) setFullName(data.full_name);
@@ -420,8 +424,12 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
             const cacheKey = `novira_profile_${userId}`;
             const cached = localStorage.getItem(cacheKey);
             if (cached) {
-                const parsed = JSON.parse(cached);
-                localStorage.setItem(cacheKey, JSON.stringify({ ...parsed, active_workspace_id: id }));
+                try {
+                    const parsed = JSON.parse(cached);
+                    localStorage.setItem(cacheKey, JSON.stringify({ ...parsed, active_workspace_id: id }));
+                } catch {
+                    localStorage.setItem(cacheKey, JSON.stringify({ active_workspace_id: id }));
+                }
             }
         }
     }, [userId]);
