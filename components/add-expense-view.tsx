@@ -385,7 +385,7 @@ export function AddExpenseView() {
                                             {method === 'Cash' ? <Banknote className="w-4 h-4" /> :
                                                 method === 'UPI' ? <Wallet className="w-4 h-4" /> :
                                                     method === 'Debit Card' ? <CreditCard className="w-4 h-4" /> :
-                                                        method === 'Credit Card' ? <Wallet className="w-4 h-4" /> :
+                                                        method === 'Credit Card' ? <CreditCard className="w-4 h-4" /> :
                                                             <Building2 className="w-4 h-4" />}
                                         </div>
                                         <span

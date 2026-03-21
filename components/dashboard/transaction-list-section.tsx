@@ -93,7 +93,7 @@ export function TransactionListSection({
             <div className="space-y-1">
                 {displayTransactions.slice(0, 5).map((tx: Transaction) => {
                     const myShare = calculateUserShare(tx, userId);
-                    const showConverted = tx.currency && tx.currency !== currency;
+                    const showConverted = tx.currency && tx.currency.toUpperCase() !== currency.toUpperCase();
                     return (
                         <TransactionRow
                             key={tx.id}

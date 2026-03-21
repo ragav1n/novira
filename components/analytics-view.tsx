@@ -494,27 +494,33 @@ export function AnalyticsView() {
                 ) : (
                     <>
                 {/* Bucket Progress Highlight */}
-                {selectedBucketId !== 'all' && buckets.find(b => b.id === selectedBucketId) && (
+                {selectedBucketId !== 'all' && buckets.find(b => b.id === selectedBucketId) && (() => {
+                    const focusedBucket = buckets.find(b => b.id === selectedBucketId)!;
+                    const bucketCurr = (focusedBucket.currency || currency).toUpperCase();
+                    const budgetInBase = convertAmount(Number(focusedBucket.budget || 0), bucketCurr);
+                    const remaining = budgetInBase - totalSpentInRange;
+                    return (
                     <Card className={`${themeConfig.bgLight} ${themeConfig.borderMedium} ${themeConfig.shadowGlow}`}>
                         <CardContent className="p-4 flex items-center justify-between">
                             <div className="flex items-center gap-3">
                                 <div className={`w-10 h-10 rounded-2xl flex items-center justify-center border ${themeConfig.bgMedium} ${themeConfig.text} ${themeConfig.borderMedium}`}>
-                                    {getBucketIcon(buckets.find(b => b.id === selectedBucketId)?.icon)}
+                                    {getBucketIcon(focusedBucket.icon)}
                                 </div>
                                 <div>
-                                    <h4 className={`text-sm font-bold ${themeConfig.text}`}>{buckets.find(b => b.id === selectedBucketId)?.name}</h4>
+                                    <h4 className={`text-sm font-bold ${themeConfig.text}`}>{focusedBucket.name}</h4>
                                     <p className={`text-[11px] font-bold uppercase tracking-widest ${themeConfig.textOpacity}`}>Targeted View</p>
                                 </div>
                             </div>
                             <div className="text-right">
                                 <p className={`text-[11px] font-bold uppercase tracking-widest ${themeConfig.textOpacity}`}>Budget Remaining</p>
                                 <p className={`text-sm font-bold ${themeConfig.text}`}>
-                                    {formatCurrency(Number(buckets.find(b => b.id === selectedBucketId)?.budget || 0) - totalSpentInRange)}
+                                    {formatCurrency(remaining)}
                                 </p>
                             </div>
                         </CardContent>
                     </Card>
-                )}
+                    );
+                })()}
 
                 {/* Monthly Spending Trend */}
                 <Card className="bg-card/40 backdrop-blur-md border-white/5 shadow-none">
