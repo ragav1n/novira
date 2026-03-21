@@ -15,6 +15,7 @@ export function useDashboardData(userId: string | null, activeWorkspaceId: strin
     const [loadingAudit, setLoadingAudit] = useState(false);
 
     const loadTxRef = useRef<((uid: string, workspaceId: string | null, bypassCache?: boolean) => Promise<void>) | null>(null);
+    const mutatingRef = useRef(false);
 
     const loadTransactions = async (currentUserId: string, workspaceId: string | null = null, bypassCache = false) => {
         try {
@@ -149,6 +150,8 @@ export function useDashboardData(userId: string | null, activeWorkspaceId: strin
     }, [userId, activeWorkspaceId]);
 
     const handleDeleteTransaction = async (tx: Transaction) => {
+        if (mutatingRef.current) return;
+        mutatingRef.current = true;
         // Optimistic: remove from UI immediately
         const previousTransactions = [...transactions];
         setTransactions(prev => prev.filter(t => t.id !== tx.id));
@@ -192,12 +195,16 @@ export function useDashboardData(userId: string | null, activeWorkspaceId: strin
             // Rollback on failure
             setTransactions(previousTransactions);
             toast.error('Failed to delete: ' + error.message);
+        } finally {
+            mutatingRef.current = false;
         }
     };
 
     const handleUpdateTransaction = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!editingTransaction) return;
+        if (mutatingRef.current) return;
+        mutatingRef.current = true;
 
         // Optimistic: update in UI immediately
         const previousTransactions = [...transactions];
@@ -232,6 +239,8 @@ export function useDashboardData(userId: string | null, activeWorkspaceId: strin
             // Rollback on failure
             setTransactions(previousTransactions);
             toast.error('Failed to update: ' + error.message);
+        } finally {
+            mutatingRef.current = false;
         }
     };
 
