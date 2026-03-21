@@ -322,10 +322,10 @@ export function GroupsProvider({ children }: { children: React.ReactNode }) {
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'groups' }, () => {
                     debouncedRefresh();
                 })
-                .on('postgres_changes', { event: '*', schema: 'public', table: 'group_members', filter: `user_id=eq.${userId}` }, () => {
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'group_members' }, () => {
                     debouncedRefresh();
                 })
-                .on('postgres_changes', { event: '*', schema: 'public', table: 'friendships', filter: `user_id=eq.${userId}` }, () => {
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'friendships' }, () => {
                     debouncedRefresh();
                 })
                 .subscribe((status, err) => {
