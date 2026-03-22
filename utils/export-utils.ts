@@ -181,7 +181,11 @@ export const generateCSV = (
         if (tx.bucket_id) {
             const bucket = bucketMap[tx.bucket_id];
             if (bucket) {
-                if (!bucketTotals[tx.bucket_id]) bucketTotals[tx.bucket_id] = { spent: 0, budget: bucket.budget || 0, name: bucket.name };
+                if (!bucketTotals[tx.bucket_id]) {
+                    const bucketCurr = (bucket.currency || currency).toUpperCase();
+                    const budgetInBase = convertAmount(Number(bucket.budget || 0), bucketCurr);
+                    bucketTotals[tx.bucket_id] = { spent: 0, budget: budgetInBase, name: bucket.name };
+                }
                 bucketTotals[tx.bucket_id].spent += abs;
             }
         }
@@ -421,7 +425,8 @@ export const generatePDF = async (
         }
 
         if (bucket) {
-            let effectiveBudget = bucket.budget;
+            const bucketCurr = (bucket.currency || currency).toUpperCase();
+            let effectiveBudget = convertAmount(Number(bucket.budget || 0), bucketCurr);
             if (bucket.start_date && bucket.end_date && reportRange?.from && reportRange?.to) {
                 const bStart = new Date(bucket.start_date), bEnd = new Date(bucket.end_date);
                 const overlapStart = new Date(Math.max(bStart.getTime(), reportRange.from.getTime()));
@@ -429,7 +434,7 @@ export const generatePDF = async (
                 if (overlapEnd > overlapStart) {
                     const bucketDays = Math.max(1, differenceInDays(bEnd, bStart) + 1);
                     const overlapDays = Math.max(1, differenceInDays(overlapEnd, overlapStart) + 1);
-                    effectiveBudget = (bucket.budget / bucketDays) * overlapDays;
+                    effectiveBudget = effectiveBudget * (overlapDays / bucketDays);
                 }
             }
             if (!bucketTotals[bucket.name]) bucketTotals[bucket.name] = { spent: 0, budget: effectiveBudget };
