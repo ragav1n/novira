@@ -16,6 +16,7 @@ interface ExportTransaction {
     bucket_id?: string;
     group_id?: string;
     is_recurring?: boolean;
+    is_settlement?: boolean;
     exclude_from_allowance?: boolean;
     place_name?: string | null;
     notes?: string | null;
@@ -349,8 +350,8 @@ export const generateCSV = (
             format(dateObj, 'yyyy-MM-dd'),
             format(dateObj, 'HH:mm'),
             tx.description,
-            tx.category.charAt(0).toUpperCase() + tx.category.slice(1),
-            isIncome ? 'Income' : 'Expense',
+            tx.is_settlement ? 'Settlement' : tx.category.charAt(0).toUpperCase() + tx.category.slice(1),
+            tx.is_settlement ? 'Settlement' : isIncome ? 'Income' : 'Expense',
             bucket?.name || '',
             group?.name || '',
             tx.payment_method || '',
@@ -777,8 +778,8 @@ export const generatePDF = async (
             : formatForPDF(rawAmount, currency);
         const row = [
             format(parseISO(tx.date.slice(0, 10)), 'MMM d, yy'),
-            (tx.is_recurring ? '[R] ' : '') + (tx.description.length > 22 ? tx.description.substring(0, 20) + '..' : tx.description),
-            tx.category.charAt(0).toUpperCase() + tx.category.slice(1),
+            (tx.is_settlement ? '[S] ' : tx.is_recurring ? '[R] ' : '') + (tx.description.length > 22 ? tx.description.substring(0, 20) + '..' : tx.description),
+            tx.is_settlement ? 'Settlement' : tx.category.charAt(0).toUpperCase() + tx.category.slice(1),
             bucket?.name || '-',
             tx.payment_method || '-',
             displayAmount,
@@ -802,7 +803,7 @@ export const generatePDF = async (
     const footnotesY = (doc as any).lastAutoTable.finalY + 5;
     const hasMultiCurrency = transactions.some(tx => tx.currency && tx.currency !== currency);
     const footnotes: string[] = [
-        '[R] = Recurring transaction',
+        '[R] = Recurring transaction · [S] = Settlement',
         'Income rows are shown with a + prefix',
     ];
     if (hasMultiCurrency) footnotes.push(`* Amounts converted to ${currency} using rates at time of import`);

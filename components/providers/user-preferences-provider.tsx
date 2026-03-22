@@ -398,6 +398,17 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
         setCurrencyState(newCurrency);
         setMonthlyBudgetState(newBudget);
 
+        // Update cache immediately so the realtime-triggered loadPreferences
+        // doesn't read stale currency and revert the change
+        if (userId) {
+            const cacheKey = `novira_profile_${userId}`;
+            try {
+                const cached = localStorage.getItem(cacheKey);
+                const parsed = cached ? JSON.parse(cached) : {};
+                localStorage.setItem(cacheKey, JSON.stringify({ ...parsed, currency: newCurrency, monthly_budget: newBudget }));
+            } catch { /* ignore */ }
+        }
+
         if (userId) {
             try {
                 const { error } = await supabase
