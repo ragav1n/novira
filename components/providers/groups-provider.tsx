@@ -508,6 +508,9 @@ export function GroupsProvider({ children }: { children: React.ReactNode }) {
 
         if (error) throw error;
 
+        // Optimistically remove settled split so UI updates instantly
+        setPendingSplits(prev => prev.filter(s => s.id !== splitId));
+
         refreshData();
 
         // Refresh dashboard transactions on the debtor's side
