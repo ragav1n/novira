@@ -21,6 +21,38 @@ interface ExportTransaction {
     notes?: string | null;
 }
 
+/**
+ * Resolves a transaction's display amount in the report's target currency.
+ * Priority:
+ *  1. tx.currency === displayCurrency → use tx.amount directly (no conversion, exact)
+ *  2. tx.converted_amount stored in displayCurrency (base_currency matches) → use it (historical rate)
+ *  3. tx.exchange_rate available → reconstruct amount in stored base_currency, then convert if needed
+ *  4. Fallback: live-rate convertAmount
+ */
+function resolveAmount(
+    tx: ExportTransaction,
+    currency: string,
+    convertAmount: (amount: number, fromCurrency: string) => number
+): number {
+    const txCurr = (tx.currency || currency).toUpperCase();
+    const displayCurr = currency.toUpperCase();
+
+    if (txCurr === displayCurr) return Number(tx.amount);
+
+    if (tx.converted_amount && tx.base_currency?.toUpperCase() === displayCurr) {
+        return tx.converted_amount;
+    }
+
+    if (tx.exchange_rate && tx.base_currency) {
+        const amtInStoredBase = Number(tx.amount) * tx.exchange_rate;
+        const storedBaseCurr = tx.base_currency.toUpperCase();
+        if (storedBaseCurr === displayCurr) return amtInStoredBase;
+        return convertAmount(amtInStoredBase, storedBaseCurr);
+    }
+
+    return convertAmount(Number(tx.amount), txCurr);
+}
+
 const CATEGORY_COLORS: Record<string, [number, number, number]> = {
     food: [138, 43, 226],
     groceries: [16, 185, 129],
@@ -162,7 +194,7 @@ export const generateCSV = (
     const bucketTotals: Record<string, { spent: number; budget: number; name: string }> = {};
 
     transactions.forEach(tx => {
-        const amt = tx.converted_amount ?? convertAmount(Number(tx.amount), tx.currency || currency);
+        const amt = resolveAmount(tx, currency, convertAmount);
         const isIncome = amt < 0 || tx.category === 'income';
         const abs = Math.abs(amt);
         if (isIncome) { totalIncome += abs; return; }
@@ -192,7 +224,7 @@ export const generateCSV = (
     });
 
     const expenseTxCount = transactions.filter(tx => {
-        const a = tx.converted_amount ?? convertAmount(Number(tx.amount), tx.currency || currency);
+        const a = resolveAmount(tx, currency, convertAmount);
         return a >= 0 && tx.category !== 'income';
     }).length;
     const daysCovered = reportRange?.from && reportRange?.to
@@ -308,7 +340,7 @@ export const generateCSV = (
         'Location', 'Notes', 'Recurring', 'Excluded from Allowance'
     ));
     sorted.forEach(tx => {
-        const converted = tx.converted_amount ?? convertAmount(Number(tx.amount), tx.currency || currency);
+        const converted = resolveAmount(tx, currency, convertAmount);
         const isIncome = converted < 0 || tx.category === 'income';
         const bucket = tx.bucket_id ? bucketMap[tx.bucket_id] : null;
         const group = tx.group_id ? groupMap[tx.group_id] : null;
@@ -396,7 +428,7 @@ export const generatePDF = async (
     const locationTotals: Record<string, { count: number, total: number }> = {};
 
     transactions.forEach(tx => {
-        const rawAmount = tx.converted_amount || convertAmount(Number(tx.amount), tx.currency || 'USD');
+        const rawAmount = resolveAmount(tx, currency, convertAmount);
         const isIncome = rawAmount < 0 || tx.category === 'income';
         const amount = Math.abs(rawAmount);
         const bucket = tx.bucket_id ? bucketMap[tx.bucket_id] : null;
@@ -443,7 +475,7 @@ export const generatePDF = async (
     });
 
     const expenseTxCount = transactions.filter(tx => {
-        const a = tx.converted_amount || convertAmount(Number(tx.amount), tx.currency || 'USD');
+        const a = resolveAmount(tx, currency, convertAmount);
         return a >= 0 && tx.category !== 'income';
     }).length;
 
@@ -456,8 +488,8 @@ export const generatePDF = async (
     const savingsRate = totalIncome > 0 ? ((totalIncome - totalExpenses) / totalIncome) * 100 : null;
 
     const topExpenses = [...transactions]
-        .filter(tx => (tx.converted_amount || convertAmount(Number(tx.amount), tx.currency || 'USD')) > 0 && tx.category !== 'income')
-        .map(tx => ({ ...tx, converted: tx.converted_amount || convertAmount(Number(tx.amount), tx.currency || 'USD') }))
+        .filter(tx => resolveAmount(tx, currency, convertAmount) > 0 && tx.category !== 'income')
+        .map(tx => ({ ...tx, converted: resolveAmount(tx, currency, convertAmount) }))
         .sort((a, b) => b.converted - a.converted)
         .slice(0, 5);
 
@@ -738,7 +770,7 @@ export const generatePDF = async (
 
     const tableRows = sortedTx.map(tx => {
         const bucket = tx.bucket_id ? bucketMap[tx.bucket_id] : null;
-        const rawAmount = tx.converted_amount || convertAmount(Number(tx.amount), tx.currency || 'USD');
+        const rawAmount = resolveAmount(tx, currency, convertAmount);
         const isIncome = rawAmount < 0 || tx.category === 'income';
         const displayAmount = isIncome
             ? `+${formatForPDF(Math.abs(rawAmount), currency)}`
