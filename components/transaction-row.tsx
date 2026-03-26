@@ -2,7 +2,7 @@
 
 import React, { memo, useState, useEffect } from 'react';
 import { format, parseISO } from 'date-fns';
-import { History, MoreVertical, Users, RefreshCcw, Ban, MapPin, Pencil, Trash2, Globe } from 'lucide-react';
+import { History, MoreVertical, Users, RefreshCcw, Ban, MapPin, Pencil, Trash2, Globe, ArrowLeftRight } from 'lucide-react';
 import type { Transaction } from '@/types/transaction';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
@@ -36,7 +36,8 @@ function CategoryIcon({ icon, color }: { icon: React.ReactNode; color: string })
 }
 
 let _swipeHintLock = false;
-const SWIPE_THRESHOLD = 72;
+const SWIPE_THRESHOLD = 72;  // minimum drag distance to trigger snap
+const SNAP_DISTANCE = 130;   // full reveal: 2 × w-16 (64px) buttons + gap
 
 export const TransactionRow = memo(function TransactionRow({
   tx,
@@ -69,7 +70,7 @@ export const TransactionRow = memo(function TransactionRow({
       await new Promise<void>(r => setTimeout(r, 900));
       if (cancelled) return;
       setShowHint(true);
-      await animate(x, -SWIPE_THRESHOLD, { type: 'spring', stiffness: 180, damping: 20 });
+      await animate(x, -SNAP_DISTANCE, { type: 'spring', stiffness: 180, damping: 20 });
       if (cancelled) return;
       await new Promise<void>(r => setTimeout(r, 650));
       if (cancelled) return;
@@ -88,7 +89,7 @@ export const TransactionRow = memo(function TransactionRow({
 
   const handleDragEnd = (_: unknown, info: { offset: { x: number } }) => {
     if (!canEdit) return;
-    if (info.offset.x < -SWIPE_THRESHOLD) { snapTo(-SWIPE_THRESHOLD); setSwiped(true); }
+    if (info.offset.x < -SWIPE_THRESHOLD) { snapTo(-SNAP_DISTANCE); setSwiped(true); }
     else { snapTo(0); setSwiped(false); }
   };
 
@@ -128,7 +129,7 @@ export const TransactionRow = memo(function TransactionRow({
       {/* Sliding card */}
       <motion.div
         drag={canEdit ? 'x' : false}
-        dragConstraints={{ left: -SWIPE_THRESHOLD * 2, right: 0 }}
+        dragConstraints={{ left: -SNAP_DISTANCE, right: 0 }}
         dragElastic={0.07}
         onDragEnd={handleDragEnd}
         style={{ x, borderLeft: `3px solid ${color}` }}
@@ -181,7 +182,7 @@ export const TransactionRow = memo(function TransactionRow({
                 className="shrink-0 text-[10px] font-bold px-1.5 py-[2px] rounded capitalize leading-none"
                 style={{ backgroundColor: `${color}18`, color }}
               >
-                {getCategoryLabel(tx.category)}
+                {isSettlement ? 'Settlement' : getCategoryLabel(tx.category)}
               </span>
               <span className="shrink-0 text-white/20 text-[10px]">·</span>
               <span className="shrink-0 text-[11px] text-white/35 font-medium leading-none">{paidByLabel}</span>
@@ -236,9 +237,15 @@ export const TransactionRow = memo(function TransactionRow({
           </div>
 
           {/* Row 3: badges */}
-          {(bucketChip || tx.is_recurring || tx.exclude_from_allowance) && (
+          {(bucketChip || tx.is_recurring || tx.exclude_from_allowance || isSettlement) && (
             <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
               {bucketChip}
+              {isSettlement && (
+                <span className="flex items-center gap-1 px-1.5 py-[2px] rounded-md bg-emerald-500/10 text-[10px] text-emerald-400 border border-emerald-500/10 font-medium shrink-0">
+                  <ArrowLeftRight className="w-2.5 h-2.5 shrink-0" />
+                  Settlement
+                </span>
+              )}
               {tx.is_recurring && (
                 <span className="flex items-center gap-1 px-1.5 py-[2px] rounded-md bg-cyan-500/10 text-[10px] text-cyan-400 border border-cyan-500/10 font-medium shrink-0">
                   <RefreshCcw className="w-2.5 h-2.5 shrink-0" />

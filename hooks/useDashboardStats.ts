@@ -94,7 +94,7 @@ export function useDashboardStats({
             }
 
             const myShare = calculateUserShare(tx, userId);
-            if (myShare === 0) return acc;
+            if (myShare <= 0) return acc;
 
             const txCurr = (tx.currency || 'USD').toUpperCase();
             const targetCurr = bucketCurrency;
@@ -209,7 +209,7 @@ export function useDashboardStats({
             const txDate = tx.date.slice(0, 10);
             if (txDate < sevenDaysAgoStr || txDate > todayStr) return acc;
             const myShare = calculateUserShare(tx, userId);
-            if (myShare === 0) return acc;
+            if (myShare <= 0) return acc;
             const txCurr = (tx.currency || 'USD').toUpperCase();
             if (tx.exchange_rate && tx.exchange_rate !== 1 && tx.base_currency === bucketCurrency) {
                 return acc + myShare * Number(tx.exchange_rate);

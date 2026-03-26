@@ -27,7 +27,7 @@ export function useDashboardData(userId: string | null, activeWorkspaceId: strin
         try {
             let query = supabase
                 .from('transactions')
-                .select('id, description, amount, category, date, created_at, user_id, group_id, currency, exchange_rate, base_currency, bucket_id, exclude_from_allowance, is_recurring, place_name, place_address, place_lat, place_lng, profile:profiles(full_name, avatar_url), splits(user_id, amount, is_paid)')
+                .select('id, description, amount, category, date, created_at, user_id, group_id, currency, exchange_rate, base_currency, bucket_id, exclude_from_allowance, is_recurring, is_settlement, place_name, place_address, place_lat, place_lng, profile:profiles(full_name, avatar_url), splits(user_id, amount, is_paid)')
                 .order('date', { ascending: false })
                 .order('created_at', { ascending: false })
                 .limit(limit);

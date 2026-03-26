@@ -126,12 +126,18 @@ export function simplifyDebts(
         const settleAmount = Math.min(creditor.amount, debtor.amount);
 
         if (settleAmount > 0.01) {
-            // Only include splits that directly correspond to this debtor→creditor pair.
-            // In transitive cases (A pays C because A→B→C), there is no direct edge so
-            // splitIds will be empty — that is correct and intentional. Using all debtor
-            // splits as a fallback would incorrectly mark unrelated splits as settled.
+            // Include splits from both directions between this pair.
+            // - Direct edge (debtor→creditor): splits the debtor owes the creditor
+            // - Reverse edge (creditor→debtor): splits the creditor owes the debtor (mutual debts)
+            // Both must be settled when the net payment is made, otherwise the reverse debt lingers.
+            // In transitive cases (A→B→C with no direct A→C edge) both edges will be empty,
+            // which is correct: the payment is informational and not directly settleable.
             const directEdge = `${debtor.id}→${creditor.id}`;
-            const relatedSplitIds = edgeSplits[directEdge] || [];
+            const reverseEdge = `${creditor.id}→${debtor.id}`;
+            const relatedSplitIds = [
+                ...(edgeSplits[directEdge] || []),
+                ...(edgeSplits[reverseEdge] || []),
+            ];
 
             payments.push({
                 from: debtor.id,
