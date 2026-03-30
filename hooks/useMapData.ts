@@ -125,19 +125,12 @@ export function useMapData(
         return features;
     }, [locationGroups, convertAmount, baseCurrency]);
 
-    // 3. Data Transformation: Lines
+    // 3. Data Transformation: Lines (per-day trails)
     const trailFeatures = useMemo(() => {
-        if (filteredTransactions.length < 2) return [];
-        
-        const userTrails: Record<string, Transaction[]> = {};
-        filteredTransactions.forEach(tx => {
-            const uid = tx.user_id;
-            if (!userTrails[uid]) userTrails[uid] = [];
-            userTrails[uid].push(tx);
-        });
-        
         const userColors = ['#00ffff', '#F472B6', '#F9C74F', '#10B981', '#6366F1', '#A855F7'];
-        
+        const userColorMap = new Map<string, string>();
+        let colorIdx = 0;
+
         const hexToRgba = (hex: string, alpha: number) => {
             const r = parseInt(hex.slice(1, 3), 16);
             const g = parseInt(hex.slice(3, 5), 16);
@@ -145,19 +138,27 @@ export function useMapData(
             return `rgba(${r}, ${g}, ${b}, ${alpha})`;
         };
 
-        return Object.entries(userTrails).map(([uid, txs], index) => {
-            const sorted = [...txs].sort((a, b) => a.created_at < b.created_at ? -1 : 1);
-            if (sorted.length < 2) return null;
-            const color = userColors[index % userColors.length];
+        // Group by user + calendar day so each day's journey is its own trail
+        const dayTrails: Record<string, Transaction[]> = {};
+        filteredTransactions.forEach(tx => {
+            const day = tx.date.slice(0, 10); // YYYY-MM-DD
+            const key = `${tx.user_id}__${day}`;
+            if (!dayTrails[key]) dayTrails[key] = [];
+            dayTrails[key].push(tx);
+        });
 
+        return Object.entries(dayTrails).map(([key, txs]) => {
+            if (txs.length < 2) return null;
+            const uid = key.split('__')[0];
+            if (!userColorMap.has(uid)) {
+                userColorMap.set(uid, userColors[colorIdx++ % userColors.length]);
+            }
+            const color = userColorMap.get(uid)!;
+            const sorted = [...txs].sort((a, b) => a.created_at < b.created_at ? -1 : 1);
             return {
                 type: 'Feature' as const,
                 geometry: { type: 'LineString' as const, coordinates: sorted.map(tx => [tx.place_lng!, tx.place_lat!]) },
-                properties: { 
-                    user_id: uid, 
-                    color: color, 
-                    halo: hexToRgba(color, 0.5) 
-                }
+                properties: { user_id: uid, date: key.split('__')[1], color, halo: hexToRgba(color, 0.5) }
             };
         }).filter(Boolean);
     }, [filteredTransactions]);

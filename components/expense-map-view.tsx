@@ -44,6 +44,7 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency, 
     const mapContainerRef = useRef<HTMLDivElement>(null);
     const mapRef = useRef<mapboxgl.Map | null>(null);
     const animFrameIdRef = useRef<number | undefined>(undefined);
+    const animateTrailsFnRef = useRef<(() => void) | null>(null);
     const isFirstBoundFit = useRef(true);
     const hide3DTimerRef = useRef<NodeJS.Timeout | null>(null);
     const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set());
@@ -137,7 +138,7 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency, 
             // Or alternatively, simply use fitBounds immediately on the instance without animation
             const map = new mapboxgl.Map({
                 container: mapContainerRef.current,
-                style: 'mapbox://styles/mapbox/dark-v11',
+                style: 'mapbox://styles/mapbox/standard',
                 // Temporarily center on first if bounds calculation gets weird, but we fitBounds immediately below
                 center: [geoTransactions[0].place_lng!, geoTransactions[0].place_lat!],
                 zoom: 12,
@@ -168,9 +169,36 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency, 
 
             map.on('load', () => {
                 setIsInitialLoad(false);
-                
+
                 // Trigger geolocation automatically once the map has loaded
                 geolocate.trigger();
+
+                // Standard style — dusk preset: deep purple-navy, amber city lights, blue water
+                map.setConfigProperty('basemap', 'lightPreset', 'dusk');
+                map.setConfigProperty('basemap', 'showPointOfInterestLabels', true);
+                map.setConfigProperty('basemap', 'showTransitLabels', false);
+
+                // Atmospheric depth — adds haze, glow, and stars in 3D mode
+                map.setFog({
+                    color: 'rgb(8, 8, 20)',
+                    'high-color': 'rgb(20, 18, 45)',
+                    'horizon-blend': 0.04,
+                    'space-color': 'rgb(4, 4, 14)',
+                    'star-intensity': 0.9
+                });
+
+                // Sky layer for dramatic 3D tilt
+                map.addLayer({
+                    id: 'sky',
+                    type: 'sky',
+                    paint: {
+                        'sky-type': 'atmosphere',
+                        'sky-atmosphere-sun': [0, 90],
+                        'sky-atmosphere-sun-intensity': 5,
+                        'sky-atmosphere-color': 'rgba(30, 20, 60, 1)',
+                        'sky-atmosphere-halo-color': 'rgba(80, 40, 160, 0.5)',
+                    }
+                });
 
                 // Ensure initial pitch is set if 3D is already on (though usually off at start)
                 if (show3D) map.setPitch(60);
@@ -186,18 +214,20 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency, 
                     id: 'expense-heat',
                     type: 'heatmap',
                     source: 'expenses',
+                    slot: 'middle',
                     maxzoom: 24,
                     paint: {
-                        'heatmap-weight': ['interpolate', ['linear'], ['get', 'amount'], 0, 0, 1000, 1],
+                        'heatmap-weight': 1,
                         'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 0, 1, 15, 3],
                         'heatmap-color': [
                             'interpolate', ['linear'], ['heatmap-density'],
-                            0, 'rgba(0, 255, 255, 0)',
-                            0.2, 'rgba(0, 255, 255, 0.2)',
-                            0.4, 'rgba(0, 255, 255, 0.4)',
-                            0.6, 'rgba(0, 255, 255, 0.7)',
-                            0.8, 'rgba(0, 255, 255, 0.9)',
-                            1, 'rgba(0, 255, 255, 1)'
+                            0,   'rgba(0, 0, 0, 0)',
+                            0.1, 'rgba(80, 0, 180, 0.2)',
+                            0.3, 'rgba(180, 0, 180, 0.5)',
+                            0.5, 'rgba(255, 40, 100, 0.75)',
+                            0.7, 'rgba(255, 120, 20, 0.9)',
+                            0.9, 'rgba(255, 220, 0, 1)',
+                            1,   'rgba(255, 255, 200, 1)'
                         ],
                         'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 0, 2, 15, 40, 20, 100],
                         'heatmap-opacity': ['interpolate', ['linear'], ['zoom'], 14, 0.8, 22, 0.6]
@@ -223,6 +253,7 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency, 
                     id: 'trail-blur',
                     type: 'line',
                     source: 'trails',
+                    slot: 'top',
                     layout: { 'line-join': 'round', 'line-cap': 'round', visibility: 'none' },
                     paint: {
                         'line-color': '#00ffff',
@@ -237,6 +268,7 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency, 
                     id: 'trail-core',
                     type: 'line',
                     source: 'trails',
+                    slot: 'top',
                     layout: { 'line-join': 'round', 'line-cap': 'round', visibility: 'none' },
                     paint: {
                         'line-color': '#00ffff',
@@ -250,6 +282,7 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency, 
                     id: 'expense-3d',
                     type: 'fill-extrusion',
                     source: 'towers',
+                    slot: 'top',
                     layout: { visibility: 'none' },
                     paint: {
                         'fill-extrusion-color': [
@@ -275,42 +308,33 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency, 
                     }
                 });
 
-                // Start Trail Animation Loop
+                // Trail animation — only runs while trails are visible
                 let step = 0;
                 function animateTrails() {
                     const map = mapRef.current;
                     if (!map || !map.getLayer('trail-core')) return;
-                    
-                    const visibility = map.getLayoutProperty('trail-core', 'visibility');
-                    if (visibility === 'visible') {
-                        step = (step + 0.005) % 1;
-                        
-                        // Strictly ascending: 0 < s1 < s2 < s3 < 1 (with 0.02 buffer)
-                        const s1 = 0.1 + (step * 0.7); // 0.1 to 0.8
-                        const s2 = s1 + 0.05;          // 0.15 to 0.85
-                        const s3 = s2 + 0.05;          // 0.2 to 0.9
-                        
-                        map.setPaintProperty('trail-core', 'line-gradient', [
-                            'interpolate',
-                            ['linear'],
-                            ['line-progress'],
-                            0, 'rgba(0, 255, 255, 0.05)',
-                            s1, 'rgba(0, 255, 255, 0.05)',
-                            s2, 'rgba(0, 255, 255, 1)',
-                            s3, 'rgba(0, 255, 255, 0.05)',
-                            1, 'rgba(0, 255, 255, 0.05)'
-                        ]);
-                    }
-                    
+                    step = (step + 0.005) % 1;
+                    const s1 = 0.1 + (step * 0.7);
+                    const s2 = s1 + 0.05;
+                    const s3 = s2 + 0.05;
+                    map.setPaintProperty('trail-core', 'line-gradient', [
+                        'interpolate', ['linear'], ['line-progress'],
+                        0, 'rgba(255, 255, 255, 0.04)',
+                        s1, 'rgba(255, 255, 255, 0.04)',
+                        s2, 'rgba(255, 255, 255, 1)',
+                        s3, 'rgba(255, 255, 255, 0.04)',
+                        1, 'rgba(255, 255, 255, 0.04)'
+                    ]);
                     animFrameIdRef.current = requestAnimationFrame(animateTrails);
                 }
-                animateTrails();
+                animateTrailsFnRef.current = animateTrails;
 
                 // Directional arrows
                 map.addLayer({
                     id: 'trail-arrows',
                     type: 'symbol',
                     source: 'trails',
+                    slot: 'top',
                     layout: {
                         'symbol-placement': 'line',
                         'symbol-spacing': 70,
@@ -399,6 +423,18 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency, 
             type: 'FeatureCollection',
             features: pointFeatures as any[]
         });
+
+        // Scale heatmap weight to actual data range so it's currency-agnostic
+        if (pointFeatures.length > 0 && map.getLayer('expense-heat')) {
+            const maxAmount = Math.max(...pointFeatures.map(f => f.properties.amount), 1);
+            map.setPaintProperty('expense-heat', 'heatmap-weight', [
+                'interpolate', ['linear'], ['get', 'amount'],
+                0, 0,
+                maxAmount * 0.1, 0.2,
+                maxAmount * 0.5, 0.6,
+                maxAmount, 1
+            ]);
+        }
 
         (map.getSource('towers') as mapboxgl.GeoJSONSource)?.setData({
             type: 'FeatureCollection',
@@ -562,6 +598,16 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency, 
         if (map.getLayer('trail-blur')) map.setLayoutProperty('trail-blur', 'visibility', showTrails ? 'visible' : 'none');
         if (map.getLayer('trail-core')) map.setLayoutProperty('trail-core', 'visibility', showTrails ? 'visible' : 'none');
         if (map.getLayer('trail-arrows')) map.setLayoutProperty('trail-arrows', 'visibility', showTrails ? 'visible' : 'none');
+
+        // Start/stop animation loop — no idle rAF when trails are hidden
+        if (showTrails) {
+            if (!animFrameIdRef.current) animateTrailsFnRef.current?.();
+        } else {
+            if (animFrameIdRef.current) {
+                cancelAnimationFrame(animFrameIdRef.current);
+                animFrameIdRef.current = undefined;
+            }
+        }
         
         // Handle 3D Towers growth and visibility
         if (hide3DTimerRef.current) clearTimeout(hide3DTimerRef.current);
