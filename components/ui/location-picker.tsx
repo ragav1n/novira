@@ -34,6 +34,7 @@ interface PlacePrediction {
     _distance?: number;
     _mapbox_id?: string;
     _maki?: string;
+    _source?: 'google' | 'mapbox' | 'photon';
 }
 
 interface LocationPickerProps {
@@ -66,6 +67,25 @@ const getMakiEmoji = (maki?: string): string => {
     if (!maki) return '';
     return MAKI_EMOJI[maki] || '';
 };
+
+// ── Google Maps loader (singleton) ─────────────────────────────────────────
+
+let _googleMapsPromise: Promise<any> | null = null;
+
+function loadGoogleMaps(apiKey: string): Promise<any> {
+    if (_googleMapsPromise) return _googleMapsPromise;
+    if (typeof window === 'undefined') return Promise.reject(new Error('SSR'));
+    if ((window as any).google?.maps?.places) return Promise.resolve((window as any).google);
+    _googleMapsPromise = new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
+        script.async = true;
+        script.onload = () => resolve((window as any).google);
+        script.onerror = (e) => { _googleMapsPromise = null; reject(e); };
+        document.head.appendChild(script);
+    });
+    return _googleMapsPromise;
+}
 
 // ── Highlight matched text ─────────────────────────────────────────────────
 
@@ -104,6 +124,7 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
     const nearbyFetchedRef = useRef(false);
     const isSelectingCurrentRef = useRef(false);
     const sessionTokenRef = useRef({ token: crypto.randomUUID(), createdAt: Date.now() });
+    const googleSessionTokenRef = useRef<any>(null);
     const listRef = useRef<HTMLDivElement>(null);
 
     const getSessionToken = useCallback(() => {
@@ -117,6 +138,7 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
     const [isLocating, setIsLocating] = useState(false);
     const hasLocation = !!placeName;
     const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
+    const googleMapsKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY;
 
     // ── Recent locations ────────────────────────────────────────────────────
 
@@ -162,6 +184,8 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
         if (!isExpanded) {
             nearbyFetchedRef.current = false;
             setActiveIndex(-1);
+            // Abandon the Google session token if user closes without selecting
+            googleSessionTokenRef.current = null;
         }
     }, [isExpanded]);
 
@@ -313,41 +337,140 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
         }, 300);
     }, [mapboxToken, searchWithPhoton, prefetchCoords, lastPosition]);
 
-    const handleSearch = mapboxToken ? searchWithMapbox : searchWithPhoton;
+    const searchWithGoogle = useCallback((searchQuery: string) => {
+        if (!googleMapsKey) { searchWithMapbox(searchQuery); return; }
+        if (searchQuery.trim().length < 2) { setPredictions([]); setIsSearching(false); return; }
+
+        const cacheKey = `google:${searchQuery}:${lastPosition?.lat?.toFixed(2)},${lastPosition?.lng?.toFixed(2)}`;
+        if (searchCacheRef.current.has(cacheKey)) {
+            setPredictions(searchCacheRef.current.get(cacheKey)!);
+            setActiveIndex(-1);
+            return;
+        }
+
+        setIsSearching(true);
+        if (debounceRef.current) clearTimeout(debounceRef.current);
+        debounceRef.current = setTimeout(async () => {
+            try {
+                const g = await loadGoogleMaps(googleMapsKey);
+                const service = new g.maps.places.AutocompleteService();
+                if (!googleSessionTokenRef.current) {
+                    googleSessionTokenRef.current = new g.maps.places.AutocompleteSessionToken();
+                }
+                const request: any = {
+                    input: searchQuery,
+                    types: ['establishment', 'geocode'],
+                    sessionToken: googleSessionTokenRef.current,
+                };
+                if (lastPosition) {
+                    request.location = new g.maps.LatLng(lastPosition.lat, lastPosition.lng);
+                    request.radius = 50000;
+                }
+                service.getPlacePredictions(request, (preds: any[], status: string) => {
+                    if (status !== g.maps.places.PlacesServiceStatus.OK || !preds) {
+                        searchWithMapbox(searchQuery);
+                        setIsSearching(false);
+                        return;
+                    }
+                    const results: PlacePrediction[] = preds.map((p: any) => ({
+                        place_id: p.place_id,
+                        description: p.description,
+                        structured_formatting: {
+                            main_text: p.structured_formatting.main_text,
+                            secondary_text: p.structured_formatting.secondary_text || '',
+                        },
+                        _lat: '', _lon: '',
+                        _source: 'google' as const,
+                    }));
+                    if (searchCacheKeysRef.current.length >= 50) {
+                        const evicted = searchCacheKeysRef.current.shift()!;
+                        searchCacheRef.current.delete(evicted);
+                    }
+                    searchCacheKeysRef.current.push(cacheKey);
+                    searchCacheRef.current.set(cacheKey, results);
+                    setPredictions(results);
+                    setActiveIndex(-1);
+                    setIsSearching(false);
+                });
+            } catch (e) {
+                console.warn('[LocationPicker] Google search failed, falling back to Mapbox:', e);
+                searchWithMapbox(searchQuery);
+                setIsSearching(false);
+            }
+        }, 300);
+    }, [googleMapsKey, searchWithMapbox, lastPosition]);
+
+    const handleSearch = googleMapsKey ? searchWithGoogle : mapboxToken ? searchWithMapbox : searchWithPhoton;
 
     // ── Nearby POIs on open ─────────────────────────────────────────────────
 
     useEffect(() => {
-        if (!isExpanded || !lastPosition || query.length > 0 || !mapboxToken || nearbyFetchedRef.current) return;
+        if (!isExpanded || !lastPosition || query.length > 0 || nearbyFetchedRef.current) return;
+        if (!googleMapsKey && !mapboxToken) return;
         nearbyFetchedRef.current = true;
+
         (async () => {
             setIsSearching(true);
-            try {
-                const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${lastPosition.lng},${lastPosition.lat}.json?` +
-                    new URLSearchParams({ access_token: mapboxToken!, types: 'poi', limit: '8' });
-                const response = await fetch(url);
-                if (response.ok) {
-                    const data = await response.json();
-                    setPredictions((data.features || []).map((f: any) => {
-                        const name = f.text || f.place_name?.split(',')[0] || 'Unknown';
-                        const address = f.place_name || '';
-                        const secondary = address.replace(name, '').replace(/^,\s*/, '').trim();
-                        const dist = getDistance(lastPosition.lat, lastPosition.lng, f.geometry.coordinates[1], f.geometry.coordinates[0]);
-                        return {
-                            place_id: f.id, description: address,
-                            structured_formatting: { main_text: name, secondary_text: secondary },
-                            _lat: String(f.geometry.coordinates[1]), _lon: String(f.geometry.coordinates[0]),
-                            _is_nearby: true, _distance: dist, _maki: f.properties?.maki,
-                        };
-                    }).sort((a: any, b: any) => (a._distance || 0) - (b._distance || 0)));
+            // Google nearby search (primary)
+            if (googleMapsKey) {
+                try {
+                    const g = await loadGoogleMaps(googleMapsKey);
+                    const div = document.createElement('div');
+                    const service = new g.maps.places.PlacesService(div);
+                    await new Promise<void>((resolve) => {
+                        service.nearbySearch(
+                            { location: { lat: lastPosition.lat, lng: lastPosition.lng }, radius: 500, type: 'establishment' },
+                            (results: any[], status: string) => {
+                                if (status === g.maps.places.PlacesServiceStatus.OK && results?.length) {
+                                    setPredictions(results.slice(0, 8).map((r: any) => {
+                                        const dist = getDistance(lastPosition.lat, lastPosition.lng, r.geometry.location.lat(), r.geometry.location.lng());
+                                        return {
+                                            place_id: r.place_id,
+                                            description: r.vicinity || r.name,
+                                            structured_formatting: { main_text: r.name, secondary_text: r.vicinity || '' },
+                                            _lat: String(r.geometry.location.lat()), _lon: String(r.geometry.location.lng()),
+                                            _is_nearby: true, _distance: dist, _source: 'google' as const,
+                                        };
+                                    }).sort((a: any, b: any) => (a._distance || 0) - (b._distance || 0)));
+                                }
+                                resolve();
+                            }
+                        );
+                    });
+                    setIsSearching(false);
+                    return;
+                } catch (e) {
+                    console.warn('[LocationPicker] Google nearby search failed, falling back to Mapbox:', e);
                 }
-            } catch (e) {
-                console.warn('[LocationPicker] Nearby POI fetch failed:', e);
-            } finally {
-                setIsSearching(false);
             }
+            // Mapbox nearby POIs (fallback)
+            if (mapboxToken) {
+                try {
+                    const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${lastPosition.lng},${lastPosition.lat}.json?` +
+                        new URLSearchParams({ access_token: mapboxToken, types: 'poi', limit: '8' });
+                    const response = await fetch(url);
+                    if (response.ok) {
+                        const data = await response.json();
+                        setPredictions((data.features || []).map((f: any) => {
+                            const name = f.text || f.place_name?.split(',')[0] || 'Unknown';
+                            const address = f.place_name || '';
+                            const secondary = address.replace(name, '').replace(/^,\s*/, '').trim();
+                            const dist = getDistance(lastPosition.lat, lastPosition.lng, f.geometry.coordinates[1], f.geometry.coordinates[0]);
+                            return {
+                                place_id: f.id, description: address,
+                                structured_formatting: { main_text: name, secondary_text: secondary },
+                                _lat: String(f.geometry.coordinates[1]), _lon: String(f.geometry.coordinates[0]),
+                                _is_nearby: true, _distance: dist, _maki: f.properties?.maki,
+                            };
+                        }).sort((a: any, b: any) => (a._distance || 0) - (b._distance || 0)));
+                    }
+                } catch (e) {
+                    console.warn('[LocationPicker] Nearby POI fetch failed:', e);
+                }
+            }
+            setIsSearching(false);
         })();
-    }, [isExpanded, lastPosition, query.length, mapboxToken]);
+    }, [isExpanded, lastPosition, query.length, googleMapsKey, mapboxToken]);
 
     // ── Selection ───────────────────────────────────────────────────────────
 
@@ -373,6 +496,38 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
             sessionTokenRef.current = { token: crypto.randomUUID(), createdAt: Date.now() };
             setIsExpanded(false); setQuery(''); setPredictions([]);
             return;
+        }
+
+        // Google place details (when coords not yet known)
+        if (pred._source === 'google' && googleMapsKey && !pred._lat) {
+            try {
+                const g = await loadGoogleMaps(googleMapsKey);
+                const div = document.createElement('div');
+                const service = new g.maps.places.PlacesService(div);
+                await new Promise<void>((resolve) => {
+                    service.getDetails(
+                        { placeId: pred.place_id, fields: ['geometry', 'name', 'formatted_address'], sessionToken: googleSessionTokenRef.current },
+                        (result: any, status: string) => {
+                            // Rotate session token — this closes the billing session
+                            googleSessionTokenRef.current = null;
+                            if (status === g.maps.places.PlacesServiceStatus.OK && result?.geometry?.location) {
+                                const loc: LocationData = {
+                                    place_name: result.name || pred.structured_formatting.main_text,
+                                    place_address: result.formatted_address || pred.description,
+                                    place_lat: result.geometry.location.lat(),
+                                    place_lng: result.geometry.location.lng(),
+                                };
+                                onChange(loc); saveToRecent(loc);
+                                setIsExpanded(false); setQuery(''); setPredictions([]);
+                            }
+                            resolve();
+                        }
+                    );
+                });
+                return;
+            } catch (e) {
+                console.warn('[LocationPicker] Google place details failed:', e);
+            }
         }
 
         // Mapbox retrieve (fallback when not pre-fetched)
@@ -441,7 +596,24 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
             setLastPosition({ lat: latitude, lng: longitude });
             isSelectingCurrentRef.current = false;
             try {
-                if (mapboxToken) {
+                // Google reverse geocoding (primary)
+                if (googleMapsKey) {
+                    const g = await loadGoogleMaps(googleMapsKey);
+                    const geocoder = new g.maps.Geocoder();
+                    await new Promise<void>((resolve) => {
+                        geocoder.geocode({ location: { lat: latitude, lng: longitude } }, (results: any[], status: string) => {
+                            const loc: LocationData = status === 'OK' && results?.[0]
+                                ? {
+                                    place_name: results[0].address_components?.[0]?.long_name || 'Current Location',
+                                    place_address: results[0].formatted_address || 'Nearby',
+                                    place_lat: latitude, place_lng: longitude,
+                                  }
+                                : { place_name: 'Current Location', place_address: `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`, place_lat: latitude, place_lng: longitude };
+                            onChange(loc); saveToRecent(loc);
+                            resolve();
+                        });
+                    });
+                } else if (mapboxToken) {
                     const res = await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${longitude},${latitude}.json?access_token=${mapboxToken}`);
                     const data = await res.json();
                     const name = data.features?.[0]?.place_name?.split(',')[0] || 'Current Location';
@@ -474,9 +646,11 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
 
     const handleClear = () => { onChange({ place_name: null, place_address: null, place_lat: null, place_lng: null }); setQuery(''); setPredictions([]); };
 
-    const getStaticMapUrl = (lat: number, lng: number) => mapboxToken
-        ? `https://api.mapbox.com/styles/v1/mapbox/dark-v11/static/pin-s+a855f7(${lng},${lat})/${lng},${lat},14,0/400x200@2x?access_token=${mapboxToken}`
-        : `https://staticmap.openstreetmap.de/staticmap.php?center=${lat},${lng}&zoom=15&size=400x200&markers=${lat},${lng},red-pushpin`;
+    const getStaticMapUrl = (lat: number, lng: number) => {
+        if (mapboxToken) return `https://api.mapbox.com/styles/v1/mapbox/dark-v11/static/pin-s+a855f7(${lng},${lat})/${lng},${lat},14,0/400x200@2x?access_token=${mapboxToken}`;
+        if (googleMapsKey) return `https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=15&size=400x200&markers=color:purple%7C${lat},${lng}&key=${googleMapsKey}`;
+        return `https://staticmap.openstreetmap.de/staticmap.php?center=${lat},${lng}&zoom=15&size=400x200&markers=${lat},${lng},red-pushpin`;
+    };
 
     const formatDist = (d: number) => d < 1 ? `${Math.round(d * 1000)}m` : `${d.toFixed(1)}km`;
 

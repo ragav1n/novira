@@ -7,6 +7,8 @@ const nextConfig = {
       { protocol: 'https', hostname: '*.googleusercontent.com' },
       { protocol: 'https', hostname: 'api.mapbox.com' },
       { protocol: 'https', hostname: 'staticmap.openstreetmap.de' },
+      { protocol: 'https', hostname: 'maps.googleapis.com' },
+      { protocol: 'https', hostname: 'maps.gstatic.com' },
     ],
   },
   experimental: {
@@ -37,7 +39,7 @@ const nextConfig = {
           {
             key: 'Content-Security-Policy',
             value: [
-              "img-src 'self' blob: data: https://*.supabase.co https://*.mapbox.com https://*.googleusercontent.com",
+              "img-src 'self' blob: data: https://*.supabase.co https://*.mapbox.com https://*.googleusercontent.com https://maps.googleapis.com https://maps.gstatic.com",
               "worker-src 'self' blob:",
             ].join('; '),
           },
