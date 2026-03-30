@@ -393,12 +393,12 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                     setIsSearching(false);
                 });
             } catch (e) {
-                console.warn('[LocationPicker] Google search failed, falling back to Mapbox:', e);
-                searchWithMapbox(searchQuery);
+                console.warn('[LocationPicker] Google search failed, falling back to Photon:', e);
+                searchWithPhoton(searchQuery);
                 setIsSearching(false);
             }
         }, 300);
-    }, [googleMapsKey, searchWithMapbox, lastPosition]);
+    }, [googleMapsKey, searchWithPhoton, lastPosition]);
 
     const handleSearch = googleMapsKey ? searchWithGoogle : mapboxToken ? searchWithMapbox : searchWithPhoton;
 
@@ -440,11 +440,10 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                     setIsSearching(false);
                     return;
                 } catch (e) {
-                    console.warn('[LocationPicker] Google nearby search failed, falling back to Mapbox:', e);
+                    console.warn('[LocationPicker] Google nearby search failed:', e);
                 }
-            }
-            // Mapbox nearby POIs (fallback)
-            if (mapboxToken) {
+            } else if (mapboxToken) {
+                // Mapbox nearby POIs (only if no Google key)
                 try {
                     const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${lastPosition.lng},${lastPosition.lat}.json?` +
                         new URLSearchParams({ access_token: mapboxToken, types: 'poi', limit: '8' });
@@ -613,13 +612,6 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                             resolve();
                         });
                     });
-                } else if (mapboxToken) {
-                    const res = await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${longitude},${latitude}.json?access_token=${mapboxToken}`);
-                    const data = await res.json();
-                    const name = data.features?.[0]?.place_name?.split(',')[0] || 'Current Location';
-                    const address = data.features?.[0]?.place_name || 'Nearby';
-                    const loc: LocationData = { place_name: name, place_address: address, place_lat: latitude, place_lng: longitude };
-                    onChange(loc); saveToRecent(loc);
                 } else {
                     const loc: LocationData = { place_name: 'Current Location', place_address: `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`, place_lat: latitude, place_lng: longitude };
                     onChange(loc); saveToRecent(loc);
@@ -862,9 +854,9 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                                 );
                             })}
                         </div>
-                        {mapboxToken && (
+                        {(googleMapsKey || mapboxToken) && (
                             <p className="text-[9px] text-muted-foreground/30 text-right pr-3 py-1 bg-white/[0.02]">
-                                Powered by Mapbox
+                                {googleMapsKey ? 'Powered by Google' : 'Powered by Mapbox'}
                             </p>
                         )}
                     </motion.div>
