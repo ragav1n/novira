@@ -71,12 +71,12 @@ export function BucketsTabContent({
                             <Card key={bucket.id} className="rounded-3xl overflow-hidden hover:bg-card/60 transition-colors border-white/5 bg-card/40">
                                 <CardContent className="p-4 space-y-4">
                                     <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-4">
-                                            <div className="w-12 h-12 rounded-2xl flex items-center justify-center border bg-cyan-500/10 border-cyan-500/20 text-cyan-500 p-2.5">
+                                        <div className="flex items-center gap-4 min-w-0">
+                                            <div className="w-12 h-12 rounded-2xl flex items-center justify-center border bg-cyan-500/10 border-cyan-500/20 text-cyan-500 p-2.5 shrink-0">
                                                 {getBucketIcon(bucket.icon)}
                                             </div>
-                                            <div>
-                                                <h4 className="font-bold text-base">{bucket.name}</h4>
+                                            <div className="min-w-0">
+                                                <h4 className="font-bold text-base truncate">{bucket.name}</h4>
                                                 <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-bold">
                                                     {bucket.start_date && bucket.end_date ? (
                                                         `${format(new Date(bucket.start_date), 'MMM d')} - ${format(new Date(bucket.end_date), 'MMM d, yy')}`
@@ -178,12 +178,12 @@ export function BucketsTabContent({
                     {archivedBuckets.map((bucket) => (
                         <Card key={bucket.id} className="rounded-3xl overflow-hidden grayscale-[0.5] opacity-60 hover:opacity-100 transition-all border-white/5 bg-card/20 group">
                             <CardContent className="p-4 flex items-center justify-between">
-                                <div className="flex items-center gap-4">
-                                    <div className="w-10 h-10 rounded-xl flex items-center justify-center border bg-secondary/10 border-white/5 text-muted-foreground p-2">
+                                <div className="flex items-center gap-4 min-w-0">
+                                    <div className="w-10 h-10 rounded-xl flex items-center justify-center border bg-secondary/10 border-white/5 text-muted-foreground p-2 shrink-0">
                                         {getBucketIcon(bucket.icon)}
                                     </div>
-                                    <div>
-                                        <h4 className="font-bold text-sm text-muted-foreground">{bucket.name}</h4>
+                                    <div className="min-w-0">
+                                        <h4 className="font-bold text-sm text-muted-foreground truncate">{bucket.name}</h4>
                                         <p className="text-[9px] text-muted-foreground/60 uppercase tracking-wider font-bold">Archived</p>
                                     </div>
                                 </div>

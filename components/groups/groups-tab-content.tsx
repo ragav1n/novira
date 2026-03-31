@@ -80,9 +80,9 @@ export function GroupsTabContent({
                         )}>
                             <CardContent className="p-4">
                                 <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-4">
+                                    <div className="flex items-center gap-4 min-w-0">
                                         <div className={cn(
-                                            "w-12 h-12 rounded-2xl flex items-center justify-center border",
+                                            "w-12 h-12 rounded-2xl flex items-center justify-center border shrink-0",
                                             isHome ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-500" :
                                                 isTrip ? "bg-sky-500/10 border-sky-500/20 text-sky-500" :
                                                     isCouple ? "bg-rose-500/10 border-rose-500/20 text-rose-500" :
@@ -90,9 +90,9 @@ export function GroupsTabContent({
                                         )}>
                                             <Icon className="w-6 h-6" />
                                         </div>
-                                        <div>
+                                        <div className="min-w-0">
                                             <div className="flex items-center gap-2">
-                                                <h4 className="font-bold text-base">{group.name}</h4>
+                                                <h4 className="font-bold text-base truncate">{group.name}</h4>
                                                 {isHome && <Badge variant="secondary" className="text-[9px] h-4 bg-emerald-500/10 text-emerald-500 border-emerald-500/20 px-1.5">HOME</Badge>}
                                             </div>
 

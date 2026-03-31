@@ -195,7 +195,7 @@ export function DashboardView() {
                             animate={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
                             transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-                            className="relative"
+                            className="relative space-y-6"
                             inert={isAnyModalOpen ? true : undefined}
                         >
                 <WorkspaceHeader 
