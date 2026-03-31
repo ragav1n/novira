@@ -100,8 +100,8 @@ export function SettlementsTabContent({
                 pendingSplits.map((split) => {
                     const isDebtor = split.user_id === userId;
                     return (
-                        <div key={split.id} className="flex items-center justify-between p-3 rounded-2xl bg-card/20 border border-white/5">
-                            <div className="flex items-center gap-3">
+                        <div key={split.id} className="flex items-center justify-between p-3 rounded-2xl bg-card/20 border border-white/5 overflow-hidden">
+                            <div className="flex items-center gap-3 min-w-0">
                                 <div className={cn(
                                     "w-10 h-10 rounded-full flex items-center justify-center border shrink-0",
                                     isDebtor ? "bg-rose-500/10 border-rose-500/20" : "bg-emerald-500/10 border-emerald-500/20"

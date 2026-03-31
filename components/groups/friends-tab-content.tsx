@@ -24,15 +24,15 @@ export function FriendsTabContent({
                 <div className="space-y-3 mb-6">
                     <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider px-1">Friend Requests</h3>
                     {friendRequests.map((request) => (
-                        <div key={request.id} className="flex items-center justify-between p-3 rounded-2xl bg-primary/10 border border-primary/20">
-                            <div className="flex items-center gap-3">
-                                <Avatar className="w-10 h-10 border border-primary/20">
+                        <div key={request.id} className="flex items-center justify-between p-3 rounded-2xl bg-primary/10 border border-primary/20 overflow-hidden">
+                            <div className="flex items-center gap-3 min-w-0">
+                                <Avatar className="w-10 h-10 border border-primary/20 shrink-0">
                                     <AvatarImage src={request.avatar_url || ''} />
                                     <AvatarFallback className="text-xs font-bold text-primary">{request.full_name?.substring(0, 2) || request.email?.substring(0, 2)}</AvatarFallback>
                                 </Avatar>
-                                <div>
-                                    <p className="text-sm font-bold">{request.full_name || request.email?.split('@')[0]}</p>
-                                    <p className="text-[11px] text-muted-foreground">{request.email}</p>
+                                <div className="min-w-0">
+                                    <p className="text-sm font-bold truncate">{request.full_name || request.email?.split('@')[0]}</p>
+                                    <p className="text-[11px] text-muted-foreground truncate">{request.email}</p>
                                 </div>
                             </div>
                             <div className="flex items-center gap-2">
@@ -79,15 +79,15 @@ export function FriendsTabContent({
             {/* Friends List */}
             {friends.length > 0 ? (
                 friends.map((friend) => (
-                    <div key={friend.id} className="flex items-center justify-between p-3 rounded-2xl bg-card/20 border border-white/5">
-                        <div className="flex items-center gap-3">
-                            <Avatar className="w-10 h-10 border border-white/10">
+                    <div key={friend.id} className="flex items-center justify-between p-3 rounded-2xl bg-card/20 border border-white/5 overflow-hidden">
+                        <div className="flex items-center gap-3 min-w-0">
+                            <Avatar className="w-10 h-10 border border-white/10 shrink-0">
                                 <AvatarImage src={friend.avatar_url || ''} />
                                 <AvatarFallback className="text-xs font-bold">{friend.full_name?.substring(0, 2) || friend.email?.substring(0, 2)}</AvatarFallback>
                             </Avatar>
-                            <div>
-                                <p className="text-sm font-bold">{friend.full_name || friend.email?.split('@')[0]}</p>
-                                <p className="text-[11px] text-muted-foreground">{friend.email}</p>
+                            <div className="min-w-0">
+                                <p className="text-sm font-bold truncate">{friend.full_name || friend.email?.split('@')[0]}</p>
+                                <p className="text-[11px] text-muted-foreground truncate">{friend.email}</p>
                             </div>
                         </div>
                         <div className="flex items-center gap-2">
