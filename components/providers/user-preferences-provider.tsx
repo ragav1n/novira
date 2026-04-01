@@ -475,17 +475,15 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
         // Update localStorage cache immediately so any re-hydration uses the new value
         if (userId) {
             const cacheKey = `novira_profile_${userId}`;
-            const cached = localStorage.getItem(cacheKey);
-            if (cached) {
-                try {
-                    const parsed = JSON.parse(cached);
-                    localStorage.setItem(cacheKey, JSON.stringify({
-                        ...parsed,
-                        monthly_budget: budget,
-                        budgets: updatedBudgets
-                    }));
-                } catch {}
-            }
+            try {
+                const cached = localStorage.getItem(cacheKey);
+                const parsed = cached ? JSON.parse(cached) : {};
+                localStorage.setItem(cacheKey, JSON.stringify({
+                    ...parsed,
+                    monthly_budget: budget,
+                    budgets: updatedBudgets
+                }));
+            } catch {}
         }
 
         if (userId) {
