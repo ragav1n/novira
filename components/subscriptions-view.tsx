@@ -8,6 +8,10 @@ import { useWorkspaceTheme } from '@/hooks/useWorkspaceTheme';
 import { supabase } from '@/lib/supabase';
 import { Card, CardContent } from '@/components/ui/card';
 import { Calendar, CreditCard, RotateCw, Trash2, ArrowLeft } from 'lucide-react';
+import {
+    AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+    AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { cn } from '@/lib/utils';
 import { format, parseISO } from 'date-fns';
 import { useRouter } from 'next/navigation';
@@ -22,6 +26,7 @@ export function SubscriptionsView() {
     const router = useRouter();
     const [templates, setTemplates] = useState<RecurringTemplate[]>([]);
     const [loading, setLoading] = useState(true);
+    const [cancelTarget, setCancelTarget] = useState<string | null>(null);
 
     const loadTemplates = useCallback(async () => {
         if (!userId) return;
@@ -70,11 +75,9 @@ export function SubscriptionsView() {
 
     const handleToggleActive = async (id: string, currentStatus: boolean) => {
         const newStatus = !currentStatus;
-        if (currentStatus && !confirm('Are you sure you want to cancel this subscription?')) return;
-        
         // Optimistic update
         setTemplates(prev => prev.map(t => t.id === id ? { ...t, is_active: newStatus } : t));
-        
+
         const { error } = await supabase
             .from('recurring_templates')
             .update({ is_active: newStatus })
@@ -102,7 +105,8 @@ export function SubscriptionsView() {
         }, 0);
 
     return (
-        <motion.div 
+        <>
+        <motion.div
             initial={{ opacity: 0, scale: 0.98 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.98 }}
@@ -171,8 +175,8 @@ export function SubscriptionsView() {
                                 </div>
                                 <div className="flex flex-col items-end gap-2 shrink-0">
                                     <span className="font-bold text-base">{formatCurrency(template.amount, template.currency)}</span>
-                                    <button 
-                                        onClick={() => handleToggleActive(template.id, true)}
+                                    <button
+                                        onClick={() => setCancelTarget(template.id)}
                                         className="text-rose-400 hover:text-rose-300 opacity-0 group-hover:opacity-100 transition-opacity p-1"
                                         title="Cancel Subscription"
                                     >
@@ -210,5 +214,26 @@ export function SubscriptionsView() {
             
             </div>
         </motion.div>
+
+        <AlertDialog open={!!cancelTarget} onOpenChange={(open) => !open && setCancelTarget(null)}>
+            <AlertDialogContent className="bg-card/95 backdrop-blur-xl border-white/10 rounded-3xl">
+                <AlertDialogHeader>
+                    <AlertDialogTitle>Cancel this subscription?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        Future transactions for this subscription will not be created automatically. You can re-activate it anytime.
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel onClick={() => setCancelTarget(null)}>Keep</AlertDialogCancel>
+                    <AlertDialogAction
+                        className="bg-rose-500/20 text-rose-400 border border-rose-500/30 hover:bg-rose-500/30"
+                        onClick={() => { if (cancelTarget) { handleToggleActive(cancelTarget, true); setCancelTarget(null); } }}
+                    >
+                        Cancel Subscription
+                    </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+        </>
     );
 }

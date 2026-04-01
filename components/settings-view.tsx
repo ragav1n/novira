@@ -144,11 +144,10 @@ export function SettingsView() {
                 .from('recurring_templates')
                 .select('id, description, amount, currency, frequency, created_at, next_occurrence, last_processed, category, is_active')
                 .eq('user_id', userId)
-                .eq('is_active', true)
                 .order('created_at', { ascending: false });
 
             if (error) throw error;
-            setRecurringTemplates(data || []);
+            setRecurringTemplates((data || []).filter(t => t.is_active));
         } catch (error) {
             console.error('Error loading recurring templates:', error);
         } finally {
