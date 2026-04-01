@@ -374,7 +374,10 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
         const to = (toCurrency || currency).toUpperCase();
         
         if (from === to) return amount;
-        
+
+        // If rates haven't loaded yet, return the amount unconverted rather than silently 1:1
+        if (Object.keys(exchangeRates).length === 0) return amount;
+
         const fromRate = exchangeRates[from] || 1;
         const toRate = exchangeRates[to] || 1;
         
@@ -468,6 +471,22 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
         const updatedBudgets = { ...budgets, [currency]: budget };
         setMonthlyBudgetState(budget);
         setBudgets(updatedBudgets);
+
+        // Update localStorage cache immediately so any re-hydration uses the new value
+        if (userId) {
+            const cacheKey = `novira_profile_${userId}`;
+            const cached = localStorage.getItem(cacheKey);
+            if (cached) {
+                try {
+                    const parsed = JSON.parse(cached);
+                    localStorage.setItem(cacheKey, JSON.stringify({
+                        ...parsed,
+                        monthly_budget: budget,
+                        budgets: updatedBudgets
+                    }));
+                } catch {}
+            }
+        }
 
         if (userId) {
             try {

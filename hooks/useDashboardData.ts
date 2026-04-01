@@ -183,7 +183,20 @@ export function useDashboardData(userId: string | null, activeWorkspaceId: strin
 
             // If recurring, ask if user wants to stop future ones
             if (tx.is_recurring) {
-                setTimeout(() => {
+                setTimeout(async () => {
+                    // Find the matching template first to get a specific ID
+                    const { data: templates } = await supabase
+                        .from('recurring_templates')
+                        .select('id')
+                        .eq('user_id', userId)
+                        .eq('description', tx.description)
+                        .eq('amount', tx.amount)
+                        .eq('is_active', true)
+                        .limit(1);
+
+                    const templateId = templates?.[0]?.id;
+                    if (!templateId) return; // No active template found, nothing to stop
+
                     toast('This was a recurring expense.', {
                         description: 'Stop future occurrences too?',
                         action: {
@@ -193,9 +206,7 @@ export function useDashboardData(userId: string | null, activeWorkspaceId: strin
                                     const { error } = await supabase
                                         .from('recurring_templates')
                                         .update({ is_active: false })
-                                        .eq('user_id', userId)
-                                        .eq('description', tx.description)
-                                        .eq('amount', tx.amount);
+                                        .eq('id', templateId);
 
                                     if (error) throw error;
                                     toast.success('Recurring series stopped');

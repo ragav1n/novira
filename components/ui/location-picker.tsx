@@ -556,7 +556,7 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
         const loc: LocationData = { place_name: pred.structured_formatting.main_text, place_address: pred.description, place_lat: lat, place_lng: lng };
         onChange(loc); saveToRecent(loc);
         setIsExpanded(false); setQuery(''); setPredictions([]);
-    }, [mapboxToken, onChange, saveToRecent]);
+    }, [googleMapsKey, mapboxToken, onChange, saveToRecent]);
 
     // ── Keyboard navigation (desktop PWA / bluetooth keyboard on mobile) ────
 
@@ -630,7 +630,7 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
             toast.error(msg);
             setIsLocating(false);
         }, { enableHighAccuracy: true, timeout: 8000 });
-    }, [mapboxToken, onChange, saveToRecent]);
+    }, [googleMapsKey, mapboxToken, onChange, saveToRecent]);
 
     const handleUseCurrentLocation = () => { setIsLocating(true); handleNativeGeolocation(); };
 
@@ -854,9 +854,9 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                                 );
                             })}
                         </div>
-                        {(googleMapsKey || mapboxToken) && (
+                        {googleMapsKey && (
                             <p className="text-[9px] text-muted-foreground/30 text-right pr-3 py-1 bg-white/[0.02]">
-                                {googleMapsKey ? 'Powered by Google' : 'Powered by Mapbox'}
+                                Powered by Google
                             </p>
                         )}
                     </motion.div>

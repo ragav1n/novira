@@ -1,21 +1,21 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { 
-    ChevronLeft, Search, SlidersHorizontal, CircleDollarSign, Tag, Plane, Home, Gift, 
-    Car, Utensils, ShoppingCart, Heart, Gamepad2, School, Laptop, Music, RefreshCcw, 
-    X, Check, Zap, ShoppingBag, HeartPulse, Clapperboard, LayoutGrid, HelpCircle, 
-    Calendar as CalendarIcon, Filter, Shirt 
+import {
+    ChevronLeft, Search, SlidersHorizontal, Tag, Plane, Home, Gift,
+    Car, Utensils, ShoppingCart, Heart, Gamepad2, School, Laptop, Music,
+    X, Check, Calendar as CalendarIcon, Filter, Shirt
 } from "lucide-react";
-import { CATEGORY_COLORS, getIconForCategory, getCategoryLabel, CATEGORIES as SYSTEM_CATEGORIES } from '@/lib/categories';
+import { CATEGORY_COLORS, getIconForCategory, CATEGORIES as SYSTEM_CATEGORIES } from '@/lib/categories';
+import { TransactionRow } from '@/components/transaction-row';
+import { Transaction } from '@/types/transaction';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
 import { toast, ImpactStyle } from '@/utils/haptics';
-import { format, parseISO } from 'date-fns';
-import { WaveLoader } from '@/components/ui/wave-loader';
+import { format } from 'date-fns';
 import { useUserPreferences } from '@/components/providers/user-preferences-provider';
 import { useBuckets } from '@/components/providers/buckets-provider';
 import { useWorkspaceTheme } from '@/hooks/useWorkspaceTheme';
@@ -43,19 +43,6 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 
-type Transaction = {
-    id: string;
-    description: string;
-    amount: number;
-    category: string;
-    date: string;
-    payment_method: string;
-    created_at: string;
-    currency?: string;
-    is_recurring?: boolean;
-    bucket_id?: string;
-};
-
 const categories = SYSTEM_CATEGORIES;
 
 const paymentMethods = ['Cash', 'UPI', 'Debit Card', 'Credit Card', 'Bank Transfer'];
@@ -80,17 +67,23 @@ function useDebounce<T>(value: T, delay: number): T {
 }
 
 const SearchSkeleton = () => (
-    <div className="space-y-3">
+    <div>
         {[1, 2, 3, 4, 5, 6].map((i) => (
-            <div key={i} className="flex items-center justify-between p-3 rounded-2xl bg-secondary/10 border border-white/5 animate-pulse">
-                <div className="flex items-center gap-3 flex-1">
-                    <div className="w-10 h-10 rounded-full bg-secondary/20 shrink-0" />
-                    <div className="space-y-2 flex-1">
-                        <div className="h-4 w-3/4 bg-secondary/20 rounded" />
-                        <div className="h-3 w-1/2 bg-secondary/20 rounded" />
+            <div key={i} className="relative overflow-hidden rounded-xl mt-1.5 first:mt-0 animate-pulse">
+                <div className="flex items-center gap-3 px-4 py-3.5 bg-card" style={{ borderLeft: '3px solid rgba(255,255,255,0.08)' }}>
+                    <div className="w-9 h-9 rounded-full bg-secondary/20 shrink-0" />
+                    <div className="flex-1 min-w-0 space-y-2">
+                        <div className="flex items-center justify-between gap-2">
+                            <div className="h-[13px] w-2/3 bg-secondary/20 rounded" />
+                            <div className="h-[14px] w-14 bg-secondary/20 rounded shrink-0" />
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <div className="h-[10px] w-16 bg-secondary/15 rounded" />
+                            <div className="h-[10px] w-8 bg-secondary/10 rounded" />
+                            <div className="h-[10px] w-10 bg-secondary/10 rounded" />
+                        </div>
                     </div>
                 </div>
-                <div className="w-16 h-5 bg-secondary/20 rounded shrink-0" />
             </div>
         ))}
     </div>
@@ -129,12 +122,38 @@ export function SearchView() {
         return <Icon className="w-full h-full" />;
     };
 
+    const calculateUserShare = (tx: Transaction, currentUserId: string | null) => {
+        if (!currentUserId) return Number(tx.amount);
+        if (tx.splits && tx.splits.length > 0) {
+            if (tx.user_id === currentUserId) {
+                const othersOwe = tx.splits.reduce((sum, s) => sum + Number(s.amount), 0);
+                return Number(tx.amount) - othersOwe;
+            } else {
+                const mySplit = tx.splits.find(s => s.user_id === currentUserId);
+                return mySplit ? Number(mySplit.amount) : 0;
+            }
+        }
+        return tx.user_id === currentUserId ? Number(tx.amount) : 0;
+    };
+
+    const getBucketChip = (tx: Transaction) => {
+        if (!tx.bucket_id) return null;
+        const txBucket = buckets.find(b => b.id === tx.bucket_id);
+        if (!txBucket) return null;
+        return (
+            <span className="flex items-center gap-1.5 text-[11px] font-bold px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-300 border border-cyan-500/20">
+                <div className="w-2.5 h-2.5 shrink-0">{getBucketIcon(txBucket.icon)}</div>
+                {txBucket.name}
+            </span>
+        );
+    };
+
     const fetchAndFilter = useCallback(async () => {
         setLoading(true);
         try {
             let query = supabase
                 .from('transactions')
-                .select('id, description, amount, category, date, payment_method, created_at, currency, is_recurring, bucket_id');
+                .select('id, description, amount, category, date, payment_method, created_at, user_id, group_id, currency, exchange_rate, base_currency, is_recurring, is_settlement, exclude_from_allowance, bucket_id, place_name, place_address, place_lat, place_lng, profile:profiles(full_name, avatar_url), splits(user_id, amount, is_paid)');
 
             // Workspace filter
             if (activeWorkspaceId && activeWorkspaceId !== 'personal') {
@@ -187,11 +206,16 @@ export function SearchView() {
             const { data } = await query;
 
             if (data) {
-                setFilteredTransactions(data);
+                const formatted = data.map(tx => ({
+                    ...tx,
+                    profile: Array.isArray(tx.profile) ? tx.profile[0] : tx.profile,
+                    splits: tx.splits || []
+                })) as Transaction[];
+                setFilteredTransactions(formatted);
 
                 // Update max price on first load (no filters active)
                 if (!debouncedSearchQuery && selectedCategories.length === 0 && selectedPayments.length === 0 && !dateRange.from && !dateRange.to && !selectedBucketId && priceRange[0] === 0 && priceRange[1] >= maxPossiblePrice) {
-                    const max = Math.max(...data.map(tx => tx.amount), 1000);
+                    const max = Math.max(...formatted.map(tx => tx.amount), 1000);
                     const rounded = Math.ceil(max / 100) * 100;
                     if (rounded !== maxPossiblePrice) {
                         setMaxPossiblePrice(rounded);
@@ -567,7 +591,7 @@ export function SearchView() {
 
 
                 <div className={cn(
-                    "space-y-3 overflow-y-auto pr-1 -mr-1 h-full transition-all duration-300 flex-1",
+                    "space-y-0 overflow-y-auto pr-1 -mr-1 h-full transition-all duration-300 flex-1",
                     loading ? "opacity-50 blur-[2px] pointer-events-none" : "opacity-100 blur-0"
                 )}>
                     {loading ? (
@@ -575,81 +599,29 @@ export function SearchView() {
                     ) : (
                         <AnimatePresence mode="popLayout">
                             {filteredTransactions.length > 0 ? (
-                                filteredTransactions.map((tx) => (
-                                <motion.div
-                                    key={tx.id}
-                                    layout
-                                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                                    exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.2 } }}
-                                    className="flex items-center justify-between p-3 rounded-2xl bg-card/20 border border-white/5 hover:bg-card/40 transition-colors"
-                                >
-                                    <div className="flex items-center gap-3 min-w-0 flex-1">
-                                        <div
-                                            className="w-10 h-10 rounded-full flex items-center justify-center border shrink-0 transition-colors"
-                                            style={{
-                                                backgroundColor: `${CATEGORY_COLORS[tx.category.toLowerCase()] || CATEGORY_COLORS.uncategorized}20`,
-                                                borderColor: `${CATEGORY_COLORS[tx.category.toLowerCase()] || CATEGORY_COLORS.uncategorized}40`
-                                            }}
-                                        >
-                                            {React.cloneElement(getIconForCategory(tx.category.toLowerCase()) as React.ReactElement<{ style?: React.CSSProperties }>, {
-                                                style: { color: CATEGORY_COLORS[tx.category.toLowerCase()] || CATEGORY_COLORS.uncategorized }
-                                            })}
-                                        </div>
-                                        <div className="min-w-0">
-                                            <p className="font-medium text-sm truncate">{tx.description}</p>
-                                            <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
-                                                <div className="flex items-center gap-1.5 shrink-0">
-                                                    <div className="w-3.5 h-3.5 flex items-center justify-center">
-                                                        {getIconForCategory(tx.category, "w-full h-full", { style: { color: CATEGORY_COLORS[tx.category] || CATEGORY_COLORS.others } })}
-                                                    </div>
-                                                    <span 
-                                                        className="px-1.5 py-0.5 rounded border text-[10px] font-bold capitalize"
-                                                        style={{
-                                                            backgroundColor: `${CATEGORY_COLORS[tx.category] || CATEGORY_COLORS.others}20`,
-                                                            borderColor: `${CATEGORY_COLORS[tx.category] || CATEGORY_COLORS.others}40`,
-                                                            color: CATEGORY_COLORS[tx.category] || CATEGORY_COLORS.others
-                                                        }}
-                                                    >
-                                                        {getCategoryLabel(tx.category)}
-                                                    </span>
-                                                </div>
-                                                <span className="shrink-0">• {tx.payment_method}</span>
-                                                <span className="shrink-0">• {format(parseISO(tx.date), 'MMM d')}</span>
-                                            </div>
-
-                                            {(tx.bucket_id || tx.is_recurring) && (
-                                                <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
-                                                    {tx.bucket_id && buckets.find(b => b.id === tx.bucket_id) && (
-                                                        <span className="px-1.5 py-0.5 rounded bg-cyan-500/10 text-[11px] text-cyan-500 border border-cyan-500/10 font-bold flex items-center gap-1 shrink-0">
-                                                            <div className="w-2.5 h-2.5">
-                                                                {getBucketIcon(buckets.find(b => b.id === tx.bucket_id)?.icon)}
-                                                            </div>
-                                                            {buckets.find(b => b.id === tx.bucket_id)?.name}
-                                                        </span>
-                                                    )}
-                                                    {tx.is_recurring && (
-                                                        <span className="px-1.5 py-0.5 rounded bg-sky-500/10 text-[11px] text-sky-500 border border-sky-500/10 font-bold flex items-center gap-1 shrink-0">
-                                                            <RefreshCcw className="w-2.5 h-2.5" />
-                                                            Recurring
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                    <div className="flex flex-col items-end shrink-0 ml-2">
-                                        <span className="font-bold text-sm whitespace-nowrap">
-                                            -{formatCurrency(Number(tx.amount), tx.currency)}
-                                        </span>
-                                        {tx.currency && tx.currency !== currency && (
-                                            <div className="text-[10px] text-emerald-500 font-bold leading-none bg-emerald-500/5 px-1 rounded-sm mt-1">
-                                                ≈ {formatCurrency(convertAmount(Number(tx.amount), tx.currency), currency)}
-                                            </div>
-                                        )}
-                                    </div>
-                                </motion.div>
-                            ))
+                                filteredTransactions.map((tx) => {
+                                    const myShare = calculateUserShare(tx, userId);
+                                    const showConverted = !!(tx.currency && tx.currency.toUpperCase() !== currency.toUpperCase());
+                                    const color = CATEGORY_COLORS[tx.category?.toLowerCase()] || CATEGORY_COLORS.uncategorized;
+                                    return (
+                                        <TransactionRow
+                                            key={tx.id}
+                                            tx={tx}
+                                            userId={userId}
+                                            myShare={myShare}
+                                            formattedAmount={formatCurrency(Math.abs(myShare), tx.currency)}
+                                            formattedConverted={showConverted ? formatCurrency(convertAmount(Math.abs(myShare), tx.currency || 'USD', currency), currency) : undefined}
+                                            showConverted={showConverted}
+                                            canEdit={false}
+                                            icon={getIconForCategory(tx.category, 'w-4 h-4')}
+                                            color={color}
+                                            bucketChip={getBucketChip(tx)}
+                                            onHistory={() => toast('History is available from the dashboard')}
+                                            onEdit={() => {}}
+                                            onDelete={() => {}}
+                                        />
+                                    );
+                                })
                         ) : (
                             <motion.div
                                 initial={{ opacity: 0 }}
