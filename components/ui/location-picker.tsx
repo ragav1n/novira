@@ -172,6 +172,9 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
 
     // ── Position acquisition ────────────────────────────────────────────────
 
+    const lastPositionRef = useRef<{ lat: number; lng: number } | null>(null);
+    useEffect(() => { lastPositionRef.current = lastPosition; }, [lastPosition]);
+
     useEffect(() => {
         if (!isExpanded || lastPosition) return;
         navigator.geolocation?.getCurrentPosition(
@@ -185,6 +188,7 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
         if (!isExpanded) {
             nearbyFetchedRef.current = false;
             setActiveIndex(-1);
+            setIsLoadingNearby(false);
             // Abandon the Google session token if user closes without selecting
             googleSessionTokenRef.current = null;
         }
@@ -196,6 +200,10 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
             abortControllerRef.current?.abort();
         };
     }, []);
+
+    // queryRef — kept in sync so effects can read latest query without stale closures
+    const queryRef = useRef(query);
+    useEffect(() => { queryRef.current = query; }, [query]);
 
     // ── Background coordinate pre-fetch for Mapbox suggestions ─────────────
 
@@ -342,7 +350,8 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
         if (!googleMapsKey) { searchWithMapbox(searchQuery); return; }
         if (searchQuery.trim().length < 2) { setPredictions([]); setIsSearching(false); return; }
 
-        const cacheKey = `google:${searchQuery}:${lastPosition?.lat?.toFixed(2)},${lastPosition?.lng?.toFixed(2)}`;
+        const pos = lastPositionRef.current;
+        const cacheKey = `google:${searchQuery}:${pos?.lat?.toFixed(2)},${pos?.lng?.toFixed(2)}`;
         if (searchCacheRef.current.has(cacheKey)) {
             setPredictions(searchCacheRef.current.get(cacheKey)!);
             setActiveIndex(-1);
@@ -353,55 +362,79 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
         if (debounceRef.current) clearTimeout(debounceRef.current);
         debounceRef.current = setTimeout(async () => {
             try {
-                const g = await loadGoogleMaps(googleMapsKey);
-                const service = new g.maps.places.AutocompleteService();
+                // Rotate session token per search session
                 if (!googleSessionTokenRef.current) {
-                    googleSessionTokenRef.current = new g.maps.places.AutocompleteSessionToken();
+                    googleSessionTokenRef.current = crypto.randomUUID();
                 }
-                const request: any = {
+                const body: Record<string, unknown> = {
                     input: searchQuery,
-                    types: ['establishment', 'geocode'],
                     sessionToken: googleSessionTokenRef.current,
                 };
-                if (lastPosition) {
-                    request.location = new g.maps.LatLng(lastPosition.lat, lastPosition.lng);
-                    request.radius = 50000;
+                const currentPos = lastPositionRef.current;
+                if (currentPos) {
+                    // origin enables distanceMeters in the response
+                    body.origin = { latitude: currentPos.lat, longitude: currentPos.lng };
+                    body.locationBias = {
+                        circle: { center: { latitude: currentPos.lat, longitude: currentPos.lng }, radius: 10000 }
+                    };
                 }
-                service.getPlacePredictions(request, (preds: any[], status: string) => {
-                    if (status !== g.maps.places.PlacesServiceStatus.OK || !preds) {
-                        searchWithMapbox(searchQuery);
-                        setIsSearching(false);
-                        return;
-                    }
-                    const results: PlacePrediction[] = preds.map((p: any) => ({
-                        place_id: p.place_id,
-                        description: p.description,
+                const response = await fetch('https://places.googleapis.com/v1/places:autocomplete', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Goog-Api-Key': googleMapsKey,
+                        'X-Goog-FieldMask': 'suggestions.placePrediction.placeId,suggestions.placePrediction.text,suggestions.placePrediction.structuredFormat,suggestions.placePrediction.distanceMeters',
+                    },
+                    body: JSON.stringify(body),
+                });
+                if (!response.ok) throw new Error(`Places API ${response.status}`);
+                const data = await response.json();
+                const results: PlacePrediction[] = (data.suggestions || []).map((s: any) => {
+                    const p = s.placePrediction;
+                    return {
+                        place_id: p.placeId,
+                        description: p.text?.text || '',
                         structured_formatting: {
-                            main_text: p.structured_formatting.main_text,
-                            secondary_text: p.structured_formatting.secondary_text || '',
+                            main_text: p.structuredFormat?.mainText?.text || p.text?.text || '',
+                            secondary_text: p.structuredFormat?.secondaryText?.text || '',
                         },
                         _lat: '', _lon: '',
+                        _distance: p.distanceMeters != null ? p.distanceMeters / 1000 : undefined,
                         _source: 'google' as const,
-                    }));
-                    if (searchCacheKeysRef.current.length >= 50) {
-                        const evicted = searchCacheKeysRef.current.shift()!;
-                        searchCacheRef.current.delete(evicted);
-                    }
-                    searchCacheKeysRef.current.push(cacheKey);
-                    searchCacheRef.current.set(cacheKey, results);
-                    setPredictions(results);
-                    setActiveIndex(-1);
-                    setIsSearching(false);
-                });
+                    };
+                }).sort((a: PlacePrediction, b: PlacePrediction) =>
+                    (a._distance ?? Infinity) - (b._distance ?? Infinity)
+                );
+                if (searchCacheKeysRef.current.length >= 50) {
+                    const evicted = searchCacheKeysRef.current.shift()!;
+                    searchCacheRef.current.delete(evicted);
+                }
+                searchCacheKeysRef.current.push(cacheKey);
+                searchCacheRef.current.set(cacheKey, results);
+                setPredictions(results);
+                setActiveIndex(-1);
+                setIsSearching(false);
             } catch (e) {
-                console.warn('[LocationPicker] Google search failed, falling back to Photon:', e);
+                console.warn('[LocationPicker] Google Places API (New) failed, falling back to Photon:', e);
                 searchWithPhoton(searchQuery);
                 setIsSearching(false);
             }
         }, 300);
-    }, [googleMapsKey, searchWithPhoton, lastPosition]);
+    }, [googleMapsKey, searchWithPhoton]);
 
     const handleSearch = googleMapsKey ? searchWithGoogle : mapboxToken ? searchWithMapbox : searchWithPhoton;
+    const handleSearchRef = useRef(handleSearch);
+    useEffect(() => { handleSearchRef.current = handleSearch; });
+
+    // Re-trigger search when position resolves while user already has a query
+    // (fixes stale-closure bias: user typed before geolocation returned)
+    useEffect(() => {
+        if (!lastPosition || queryRef.current.length < 2) return;
+        if (predictions.length > 0 && predictions.every(p => p._distance === undefined)) {
+            handleSearchRef.current(queryRef.current);
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [lastPosition]);
 
     // ── Nearby POIs on open ─────────────────────────────────────────────────
 
@@ -498,33 +531,34 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
             return;
         }
 
-        // Google place details (when coords not yet known)
+        // Google place details (Places API New — single fetch, no JS SDK needed)
         if (pred._source === 'google' && googleMapsKey && !pred._lat) {
             try {
-                const g = await loadGoogleMaps(googleMapsKey);
-                const div = document.createElement('div');
-                const service = new g.maps.places.PlacesService(div);
-                await new Promise<void>((resolve) => {
-                    service.getDetails(
-                        { placeId: pred.place_id, fields: ['geometry', 'name', 'formatted_address'], sessionToken: googleSessionTokenRef.current },
-                        (result: any, status: string) => {
-                            // Rotate session token — this closes the billing session
-                            googleSessionTokenRef.current = null;
-                            if (status === g.maps.places.PlacesServiceStatus.OK && result?.geometry?.location) {
-                                const loc: LocationData = {
-                                    place_name: result.name || pred.structured_formatting.main_text,
-                                    place_address: result.formatted_address || pred.description,
-                                    place_lat: result.geometry.location.lat(),
-                                    place_lng: result.geometry.location.lng(),
-                                };
-                                onChange(loc); saveToRecent(loc);
-                                setIsExpanded(false); setQuery(''); setPredictions([]);
-                            }
-                            resolve();
-                        }
-                    );
+                const sessionToken = typeof googleSessionTokenRef.current === 'string'
+                    ? googleSessionTokenRef.current : null;
+                googleSessionTokenRef.current = null; // rotate — closes the billing session
+                const url = new URL(`https://places.googleapis.com/v1/places/${encodeURIComponent(pred.place_id)}`);
+                if (sessionToken) url.searchParams.set('sessionToken', sessionToken);
+                const response = await fetch(url.toString(), {
+                    headers: {
+                        'X-Goog-Api-Key': googleMapsKey,
+                        'X-Goog-FieldMask': 'location,displayName,formattedAddress',
+                    },
                 });
-                return;
+                if (response.ok) {
+                    const detail = await response.json();
+                    if (detail.location) {
+                        const loc: LocationData = {
+                            place_name: detail.displayName?.text || pred.structured_formatting.main_text,
+                            place_address: detail.formattedAddress || pred.description,
+                            place_lat: detail.location.latitude,
+                            place_lng: detail.location.longitude,
+                        };
+                        onChange(loc); saveToRecent(loc);
+                        setIsExpanded(false); setQuery(''); setPredictions([]);
+                        return;
+                    }
+                }
             } catch (e) {
                 console.warn('[LocationPicker] Google place details failed:', e);
             }
@@ -551,9 +585,10 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
             }
         }
 
-        // Photon / direct coords
+        // Direct coords (Photon result, or Google result already enriched with geometry)
         const lat = parseFloat(pred._lat), lng = parseFloat(pred._lon);
         if (isNaN(lat) || isNaN(lng)) { toast.error('Could not get location coordinates'); return; }
+        if (pred._source === 'google') googleSessionTokenRef.current = null; // close billing session
         const loc: LocationData = { place_name: pred.structured_formatting.main_text, place_address: pred.description, place_lat: lat, place_lng: lng };
         onChange(loc); saveToRecent(loc);
         setIsExpanded(false); setQuery(''); setPredictions([]);
