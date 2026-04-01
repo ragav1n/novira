@@ -136,6 +136,7 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
     }, []);
 
     const [isLocating, setIsLocating] = useState(false);
+    const [isLoadingNearby, setIsLoadingNearby] = useState(false);
     const hasLocation = !!placeName;
     const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
     const googleMapsKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY;
@@ -410,7 +411,7 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
         nearbyFetchedRef.current = true;
 
         (async () => {
-            setIsSearching(true);
+            setIsLoadingNearby(true);
             // Google nearby search (primary)
             if (googleMapsKey) {
                 try {
@@ -437,7 +438,7 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                             }
                         );
                     });
-                    setIsSearching(false);
+                    setIsLoadingNearby(false);
                     return;
                 } catch (e) {
                     console.warn('[LocationPicker] Google nearby search failed:', e);
@@ -467,7 +468,7 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                     console.warn('[LocationPicker] Nearby POI fetch failed:', e);
                 }
             }
-            setIsSearching(false);
+            setIsLoadingNearby(false);
         })();
     }, [isExpanded, lastPosition, query.length, googleMapsKey, mapboxToken]);
 
@@ -735,7 +736,7 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                     className="h-14 pl-12 pr-4 bg-primary/5 border-primary/20 focus-visible:ring-primary/30 rounded-2xl text-base"
                 />
                 <div className="absolute left-4 top-1/2 -translate-y-1/2">
-                    {isSearching
+                    {isSearching && query.length > 0
                         ? <div className="w-4 h-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
                         : <div className="p-1 rounded-lg bg-primary/10"><Search className="w-4 h-4 text-primary" /></div>
                     }
@@ -768,6 +769,11 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                     </div>
                 </button>
             </div>
+
+            {/* Nearby loading shimmer */}
+            {isLoadingNearby && query.length === 0 && (
+                <p className="text-[10px] text-primary/40 text-center py-1 animate-pulse">Finding nearby places…</p>
+            )}
 
             {/* Recent locations */}
             <AnimatePresence>
