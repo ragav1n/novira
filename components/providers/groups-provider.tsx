@@ -315,6 +315,8 @@ export function GroupsProvider({ children }: { children: React.ReactNode }) {
                 // splits: no filter — a split can belong to any user involved in the transaction
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'splits' }, () => {
                     debouncedRefresh();
+                    // Also refresh the dashboard so settlement transactions appear immediately
+                    window.dispatchEvent(new Event('novira:expense-added'));
                 })
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions', filter: `user_id=eq.${userId}` }, () => {
                     debouncedRefresh();

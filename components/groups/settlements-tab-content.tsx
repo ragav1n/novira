@@ -69,13 +69,19 @@ export function SettlementsTabContent({
                                                 className="h-7 text-[11px] rounded-full bg-amber-500/20 text-amber-500 border border-amber-500/30 hover:bg-amber-500/30 gap-1"
                                                 onClick={async () => {
                                                     setSettlingPaymentIndex(index);
+                                                    let settled = 0;
                                                     try {
                                                         for (const splitId of payment.splitIds) {
                                                             await settleSplit(splitId, payment.to);
+                                                            settled++;
                                                         }
-                                                        toast.success(`Settled ${payment.splitIds.length} split${payment.splitIds.length !== 1 ? 's' : ''} with ${payment.toName}!`);
+                                                        toast.success(`Settled ${settled} split${settled !== 1 ? 's' : ''} with ${payment.toName}!`);
                                                     } catch (error: any) {
-                                                        toast.error(error.message || 'Failed to settle');
+                                                        if (settled > 0) {
+                                                            toast.error(`Settled ${settled} of ${payment.splitIds.length} — ${error.message || 'partial failure'}`);
+                                                        } else {
+                                                            toast.error(error.message || 'Failed to settle');
+                                                        }
                                                     } finally {
                                                         setSettlingPaymentIndex(null);
                                                     }
