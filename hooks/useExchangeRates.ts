@@ -15,20 +15,26 @@ export function useExchangeRates(currency: string): Record<string, number> {
         const cacheKey = `novira_rates_${currency}`;
         const API_KEY = process.env.NEXT_PUBLIC_EXCHANGERATE_API_KEY;
 
-        const fetchRates = async () => {
-            try {
-                const cached = localStorage.getItem(cacheKey);
-                if (cached) {
-                    const { rates, timestamp } = JSON.parse(cached);
-                    if (Date.now() - timestamp < CACHE_TTL) {
-                        setExchangeRates(rates);
-                        return;
-                    }
-                }
-            } catch (e) {
-                console.warn('[useExchangeRates] Cache read failed:', e);
+        // Synchronously restore from cache for this currency to avoid using stale
+        // rates from a previous currency during the async fetch window.
+        let hasFreshCache = false;
+        try {
+            const cached = localStorage.getItem(cacheKey);
+            if (cached) {
+                const { rates, timestamp } = JSON.parse(cached);
+                setExchangeRates(rates);
+                hasFreshCache = Date.now() - timestamp < CACHE_TTL;
+            } else {
+                setExchangeRates({}); // No cache for this currency — reset so isRatesLoading becomes true
             }
+        } catch (e) {
+            console.warn('[useExchangeRates] Cache read failed:', e);
+            setExchangeRates({});
+        }
 
+        if (hasFreshCache) return;
+
+        const fetchRates = async () => {
             let ratesRes: Record<string, number> | null = null;
 
             if (FRANKFURTER_SUPPORTED.includes(currency)) {
@@ -68,17 +74,8 @@ export function useExchangeRates(currency: string): Record<string, number> {
                 } catch (e) {
                     console.warn('[useExchangeRates] Cache write failed:', e);
                 }
-            } else {
-                try {
-                    const cached = localStorage.getItem(cacheKey);
-                    if (cached) {
-                        const { rates } = JSON.parse(cached);
-                        setExchangeRates(rates);
-                    }
-                } catch (e) {
-                    console.warn('[useExchangeRates] Stale cache read failed:', e);
-                }
             }
+            // If fetch fails, the stale cache was already set above (or {} if no cache)
         };
 
         fetchRates();

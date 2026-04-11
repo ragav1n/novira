@@ -164,8 +164,14 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
                 if (data.budgets) setBudgets(data.budgets as Record<string, number>);
                 if (data.full_name) setFullName(data.full_name);
 
-                // Update cache with fresh data
-                localStorage.setItem(cacheKey, JSON.stringify(data));
+                // Update cache with fresh data (merge to preserve fields like active_workspace_id)
+                try {
+                    const existing = localStorage.getItem(cacheKey);
+                    const parsed = existing ? JSON.parse(existing) : {};
+                    localStorage.setItem(cacheKey, JSON.stringify({ ...parsed, ...data }));
+                } catch {
+                    localStorage.setItem(cacheKey, JSON.stringify(data));
+                }
             }
             if (error && error.code !== 'PGRST116') {
                 console.error('Error fetching preferences:', error);
@@ -540,6 +546,9 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
         }
     }, [userId, currency, refreshPreferences]);
 
+    // Derived from exchangeRates — stable boolean so context only re-renders when loading state changes
+    const isRatesLoading = Object.keys(exchangeRates).length === 0;
+
     const contextValue = useMemo(() => ({
         user,
         userId,
@@ -560,7 +569,7 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
         setFullName,
         isNavigating,
         setIsNavigating,
-        isRatesLoading: Object.keys(exchangeRates).length === 0,
+        isRatesLoading,
         CURRENCY_SYMBOLS,
         CURRENCY_DETAILS,
         activeWorkspaceId,
@@ -584,7 +593,7 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
         avatarUrl,
         fullName,
         isNavigating,
-        exchangeRates,
+        isRatesLoading,
         activeWorkspaceId,
         workspaceBudgets,
         convertedWorkspaceBudgets,
