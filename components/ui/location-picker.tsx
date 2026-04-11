@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import Image from 'next/image';
-import { MapPin, X, Search, Navigation, LocateFixed, Clock, Globe } from 'lucide-react';
+import { MapPin, X, Search, Navigation, LocateFixed, Globe } from 'lucide-react';
 import { getDistance } from '@/lib/location';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
@@ -818,28 +818,40 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                         className="absolute left-0 right-0 top-full mt-2 z-[100] rounded-2xl border border-white/10 bg-[#0A0A0A] shadow-2xl overflow-hidden ring-1 ring-white/5">
                         <p className="text-[9px] font-bold text-muted-foreground/50 uppercase tracking-widest px-3 pt-2.5 pb-1">Recent</p>
                         <div className="max-h-[260px] overflow-y-auto no-scrollbar" ref={listRef}>
-                            {recentLocations.map((loc, i) => (
-                                <button key={`${loc.place_name}-${i}`} type="button"
-                                    id={`loc-option-${i}`} role="option" aria-selected={activeIndex === i}
-                                    onClick={() => handleSelectPlace(loc)}
-                                    className={cn(
-                                        'w-full flex items-center gap-3 px-3 py-3.5 transition-colors border-b border-white/5 last:border-b-0 text-left touch-manipulation min-h-[56px]',
-                                        activeIndex === i ? 'bg-white/10' : 'active:bg-white/5'
-                                    )}>
-                                    <div className="w-8 h-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center shrink-0 text-base">
-                                        <Clock className="w-3.5 h-3.5 text-muted-foreground" />
-                                    </div>
-                                    <div className="min-w-0 flex-1">
-                                        <p className="text-sm font-semibold truncate">{loc.place_name}</p>
-                                        {loc.place_address && <p className="text-[11px] text-muted-foreground truncate mt-0.5">{loc.place_address}</p>}
-                                    </div>
-                                    {loc.visitCount > 1 && (
-                                        <span className="text-[9px] font-bold text-primary/50 bg-primary/10 px-1.5 py-0.5 rounded-full shrink-0">
-                                            {loc.visitCount}×
-                                        </span>
-                                    )}
-                                </button>
-                            ))}
+                            {recentLocations.map((loc, i) => {
+                                const dist = lastPosition && loc.place_lat && loc.place_lng
+                                    ? getDistance(lastPosition.lat, lastPosition.lng, loc.place_lat, loc.place_lng)
+                                    : undefined;
+                                return (
+                                    <button key={`${loc.place_name}-${i}`} type="button"
+                                        id={`loc-option-${i}`} role="option" aria-selected={activeIndex === i}
+                                        onClick={() => handleSelectPlace(loc)}
+                                        className={cn(
+                                            'w-full flex items-center gap-3 px-3 py-3.5 transition-colors border-b border-white/5 last:border-b-0 text-left touch-manipulation min-h-[56px]',
+                                            activeIndex === i ? 'bg-white/10' : 'active:bg-white/5'
+                                        )}>
+                                        <div className="w-9 h-9 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
+                                            <MapPin className="w-4 h-4 text-primary" />
+                                        </div>
+                                        <div className="min-w-0 flex-1">
+                                            <p className="text-sm font-semibold line-clamp-1">{loc.place_name}</p>
+                                            {loc.place_address && (
+                                                <p className="text-[11px] text-muted-foreground line-clamp-1 mt-0.5 truncate">{loc.place_address}</p>
+                                            )}
+                                        </div>
+                                        <div className="flex items-center gap-1.5 shrink-0 ml-1">
+                                            {dist !== undefined && (
+                                                <span className="text-[10px] text-primary/60 font-semibold">{formatDist(dist)}</span>
+                                            )}
+                                            {loc.visitCount > 1 && (
+                                                <span className="text-[9px] font-bold text-primary/50 bg-primary/10 px-1.5 py-0.5 rounded-full">
+                                                    {loc.visitCount}×
+                                                </span>
+                                            )}
+                                        </div>
+                                    </button>
+                                );
+                            })}
                         </div>
                     </motion.div>
                 )}

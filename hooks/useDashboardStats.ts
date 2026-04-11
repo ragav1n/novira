@@ -176,14 +176,13 @@ export function useDashboardStats({
 
         if (!Array.isArray(transactions)) return [];
 
-        return transactions
-            .filter(tx => tx && !tx.exclude_from_allowance)
-            .filter(tx => {
-                if (!userId) return true;
-                if (tx.user_id === userId) return true;
-                if (tx.splits && tx.splits.some(s => s.user_id === userId)) return true;
-                return false;
-            });
+        return transactions.filter(tx => {
+            if (!tx || tx.exclude_from_allowance) return false;
+            if (!userId) return true;
+            if (tx.user_id === userId) return true;
+            if (tx.splits && tx.splits.some(s => s.user_id === userId)) return true;
+            return false;
+        });
     }, [transactions, isBucketFocused, displayTransactions, userId]);
 
     // Run Rate Calculation — weighted toward recent 7 days to reflect current spending trend
