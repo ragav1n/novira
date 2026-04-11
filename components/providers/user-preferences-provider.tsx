@@ -6,7 +6,7 @@ import { toast } from '@/utils/haptics';
 import { User, Session } from '@supabase/supabase-js';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
 
-export type Currency = 'USD' | 'EUR' | 'INR' | 'GBP' | 'SGD' | 'VND' | 'TWD' | 'JPY' | 'KRW' | 'HKD' | 'MYR' | 'PHP' | 'THB' | 'CAD' | 'AUD' | 'MXN' | 'BRL' | 'IDR' | 'AED';
+export type Currency = 'USD' | 'EUR' | 'INR' | 'GBP' | 'CHF' | 'SGD' | 'VND' | 'TWD' | 'JPY' | 'KRW' | 'HKD' | 'MYR' | 'PHP' | 'THB' | 'CAD' | 'AUD' | 'MXN' | 'BRL' | 'IDR' | 'AED';
 
 const DEFAULT_BUDGETS: Record<Currency, number> = {
     USD: 1500,
@@ -27,6 +27,7 @@ const DEFAULT_BUDGETS: Record<Currency, number> = {
     MXN: 25000,
     BRL: 7000,
     IDR: 25000000,
+    CHF: 1350,
     AED: 5500
 };
 
@@ -66,7 +67,7 @@ interface UserPreferencesContextType {
 }
 
 export const CURRENCY_SYMBOLS: Record<Currency, string> = {
-    USD: '$', EUR: '€', INR: '₹', GBP: '£', SGD: 'S$', VND: '₫',
+    USD: '$', EUR: '€', INR: '₹', GBP: '£', CHF: 'Fr', SGD: 'S$', VND: '₫',
     TWD: 'NT$', JPY: '¥', KRW: '₩', HKD: 'HK$', MYR: 'RM',
     PHP: '₱', THB: '฿', CAD: 'C$', AUD: 'A$', MXN: 'Mex$', BRL: 'R$', IDR: 'Rp', AED: 'AED'
 };
@@ -76,6 +77,7 @@ export const CURRENCY_DETAILS: Record<Currency, { name: string; symbol: string }
     USD: { name: 'US Dollar', symbol: '$' },
     EUR: { name: 'Euro', symbol: '€' },
     GBP: { name: 'British Pound', symbol: '£' },
+    CHF: { name: 'Swiss Franc', symbol: 'Fr' },
     SGD: { name: 'Singapore Dollar', symbol: 'S$' },
     VND: { name: 'Vietnamese Dong', symbol: '₫' },
     TWD: { name: 'Taiwan Dollar', symbol: 'NT$' },
