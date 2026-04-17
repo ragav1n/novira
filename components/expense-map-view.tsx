@@ -55,7 +55,6 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency, 
     const [show3D, setShow3D] = useState(false);
     const [isInitialLoad, setIsInitialLoad] = useState(true);
     const [mounted, setMounted] = useState(false);
-
     useEffect(() => {
         setMounted(true);
     }, []);
@@ -657,7 +656,7 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency, 
                             transactionCount={geoTransactions.length}
                             onClose={onClose}
                         >
-                            <MapControls 
+                            <MapControls
                                 viewMode={viewMode}
                                 setViewMode={setViewMode}
                                 show3D={show3D}

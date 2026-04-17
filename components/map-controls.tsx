@@ -17,7 +17,7 @@ export function MapControls({
     show3D,
     setShow3D,
     showTrails,
-    setShowTrails
+    setShowTrails,
 }: MapControlsProps) {
     return (
         <div className="flex items-center gap-2 mt-2 sm:mt-0 pointer-events-auto">
@@ -61,14 +61,15 @@ export function MapControls({
                 onClick={() => setShowTrails(!showTrails)}
                 className={cn(
                     "w-11 h-11 rounded-full flex items-center justify-center border transition-all shadow-lg backdrop-blur-md",
-                    showTrails 
-                        ? "bg-cyan-500/20 border-cyan-500/40 text-cyan-400" 
+                    showTrails
+                        ? "bg-cyan-500/20 border-cyan-500/40 text-cyan-400"
                         : "bg-card/60 border-white/10 text-muted-foreground hover:bg-white/5"
                 )}
                 title="Toggle Spending Trails"
             >
                 <Zap className={cn("w-5 h-5", showTrails && "fill-current animate-pulse")} />
             </button>
+
         </div>
     );
 }
