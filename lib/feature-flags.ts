@@ -1,29 +1,29 @@
 export const LATEST_FEATURE_ANNOUNCEMENT = {
-    id: 'workspaces-goals-v6', // New ID to trigger the modal
-    title: 'Workspaces, Goals & Subs!',
+    id: 'drop-pin-settlement-v7',
+    title: 'Maps, Splits & More!',
     features: [
         {
-            title: 'Dedicated Workspaces',
-            description: 'Instantly swap between your Personal dashboard and shared Household/Couple workspaces. Budgets and expenses isolate perfectly.',
-            icon: 'home'
+            title: 'Drop Pin on Map',
+            description: 'Tap "Drop Pin" in the location picker to pan a live Google Maps map and set any location — no typing needed.',
+            icon: 'map'
         },
         {
-            title: 'Savings Goals',
-            description: 'Set ambitious financial targets. Add deposits over time and watch your progress bar fill up until you hit your goal.',
-            icon: 'target'
-        },
-        {
-            title: 'Subscription Manager',
-            description: 'Keep track of all your recurring expenses in one place. Instantly see your total monthly subscription drain.',
-            icon: 'calendar'
-        },
-        {
-            title: 'Predictive Run Rate',
-            description: 'A new smart widget on your dashboard predicts your end-of-month spend based on your daily average.',
+            title: 'Smart Settlement Balances',
+            description: 'Your green and red balance cards now reflect simplified mutual debts — see your true net position after cancellations.',
             icon: 'zap'
+        },
+        {
+            title: 'Swipe to Edit & Delete',
+            description: 'Swipe left on any transaction to reveal quick Edit and Delete actions without opening the full details.',
+            icon: 'zap'
+        },
+        {
+            title: 'Instant Currency Switch',
+            description: 'Changing your preferred currency now takes effect everywhere immediately — no manual refresh required.',
+            icon: 'globe'
         }
     ],
-    buttonText: 'Let\'s Go!!',
+    buttonText: 'Nice!',
 };
 
 export const WELCOME_FEATURES = [
@@ -79,7 +79,7 @@ export const WELCOME_FEATURES = [
     },
     {
         title: 'Map & Location Tracking',
-        description: 'Tag expenses with locations and visualize your spending journey on an interactive map.',
+        description: 'Tag expenses with locations, drop a pin anywhere on the map, and visualize your spending journey interactively.',
         icon: 'map'
     },
     {
