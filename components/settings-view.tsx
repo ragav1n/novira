@@ -146,10 +146,20 @@ export function SettingsView() {
                 .eq('user_id', userId)
                 .order('created_at', { ascending: false });
 
-            if (error) throw error;
+            if (error) {
+                // Fallback: some columns may not exist yet — retry with minimal columns
+                const { data: fallbackData, error: fallbackError } = await supabase
+                    .from('recurring_templates')
+                    .select('id, description, amount, currency, frequency, created_at, category, is_active')
+                    .eq('user_id', userId)
+                    .order('created_at', { ascending: false });
+                if (fallbackError) throw fallbackError;
+                setRecurringTemplates((fallbackData || []).map((t: any) => ({ ...t, next_occurrence: t.next_occurrence ?? '', last_processed: t.last_processed ?? null })).filter((t: any) => t.is_active));
+                return;
+            }
             setRecurringTemplates((data || []).filter(t => t.is_active));
         } catch (error) {
-            console.error('Error loading recurring templates:', error);
+            console.warn('Error loading recurring templates:', error);
         } finally {
             setLoadingTemplates(false);
         }
