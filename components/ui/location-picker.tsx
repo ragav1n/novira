@@ -2,7 +2,9 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import Image from 'next/image';
-import { MapPin, X, Search, Navigation, LocateFixed, Globe } from 'lucide-react';
+import mapboxgl from 'mapbox-gl';
+import 'mapbox-gl/dist/mapbox-gl.css';
+import { MapPin, X, Search, Navigation, LocateFixed, Globe, Crosshair } from 'lucide-react';
 import { getDistance } from '@/lib/location';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
@@ -44,6 +46,35 @@ interface LocationPickerProps {
     placeLng: number | null;
     onChange: (location: LocationData) => void;
 }
+
+// ── Custom dark-purple map style (Google Maps) ────────────────────────────────
+
+const NOVIRA_MAP_STYLE = [
+    { elementType: 'geometry', stylers: [{ color: '#0d0d1a' }] },
+    { elementType: 'labels.text.fill', stylers: [{ color: '#8888aa' }] },
+    { elementType: 'labels.text.stroke', stylers: [{ color: '#0d0d1a' }] },
+    { featureType: 'administrative', elementType: 'geometry', stylers: [{ color: '#1a1a2e' }] },
+    { featureType: 'administrative.locality', elementType: 'labels.text.fill', stylers: [{ color: '#c0b8e8' }] },
+    { featureType: 'poi', elementType: 'geometry', stylers: [{ color: '#0f0f1e' }] },
+    { featureType: 'poi', elementType: 'labels.text.fill', stylers: [{ color: '#8070c0' }] },
+    { featureType: 'poi', elementType: 'labels.icon', stylers: [{ saturation: -30 }, { lightness: -20 }] },
+    { featureType: 'poi.business', elementType: 'labels.icon', stylers: [{ visibility: 'simplified' }] },
+    { featureType: 'poi.park', elementType: 'geometry', stylers: [{ color: '#0c0c1a' }] },
+    { featureType: 'poi.park', elementType: 'labels.text.fill', stylers: [{ color: '#4a6040' }] },
+    { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#1c1c38' }] },
+    { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: '#28285a' }] },
+    { featureType: 'road', elementType: 'labels.text.fill', stylers: [{ color: '#9898c0' }] },
+    { featureType: 'road.arterial', elementType: 'geometry', stylers: [{ color: '#20203a' }] },
+    { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#2e1f6b' }] },
+    { featureType: 'road.highway', elementType: 'geometry.stroke', stylers: [{ color: '#3d2b90' }] },
+    { featureType: 'road.highway', elementType: 'labels.text.fill', stylers: [{ color: '#d0c8ff' }] },
+    { featureType: 'road.local', elementType: 'labels.text.fill', stylers: [{ color: '#7878a0' }] },
+    { featureType: 'transit', elementType: 'geometry', stylers: [{ color: '#181830' }] },
+    { featureType: 'transit.station', elementType: 'labels.text.fill', stylers: [{ color: '#a898e8' }] },
+    { featureType: 'transit.station', elementType: 'labels.icon', stylers: [{ saturation: -20 }] },
+    { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#060614' }] },
+    { featureType: 'water', elementType: 'labels.text.fill', stylers: [{ color: '#3a3870' }] },
+];
 
 // ── Maki → emoji map (no extra bundle, works perfectly on mobile) ───────────
 
@@ -137,6 +168,12 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
 
     const [isLocating, setIsLocating] = useState(false);
     const [isLoadingNearby, setIsLoadingNearby] = useState(false);
+    const [dropPinMode, setDropPinMode] = useState(false);
+    const [dropPinLabel, setDropPinLabel] = useState<string | null>(null);
+    const dropPinMapContainerRef = useRef<HTMLDivElement>(null);
+    const dropPinMapRef = useRef<mapboxgl.Map | null>(null);
+    const dropPinGoogleMapRef = useRef<any>(null);
+    const dropPinGeocodeRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const hasLocation = !!placeName;
     const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
     const googleMapsKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY;
@@ -200,6 +237,145 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
             abortControllerRef.current?.abort();
         };
     }, []);
+
+    // Reset drop pin mode when picker collapses
+    useEffect(() => {
+        if (!isExpanded) {
+            setDropPinMode(false);
+            setDropPinLabel(null);
+        }
+    }, [isExpanded]);
+
+    // Callback ref — fires with the real DOM node the moment React mounts/unmounts.
+    // Uses Google Maps (already loaded for search) with custom dark-purple styling.
+    // Falls back to Mapbox navigation-night if no Google key.
+    const dropPinMapInit = useCallback((node: HTMLDivElement | null) => { (async () => {
+        if (!node) {
+            if (dropPinGeocodeRef.current) clearTimeout(dropPinGeocodeRef.current);
+            toast.dismiss('drop-pin-location');
+            dropPinMapRef.current?.remove();
+            dropPinMapRef.current = null;
+            dropPinGoogleMapRef.current = null;
+            return;
+        }
+
+        const center = lastPositionRef.current
+            ? { lat: lastPositionRef.current.lat, lng: lastPositionRef.current.lng }
+            : { lat: 20, lng: 0 };
+        const initialZoom = lastPositionRef.current ? 15 : 3;
+
+        const debounceReverseGeocode = (lat: number, lng: number) => {
+            if (dropPinGeocodeRef.current) clearTimeout(dropPinGeocodeRef.current);
+            dropPinGeocodeRef.current = setTimeout(async () => {
+                try {
+                    // Use Google Geocoder if available, else Mapbox
+                    if (googleMapsKey) {
+                        const g = (window as any).google;
+                        if (g?.maps?.Geocoder) {
+                            new g.maps.Geocoder().geocode({ location: { lat, lng } }, (results: any[], status: string) => {
+                                if (status === 'OK' && results?.[0]) {
+                                    const name = results[0].formatted_address as string;
+                                    setDropPinLabel(name);
+                                    toast('📍 ' + (name.split(',')[0] ?? name), { id: 'drop-pin-location' });
+                                }
+                            });
+                            return;
+                        }
+                    }
+                    if (mapboxToken) {
+                        const res = await fetch(
+                            `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?` +
+                            new URLSearchParams({ access_token: mapboxToken, limit: '1', types: 'poi,address,place,neighborhood' })
+                        );
+                        const data = await res.json();
+                        const name = data.features?.[0]?.place_name ?? `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+                        setDropPinLabel(name);
+                        toast('📍 ' + (name.split(',')[0] ?? name), { id: 'drop-pin-location' });
+                    }
+                } catch { /* ignore */ }
+            }, 500);
+        };
+
+        if (googleMapsKey) {
+            try {
+                const g = await loadGoogleMaps(googleMapsKey);
+                const map = new g.maps.Map(node, {
+                    center,
+                    zoom: initialZoom,
+                    styles: NOVIRA_MAP_STYLE,
+                    disableDefaultUI: true,
+                    gestureHandling: 'greedy',
+                    clickableIcons: false,
+                });
+                dropPinGoogleMapRef.current = map;
+
+                // User location dot + accuracy ring
+                if (lastPositionRef.current) {
+                    const userPos = { lat: lastPositionRef.current.lat, lng: lastPositionRef.current.lng };
+                    new g.maps.Circle({
+                        map, center: userPos, radius: 80,
+                        fillColor: '#a78bfa', fillOpacity: 0.15,
+                        strokeColor: '#a78bfa', strokeOpacity: 0.35, strokeWeight: 1,
+                        zIndex: 998,
+                    });
+                    new g.maps.Marker({
+                        map, position: userPos, zIndex: 1000, title: 'Your location',
+                        icon: {
+                            path: g.maps.SymbolPath.CIRCLE,
+                            scale: 7,
+                            fillColor: '#a78bfa', fillOpacity: 1,
+                            strokeColor: '#ffffff', strokeWeight: 2.5,
+                        },
+                    });
+                }
+
+                // Geocode on initial load
+                debounceReverseGeocode(center.lat, center.lng);
+                // Geocode after every pan/zoom
+                map.addListener('idle', () => {
+                    const c = map.getCenter();
+                    if (c) debounceReverseGeocode(c.lat(), c.lng());
+                });
+                return;
+            } catch (e) {
+                console.warn('[LocationPicker] Google Maps init failed, falling back to Mapbox:', e);
+            }
+        }
+
+        if (mapboxToken) {
+            mapboxgl.accessToken = mapboxToken;
+            const map = new mapboxgl.Map({
+                container: node,
+                style: 'mapbox://styles/mapbox/navigation-night-v1',
+                center: [center.lng, center.lat],
+                zoom: initialZoom,
+                attributionControl: false,
+            });
+            dropPinMapRef.current = map;
+            map.on('load', () => {
+                const c = map.getCenter();
+                debounceReverseGeocode(c.lat, c.lng);
+                // User location dot
+                if (lastPositionRef.current) {
+                    const coords: [number, number] = [lastPositionRef.current.lng, lastPositionRef.current.lat];
+                    map.addSource('user-loc', { type: 'geojson', data: { type: 'Feature', geometry: { type: 'Point', coordinates: coords }, properties: {} } });
+                    map.addLayer({ id: 'user-loc-pulse', type: 'circle', source: 'user-loc', paint: { 'circle-radius': 14, 'circle-color': '#a78bfa', 'circle-opacity': 0.15 } });
+                    map.addLayer({ id: 'user-loc-dot', type: 'circle', source: 'user-loc', paint: { 'circle-radius': 6, 'circle-color': '#a78bfa', 'circle-stroke-width': 2.5, 'circle-stroke-color': '#ffffff' } });
+                }
+            });
+            map.on('moveend', () => { const c = map.getCenter(); debounceReverseGeocode(c.lat, c.lng); });
+        }
+    })(); }, [googleMapsKey, mapboxToken]);
+
+    const handleDropPinRecenter = useCallback(() => {
+        if (!lastPosition) return;
+        if (dropPinGoogleMapRef.current) {
+            dropPinGoogleMapRef.current.panTo({ lat: lastPosition.lat, lng: lastPosition.lng });
+            dropPinGoogleMapRef.current.setZoom(15);
+        } else if (dropPinMapRef.current) {
+            dropPinMapRef.current.flyTo({ center: [lastPosition.lng, lastPosition.lat], zoom: 15 });
+        }
+    }, [lastPosition]);
 
     // queryRef — kept in sync so effects can read latest query without stale closures
     const queryRef = useRef(query);
@@ -779,40 +955,130 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
             </div>
 
             {/* Quick-select buttons */}
-            <div className="grid grid-cols-2 gap-2">
+            <div className={cn("grid gap-2", (googleMapsKey || mapboxToken) ? "grid-cols-3" : "grid-cols-2")}>
                 <button type="button" onClick={handleUseCurrentLocation}
-                    className="h-14 flex items-center gap-3 px-4 rounded-2xl border border-primary/20 bg-primary/5 active:bg-primary/10 transition-all touch-manipulation">
-                    <div className={cn('w-9 h-9 rounded-full bg-primary/20 flex items-center justify-center shrink-0', isLocating && 'animate-pulse')}>
+                    className="h-[72px] flex flex-col items-center justify-center gap-2 px-2 rounded-2xl border border-primary/20 bg-primary/5 active:bg-primary/10 transition-all touch-manipulation">
+                    <div className={cn('w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center shrink-0', isLocating && 'animate-pulse')}>
                         <LocateFixed className="w-4 h-4 text-primary" />
                     </div>
-                    <div className="text-left min-w-0">
-                        <p className="text-xs font-bold text-primary leading-none">{isLocating ? 'Locating…' : 'Current Location'}</p>
-                        <p className="text-[10px] text-primary/50 font-medium mt-0.5">Where you are now</p>
-                    </div>
+                    <p className="text-[10px] font-bold text-primary text-center leading-tight">
+                        {isLocating ? 'Locating…' : 'My Location'}
+                    </p>
                 </button>
                 <button type="button" onClick={() => {
                     onChange({ place_name: 'Online', place_address: null, place_lat: null, place_lng: null });
                     setIsExpanded(false); setQuery(''); setPredictions([]);
                 }}
-                    className="h-14 flex items-center gap-3 px-4 rounded-2xl border border-blue-500/20 bg-blue-500/5 active:bg-blue-500/10 transition-all touch-manipulation">
-                    <div className="w-9 h-9 rounded-full bg-blue-500/20 flex items-center justify-center shrink-0">
+                    className="h-[72px] flex flex-col items-center justify-center gap-2 px-2 rounded-2xl border border-blue-500/20 bg-blue-500/5 active:bg-blue-500/10 transition-all touch-manipulation">
+                    <div className="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center shrink-0">
                         <Globe className="w-4 h-4 text-blue-400" />
                     </div>
-                    <div className="text-left min-w-0">
-                        <p className="text-xs font-bold text-blue-400 leading-none">Online</p>
-                        <p className="text-[10px] text-blue-400/50 font-medium mt-0.5">No physical location</p>
-                    </div>
+                    <p className="text-[10px] font-bold text-blue-400 text-center leading-tight">Online</p>
                 </button>
+                {(googleMapsKey || mapboxToken) && (
+                    <button type="button" onClick={() => { setDropPinMode(v => !v); setDropPinLabel(null); }}
+                        className={cn(
+                            "h-[72px] flex flex-col items-center justify-center gap-2 px-2 rounded-2xl border transition-all touch-manipulation",
+                            dropPinMode
+                                ? "border-rose-500/40 bg-rose-500/10 active:bg-rose-500/15"
+                                : "border-rose-500/20 bg-rose-500/5 active:bg-rose-500/10"
+                        )}>
+                        <div className={cn("w-8 h-8 rounded-full bg-rose-500/20 flex items-center justify-center shrink-0", dropPinMode && "ring-1 ring-rose-500/40")}>
+                            <Crosshair className="w-4 h-4 text-rose-400" />
+                        </div>
+                        <p className="text-[10px] font-bold text-rose-400 text-center leading-tight">
+                            {dropPinMode ? 'Cancel' : 'Drop Pin'}
+                        </p>
+                    </button>
+                )}
             </div>
 
+            {/* Drop-pin mini map — rendered outside AnimatePresence so mapboxgl gets a real container */}
+            {dropPinMode && (googleMapsKey || mapboxToken) && (
+                <motion.div
+                    initial={{ opacity: 0, y: -6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -6 }}
+                    transition={{ duration: 0.2 }}
+                    className="rounded-2xl border border-rose-500/20 overflow-hidden">
+                    <div className="relative">
+                        {/* Map container — callback ref fires with real node so mapboxgl gets proper dimensions */}
+                        <div ref={dropPinMapInit} className="w-full h-[240px]" />
+                        {/* Recenter button */}
+                        {lastPosition && (
+                            <button
+                                type="button"
+                                onClick={handleDropPinRecenter}
+                                className="absolute top-2 right-2 z-10 w-9 h-9 rounded-full bg-black/60 backdrop-blur-sm border border-white/15 flex items-center justify-center active:bg-white/10 transition-colors touch-manipulation shadow-lg"
+                                title="Go to my location">
+                                <LocateFixed className="w-4 h-4 text-violet-300" />
+                            </button>
+                        )}
+                        {/* Centered pin overlay */}
+                        <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                            <div className="relative -translate-y-3">
+                                <svg viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-8 h-10 drop-shadow-lg">
+                                    <path d="M16 0C7.163 0 0 7.163 0 16c0 10.5 16 24 16 24S32 26.5 32 16C32 7.163 24.837 0 16 0z" fill="#f43f5e" />
+                                    <circle cx="16" cy="16" r="7" fill="white" fillOpacity="0.9" />
+                                </svg>
+                                <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-full w-0.5 h-2 bg-rose-500/60 rounded-full" />
+                            </div>
+                        </div>
+                        {/* Location label */}
+                        <div className="absolute bottom-2 left-2 right-2 pointer-events-none">
+                            <div className="bg-black/70 backdrop-blur-md rounded-xl px-3 py-2 border border-white/10 min-h-[36px] flex flex-col justify-center">
+                                {dropPinLabel ? (
+                                    <>
+                                        <p className="text-[11px] font-semibold text-white line-clamp-1">{dropPinLabel.split(',')[0]}</p>
+                                        <p className="text-[10px] text-white/50 line-clamp-1 mt-0.5">{dropPinLabel.split(',').slice(1).join(',').trim()}</p>
+                                    </>
+                                ) : (
+                                    <p className="text-[11px] text-white/30 animate-pulse">Finding location…</p>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                    {/* Confirm button */}
+                    <button type="button"
+                        onClick={() => {
+                            let lat: number, lng: number;
+                            if (dropPinGoogleMapRef.current) {
+                                const c = dropPinGoogleMapRef.current.getCenter();
+                                lat = c.lat(); lng = c.lng();
+                            } else if (dropPinMapRef.current) {
+                                const c = dropPinMapRef.current.getCenter();
+                                lat = c.lat; lng = c.lng;
+                            } else return;
+                            const loc: LocationData = {
+                                place_name: dropPinLabel?.split(',')[0]?.trim() ?? `${lat.toFixed(5)}, ${lng.toFixed(5)}`,
+                                place_address: dropPinLabel ?? null,
+                                place_lat: lat,
+                                place_lng: lng,
+                            };
+                            onChange(loc);
+                            saveToRecent(loc);
+                            toast.dismiss('drop-pin-location');
+                            setDropPinMode(false);
+                            setIsExpanded(false);
+                            setQuery('');
+                            setPredictions([]);
+                        }}
+                        disabled={!dropPinLabel}
+                        className="w-full h-12 flex items-center justify-center gap-2 bg-rose-500/10 border-t border-rose-500/20 text-rose-400 font-bold text-sm disabled:opacity-40 active:bg-rose-500/20 transition-colors touch-manipulation">
+                        <MapPin className="w-4 h-4" />
+                        Use this location
+                    </button>
+                </motion.div>
+            )}
+
             {/* Nearby loading shimmer */}
-            {isLoadingNearby && query.length === 0 && (
+            {!dropPinMode && isLoadingNearby && query.length === 0 && (
                 <p className="text-[10px] text-primary/40 text-center py-1 animate-pulse">Finding nearby places…</p>
             )}
 
             {/* Recent locations */}
             <AnimatePresence>
-                {showRecents && (
+                {!dropPinMode && showRecents && (
                     <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
                         id="loc-listbox" role="listbox" aria-label="Recent locations"
                         className="absolute left-0 right-0 top-full mt-2 z-[100] rounded-2xl border border-white/10 bg-[#0A0A0A] shadow-2xl overflow-hidden ring-1 ring-white/5">
@@ -859,7 +1125,7 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
 
             {/* Search results */}
             <AnimatePresence>
-                {predictions.length > 0 && (
+                {!dropPinMode && predictions.length > 0 && (
                     <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
                         id="loc-listbox" role="listbox" aria-label="Location suggestions"
                         className="absolute left-0 right-0 top-full mt-2 z-[100] rounded-2xl border border-white/10 bg-[#0A0A0A] shadow-2xl overflow-hidden ring-1 ring-white/5">
@@ -917,7 +1183,7 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
             </AnimatePresence>
 
             {/* Empty state */}
-            {query.length >= 2 && !isSearching && predictions.length === 0 && (
+            {!dropPinMode && query.length >= 2 && !isSearching && predictions.length === 0 && (
                 <div className="text-center py-4">
                     <p className="text-xs text-muted-foreground">No places found. Try a different search.</p>
                 </div>
