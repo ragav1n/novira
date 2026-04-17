@@ -539,13 +539,27 @@ export function GroupsProvider({ children }: { children: React.ReactNode }) {
         return simplifyDebts(pendingSplits, userId, convertAmount, userCurrency);
     }, [pendingSplits, userId, convertAmount, userCurrency]);
 
+    // Derive balances from simplified debts so the green/red cards reflect
+    // the net amounts after debt cancellation — not the raw split totals.
+    const computedBalances = useMemo(() => {
+        if (!userId) return { totalOwed: 0, totalOwedToMe: 0 };
+        return {
+            totalOwed: computedSimplifiedDebts
+                .filter(p => p.from === userId)
+                .reduce((acc, p) => acc + p.amount, 0),
+            totalOwedToMe: computedSimplifiedDebts
+                .filter(p => p.to === userId)
+                .reduce((acc, p) => acc + p.amount, 0),
+        };
+    }, [computedSimplifiedDebts, userId]);
+
     const contextValue = useMemo(() => ({
-        groups, friends, friendRequests, balances, pendingSplits, loading,
+        groups, friends, friendRequests, balances: computedBalances, pendingSplits, loading,
         refreshData, createGroup, addFriendByEmail, addFriendById, addMemberToGroup, settleSplit,
         acceptFriendRequest, declineFriendRequest, leaveGroup, removeFriend,
         simplifiedDebts: computedSimplifiedDebts
     }), [
-        groups, friends, friendRequests, balances, pendingSplits, loading,
+        groups, friends, friendRequests, computedBalances, pendingSplits, loading,
         refreshData, createGroup, addFriendByEmail, addFriendById, addMemberToGroup, settleSplit,
         acceptFriendRequest, declineFriendRequest, leaveGroup, removeFriend,
         computedSimplifiedDebts
