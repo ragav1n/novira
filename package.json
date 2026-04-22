@@ -12,6 +12,7 @@
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.90.0",
     "@ark-ui/react": "^5.31.0",
     "@capacitor/android": "^8.1.0",
     "@capacitor/app": "^8.0.1",
