@@ -30,14 +30,13 @@ export const metadata: Metadata = {
     default: 'Novira - Finance Tracker',
   },
   description: 'Experience the future of personal finance with Novira. Track spending, manage budgets, and visualize your financial universe.',
-  generator: 'v0.app',
   icons: {
     icon: '/Novira.png',
     shortcut: '/Novira.png',
     apple: '/Novira.png',
   },
   manifest: '/manifest.json',
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'https://novira.one'),
   openGraph: {
     title: 'Novira - Finance Tracker',
     description: 'Track spending, manage budgets, split expenses, and visualize your financial universe.',

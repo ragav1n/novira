@@ -1,7 +1,9 @@
 'use client';
 
-import React, { useEffect } from 'react';
-import { ChevronLeft, CreditCard, Utensils, Car, Zap, ShoppingBag, HeartPulse, Clapperboard, Wallet, Banknote, HelpCircle, Calendar as CalendarIcon, Home, School, LayoutGrid, Building2, MapPin, Shirt, ShoppingCart, LocateFixed } from 'lucide-react';
+import React, { useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
+import { ChevronLeft, CreditCard, Utensils, Car, Zap, ShoppingBag, HeartPulse, Clapperboard, Wallet, Banknote, HelpCircle, Calendar as CalendarIcon, Home, School, LayoutGrid, Building2, MapPin, Shirt, ShoppingCart, LocateFixed, ScanSearch } from 'lucide-react';
+import UniqueLoading from '@/components/ui/grid-loading';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -71,6 +73,59 @@ export function AddExpenseView() {
 
     const formState = useExpenseForm(userId, currency, activeWorkspaceId, defaultSplitEnabled);
     const { handleSubmit, loading } = useExpenseSubmission();
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const [scanning, setScanning] = React.useState(false);
+
+    const handleScan = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        setScanning(true);
+        try {
+            const base64 = await new Promise<string>((resolve, reject) => {
+                const img = new Image();
+                const objectUrl = URL.createObjectURL(file);
+                img.onload = () => {
+                    URL.revokeObjectURL(objectUrl);
+                    const MAX = 1600;
+                    const scale = Math.min(1, MAX / Math.max(img.width, img.height));
+                    const canvas = document.createElement('canvas');
+                    canvas.width = Math.round(img.width * scale);
+                    canvas.height = Math.round(img.height * scale);
+                    canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+                    resolve(dataUrl.split(',')[1]);
+                };
+                img.onerror = reject;
+                img.src = objectUrl;
+            });
+            const res = await fetch('/api/scan-receipt', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ imageBase64: base64, mimeType: 'image/jpeg' }),
+            });
+            if (!res.ok) throw new Error('Scan failed');
+            const data = await res.json();
+            if (data.amount) formState.setAmount(String(data.amount));
+            if (data.description) formState.setDescription(data.description);
+            if (data.category) formState.setSelectedCategory(data.category);
+            if (data.currency) formState.setTxCurrency(data.currency);
+            if (data.place_name) formState.setPlaceName(data.place_name);
+            if (data.place_address) formState.setPlaceAddress(data.place_address);
+            if (data.date) {
+                const d = new Date(data.date);
+                if (data.time) {
+                    const [h, m] = data.time.split(':').map(Number);
+                    d.setHours(h, m, 0, 0);
+                }
+                formState.setDate(d);
+            }
+        } catch {
+            // silently fail — user can fill in manually
+        } finally {
+            setScanning(false);
+            if (fileInputRef.current) fileInputRef.current.value = '';
+        }
+    };
 
     const onSubmit = () => {
         if (isNative) Haptics.impact({ style: ImpactStyle.Medium }).catch(() => { });
@@ -111,7 +166,21 @@ export function AddExpenseView() {
 
 
     return (
-        <motion.div 
+        <>
+        {scanning && createPortal(
+            <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(8px)', backgroundColor: 'rgba(12,8,30,0.85)' }}
+            >
+                <UniqueLoading variant="squares" size="lg" />
+                <p className="mt-6 text-sm font-semibold text-foreground">Scanning receipt...</p>
+                <p className="mt-1 text-xs text-muted-foreground">Reading your receipt</p>
+            </motion.div>,
+            document.body
+        )}
+        <motion.div
             initial={{ opacity: 0, scale: 0.98 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.98 }}
@@ -136,7 +205,7 @@ export function AddExpenseView() {
                     </button>
                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                         <h2 className={cn(
-                            "text-lg font-bold truncate px-12 text-center leading-tight transition-colors duration-500",
+                            "text-lg font-bold truncate px-24 text-center leading-tight transition-colors duration-500",
                             formState.selectedBucketId ? "text-cyan-400" : "text-foreground"
                         )}>
                             {formState.selectedBucketId ? buckets.find(b => b.id === formState.selectedBucketId)?.name : "Add Expense"}
@@ -150,6 +219,31 @@ export function AddExpenseView() {
                         {loading ? 'Saving...' : 'Save'}
                     </button>
                 </div>
+
+                {/* Scan Receipt Button */}
+                <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    className="hidden"
+                    onChange={handleScan}
+                />
+                <button
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={scanning}
+                    aria-label="Scan receipt"
+                    className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl border border-primary/30 bg-primary/10 hover:bg-primary/20 transition-all disabled:opacity-50 group"
+                >
+                    <div className="w-9 h-9 rounded-xl bg-primary/20 border border-primary/30 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                        <ScanSearch className="w-4 h-4 text-primary" />
+                    </div>
+                    <div className="text-left">
+                        <p className="text-sm font-semibold text-primary">Scan Receipt</p>
+                        <p className="text-[11px] text-primary/60">Auto-fill amount, date & more</p>
+                    </div>
+                </button>
+
 
                 {/* Amount Input */}
                 <div className="space-y-2">
@@ -472,5 +566,6 @@ export function AddExpenseView() {
                 </Button>
             </div>
         </motion.div>
+        </>
     );
 }

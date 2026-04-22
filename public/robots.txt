@@ -1,2 +1,9 @@
 User-agent: *
+Allow: /signin
+Allow: /signup
+Allow: /forgot-password
+Allow: /privacy
+Allow: /terms
 Disallow: /
+
+Sitemap: https://novira.one/sitemap.xml
