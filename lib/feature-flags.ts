@@ -1,29 +1,29 @@
 export const LATEST_FEATURE_ANNOUNCEMENT = {
-    id: 'drop-pin-settlement-v7',
-    title: 'Maps, Splits & More!',
+    id: 'receipt-map-desktop-v9',
+    title: "What's New ✦",
     features: [
         {
-            title: 'Drop Pin on Map',
-            description: 'Tap "Drop Pin" in the location picker to pan a live Google Maps map and set any location — no typing needed.',
+            title: 'Receipt Scanner',
+            description: 'Point your camera at any receipt and Novira reads the amount and merchant automatically — no manual entry from paper slips.',
+            icon: 'receipt'
+        },
+        {
+            title: 'Drop a Pin Anywhere',
+            description: 'In the Expense Map, drag and drop a custom pin to tag any location on earth — not just places detected automatically.',
             icon: 'map'
         },
         {
-            title: 'Smart Settlement Balances',
-            description: 'Your green and red balance cards now reflect simplified mutual debts — see your true net position after cancellations.',
-            icon: 'zap'
+            title: 'New Desktop Nav',
+            description: 'The sidebar is replaced by a floating pill nav at the top. It collapses to a burger icon as you scroll and snaps back on click.',
+            icon: 'layers'
         },
         {
-            title: 'Swipe to Edit & Delete',
-            description: 'Swipe left on any transaction to reveal quick Edit and Delete actions without opening the full details.',
+            title: 'Smart Settle',
+            description: 'Settle all your debts at once or mark incoming payments as received in a single tap — no more settling one by one.',
             icon: 'zap'
         },
-        {
-            title: 'Instant Currency Switch',
-            description: 'Changing your preferred currency now takes effect everywhere immediately — no manual refresh required.',
-            icon: 'globe'
-        }
     ],
-    buttonText: 'Nice!',
+    buttonText: "Let's go!",
 };
 
 export const WELCOME_FEATURES = [

@@ -109,8 +109,10 @@ export function AddExpenseView() {
             if (data.description) formState.setDescription(data.description);
             if (data.category) formState.setSelectedCategory(data.category);
             if (data.currency) formState.setTxCurrency(data.currency);
-            if (data.place_name) formState.setPlaceName(data.place_name);
-            if (data.place_address) formState.setPlaceAddress(data.place_address);
+            if (!data.is_online) {
+                if (data.place_name) formState.setPlaceName(data.place_name);
+                if (data.place_address) formState.setPlaceAddress(data.place_address);
+            }
             if (data.date) {
                 const d = new Date(data.date);
                 if (data.time) {

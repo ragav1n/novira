@@ -22,29 +22,29 @@ export function HowToUseDialog({ isOpen, onClose }: HowToUseDialogProps) {
         {
             icon: <Plus className="w-6 h-6 text-emerald-400" />,
             title: "Precision Recording",
-            desc: "Hit the floating (+) button anywhere to record a spend. Our Smart Location Memory learns where you spend and automatically suggests locations for recurring descriptions. Travelling? Select a different currency from the dropdown and we'll instantly convert the amount to your base currency using real-time rates.",
+            desc: "Hit the floating (+) button anywhere to record a spend. Point your camera at a receipt and Novira reads the amount and merchant for you — no typing needed. Travelling? Select a different currency and we'll convert the amount to your base currency in real-time.",
             subPoints: [
+                "Receipt scanner — auto-fills amount & merchant",
                 "Smart Location & Merchant memory",
-                "Real-time FX for 160+ currencies",
-                "Optional notes for paperless tracking"
+                "Real-time FX for 160+ currencies"
             ]
         },
         {
             icon: <Users className="w-6 h-6 text-blue-400" />,
             title: "Social Connectivity",
-            desc: "Money shouldn't be awkward. Add friends by scanning their unique QR codes or via email. Create shared Groups for trips, rent, or dinner parties. Split bills by percentage, exact amounts, or shares. Settle up with a single tap, keeping a clear history of every settlement.",
+            desc: "Money shouldn't be awkward. Add friends by scanning their unique QR codes or via email. Create shared Groups for trips, rent, or dinner parties. Split bills by percentage, exact amounts, or shares. Use Smart Settle to clear all debts in one tap — or mark incoming payments as received instantly.",
             subPoints: [
                 "Scan-to-add friend QR codes",
                 "Advanced bill splitting rules",
-                "One-tap debt settlement tracking"
+                "Smart Settle — clear all debts in one tap"
             ]
         },
         {
             icon: <MapPin className="w-6 h-6 text-rose-400" />,
             title: "Spatial Intelligence",
-            desc: "Location is everything. Use the 'Expense Map' to visualize your finances in 3D. Enable 'Heatmap' mode for density hotspots or 'Trip Trails' to see your spending pulse flow through the city.",
+            desc: "Location is everything. Use the 'Expense Map' to visualize your finances in 3D. Drag and drop a custom pin to tag any spot on earth — not just auto-detected places. Enable 'Heatmap' mode for density hotspots or 'Trip Trails' to see your spending pulse flow through the city.",
             subPoints: [
-                "Clear-Sight 3D visualization",
+                "Drag & drop a pin anywhere on the map",
                 "Animated Flow Trails & Hover Insights",
                 "Spending Density Heatmaps"
             ]
