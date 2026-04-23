@@ -4,7 +4,6 @@ import Anthropic from '@anthropic-ai/sdk'
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
-const CATEGORIES = ['food', 'groceries', 'transport', 'fashion', 'beauty', 'healthcare', 'rent', 'bills', 'shopping', 'entertainment', 'education', 'others']
 
 type SupportedMediaType = 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp'
 const SUPPORTED_TYPES: SupportedMediaType[] = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
@@ -24,7 +23,7 @@ export async function POST(req: NextRequest) {
 
   const message = await client.messages.create({
     model: 'claude-haiku-4-5-20251001',
-    max_tokens: 256,
+    max_tokens: 512,
     messages: [
       {
         role: 'user',
@@ -42,10 +41,25 @@ export async function POST(req: NextRequest) {
   "date": <date in YYYY-MM-DD format, or null if not found>,
   "time": <time in HH:MM 24h format, or null if not found>,
   "currency": <ISO 4217 currency code e.g. EUR, USD, INR, GBP — infer from symbol if needed, or null>,
-  "place_name": <store or merchant name, or null>,
-  "place_address": <full store address if visible, or null>,
-  "category": <one of: ${CATEGORIES.join(', ')}>
-}`,
+  "is_online": <true if this was an online/e-commerce purchase (website URL, order number, "shipped to", no physical store address), false if it was at a physical location>,
+  "place_name": <physical store or merchant name — null if is_online is true>,
+  "place_address": <full physical store address if visible — null if is_online is true>,
+  "category": <pick exactly one from the list below based on what was purchased>
+}
+
+Category definitions — pick the best match:
+- food: restaurants, cafes, takeaway, fast food, coffee shops, delivery (Zomato, Swiggy, UberEats)
+- groceries: supermarkets, grocery stores, fresh produce, dairy, household consumables (BigBasket, Blinkit, Whole Foods, Tesco)
+- transport: fuel, petrol, taxi, ride-hail (Uber, Ola), parking, bus/train tickets, tolls
+- fashion: clothing, shoes, accessories, apparel stores (Zara, H&M, Myntra, Nike)
+- beauty: skincare, haircare, cosmetics, salon, spa, pharmacy beauty products (Nykaa, Sephora, MAC)
+- healthcare: doctor, hospital, pharmacy/chemist, medicine, dental, optician, gym/fitness
+- rent: rent payment, lease, property maintenance
+- bills: electricity, water, gas, internet, phone recharge, insurance, utility providers
+- shopping: general retail, electronics, home goods, online marketplaces (Amazon, Flipkart) — use this when no more specific category fits
+- entertainment: movies, concerts, streaming (Netflix, Spotify), games, sports events, amusement
+- education: school fees, tuition, courses, books, stationery, online learning (Udemy, Coursera)
+- others: anything that does not clearly fit the above categories`,
           },
         ],
       },
