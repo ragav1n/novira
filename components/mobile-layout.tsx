@@ -104,7 +104,7 @@ export function MobileLayout({ children }: { children: React.ReactNode }) {
     const routes = ['/', '/add', '/analytics', '/groups', '/subscriptions', '/goals', '/search', null, '/settings'];
 
     const pathname = usePathname();
-    const isPublicPage = ['/privacy', '/terms'].includes(pathname);
+    const isPublicPage = ['/privacy', '/terms', '/landing'].includes(pathname);
     const isAuthPage = ['/signin', '/signup', '/forgot-password', '/update-password'].includes(pathname);
     const { isAuthenticated, isLoading, isNavigating, setIsNavigating, activeWorkspaceId } = useUserPreferences();
     const { groups } = useGroups();
@@ -215,7 +215,7 @@ export function MobileLayout({ children }: { children: React.ReactNode }) {
             {/* Main Content Area */}
             <main id="main-content" tabIndex={-1} className={cn(
                 "flex-1 w-full overflow-y-auto no-scrollbar relative flex flex-col",
-                (!isAuthPage && !isPublicPage) ? "pb-24" : "pb-0"
+                (showNav) ? "pb-24" : "pb-0"
             )}>
                 <UIBoundary>
                     <AnimatePresence mode="wait" initial={false}>

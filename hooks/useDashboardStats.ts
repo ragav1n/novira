@@ -82,17 +82,26 @@ export function useDashboardStats({
         return 0;
     }, []);
 
-    const totalSpent = useMemo(() => {
-        if (!Array.isArray(transactions)) return 0;
-        return transactions.reduce((acc, tx) => {
-            // Filter by context (bucket or monthly allowance)
+    // Single pre-filtered pass — all downstream computations derive from this
+    const filteredTransactions = useMemo(() => {
+        if (!Array.isArray(transactions)) return [];
+        return transactions.filter(tx => {
             if (isBucketFocused) {
-                if (tx.bucket_id !== effectiveFocus) return acc;
+                if (tx.bucket_id !== effectiveFocus) return false;
             } else {
-                if (tx.exclude_from_allowance) return acc;
-                if (!tx.date.startsWith(currentMonthPrefix)) return acc;
+                if (tx.exclude_from_allowance) return false;
+                if (!tx.date.startsWith(currentMonthPrefix)) return false;
             }
+            // Involvement filter
+            if (!userId) return true;
+            if (tx.user_id === userId) return true;
+            if (tx.splits && tx.splits.some(s => s.user_id === userId)) return true;
+            return false;
+        });
+    }, [transactions, userId, isBucketFocused, effectiveFocus, currentMonthPrefix]);
 
+    const totalSpent = useMemo(() => {
+        return filteredTransactions.reduce((acc, tx) => {
             const myShare = calculateUserShare(tx, userId);
             if (myShare <= 0) return acc;
 
@@ -107,22 +116,13 @@ export function useDashboardStats({
 
             return acc + convertAmount(myShare, txCurr, targetCurr);
         }, 0);
-    }, [transactions, userId, isBucketFocused, effectiveFocus, calculateUserShare, bucketCurrency, convertAmount, currentMonthPrefix]);
+    }, [filteredTransactions, userId, calculateUserShare, bucketCurrency, convertAmount]);
 
     const remaining = displayBudget - totalSpent;
     const progress = displayBudget > 0 ? Math.min((totalSpent / displayBudget) * 100, 100) : 0;
 
     const spendingByCategory = useMemo(() => {
-        if (!Array.isArray(transactions)) return {};
-        return transactions.reduce((acc, tx) => {
-            // Filter by context (bucket or monthly allowance)
-            if (isBucketFocused) {
-                if (tx.bucket_id !== effectiveFocus) return acc;
-            } else {
-                if (tx.exclude_from_allowance) return acc;
-                if (!tx.date.startsWith(currentMonthPrefix)) return acc;
-            }
-
+        return filteredTransactions.reduce((acc, tx) => {
             const cat = tx.category.toLowerCase();
             const myShare = calculateUserShare(tx, userId);
 
@@ -142,7 +142,7 @@ export function useDashboardStats({
             }
             return acc;
         }, {} as Record<string, number>);
-    }, [transactions, userId, isBucketFocused, effectiveFocus, calculateUserShare, currency, convertAmount, currentMonthPrefix, bucketCurrency]);
+    }, [filteredTransactions, userId, isBucketFocused, calculateUserShare, currency, convertAmount, bucketCurrency]);
 
     const spendingData: SpendingCategory[] = useMemo(() => Object.entries(spendingByCategory).map(([cat, value]) => ({
         name: cat.charAt(0).toUpperCase() + cat.slice(1),
@@ -151,24 +151,8 @@ export function useDashboardStats({
         fill: CATEGORY_COLORS[cat] || CATEGORY_COLORS.others,
     })), [spendingByCategory]);
 
-    const displayTransactions = useMemo(() => {
-        if (!Array.isArray(transactions)) return [];
-        return transactions.filter(tx => {
-            // Filter by context (bucket or monthly allowance)
-            if (isBucketFocused) {
-                if (tx.bucket_id !== effectiveFocus) return false;
-            } else {
-                if (tx.exclude_from_allowance) return false;
-                if (!tx.date.startsWith(currentMonthPrefix)) return false;
-            }
-
-            // Involvement filter
-            if (!userId) return true;
-            if (tx.user_id === userId) return true;
-            if (tx.splits && tx.splits.some(s => s.user_id === userId)) return true;
-            return false;
-        });
-    }, [transactions, userId, isBucketFocused, effectiveFocus, currentMonthPrefix]);
+    // displayTransactions is now just the pre-filtered set
+    const displayTransactions = filteredTransactions;
 
     // All relevant transactions for the feed (preview slice happens in TransactionListSection)
     const recentFeed = useMemo(() => {
@@ -186,6 +170,7 @@ export function useDashboardStats({
     }, [transactions, isBucketFocused, displayTransactions, userId]);
 
     // Run Rate Calculation — weighted toward recent 7 days to reflect current spending trend
+    // Derives from filteredTransactions instead of scanning raw transactions again
     const runRateData = useMemo(() => {
         if (isBucketFocused) return null;
 
@@ -196,15 +181,13 @@ export function useDashboardStats({
         const currentDayOfMonth = today.getDate();
         const spentThisMonth = totalSpent;
 
-        // Recent 7-day spend (current month only)
+        // Recent 7-day spend — derived from already-filtered transactions
         const sevenDaysAgo = new Date(today);
         sevenDaysAgo.setDate(today.getDate() - 6);
         const sevenDaysAgoStr = format(sevenDaysAgo, 'yyyy-MM-dd');
         const todayStr = format(today, 'yyyy-MM-dd');
 
-        const recentSpent = transactions.reduce((acc, tx) => {
-            if (tx.exclude_from_allowance) return acc;
-            if (!tx.date.startsWith(currentMonthPrefix)) return acc;
+        const recentSpent = filteredTransactions.reduce((acc, tx) => {
             const txDate = tx.date.slice(0, 10);
             if (txDate < sevenDaysAgoStr || txDate > todayStr) return acc;
             const myShare = calculateUserShare(tx, userId);
@@ -230,7 +213,7 @@ export function useDashboardStats({
             daysInMonth,
             currentDayOfMonth
         };
-    }, [isBucketFocused, totalSpent, displayBudget, transactions, currentMonthPrefix, calculateUserShare, userId, bucketCurrency, convertAmount]);
+    }, [isBucketFocused, totalSpent, displayBudget, filteredTransactions, calculateUserShare, userId, bucketCurrency, convertAmount]);
 
     return {
         focusedBucket,

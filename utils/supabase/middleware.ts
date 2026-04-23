@@ -32,6 +32,8 @@ export async function updateSession(request: NextRequest) {
     // 1. Early exit for static files and specific paths to avoid redundant getUser() calls
     const path = request.nextUrl.pathname;
     if (
+        path === '/' ||
+        path.startsWith('/landing') ||
         path.startsWith('/signin') ||
         path.startsWith('/signup') ||
         path.startsWith('/forgot-password') ||
@@ -41,7 +43,7 @@ export async function updateSession(request: NextRequest) {
         path.startsWith('/auth') ||
         path.startsWith('/confirm-delete') ||
         path.startsWith('/_next') ||
-        path.startsWith('/api') || 
+        path.startsWith('/api') ||
         path.includes('.')
     ) {
         return supabaseResponse;
