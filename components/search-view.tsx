@@ -297,7 +297,7 @@ export function SearchView() {
         >
 
 
-            <div className="p-5 space-y-6 max-w-md mx-auto relative pb-24 h-full flex flex-col z-10">
+            <div className="p-5 space-y-6 max-w-md lg:max-w-2xl mx-auto relative pb-24 lg:pb-8 h-full flex flex-col z-10">
                 {/* Header */}
             <div className="flex items-center justify-between relative min-h-[40px]">
                 <button

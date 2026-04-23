@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { headers } from 'next/headers'
 import { Geist, Geist_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { SpeedInsights } from '@vercel/speed-insights/next'
@@ -27,9 +28,9 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: {
     template: '%s - Novira',
-    default: 'Novira - Finance Tracker',
+    default: 'Novira — Smarter personal finance',
   },
-  description: 'Experience the future of personal finance with Novira. Track spending, manage budgets, and visualize your financial universe.',
+  description: 'Track spending, split with friends, and understand your money — in one quietly brilliant app that works anywhere, even offline. 150+ currencies, AI receipt scanning, beautiful analytics.',
   icons: {
     icon: '/Novira.png',
     shortcut: '/Novira.png',
@@ -38,16 +39,15 @@ export const metadata: Metadata = {
   manifest: '/manifest.json',
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'https://novira.one'),
   openGraph: {
-    title: 'Novira - Finance Tracker',
-    description: 'Track spending, manage budgets, split expenses, and visualize your financial universe.',
+    title: 'Novira — Smarter personal finance',
+    description: 'Track spending, split with friends, and understand your money — in one quietly brilliant app that works anywhere, even offline.',
     type: 'website',
-    images: [{ url: '/Novira.png', width: 512, height: 512, alt: 'Novira Logo' }],
+    url: 'https://novira.one',
   },
   twitter: {
-    card: 'summary',
-    title: 'Novira - Finance Tracker',
-    description: 'Track spending, manage budgets, split expenses, and visualize your financial universe.',
-    images: ['/Novira.png'],
+    card: 'summary_large_image',
+    title: 'Novira — Smarter personal finance',
+    description: 'Track spending, split with friends, and understand your money — in one quietly brilliant app that works anywhere, even offline.',
   },
 }
 
@@ -58,11 +58,13 @@ export const viewport = {
   viewportFit: 'cover',
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode
 }>) {
+  const ua = (await headers()).get('user-agent') ?? '';
+  const defaultIsDesktop = !/Mobi|Android|iPhone|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua);
   return (
     <html lang="en" className="dark">
       <head>
@@ -81,7 +83,7 @@ export default function RootLayout({
               <WorkspaceThemeProvider />
               <SyncIndicator />
               <BucketsProvider>
-                <MobileLayout>
+                <MobileLayout defaultIsDesktop={defaultIsDesktop}>
                   {children}
                 </MobileLayout>
               </BucketsProvider>
