@@ -94,7 +94,7 @@ export const DashboardTransactionsDrawer = React.memo(function DashboardTransact
                         </div>
                     ) : null}
 
-                    <div className="w-full max-w-md mx-auto px-1 pb-20">
+                    <div className="w-full max-w-md lg:max-w-4xl mx-auto px-1 pb-20">
                         {children}
                     </div>
 

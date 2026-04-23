@@ -110,7 +110,7 @@ export function useDashboardStats({
             
             const isSameCurrency = txCurr === targetCurr;
             
-            if (!isSameCurrency && tx.exchange_rate && tx.exchange_rate !== 1 && tx.base_currency === targetCurr) {
+            if (!isSameCurrency && tx.exchange_rate && tx.exchange_rate !== 1 && (tx.base_currency || '').toUpperCase() === targetCurr) {
                 return acc + (myShare * Number(tx.exchange_rate));
             }
 
@@ -193,7 +193,7 @@ export function useDashboardStats({
             const myShare = calculateUserShare(tx, userId);
             if (myShare <= 0) return acc;
             const txCurr = (tx.currency || 'USD').toUpperCase();
-            if (tx.exchange_rate && tx.exchange_rate !== 1 && tx.base_currency === bucketCurrency) {
+            if (tx.exchange_rate && tx.exchange_rate !== 1 && (tx.base_currency || '').toUpperCase() === bucketCurrency) {
                 return acc + myShare * Number(tx.exchange_rate);
             }
             return acc + convertAmount(myShare, txCurr, bucketCurrency);
@@ -209,7 +209,7 @@ export function useDashboardStats({
         return {
             dailyAverage,
             projectedSpend,
-            isExceeding: projectedSpend > displayBudget,
+            isExceeding: displayBudget > 0 && projectedSpend > displayBudget,
             daysInMonth,
             currentDayOfMonth
         };

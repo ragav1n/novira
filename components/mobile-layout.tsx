@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { Home, Plus, BarChart2, Search, Settings, Users, Calendar, Target } from 'lucide-react';
+import { Home, Plus, BarChart2, Search, Settings, Users, Calendar, Target, Menu } from 'lucide-react';
 import Image from 'next/image';
 import { ExpandableTabs } from '@/components/ui/expandable-tabs';
 import { Toaster } from 'sonner';
@@ -10,108 +10,148 @@ import { cn } from '@/lib/utils';
 import { useUserPreferences } from '@/components/providers/user-preferences-provider';
 import { WaveLoader } from '@/components/ui/wave-loader';
 import { UIBoundary } from '@/components/boundaries/ui-boundary';
-import { AnimatePresence, motion, MotionConfig } from 'framer-motion';
+import { AnimatePresence, motion, MotionConfig, useScroll, useMotionValueEvent } from 'framer-motion';
 import { useIsNative } from '@/hooks/use-native';
 import { useGroups } from '@/components/providers/groups-provider';
 import { PWAUpdater } from '@/components/pwa-updater';
 import { toast, ImpactStyle } from '@/utils/haptics';
 
-// ─── Desktop Sidebar ──────────────────────────────────────────────────────────
+// ─── Desktop Top Nav ──────────────────────────────────────────────────────────
 
 const DESKTOP_NAV = [
-    { title: 'Home',          icon: Home,     route: '/' },
-    { title: 'Analytics',     icon: BarChart2, route: '/analytics' },
-    { title: 'Groups',        icon: Users,    route: '/groups' },
-    { title: 'Subscriptions', icon: Calendar, route: '/subscriptions' },
-    { title: 'Goals',         icon: Target,   route: '/goals' },
-    { title: 'Search',        icon: Search,   route: '/search' },
+    { title: 'Home',     icon: Home,     route: '/' },
+    { title: 'Add',      icon: Plus,     route: '/add' },
+    { title: 'Analytics',icon: BarChart2, route: '/analytics' },
+    { title: 'Groups',   icon: Users,    route: '/groups' },
+    { title: 'Subs',     icon: Calendar, route: '/subscriptions' },
+    { title: 'Goals',    icon: Target,   route: '/goals' },
+    { title: 'Search',   icon: Search,   route: '/search' },
+    { title: 'Settings', icon: Settings, route: '/settings' },
 ];
 
-function DesktopSidebar({
+function DesktopTopNav({
     pathname,
     onNavigate,
     isCoupleWorkspace,
     isHomeWorkspace,
+    scrollContainerRef,
 }: {
     pathname: string;
     onNavigate: (route: string) => void;
     isCoupleWorkspace: boolean;
     isHomeWorkspace: boolean;
+    scrollContainerRef: React.RefObject<HTMLElement | null>;
 }) {
+    const [isExpanded, setExpanded] = useState(true);
+    const lastScrollY = useRef(0);
+    const scrollPositionOnCollapse = useRef(0);
+
     const activeText = isCoupleWorkspace ? 'text-rose-400' : isHomeWorkspace ? 'text-amber-400' : 'text-primary';
     const activeBg   = isCoupleWorkspace ? 'bg-rose-500/10' : isHomeWorkspace ? 'bg-amber-500/10' : 'bg-primary/10';
-    const addBg      = isCoupleWorkspace
-        ? 'bg-rose-600 hover:bg-rose-500'
-        : isHomeWorkspace
-            ? 'bg-amber-600 hover:bg-amber-500'
-            : 'bg-primary hover:bg-primary/90';
+
+    const { scrollY } = useScroll({ container: scrollContainerRef as React.RefObject<HTMLElement> });
+
+    useMotionValueEvent(scrollY, 'change', (latest) => {
+        const previous = lastScrollY.current;
+        if (isExpanded && latest > previous && latest > 150) {
+            setExpanded(false);
+            scrollPositionOnCollapse.current = latest;
+        } else if (!isExpanded && latest < previous && scrollPositionOnCollapse.current - latest > 80) {
+            setExpanded(true);
+        }
+        lastScrollY.current = latest;
+    });
 
     return (
-        <aside className="fixed left-0 top-0 bottom-0 w-[240px] z-40 flex flex-col border-r border-white/5 bg-background">
-            {/* Logo */}
-            <div className="flex items-center gap-2.5 px-5 py-5">
-                <Image
-                    src="/Novira.png"
-                    alt="Novira"
-                    width={26}
-                    height={26}
-                    className="drop-shadow-[0_0_8px_rgba(138,43,226,0.6)]"
-                />
-                <span className="font-bold text-[15px] tracking-tight">Novira</span>
-            </div>
-
-            {/* Add Expense */}
-            <div className="px-4 mb-3">
-                <button
-                    onClick={() => onNavigate('/add')}
+        // MotionConfig override: the outer layout wraps everything in reducedMotion="user"
+        // which would kill these animations — we opt the nav out of that.
+        <MotionConfig reducedMotion="never">
+            <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50">
+                <motion.nav
+                    layout
+                    initial={{ y: -80, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    transition={{
+                        layout: { type: 'spring', damping: 22, stiffness: 280 },
+                        y: { type: 'spring', damping: 22, stiffness: 280 },
+                        opacity: { duration: 0.25 },
+                    }}
+                    whileHover={!isExpanded ? { scale: 1.06 } : {}}
+                    whileTap={!isExpanded ? { scale: 0.96 } : {}}
+                    onClick={() => !isExpanded && setExpanded(true)}
+                    style={{ borderRadius: 999 }}
                     className={cn(
-                        'w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm text-white transition-colors',
-                        addBg
+                        'flex items-center border border-white/10 bg-background/80 shadow-lg shadow-black/20 backdrop-blur-md h-11 overflow-hidden',
+                        !isExpanded && 'cursor-pointer'
                     )}
                 >
-                    <Plus className="w-4 h-4" />
-                    Add Expense
-                </button>
-            </div>
+                    <AnimatePresence mode="popLayout" initial={false}>
+                        {isExpanded ? (
+                            <motion.div
+                                key="expanded"
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                transition={{ duration: 0.12 }}
+                                className="flex items-center"
+                            >
+                                {/* Logo */}
+                                <div className="flex-shrink-0 flex items-center gap-2 pl-4 pr-3">
+                                    <Image
+                                        src="/Novira.png"
+                                        alt="Novira"
+                                        width={18}
+                                        height={18}
+                                        className="drop-shadow-[0_0_6px_rgba(138,43,226,0.6)]"
+                                    />
+                                    <span className="font-bold text-sm tracking-tight">Novira</span>
+                                </div>
 
-            {/* Nav items */}
-            <nav className="flex-1 px-3 space-y-0.5 overflow-y-auto">
-                {DESKTOP_NAV.map(({ title, icon: Icon, route }) => {
-                    const isActive = pathname === route;
-                    return (
-                        <button
-                            key={route}
-                            onClick={() => onNavigate(route)}
-                            className={cn(
-                                'w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors',
-                                isActive
-                                    ? cn(activeBg, activeText)
-                                    : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
-                            )}
-                        >
-                            <Icon className="w-[18px] h-[18px] shrink-0" />
-                            {title}
-                        </button>
-                    );
-                })}
-            </nav>
+                                <div className="h-4 w-px bg-white/10 flex-shrink-0" />
 
-            {/* Settings */}
-            <div className="px-3 pb-5 pt-2 border-t border-white/5">
-                <button
-                    onClick={() => onNavigate('/settings')}
-                    className={cn(
-                        'w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors',
-                        pathname === '/settings'
-                            ? cn(activeBg, activeText)
-                            : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
-                    )}
-                >
-                    <Settings className="w-[18px] h-[18px] shrink-0" />
-                    Settings
-                </button>
+                                {/* Nav items */}
+                                <div className="flex items-center gap-0.5 px-2">
+                                    {DESKTOP_NAV.map(({ title, icon: Icon, route }, i) => {
+                                        const isActive = pathname === route;
+                                        return (
+                                            <motion.button
+                                                key={route}
+                                                initial={{ opacity: 0, x: -8 }}
+                                                animate={{ opacity: 1, x: 0 }}
+                                                transition={{ delay: i * 0.04, type: 'spring', damping: 16, stiffness: 300 }}
+                                                onClick={(e) => { e.stopPropagation(); onNavigate(route); }}
+                                                className={cn(
+                                                    'flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-medium transition-colors whitespace-nowrap',
+                                                    isActive
+                                                        ? cn(activeBg, activeText)
+                                                        : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
+                                                )}
+                                            >
+                                                <Icon className="w-3.5 h-3.5 shrink-0" />
+                                                <span>{title}</span>
+                                            </motion.button>
+                                        );
+                                    })}
+                                </div>
+
+                                <div className="w-2 flex-shrink-0" />
+                            </motion.div>
+                        ) : (
+                            <motion.div
+                                key="collapsed"
+                                initial={{ opacity: 0, scale: 0.6 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                exit={{ opacity: 0, scale: 0.6 }}
+                                transition={{ type: 'spring', damping: 18, stiffness: 320 }}
+                                className="w-11 h-11 flex items-center justify-center"
+                            >
+                                <Menu className="h-5 w-5" />
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+                </motion.nav>
             </div>
-        </aside>
+        </MotionConfig>
     );
 }
 
@@ -121,6 +161,7 @@ export function MobileLayout({ children, defaultIsDesktop = false }: { children:
     const router = useRouter();
     const isNative = useIsNative();
     const [isDesktop, setIsDesktop] = useState(defaultIsDesktop);
+    const mainRef = useRef<HTMLElement>(null);
 
     // Configure the native status bar to overlay (transparent) and handle deep links
     useEffect(() => {
@@ -314,20 +355,21 @@ export function MobileLayout({ children, defaultIsDesktop = false }: { children:
                         : "bg-gradient-to-br from-primary/10 via-transparent to-transparent"
             )} />
 
-            {/* Desktop Sidebar */}
+            {/* Desktop Top Nav */}
             {showDesktop && (
-                <DesktopSidebar
+                <DesktopTopNav
                     pathname={pathname}
                     onNavigate={handleDesktopNavigate}
                     isCoupleWorkspace={isCoupleWorkspace ?? false}
                     isHomeWorkspace={isHomeWorkspace ?? false}
+                    scrollContainerRef={mainRef}
                 />
             )}
 
             {/* Main Content */}
-            <main id="main-content" tabIndex={-1} className={cn(
+            <main ref={mainRef} id="main-content" tabIndex={-1} className={cn(
                 "flex-1 w-full overflow-y-auto no-scrollbar relative flex flex-col",
-                showDesktop ? "pl-[240px]" : (showNav ? "pb-24" : "pb-0")
+                showDesktop ? "pt-20" : (showNav ? "pb-24" : "pb-0")
             )}>
                 <UIBoundary>
                     <AnimatePresence mode="wait" initial={false}>

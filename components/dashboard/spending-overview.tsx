@@ -326,7 +326,7 @@ export const SpendingOverview = React.memo(function SpendingOverview({
             </motion.button>
 
             {/* Run Rate Widget */}
-            {runRateData && !isBucketFocused && runRateData.currentDayOfMonth > 1 && (
+            {runRateData && !isBucketFocused && runRateData.currentDayOfMonth > 1 && runRateData.dailyAverage > 0 && (
                 <motion.div
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}

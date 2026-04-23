@@ -379,7 +379,7 @@ export function SettingsView() {
 
 
             <div className={cn(
-                "p-5 space-y-6 max-w-md lg:max-w-2xl mx-auto relative transition-opacity duration-300",
+                "p-5 space-y-6 max-w-md lg:max-w-4xl mx-auto relative transition-opacity duration-300",
                 loading ? "opacity-40 pointer-events-none" : "opacity-100"
             )}>
                 {/* Header */}

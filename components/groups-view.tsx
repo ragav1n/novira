@@ -39,7 +39,7 @@ export function GroupsView() {
             transition={{ type: 'spring', stiffness: 300, damping: 30, mass: 0.8 }}
             className="relative min-h-screen w-full"
         >
-            <div className="p-5 space-y-6 max-w-md lg:max-w-2xl mx-auto relative pb-24 lg:pb-8">
+            <div className="p-5 space-y-6 max-w-md lg:max-w-4xl mx-auto relative pb-24 lg:pb-8">
                 {/* Header */}
             <div className="flex items-center justify-between relative min-h-[40px]">
                 <button

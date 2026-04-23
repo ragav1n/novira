@@ -50,7 +50,7 @@ export function DashboardView() {
         workspaceBudgets, convertedWorkspaceBudgets, setWorkspaceBudget 
     } = useUserPreferences();
     const { balances, groups, friends } = useGroups();
-    const { buckets } = useBuckets();
+    const { buckets, bucketSpending } = useBuckets();
 
     const {
         transactions, loading, hasMore, loadingMore, loadMore,
@@ -174,7 +174,7 @@ export function DashboardView() {
         <div className="relative min-h-[100dvh]">
             <BudgetAlertManager totalSpent={totalSpent} currency={bucketCurrency} />
             <div className={cn(
-                "p-5 space-y-6 max-w-md lg:max-w-2xl mx-auto relative",
+                "p-5 space-y-6 max-w-md lg:max-w-4xl mx-auto relative",
                 mounted && !loading && isAnyModalOpen ? "pointer-events-none overflow-hidden" : "overflow-x-hidden"
             )}>
                 <AnimatePresence mode="wait">
@@ -239,11 +239,11 @@ export function DashboardView() {
                     </Card>
                 )}
 
-                <SpendingOverview 
-                    totalSpent={totalSpent}
+                <SpendingOverview
+                    totalSpent={isBucketFocused ? (bucketSpending[dashboardFocus] ?? totalSpent) : totalSpent}
                     displayBudget={displayBudget}
-                    remaining={remaining}
-                    progress={progress}
+                    remaining={isBucketFocused ? displayBudget - (bucketSpending[dashboardFocus] ?? totalSpent) : remaining}
+                    progress={isBucketFocused && displayBudget > 0 ? Math.min(((bucketSpending[dashboardFocus] ?? totalSpent) / displayBudget) * 100, 100) : progress}
                     isBucketFocused={isBucketFocused}
                     focusedBucket={focusedBucket}
                     bucketCurrency={bucketCurrency}
