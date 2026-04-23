@@ -89,7 +89,7 @@ function PhoneScreen() {
           <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)' }}>Good morning,</div>
           <div style={{ fontSize: 15, fontWeight: 700, letterSpacing: '-0.01em' }}>Saara</div>
         </div>
-        <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'linear-gradient(135deg, #7B39FC, #C084FC)', display: 'grid', placeItems: 'center', fontSize: 12, fontWeight: 700 }}>A</div>
+        <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'linear-gradient(135deg, #7B39FC, #C084FC)', display: 'grid', placeItems: 'center', fontSize: 12, fontWeight: 700 }}>S</div>
       </div>
       <div style={{ background: 'linear-gradient(135deg, #4A0E8F 0%, #8A2BE2 50%, #EC4899 100%)', borderRadius: 18, padding: '14px 16px', position: 'relative', overflow: 'hidden', boxShadow: '0 10px 30px rgba(138,43,226,0.4)' }}>
         <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(120% 80% at 100% 0%, rgba(255,255,255,0.25), transparent 60%)' }} />
@@ -185,7 +185,7 @@ function DeviceFrame({ tiltRef }: { tiltRef: React.RefObject<HTMLDivElement | nu
     { label: 'Food & Dining', val: '₹7,820', color: '#9333EA', pct: 42 },
     { label: 'Transport', val: '₹5,240', color: '#06B6D4', pct: 28 },
     { label: 'Shopping', val: '₹3,360', color: '#F472B6', pct: 18 },
-    { label: 'Others', val: '₹2,200', color: '#FBBF24', pct: 12 },
+    { label: 'Others', val: '₹2,000', color: '#FBBF24', pct: 11 },
   ];
   const card: React.CSSProperties = {
     background: 'rgba(20,10,40,0.78)', border: '1px solid rgba(164,132,215,0.22)',
@@ -317,9 +317,9 @@ function DeviceFrame({ tiltRef }: { tiltRef: React.RefObject<HTMLDivElement | nu
 
 function ScanVisual() {
   const items = [
-    ['Milk 1L', '₹62'], ['Brot', '₹145'], ['Kaffee 500g', '₹389'],
-    ['Apfel 1kg', '₹88'], ['Joghurt', '₹54'], ['Bananen', '₹46'],
-    ['Pasta', '₹92'], ['Käse', '₹212'],
+    ['Milk 1L', '₹62'], ['Bread', '₹145'], ['Coffee 500g', '₹389'],
+    ['Apples 1kg', '₹88'], ['Yogurt', '₹54'], ['Bananas', '₹46'],
+    ['Pasta', '₹92'], ['Cheese', '₹212'],
   ];
   return (
     <div style={{ aspectRatio: '4/3.3', borderRadius: 24, position: 'relative', overflow: 'hidden', background: 'linear-gradient(180deg, rgba(28,14,55,0.9), rgba(14,6,30,0.95))', border: '1px solid rgba(164,132,215,0.5)', boxShadow: '0 30px 80px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.05)' }}>
