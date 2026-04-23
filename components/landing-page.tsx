@@ -611,7 +611,7 @@ export function LandingPage() {
             <span>© 2026 Novira</span>
           </div>
           <div className="flex gap-5">
-            {[['Privacy','/privacy'],['Terms','/terms'],['Support','#']].map(([l, h]) => (
+            {[['Privacy','/privacy'],['Terms','/terms'],['Support','mailto:ragava22005@gmail.com']].map(([l, h]) => (
               <Link key={l} href={h} className="hover:text-white/80 transition-colors">{l}</Link>
             ))}
           </div>

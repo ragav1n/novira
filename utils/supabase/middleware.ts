@@ -33,7 +33,6 @@ export async function updateSession(request: NextRequest) {
     const path = request.nextUrl.pathname;
     if (
         path === '/' ||
-        path.startsWith('/landing') ||
         path.startsWith('/signin') ||
         path.startsWith('/signup') ||
         path.startsWith('/forgot-password') ||
