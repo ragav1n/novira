@@ -39,5 +39,10 @@ next-env.d.ts
 /android/
 /ios/
 /electron/
-node_modules/
+
+# design system
+/novira-design-system
+
+# ai assistant config
+.claude
 

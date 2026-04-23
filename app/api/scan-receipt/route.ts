@@ -1,3 +1,4 @@
+import 'server-only'
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 
@@ -16,8 +17,10 @@ export async function POST(req: NextRequest) {
   }
 
   const mediaType: SupportedMediaType = SUPPORTED_TYPES.includes(mimeType) ? mimeType : 'image/jpeg'
-  const sizeKB = Math.round((imageBase64.length * 3) / 4 / 1024)
-  console.log(`[scan-receipt] mimeType=${mimeType} mediaType=${mediaType} size≈${sizeKB}KB`)
+  if (process.env.NODE_ENV === 'development') {
+    const sizeKB = Math.round((imageBase64.length * 3) / 4 / 1024)
+    console.log(`[scan-receipt] mimeType=${mimeType} mediaType=${mediaType} size≈${sizeKB}KB`)
+  }
 
   const message = await client.messages.create({
     model: 'claude-haiku-4-5-20251001',
@@ -50,7 +53,9 @@ export async function POST(req: NextRequest) {
   })
 
   const text = message.content[0].type === 'text' ? message.content[0].text : ''
-  console.log(`[scan-receipt] response: ${text}`)
+  if (process.env.NODE_ENV === 'development') {
+    console.log(`[scan-receipt] response: ${text}`)
+  }
 
   const cleaned = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim()
   try {

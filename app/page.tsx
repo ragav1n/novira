@@ -27,9 +27,9 @@ const DashboardView = dynamic(
   { ssr: false, loading: () => <DashboardSkeleton /> }
 )
 
-const SignInCard = dynamic(
-  () => import('@/components/sign-in-card').then((mod) => mod.Component),
-  { ssr: true }
+const LandingPage = dynamic(
+  () => import('@/components/landing-page').then((mod) => mod.LandingPage),
+  { ssr: false }
 )
 
 import { useUserPreferences } from '@/components/providers/user-preferences-provider'
@@ -61,14 +61,14 @@ export default function Page() {
         </motion.div>
       ) : !isAuthenticated ? (
         <motion.div
-          key="signin"
+          key="landing"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.3 }}
           className="w-full"
         >
-          <SignInCard isSignUp={false} />
+          <LandingPage />
         </motion.div>
       ) : (
         <motion.div

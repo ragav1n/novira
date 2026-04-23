@@ -19,15 +19,17 @@ export function useDashboardData(userId: string | null, activeWorkspaceId: strin
     const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
     const [loadingAudit, setLoadingAudit] = useState(false);
 
-    const loadTxRef = useRef<((uid: string, workspaceId: string | null, bypassCache?: boolean, limit?: number) => Promise<void>) | null>(null);
+    const loadTxRef = useRef<((uid: string, workspaceId: string | null, limit?: number) => Promise<void>) | null>(null);
     const loadLimitRef = useRef(PAGE_SIZE);
     const mutatingRef = useRef(false);
 
-    const loadTransactions = async (currentUserId: string, workspaceId: string | null = null, bypassCache = false, limit = loadLimitRef.current) => {
+    const TX_SELECT = 'id, description, amount, category, date, created_at, user_id, group_id, currency, exchange_rate, base_currency, bucket_id, exclude_from_allowance, is_recurring, is_settlement, place_name, place_address, place_lat, place_lng, profile:profiles(full_name, avatar_url), splits(user_id, amount, is_paid)';
+
+    const loadTransactions = useCallback(async (currentUserId: string, workspaceId: string | null = null, limit = loadLimitRef.current) => {
         try {
             let query = supabase
                 .from('transactions')
-                .select('id, description, amount, category, date, created_at, user_id, group_id, currency, exchange_rate, base_currency, bucket_id, exclude_from_allowance, is_recurring, is_settlement, place_name, place_address, place_lat, place_lng, profile:profiles(full_name, avatar_url), splits(user_id, amount, is_paid)')
+                .select(TX_SELECT)
                 .order('date', { ascending: false })
                 .order('created_at', { ascending: false })
                 .limit(limit);
@@ -38,10 +40,6 @@ export function useDashboardData(userId: string | null, activeWorkspaceId: strin
                 query = query.is('group_id', null).eq('user_id', currentUserId);
             } else {
                 query = query.eq('user_id', currentUserId);
-            }
-
-            if (bypassCache) {
-                 query = query.neq('description', `bypass-${Date.now()}`);
             }
 
             const { data: txs } = await query;
@@ -57,9 +55,11 @@ export function useDashboardData(userId: string | null, activeWorkspaceId: strin
                 setHasMore(txs.length >= limit);
             }
         } catch (error) {
-            console.error("Error loading transactions:", error);
+            if (process.env.NODE_ENV === 'development') {
+                console.error("Error loading transactions:", error);
+            }
         }
-    };
+    }, []);
 
     loadTxRef.current = loadTransactions;
     loadLimitRef.current = loadLimit;
@@ -71,17 +71,17 @@ export function useDashboardData(userId: string | null, activeWorkspaceId: strin
         loadLimitRef.current = nextLimit;
         setLoadingMore(true);
         try {
-            await loadTxRef.current?.(userId, activeWorkspaceId, false, nextLimit);
+            await loadTxRef.current?.(userId, activeWorkspaceId, nextLimit);
         } finally {
             setLoadingMore(false);
         }
     }, [userId, activeWorkspaceId, loadingMore, hasMore]);
 
     const txDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const debouncedLoadTx = useCallback((uid: string, workspaceId: string | null = null, bypassCache = false) => {
+    const debouncedLoadTx = useCallback((uid: string, workspaceId: string | null = null) => {
         if (txDebounceRef.current) clearTimeout(txDebounceRef.current);
         txDebounceRef.current = setTimeout(() => {
-            loadTxRef.current?.(uid, workspaceId, bypassCache);
+            loadTxRef.current?.(uid, workspaceId);
         }, 300);
     }, []);
 
@@ -100,7 +100,7 @@ export function useDashboardData(userId: string | null, activeWorkspaceId: strin
         const fetchInitialData = async () => {
             setLoading(true);
             try {
-                await loadTxRef.current?.(userId, activeWorkspaceId, false, PAGE_SIZE);
+                await loadTxRef.current?.(userId, activeWorkspaceId, PAGE_SIZE);
             } finally {
                 setLoading(false);
             }
@@ -108,6 +108,25 @@ export function useDashboardData(userId: string | null, activeWorkspaceId: strin
 
         fetchInitialData();
     }, [userId, activeWorkspaceId]);
+
+    // Fetch a single transaction with full profile/splits joins for surgical state updates
+    const fetchFullTransaction = useCallback(async (txId: string): Promise<Transaction | null> => {
+        try {
+            const { data } = await supabase
+                .from('transactions')
+                .select(TX_SELECT)
+                .eq('id', txId)
+                .single();
+            if (!data) return null;
+            return {
+                ...data,
+                profile: Array.isArray(data.profile) ? data.profile[0] : data.profile,
+                splits: data.splits || []
+            } as Transaction;
+        } catch {
+            return null;
+        }
+    }, []);
 
     useEffect(() => {
         if (!userId) return;
@@ -120,25 +139,63 @@ export function useDashboardData(userId: string | null, activeWorkspaceId: strin
             .channel(`dashboard-sync-${userId}-${activeWorkspaceId || 'personal'}`)
             .on(
                 'postgres_changes',
-                { event: '*', schema: 'public', table: 'transactions', filter: txFilter },
-                () => { debouncedLoadTx(userId, activeWorkspaceId, true); }
+                { event: 'INSERT', schema: 'public', table: 'transactions', filter: txFilter },
+                async (payload) => {
+                    // Fetch full transaction with profile/splits joins
+                    const fullTx = await fetchFullTransaction(payload.new.id);
+                    if (fullTx) {
+                        setTransactions(prev => {
+                            // Avoid duplicates (e.g. from optimistic updates)
+                            if (prev.some(t => t.id === fullTx.id)) {
+                                return prev.map(t => t.id === fullTx.id ? fullTx : t);
+                            }
+                            // Insert in sorted position (date desc, created_at desc)
+                            const inserted = [fullTx, ...prev];
+                            inserted.sort((a, b) => {
+                                const dateCompare = b.date.localeCompare(a.date);
+                                if (dateCompare !== 0) return dateCompare;
+                                return b.created_at.localeCompare(a.created_at);
+                            });
+                            return inserted;
+                        });
+                    }
+                }
+            )
+            .on(
+                'postgres_changes',
+                { event: 'UPDATE', schema: 'public', table: 'transactions', filter: txFilter },
+                async (payload) => {
+                    const fullTx = await fetchFullTransaction(payload.new.id);
+                    if (fullTx) {
+                        setTransactions(prev =>
+                            prev.map(t => t.id === fullTx.id ? fullTx : t)
+                        );
+                    }
+                }
+            )
+            .on(
+                'postgres_changes',
+                { event: 'DELETE', schema: 'public', table: 'transactions', filter: txFilter },
+                (payload) => {
+                    setTransactions(prev => prev.filter(t => t.id !== payload.old.id));
+                }
             )
             .on(
                 'postgres_changes',
                 { event: '*', schema: 'public', table: 'splits', filter: `user_id=eq.${userId}` },
-                () => { debouncedLoadTx(userId, activeWorkspaceId, true); }
+                () => { debouncedLoadTx(userId, activeWorkspaceId); }
             )
             .on(
                 'postgres_changes',
                 { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${userId}` },
-                () => { debouncedLoadTx(userId, activeWorkspaceId, true); }
+                () => { debouncedLoadTx(userId, activeWorkspaceId); }
             )
             .subscribe();
 
         return () => {
             supabase.removeChannel(channel);
         };
-    }, [userId, activeWorkspaceId, debouncedLoadTx]);
+    }, [userId, activeWorkspaceId, debouncedLoadTx, fetchFullTransaction]);
 
     useEffect(() => {
         if (!userId) return;
@@ -146,10 +203,10 @@ export function useDashboardData(userId: string | null, activeWorkspaceId: strin
         // Handle case where expense was added before this component mounted (post-navigation)
         if (sessionStorage.getItem('novira_expense_added')) {
             sessionStorage.removeItem('novira_expense_added');
-            loadTxRef.current?.(userId, activeWorkspaceId, true);
+            loadTxRef.current?.(userId, activeWorkspaceId);
         }
 
-        const handleExpenseAdded = () => loadTxRef.current?.(userId, activeWorkspaceId, true);
+        const handleExpenseAdded = () => loadTxRef.current?.(userId, activeWorkspaceId);
         window.addEventListener('novira:expense-added', handleExpenseAdded);
         return () => window.removeEventListener('novira:expense-added', handleExpenseAdded);
     }, [userId, activeWorkspaceId]);
@@ -158,7 +215,7 @@ export function useDashboardData(userId: string | null, activeWorkspaceId: strin
         if (!userId) return;
         const handleVisibility = () => {
             if (document.visibilityState === 'visible') {
-                loadTxRef.current?.(userId, activeWorkspaceId, true);
+                loadTxRef.current?.(userId, activeWorkspaceId);
             }
         };
         document.addEventListener('visibilitychange', handleVisibility);
@@ -284,7 +341,9 @@ export function useDashboardData(userId: string | null, activeWorkspaceId: strin
             if (error) throw error;
             setAuditLogs(data || []);
         } catch (error: any) {
-            console.error("Error loading audit logs:", error);
+            if (process.env.NODE_ENV === 'development') {
+                console.error("Error loading audit logs:", error);
+            }
             toast.error("Failed to load history");
         } finally {
             setLoadingAudit(false);
