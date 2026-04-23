@@ -19,6 +19,7 @@ export function SettlementsTabContent({
     simplifiedDebts, pendingSplits, userId, currency, formatCurrency, convertAmount, settleSplit
 }: SettlementsTabContentProps) {
     const [settlingPaymentIndex, setSettlingPaymentIndex] = useState<number | null>(null);
+    const [isSettlingAll, setIsSettlingAll] = useState(false);
 
     return (
         <div className="mt-6 space-y-4">
@@ -62,35 +63,36 @@ export function SettlementsTabContent({
                                         <span className="font-bold text-sm text-amber-500">
                                             {formatCurrency(payment.amount)}
                                         </span>
-                                        {isMyPayment && (
-                                            <Button
-                                                size="sm"
-                                                disabled={isSettling}
-                                                className="h-7 text-[11px] rounded-full bg-amber-500/20 text-amber-500 border border-amber-500/30 hover:bg-amber-500/30 gap-1"
-                                                onClick={async () => {
-                                                    setSettlingPaymentIndex(index);
-                                                    let settled = 0;
-                                                    try {
-                                                        for (const splitId of payment.splitIds) {
-                                                            await settleSplit(splitId, payment.to);
-                                                            settled++;
-                                                        }
-                                                        toast.success(`Settled ${settled} split${settled !== 1 ? 's' : ''} with ${payment.toName}!`);
-                                                    } catch (error: any) {
-                                                        if (settled > 0) {
-                                                            toast.error(`Settled ${settled} of ${payment.splitIds.length} — ${error.message || 'partial failure'}`);
-                                                        } else {
-                                                            toast.error(error.message || 'Failed to settle');
-                                                        }
-                                                    } finally {
-                                                        setSettlingPaymentIndex(null);
+                                        <Button
+                                            size="sm"
+                                            disabled={isSettling}
+                                            className="h-7 text-[11px] rounded-full bg-amber-500/20 text-amber-500 border border-amber-500/30 hover:bg-amber-500/30 gap-1"
+                                            onClick={async () => {
+                                                setSettlingPaymentIndex(index);
+                                                let settled = 0;
+                                                try {
+                                                    for (const splitId of payment.splitIds) {
+                                                        await settleSplit(splitId, isMyPayment ? payment.to : payment.from);
+                                                        settled++;
                                                     }
-                                                }}
-                                            >
-                                                <Zap className="w-3 h-3" />
-                                                {isSettling ? 'Settling...' : 'Settle All'}
-                                            </Button>
-                                        )}
+                                                    toast.success(isMyPayment
+                                                        ? `Settled ${settled} split${settled !== 1 ? 's' : ''} with ${payment.toName}!`
+                                                        : `Marked ${settled} payment${settled !== 1 ? 's' : ''} as received from ${payment.fromName}!`
+                                                    );
+                                                } catch (error: any) {
+                                                    if (settled > 0) {
+                                                        toast.error(`Settled ${settled} of ${payment.splitIds.length} — ${error.message || 'partial failure'}`);
+                                                    } else {
+                                                        toast.error(error.message || 'Failed to settle');
+                                                    }
+                                                } finally {
+                                                    setSettlingPaymentIndex(null);
+                                                }
+                                            }}
+                                        >
+                                            <Zap className="w-3 h-3" />
+                                            {isSettling ? 'Settling...' : isMyPayment ? 'Settle All' : 'Mark Received'}
+                                        </Button>
                                     </div>
                                 </div>
                             </div>
@@ -101,6 +103,37 @@ export function SettlementsTabContent({
                     )}
                 </div>
             )}
+
+            {(() => {
+                const debtorSplits = pendingSplits.filter(s => s.user_id === userId);
+                return debtorSplits.length >= 2 ? (
+                    <div className="flex justify-end">
+                        <Button
+                            size="sm"
+                            disabled={isSettlingAll}
+                            className="h-8 text-xs rounded-full bg-primary/15 text-primary border border-primary/20 hover:bg-primary/25 gap-1.5"
+                            onClick={async () => {
+                                setIsSettlingAll(true);
+                                let settled = 0;
+                                try {
+                                    for (const split of debtorSplits) {
+                                        await settleSplit(split.id, split.transaction?.user_id);
+                                        settled++;
+                                    }
+                                    toast.success(`Settled all ${settled} debt${settled !== 1 ? 's' : ''}!`);
+                                } catch (error: any) {
+                                    toast.error(error.message || 'Failed to settle all');
+                                } finally {
+                                    setIsSettlingAll(false);
+                                }
+                            }}
+                        >
+                            <Check className="w-3 h-3" />
+                            {isSettlingAll ? 'Settling...' : `Settle All Debts (${debtorSplits.length})`}
+                        </Button>
+                    </div>
+                ) : null;
+            })()}
 
             {pendingSplits.length > 0 ? (
                 pendingSplits.map((split) => {

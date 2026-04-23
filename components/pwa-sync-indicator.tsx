@@ -97,10 +97,7 @@ export function SyncIndicator() {
                         initial={{ opacity: 0, y: -20 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.8 }}
-                        className={cn(
-                            "fixed top-safe left-1/2 -translate-x-1/2 z-50",
-                            "mt-2 flex items-center justify-center pointer-events-none"
-                        )}
+                        className="fixed top-2 lg:top-[72px] left-1/2 -translate-x-1/2 z-[60] flex items-center justify-center pointer-events-none"
                         style={{ willChange: "transform, opacity" }}
                     >
                         <div className="bg-background/80 backdrop-blur-md border border-white/10 shadow-lg rounded-full px-3 py-1.5 flex items-center gap-2">
@@ -117,7 +114,7 @@ export function SyncIndicator() {
                         initial={{ opacity: 0, y: -20 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.8 }}
-                        className="fixed top-safe left-1/2 -translate-x-1/2 z-50 mt-2 pointer-events-auto"
+                        className="fixed top-2 lg:top-[72px] left-1/2 -translate-x-1/2 z-[60] pointer-events-auto"
                         style={{ willChange: "transform, opacity" }}
                     >
                         <div className="bg-destructive/20 backdrop-blur-md border border-destructive/30 shadow-lg rounded-full px-3 py-1.5 flex items-center gap-2">
