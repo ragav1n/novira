@@ -1,6 +1,6 @@
 'use client';
 
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -9,7 +9,7 @@ import { AdvancedButton } from '@/components/ui/gradient-button';
 import { ShinyButton } from '@/components/ui/shiny-button';
 import {
   ArrowRight, CheckCircle2, BarChart3, Globe, MessageSquare,
-  FileText, Calendar, Zap,
+  FileText, Calendar, Zap, Menu, X,
 } from 'lucide-react';
 
 // ─── Constants ──────────────────────────────────────────────────────────────
@@ -508,6 +508,7 @@ function MapVisual() {
 
 export function LandingPage() {
   const [activeSection, setActiveSection] = useState(0);
+  const [menuOpen, setMenuOpen] = useState(false);
   const deviceRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -549,6 +550,13 @@ export function LandingPage() {
     update();
     return () => container.removeEventListener('scroll', update);
   }, []);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onResize = () => { if (window.innerWidth >= 768) setMenuOpen(false); };
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, [menuOpen]);
 
   const snapSection: React.CSSProperties = {
     minHeight: '100vh', scrollSnapAlign: 'start', scrollSnapStop: 'always',
@@ -593,15 +601,76 @@ export function LandingPage() {
                 className="hover:text-white transition-colors whitespace-nowrap cursor-pointer">{label}</a>
             ))}
           </nav>
-          <div className="flex items-center gap-2.5">
+          <div className="hidden md:flex items-center gap-2.5">
             <ShinyButton href="/signin" size="sm">Sign In</ShinyButton>
             <AdvancedButton href="/signup" size="small">Get Started</AdvancedButton>
           </div>
+          <button
+            className="md:hidden p-2 rounded-xl hover:bg-white/10 transition-colors"
+            onClick={() => setMenuOpen(true)}
+            aria-label="Open menu"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
         </div>
       </header>
 
       {/* ── Section Dots ────────────────────────────────────────── */}
       <SectionDots active={activeSection} />
+
+      {/* ── Mobile full-screen menu ──────────────────────────────── */}
+      <AnimatePresence>
+        {menuOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: -16 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -16 }}
+            transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+            className="fixed inset-0 z-[60] flex flex-col"
+            style={{ background: '#0c081e' }}
+          >
+            {/* Header row */}
+            <div className="flex items-center justify-between px-6 py-[14px]" style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+              <div className="flex items-center gap-2.5" style={{ fontWeight: 700, fontSize: 17, letterSpacing: '-0.01em' }}>
+                <Image src="/Novira.png" alt="Novira" width={28} height={28} style={{ filter: 'drop-shadow(0 0 8px rgba(138,43,226,0.6))' }} />
+                <span>Novira</span>
+              </div>
+              <button onClick={() => setMenuOpen(false)} className="p-2 rounded-xl hover:bg-white/10 transition-colors" aria-label="Close menu">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Nav links */}
+            <nav className="flex-1 flex flex-col justify-center px-8 gap-0.5">
+              {([['sec-hero','Home'],['sec-dash','Dashboard'],['sec-scan','AI Scan'],['sec-split','Split'],['sec-offline','Offline'],['sec-features','Features']] as [string,string][]).map(([id, label], i) => (
+                <motion.a
+                  key={id}
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.04 + i * 0.05, ease: [0.22, 1, 0.36, 1] }}
+                  href={`#${id}`}
+                  onClick={e => {
+                    e.preventDefault();
+                    setMenuOpen(false);
+                    setTimeout(() => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' }), 150);
+                  }}
+                  className="text-[30px] font-bold py-2.5 text-white/60 hover:text-white transition-colors cursor-pointer"
+                >
+                  {label}
+                </motion.a>
+              ))}
+            </nav>
+
+            {/* CTAs */}
+            <div className="px-8 pb-14 flex flex-col gap-3">
+              <AdvancedButton href="/signup" size="large">
+                Get started free <ArrowRight className="w-4 h-4" />
+              </AdvancedButton>
+              <ShinyButton href="/signin">Sign in</ShinyButton>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ── Fixed Footer ────────────────────────────────────────── */}
       <footer className="fixed bottom-0 left-0 right-0 z-40 px-7 py-3.5 pointer-events-none">
@@ -821,6 +890,12 @@ export function LandingPage() {
         }
         @media (max-width: 768px) {
           #sec-features > div:last-child { grid-template-columns: 1fr !important; }
+        }
+        @media (max-width: 640px) {
+          section[id^="sec-"] { padding-left: 18px !important; padding-right: 18px !important; }
+          .hero-grid-cols h1 { font-size: clamp(32px, 10vw, 44px) !important; line-height: 1.05 !important; }
+          .hero-grid-cols p  { font-size: 15px !important; }
+          .two-col-grid { gap: 24px !important; }
         }
       `}</style>
     </div>

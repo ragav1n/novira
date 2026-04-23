@@ -115,7 +115,7 @@ export function SubscriptionsView() {
         >
 
 
-            <div className="p-5 space-y-6 max-w-md mx-auto relative min-h-screen z-10">
+            <div className="p-5 space-y-6 max-w-md lg:max-w-2xl mx-auto relative min-h-screen z-10">
                 <div className="flex items-center justify-between relative min-h-[40px] mb-2">
                 <button 
                     onClick={() => router.back()} 

@@ -403,7 +403,7 @@ export function AnalyticsView() {
 
 
             <div className={cn(
-                "p-5 space-y-6 max-w-md mx-auto relative transition-all duration-300",
+                "p-5 space-y-6 max-w-md lg:max-w-3xl mx-auto relative transition-all duration-300",
                 loading ? "opacity-50 blur-[2px] pointer-events-none" : "opacity-100 blur-0"
             )}>
                 {/* Header */}

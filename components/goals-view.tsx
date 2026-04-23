@@ -233,7 +233,7 @@ export function GoalsView() {
         >
 
 
-            <div className="p-5 max-w-md mx-auto pb-32 relative z-10 space-y-6">
+            <div className="p-5 max-w-md lg:max-w-2xl mx-auto pb-32 lg:pb-8 relative z-10 space-y-6">
                 <div className="flex items-center justify-between relative min-h-[40px] mb-2">
                     <button 
                         onClick={() => router.back()} 
