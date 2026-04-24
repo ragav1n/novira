@@ -19,15 +19,19 @@ export function PWAInstallPrompt() {
         // Don't show if dismissed in this session
         if (sessionStorage.getItem('pwa-install-dismissed')) return;
 
+        let timer: ReturnType<typeof setTimeout> | null = null;
         const handler = (e: Event) => {
             e.preventDefault();
             setDeferredPrompt(e as BeforeInstallPromptEvent);
             // Small delay so the page settles before showing the banner
-            setTimeout(() => setIsVisible(true), 3000);
+            timer = setTimeout(() => setIsVisible(true), 3000);
         };
 
         window.addEventListener('beforeinstallprompt', handler);
-        return () => window.removeEventListener('beforeinstallprompt', handler);
+        return () => {
+            window.removeEventListener('beforeinstallprompt', handler);
+            if (timer) clearTimeout(timer);
+        };
     }, []);
 
     const handleInstall = async () => {

@@ -20,6 +20,7 @@ export function CategorySelector({ categories, selectedCategory, onSelect }: Cat
             <p className="text-sm font-medium">Category *</p>
             <FluidDropdown
                 items={categories}
+                activeId={selectedCategory}
                 onSelect={(cat) => onSelect(cat.id)}
                 className="w-full max-w-none"
             />

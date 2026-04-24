@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
             text: `Extract the following from this receipt and respond with ONLY valid JSON, no markdown:
 {
   "amount": <total amount as a number, no currency symbol>,
-  "description": <short summary of items purchased (e.g. "Milk, eggs, bread" or "Coffee & sandwich"), max 40 chars. If too many items, summarise (e.g. "Groceries x7"). Fall back to merchant name if items are not legible>,
+  "description": <short summary of items purchased IN ENGLISH, max 40 chars (e.g. "Milk, eggs, bread" or "Coffee & sandwich"). Translate foreign-language item names to English (e.g. "Brot"→"Bread", "Käse"→"Cheese"). Keep brand names, proper nouns, and untranslatable foreign words as-is. If there are too many items to list, pick the 2–3 most prominent/expensive ones (e.g. "Steak, wine, cheese"). Never output placeholder text like "Groceries x7" — always describe actual items. Fall back to merchant name if items are not legible>,
   "date": <date in YYYY-MM-DD format, or null if not found>,
   "time": <time in HH:MM 24h format, or null if not found>,
   "currency": <ISO 4217 currency code e.g. EUR, USD, INR, GBP — infer from symbol if needed, or null>,

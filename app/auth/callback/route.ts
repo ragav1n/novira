@@ -1,45 +1,35 @@
-import { NextResponse } from 'next/server'
-import { createClient } from '@/utils/supabase/server'
+import { NextResponse, type NextRequest } from 'next/server'
+import { createServerClient } from '@supabase/ssr'
+import { cookies } from 'next/headers'
 
-export const runtime = 'edge'
-
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
     const { searchParams, origin } = new URL(request.url)
     const code = searchParams.get('code')
-    // if "next" is in param, use it as the redirect URL
     let next = searchParams.get('next') ?? '/'
-
-    // Basic open redirect protection: Ensure next starts with / and not //
-    if (!next.startsWith('/') || next.startsWith('//')) {
-        next = '/'
-    }
+    if (!next.startsWith('/') || next.startsWith('//')) next = '/'
 
     if (code) {
-        const supabase = await createClient()
-        const { error } = await supabase.auth.exchangeCodeForSession(code)
-        if (!error) {
-            // Priority 1: Use specific NEXT_PUBLIC_APP_URL from env
-            const envAppUrl = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '');
-            
-            // Priority 2: Use headers for dynamic environment detection (Vercel previews, etc)
-            const forwardedHost = request.headers.get('x-forwarded-host')
-            const forwardedProto = request.headers.get('x-forwarded-proto') || 'https'
-            
-            // Priority 3: Use the request origin
-            
-            let redirectBase = origin;
+        const cookieStore = await cookies()
+        const redirectResponse = NextResponse.redirect(new URL(next, origin))
 
-            if (envAppUrl) {
-                redirectBase = envAppUrl;
-            } else if (forwardedHost) {
-                const protocol = forwardedHost.includes('localhost') ? 'http' : forwardedProto
-                redirectBase = `${protocol}://${forwardedHost}`
+        const supabase = createServerClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+            {
+                cookies: {
+                    getAll() { return cookieStore.getAll() },
+                    setAll(cookiesToSet) {
+                        cookiesToSet.forEach(({ name, value, options }) => {
+                            redirectResponse.cookies.set(name, value, options)
+                        })
+                    },
+                },
             }
+        )
 
-            return NextResponse.redirect(`${redirectBase}${next}`)
-        }
+        const { error } = await supabase.auth.exchangeCodeForSession(code)
+        if (!error) return redirectResponse
     }
 
-    // return the user to an error page with instructions
-    return NextResponse.redirect(`${origin}/signin?error=auth_code_error`)
+    return NextResponse.redirect(new URL('/signin?error=auth_code_error', origin))
 }

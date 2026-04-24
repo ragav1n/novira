@@ -79,6 +79,14 @@ export function AddFundsDialog({ isOpen, onClose, userId, defaultBucketId, onSuc
 
             if (error) throw error;
 
+            // Notify dashboard & providers to refresh immediately (realtime can lag)
+            try {
+                sessionStorage.setItem('novira_expense_added', 'true');
+                window.dispatchEvent(new Event('novira:expense-added'));
+            } catch (e) {
+                console.error('[add-funds] dispatch', e);
+            }
+
             toast.success('Funds added successfully!');
             setAmount('');
             setDescription('');
