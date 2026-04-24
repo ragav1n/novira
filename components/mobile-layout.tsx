@@ -29,6 +29,45 @@ const DESKTOP_NAV = [
     { title: 'Settings', icon: Settings, route: '/settings' },
 ];
 
+const containerVariants = {
+    hidden: { y: -80, opacity: 0 },
+    expanded: {
+        y: 0,
+        opacity: 1,
+        width: 'auto',
+        transition: {
+            y: { type: 'spring' as const, damping: 22, stiffness: 280 },
+            opacity: { duration: 0.25 },
+            width: { type: 'spring' as const, damping: 22, stiffness: 280 },
+            staggerChildren: 0.04,
+            delayChildren: 0.08,
+        },
+    },
+    collapsed: {
+        y: 0,
+        opacity: 1,
+        width: '2.75rem',
+        transition: {
+            y: { type: 'spring' as const, damping: 22, stiffness: 280 },
+            opacity: { duration: 0.25 },
+            width: { type: 'spring' as const, damping: 22, stiffness: 280 },
+            when: 'afterChildren' as const,
+            staggerChildren: 0.03,
+            staggerDirection: -1,
+        },
+    },
+};
+
+const expandedChildVariants = {
+    expanded: { opacity: 1, x: 0, scale: 1, transition: { type: 'spring' as const, damping: 16, stiffness: 300 } },
+    collapsed: { opacity: 0, x: -12, scale: 0.95, transition: { duration: 0.18 } },
+};
+
+const burgerVariants = {
+    expanded: { opacity: 0, scale: 0.6, transition: { duration: 0.18 } },
+    collapsed: { opacity: 1, scale: 1, transition: { type: 'spring' as const, damping: 16, stiffness: 320, delay: 0.12 } },
+};
+
 function DesktopTopNav({
     pathname,
     onNavigate,
@@ -68,87 +107,71 @@ function DesktopTopNav({
         <MotionConfig reducedMotion="never">
             <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50">
                 <motion.nav
-                    layout
-                    initial={{ y: -80, opacity: 0 }}
-                    animate={{ y: 0, opacity: 1 }}
-                    transition={{
-                        layout: { type: 'spring', damping: 22, stiffness: 280 },
-                        y: { type: 'spring', damping: 22, stiffness: 280 },
-                        opacity: { duration: 0.25 },
-                    }}
+                    initial="hidden"
+                    animate={isExpanded ? 'expanded' : 'collapsed'}
+                    variants={containerVariants}
                     whileHover={!isExpanded ? { scale: 1.06 } : {}}
                     whileTap={!isExpanded ? { scale: 0.96 } : {}}
                     onClick={() => !isExpanded && setExpanded(true)}
                     style={{ borderRadius: 999 }}
                     className={cn(
-                        'flex items-center border border-white/10 bg-background/80 shadow-lg shadow-black/20 backdrop-blur-md h-11 overflow-hidden',
-                        !isExpanded && 'cursor-pointer'
+                        'relative flex items-center border border-white/10 bg-background/80 shadow-lg shadow-black/20 backdrop-blur-md h-11 overflow-hidden',
+                        !isExpanded && 'cursor-pointer justify-center'
                     )}
                 >
-                    <AnimatePresence mode="popLayout" initial={false}>
-                        {isExpanded ? (
-                            <motion.div
-                                key="expanded"
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
-                                exit={{ opacity: 0 }}
-                                transition={{ duration: 0.12 }}
-                                className="flex items-center"
-                            >
-                                {/* Logo */}
-                                <div className="flex-shrink-0 flex items-center gap-2 pl-4 pr-3">
-                                    <Image
-                                        src="/Novira.png"
-                                        alt="Novira"
-                                        width={18}
-                                        height={18}
-                                        className="drop-shadow-[0_0_6px_rgba(138,43,226,0.6)]"
-                                    />
-                                    <span className="font-bold text-sm tracking-tight">Novira</span>
-                                </div>
+                    {/* Logo */}
+                    <motion.div
+                        variants={expandedChildVariants}
+                        className="flex-shrink-0 flex items-center gap-2 pl-4 pr-3"
+                    >
+                        <Image
+                            src="/Novira.png"
+                            alt="Novira"
+                            width={18}
+                            height={18}
+                            className="drop-shadow-[0_0_6px_rgba(138,43,226,0.6)]"
+                        />
+                        <span className="font-bold text-sm tracking-tight">Novira</span>
+                    </motion.div>
 
-                                <div className="h-4 w-px bg-white/10 flex-shrink-0" />
+                    <motion.div variants={expandedChildVariants} className="h-4 w-px bg-white/10 flex-shrink-0" />
 
-                                {/* Nav items */}
-                                <div className="flex items-center gap-0.5 px-2">
-                                    {DESKTOP_NAV.map(({ title, icon: Icon, route }, i) => {
-                                        const isActive = pathname === route;
-                                        return (
-                                            <motion.button
-                                                key={route}
-                                                initial={{ opacity: 0, x: -8 }}
-                                                animate={{ opacity: 1, x: 0 }}
-                                                transition={{ delay: i * 0.04, type: 'spring', damping: 16, stiffness: 300 }}
-                                                onClick={(e) => { e.stopPropagation(); onNavigate(route); }}
-                                                className={cn(
-                                                    'flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-medium transition-colors whitespace-nowrap',
-                                                    isActive
-                                                        ? cn(activeBg, activeText)
-                                                        : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
-                                                )}
-                                            >
-                                                <Icon className="w-3.5 h-3.5 shrink-0" />
-                                                <span>{title}</span>
-                                            </motion.button>
-                                        );
-                                    })}
-                                </div>
-
-                                <div className="w-2 flex-shrink-0" />
-                            </motion.div>
-                        ) : (
-                            <motion.div
-                                key="collapsed"
-                                initial={{ opacity: 0, scale: 0.6 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                exit={{ opacity: 0, scale: 0.6 }}
-                                transition={{ type: 'spring', damping: 18, stiffness: 320 }}
-                                className="w-11 h-11 flex items-center justify-center"
-                            >
-                                <Menu className="h-5 w-5" />
-                            </motion.div>
+                    {/* Nav items */}
+                    <motion.div
+                        className={cn(
+                            'flex items-center gap-0.5 px-2',
+                            !isExpanded && 'pointer-events-none'
                         )}
-                    </AnimatePresence>
+                    >
+                        {DESKTOP_NAV.map(({ title, icon: Icon, route }) => {
+                            const isActive = pathname === route;
+                            return (
+                                <motion.button
+                                    key={route}
+                                    variants={expandedChildVariants}
+                                    onClick={(e) => { e.stopPropagation(); onNavigate(route); }}
+                                    className={cn(
+                                        'flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-medium transition-colors whitespace-nowrap',
+                                        isActive
+                                            ? cn(activeBg, activeText)
+                                            : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
+                                    )}
+                                >
+                                    <Icon className="w-3.5 h-3.5 shrink-0" />
+                                    <span>{title}</span>
+                                </motion.button>
+                            );
+                        })}
+                    </motion.div>
+
+                    <motion.div variants={expandedChildVariants} className="w-2 flex-shrink-0" />
+
+                    {/* Burger icon — fades in when collapsed */}
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                        <motion.div variants={burgerVariants} animate={isExpanded ? 'expanded' : 'collapsed'}>
+                            <Menu className="h-5 w-5" />
+                        </motion.div>
+                    </div>
                 </motion.nav>
             </div>
         </MotionConfig>

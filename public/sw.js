@@ -1,4 +1,4 @@
-const CACHE_NAME = 'novira-cache-7b31ce16'; // Updated version
+const CACHE_NAME = 'novira-cache-d98fafd6'; // Updated version
 const STATIC_ASSETS = [
     '/Novira.png',
     '/manifest.json',
@@ -187,35 +187,27 @@ self.addEventListener('fetch', (event) => {
     }
 
     // --- 4. Navigation requests (Network-first with offline fallback) ---
-    // Navigation requests use redirect:'manual' by default, so we must create a new
-    // request with redirect:'follow' — otherwise redirect responses (e.g. auth middleware
-    // redirecting / → /signin) cause a network error in the service worker.
+    // Always try the network first for navigate requests. Pages are server-rendered
+    // with live auth state, so serving a stale cached HTML immediately (cache-first)
+    // risks showing outdated content or auth-redirect loops.
+    // On failure (e.g. brief network gap when app resumes from background) we fall back
+    // to any previously cached version of that URL, then /offline.html.
     if (request.mode === 'navigate') {
         event.respondWith(
-            caches.match(request).then((cachedResponse) => {
-                const followRequest = new Request(request.url, { redirect: 'follow' });
-                const fetchPromise = fetch(followRequest).then((response) => {
-                    // Only cache final, non-redirected OK responses
+            fetch(new Request(request.url, { redirect: 'follow', credentials: 'include' }))
+                .then((response) => {
+                    // Cache successful, non-redirected responses for offline fallback
                     if (response.ok && !response.redirected) {
-                        const responseClone = response.clone();
                         caches.open(CACHE_NAME).then((cache) => {
-                            cache.put(request, responseClone);
+                            cache.put(request, response.clone());
                         });
                     }
                     return response;
-                }).catch(() => {
-                    // Network failed — fall back to cache, then offline page
-                    if (cachedResponse) {
-                        return cachedResponse;
-                    }
-                    return caches.match('/offline.html');
-                });
-
-                // Only serve cached response if it's not a redirected response.
-                // Redirected responses cause ERR_FAILED when the SW serves them
-                // for navigate requests (redirect mode defaults to 'manual').
-                return (cachedResponse && !cachedResponse.redirected) ? cachedResponse : fetchPromise;
-            })
+                })
+                .catch(() =>
+                    // Network failed — serve any cached version of this URL, else offline page
+                    caches.match(request).then(cached => cached || caches.match('/offline.html'))
+                )
         );
         return;
     }

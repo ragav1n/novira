@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { parseISO } from 'date-fns';
 import { CATEGORY_COLORS } from '@/lib/categories';
 import { Transaction } from '@/components/expense-map-view';
 
@@ -94,7 +95,7 @@ export function useMapData(
                 }
                 coordinates.push(coordinates[0]);
 
-                const txsInCategory = group.transactions.filter(t => t.category === category).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+                const txsInCategory = group.transactions.filter(t => t.category === category).sort((a, b) => parseISO(a.date).getTime() - parseISO(b.date).getTime());
                 const count = txsInCategory.length;
                 
                 const merchantMap = new Map<string, number>();

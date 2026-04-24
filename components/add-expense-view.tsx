@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { FloatingLabelInput } from '@/components/ui/floating-label';
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { TimePicker } from "@/components/ui/datetime-picker";
@@ -109,20 +109,23 @@ export function AddExpenseView() {
             if (data.description) formState.setDescription(data.description);
             if (data.category) formState.setSelectedCategory(data.category);
             if (data.currency) formState.setTxCurrency(data.currency);
-            if (!data.is_online) {
+            if (data.is_online) {
+                formState.setPlaceName('');
+                formState.setPlaceAddress('');
+            } else {
                 if (data.place_name) formState.setPlaceName(data.place_name);
                 if (data.place_address) formState.setPlaceAddress(data.place_address);
             }
             if (data.date) {
-                const d = new Date(data.date);
+                const d = parseISO(data.date);
                 if (data.time) {
                     const [h, m] = data.time.split(':').map(Number);
                     d.setHours(h, m, 0, 0);
                 }
                 formState.setDate(d);
             }
-        } catch {
-            // silently fail — user can fill in manually
+        } catch (e) {
+            console.error('[scan-receipt]', e);
         } finally {
             setScanning(false);
             if (fileInputRef.current) fileInputRef.current.value = '';

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { ChevronLeft, User, Download, AlertTriangle, Shield, Lock, ChevronRight, SlidersHorizontal, LogOut, Banknote, FileSpreadsheet, ShieldCheck, RefreshCcw, Camera, Trash2, Plus, Save, Wallet, Bell, Mail, Moon, Sun, Smartphone, Globe, CreditCard } from 'lucide-react';
+import { ChevronLeft, User, Download, AlertTriangle, Shield, Lock, ChevronRight, SlidersHorizontal, LogOut, Banknote, FileSpreadsheet, ShieldCheck, RefreshCcw, Camera, Trash2, Plus, Save, Wallet, Bell, Mail, Moon, Sun, Smartphone, Globe, CreditCard, Wrench } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Switch } from '@/components/ui/switch';
@@ -743,6 +743,25 @@ export function SettingsView() {
                         <LogOut className="w-4 h-4" />
                         <span className="font-medium text-sm">Log Out</span>
                     </button>
+                </div>
+
+                {/* Troubleshooting */}
+                <div className="space-y-3 pt-2">
+                    <div className="bg-secondary/5 rounded-xl border border-white/5 overflow-hidden">
+                        <button
+                            onClick={() => router.push('/sw-reset')}
+                            className="w-full flex items-center justify-between p-3 hover:bg-white/5 transition-colors text-left outline-none group"
+                        >
+                            <div className="flex items-center gap-3">
+                                <Wrench className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                                <span className="text-sm font-medium text-muted-foreground group-hover:text-foreground transition-colors">Reset App</span>
+                            </div>
+                            <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:translate-x-0.5 transition-all" />
+                        </button>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground px-1">
+                        Clears cached data and resets the service worker. Use if the app behaves unexpectedly.
+                    </p>
                 </div>
 
                 {/* Danger Zone - Refined */}
