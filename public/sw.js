@@ -5,12 +5,28 @@ const STATIC_ASSETS = [
     '/offline.html',
     '/offline-illustration.png'
 ];
+// Navigation routes to warm so the app shell loads if the user goes offline before
+// their first navigation has populated the cache (e.g. install PWA → quit → open offline).
+// Failures are non-fatal — they're best-effort warmers, not invariants.
+const WARM_NAVIGATION_ROUTES = ['/', '/add'];
 
 // Install: pre-cache essential static assets
 self.addEventListener('install', (event) => {
     event.waitUntil(
-        caches.open(CACHE_NAME).then((cache) => {
-            return cache.addAll(STATIC_ASSETS);
+        caches.open(CACHE_NAME).then(async (cache) => {
+            await cache.addAll(STATIC_ASSETS);
+            await Promise.all(
+                WARM_NAVIGATION_ROUTES.map(async (route) => {
+                    try {
+                        const response = await fetch(route, { credentials: 'include' });
+                        if (response.ok && !response.redirected) {
+                            await cache.put(route, response.clone());
+                        }
+                    } catch {
+                        /* offline at install time — skip silently */
+                    }
+                })
+            );
         })
     );
     // Take over immediately — don't wait for old SW to be released.
@@ -75,18 +91,18 @@ async function notifyClientsToSync() {
     }
 }
 
-// Activate: clean up old caches
+// Activate: clean up old caches, then claim clients (in that order, inside waitUntil
+// so activation isn't reported complete until both finish).
 self.addEventListener('activate', (event) => {
-    event.waitUntil(
-        caches.keys().then((cacheNames) => {
-            return Promise.all(
-                cacheNames
-                    .filter((name) => name !== CACHE_NAME)
-                    .map((name) => caches.delete(name))
-            );
-        })
-    );
-    self.clients.claim();
+    event.waitUntil((async () => {
+        const cacheNames = await caches.keys();
+        await Promise.all(
+            cacheNames
+                .filter((name) => name !== CACHE_NAME)
+                .map((name) => caches.delete(name))
+        );
+        await self.clients.claim();
+    })());
 });
 
 // Helper function to add a custom header to a cached response

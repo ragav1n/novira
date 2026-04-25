@@ -7,11 +7,14 @@ import {
     markSynced,
     markFailed,
     incrementRetry,
-    removeSynced
+    removeSynced,
+    evictForCapacity,
+    MAX_QUEUE_SIZE
 } from './offline-sync-queue';
 import { TransactionService } from './services/transaction-service';
 
 const QUEUE_KEY = 'novira-offline-queue';
+const MUTATION_TIMEOUT_MS = 20_000;
 let isSyncingLoopActive = false;
 
 function uuidv4() {
@@ -23,14 +26,39 @@ function uuidv4() {
     );
 }
 
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
+        promise.then(
+            v => { clearTimeout(timer); resolve(v); },
+            e => { clearTimeout(timer); reject(e); }
+        );
+    });
+}
+
+export class QueueFullError extends Error {
+    constructor() {
+        super(`Offline queue is full (${MAX_QUEUE_SIZE} items). Please reconnect to sync pending items.`);
+        this.name = 'QueueFullError';
+    }
+}
+
 // 1. Enqueue Function
 export async function enqueueMutation(type: string, data: any): Promise<string> {
-    const currentQueue = (await get<SyncPayload[]>(QUEUE_KEY)) || [];
+    let currentQueue = (await get<SyncPayload[]>(QUEUE_KEY)) || [];
+
+    // Evict oldest failed/pending items if at capacity. Currently-syncing items are preserved.
+    if (currentQueue.length >= MAX_QUEUE_SIZE) {
+        currentQueue = evictForCapacity(currentQueue);
+        if (currentQueue.length >= MAX_QUEUE_SIZE) {
+            throw new QueueFullError();
+        }
+    }
+
     const id = uuidv4();
-    
     const newQueue = addToQueue(currentQueue, { id, type, data });
     await set(QUEUE_KEY, newQueue);
-    
+
     window.dispatchEvent(new CustomEvent('novira-queue-updated', { detail: { queue: newQueue } }));
 
     if (navigator.onLine) {
@@ -43,51 +71,21 @@ export async function enqueueMutation(type: string, data: any): Promise<string> 
     return id;
 }
 
-// 2. Head Probe Health Check
-async function isSupabaseHealthy(): Promise<boolean> {
-    if (!navigator.onLine) return false;
-    
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    if (!supabaseUrl) return false;
-
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000);
-
-    try {
-        const response = await fetch(`${supabaseUrl}/rest/v1/`, {
-            method: 'HEAD',
-            signal: controller.signal
-        });
-        clearTimeout(timeoutId);
-        return response.ok;
-    } catch (error) {
-        clearTimeout(timeoutId);
-        return false;
-    }
-}
-
 // 3. Process the Queue
 export async function attemptSync() {
     if (isSyncingLoopActive) return;
-    
+
     let queue = (await get<SyncPayload[]>(QUEUE_KEY)) || [];
-    // Migrate legacy items that don't have retryCount
-    queue = queue.map(item => ({ ...item, retryCount: item.retryCount ?? 0 }));
     const now = Date.now();
     const pendingItems = queue.filter(item =>
         item.status === 'pending' &&
         (!item.nextRetryAt || item.nextRetryAt <= now)
     );
-    
+
     if (pendingItems.length === 0) return;
+    if (!navigator.onLine) return;
 
     isSyncingLoopActive = true;
-
-    const healthy = await isSupabaseHealthy();
-    if (!healthy) {
-        isSyncingLoopActive = false;
-        return;
-    }
 
     // Notify UI we are actively syncing
     window.dispatchEvent(new Event('novira-sync-started'));
@@ -96,52 +94,101 @@ export async function attemptSync() {
         for (const item of pendingItems) {
             // Transition to Syncing
             queue = startSyncing(queue, item.id);
-        await set(QUEUE_KEY, queue);
-        window.dispatchEvent(new CustomEvent('novira-queue-updated', { detail: { queue } }));
+            await set(QUEUE_KEY, queue);
+            window.dispatchEvent(new CustomEvent('novira-queue-updated', { detail: { queue } }));
 
-        try {
-            // Execute mutation based on Type
-            if (item.type === 'ADD_FULL_TRANSACTION') {
-                const { transaction, splitRecords, recurringRecord } = item.data;
-                
-                // Use the Service method which now uses the RPC
-                // We pass the transaction as is, but ensuring idempotency_key is present (it should be from enqueue)
-                const result = await TransactionService.createTransaction({
-                    transaction: { ...transaction, idempotency_key: item.id },
-                    splits: splitRecords,
-                    recurring: recurringRecord
-                });
+            try {
+                if (item.type === 'ADD_FULL_TRANSACTION') {
+                    const { transaction, splitRecords, recurringRecord } = item.data;
+                    // Use the queue id as idempotency_key so retries dedupe at the RPC layer.
+                    const result = await withTimeout(
+                        TransactionService.createTransaction({
+                            transaction: { ...transaction, idempotency_key: item.id },
+                            splits: splitRecords,
+                            recurring: recurringRecord
+                        }),
+                        MUTATION_TIMEOUT_MS,
+                        'ADD_FULL_TRANSACTION'
+                    );
 
-                if (result.success) {
-                    queue = markSynced(queue, item.id);
-                } else {
-                    // This block might not be reachable if createTransaction throws, but keeping for safety
-                    throw new Error("Failed to create transaction via sync");
-                }
-            } else if (item.type === 'DELETE_TRANSACTION') {
-                const { error, status } = await supabase
-                    .from('transactions')
-                    .delete()
-                    .eq('id', item.data.id);
-                
-                if (error) {
-                    if (status >= 400 && status < 500) {
-                        queue = markFailed(queue, item.id, error.message);
+                    if (result.success) {
+                        queue = markSynced(queue, item.id);
+                        window.dispatchEvent(new CustomEvent('novira-mutation-synced', {
+                            detail: { id: item.id, type: item.type, data: item.data, result }
+                        }));
                     } else {
-                        throw new Error("Temporary failure");
+                        throw new Error('Failed to create transaction via sync');
                     }
-                } else {
-                    queue = markSynced(queue, item.id);
-                }
-            }
-            // Add other types as needed
-            
-        } catch (e) {
-            // Temporary network failure — apply exponential backoff
-            queue = incrementRetry(queue, item.id);
-        }
+                } else if (item.type === 'DELETE_TRANSACTION') {
+                    const { error } = await withTimeout(
+                        Promise.resolve(
+                            supabase
+                                .from('transactions')
+                                .delete()
+                                .eq('id', item.data.id)
+                        ),
+                        MUTATION_TIMEOUT_MS,
+                        'DELETE_TRANSACTION'
+                    );
 
-        await set(QUEUE_KEY, queue);
+                    if (error) {
+                        const code = (error as any).code as string | undefined;
+                        const status = (error as any).status as number | undefined;
+                        const reason = code ? `${code}: ${error.message}` : error.message;
+                        if ((status && status >= 400 && status < 500) || code === '42501' || code === 'PGRST116') {
+                            // Permanent failure: RLS violation, not found, or other 4xx.
+                            // Note: RLS-filtered deletes succeed with 0 rows (no error), so this branch
+                            // is only hit on actual rejection.
+                            queue = markFailed(queue, item.id, reason);
+                        } else {
+                            throw new Error(reason);
+                        }
+                    } else {
+                        // Postgres treats delete-with-no-match as success (0 rows). That's the
+                        // idempotent behavior we want — already-deleted is the same as deleted now.
+                        queue = markSynced(queue, item.id);
+                        window.dispatchEvent(new CustomEvent('novira-mutation-synced', {
+                            detail: { id: item.id, type: item.type, data: item.data }
+                        }));
+                    }
+                } else if (item.type === 'UPDATE_TRANSACTION') {
+                    const { id, patch } = item.data;
+                    const { error } = await withTimeout(
+                        Promise.resolve(
+                            supabase
+                                .from('transactions')
+                                .update(patch)
+                                .eq('id', id)
+                        ),
+                        MUTATION_TIMEOUT_MS,
+                        'UPDATE_TRANSACTION'
+                    );
+
+                    if (error) {
+                        const code = (error as any).code as string | undefined;
+                        const status = (error as any).status as number | undefined;
+                        const reason = code ? `${code}: ${error.message}` : error.message;
+                        if ((status && status >= 400 && status < 500) || code === '42501' || code === 'PGRST116') {
+                            queue = markFailed(queue, item.id, reason);
+                        } else {
+                            throw new Error(reason);
+                        }
+                    } else {
+                        queue = markSynced(queue, item.id);
+                        window.dispatchEvent(new CustomEvent('novira-mutation-synced', {
+                            detail: { id: item.id, type: item.type, data: item.data }
+                        }));
+                    }
+                }
+            } catch (e) {
+                // Temporary network/server failure — apply exponential backoff with jitter.
+                if (process.env.NODE_ENV === 'development') {
+                    console.error(`[sync-manager] ${item.type} failed, will retry:`, e);
+                }
+                queue = incrementRetry(queue, item.id);
+            }
+
+            await set(QUEUE_KEY, queue);
         }
 
         // Clean up

@@ -2,16 +2,17 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { RefreshCcw, AlertCircle } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { RefreshCcw, AlertCircle, CloudOff } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { type SyncPayload } from '@/lib/offline-sync-queue';
 import { retryFailedItem } from '@/lib/sync-manager';
+import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 
 export function SyncIndicator() {
     const [isSyncing, setIsSyncing] = useState(false);
     const [failedCount, setFailedCount] = useState(0);
     const pathname = usePathname();
+    const online = useOnlineStatus();
 
     const onQueueUpdated = useCallback((e: Event) => {
         const queue: SyncPayload[] = (e as CustomEvent<{ queue: SyncPayload[] }>).detail?.queue ?? [];
@@ -30,46 +31,6 @@ export function SyncIndicator() {
     useEffect(() => {
         if (typeof window === 'undefined') return;
 
-        // Intercept fetch requests to detect background syncs from the service worker
-        const originalFetch = window.fetch;
-
-        window.fetch = async (...args) => {
-            const [resource, config] = args;
-            let url = '';
-
-            if (typeof resource === 'string') {
-                url = resource;
-            } else if (resource instanceof Request) {
-                url = resource.url;
-            } else if (resource instanceof URL) {
-                url = resource.href;
-            }
-
-            // Look for non-auth Supabase GET requests which the service worker intercepts
-            const isSupabaseDataRequest =
-                url.includes('supabase.co') &&
-                !url.includes('/auth/v1/') &&
-                (!config?.method || config.method.toUpperCase() === 'GET');
-
-            let fetchPromise;
-
-            if (isSupabaseDataRequest) {
-                fetchPromise = originalFetch(...args);
-
-                fetchPromise.then((response: Response) => {
-                    const isFromCache = response.headers.get('X-From-Cache') === 'true';
-                    if (isFromCache) {
-                        setIsSyncing(true);
-                        setTimeout(() => setIsSyncing(false), 1500);
-                    }
-                }).catch(() => {});
-            } else {
-                fetchPromise = originalFetch(...args);
-            }
-
-            return fetchPromise;
-        };
-
         const onSyncStart = () => setIsSyncing(true);
         const onSyncEnd = () => setIsSyncing(false);
 
@@ -78,7 +39,6 @@ export function SyncIndicator() {
         window.addEventListener('novira-queue-updated', onQueueUpdated);
 
         return () => {
-            window.fetch = originalFetch;
             window.removeEventListener('novira-sync-started', onSyncStart);
             window.removeEventListener('novira-sync-finished', onSyncEnd);
             window.removeEventListener('novira-queue-updated', onQueueUpdated);
@@ -97,6 +57,7 @@ export function SyncIndicator() {
                         initial={{ opacity: 0, y: -20 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.8 }}
+                        transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
                         className="fixed top-2 lg:top-[72px] left-1/2 -translate-x-1/2 z-[60] flex items-center justify-center pointer-events-none"
                         style={{ willChange: "transform, opacity" }}
                     >
@@ -109,11 +70,30 @@ export function SyncIndicator() {
             </AnimatePresence>
 
             <AnimatePresence>
-                {failedCount > 0 && !isSyncing && (
+                {!online && !isSyncing && (
                     <motion.div
                         initial={{ opacity: 0, y: -20 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.8 }}
+                        transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+                        className="fixed top-2 lg:top-[72px] left-1/2 -translate-x-1/2 z-[60] pointer-events-none"
+                        style={{ willChange: "transform, opacity" }}
+                    >
+                        <div className="bg-amber-500/15 backdrop-blur-md border border-amber-500/20 shadow-lg rounded-full px-3 py-1.5 flex items-center gap-2">
+                            <CloudOff className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                            <span className="text-xs font-medium text-amber-300">Offline — changes will sync later</span>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            <AnimatePresence>
+                {failedCount > 0 && !isSyncing && online && (
+                    <motion.div
+                        initial={{ opacity: 0, y: -20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.8 }}
+                        transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
                         className="fixed top-2 lg:top-[72px] left-1/2 -translate-x-1/2 z-[60] pointer-events-auto"
                         style={{ willChange: "transform, opacity" }}
                     >

@@ -36,10 +36,10 @@ const containerVariants = {
         opacity: 1,
         width: 'auto',
         transition: {
-            y: { type: 'spring' as const, damping: 22, stiffness: 280 },
-            opacity: { duration: 0.25 },
-            width: { type: 'spring' as const, damping: 22, stiffness: 280 },
-            staggerChildren: 0.04,
+            y: { type: 'spring' as const, damping: 28, stiffness: 200, mass: 0.9 },
+            opacity: { duration: 0.35, ease: [0.22, 1, 0.36, 1] as const },
+            width: { type: 'spring' as const, damping: 28, stiffness: 200, mass: 0.9 },
+            staggerChildren: 0.05,
             delayChildren: 0.08,
         },
     },
@@ -48,24 +48,24 @@ const containerVariants = {
         opacity: 1,
         width: '2.75rem',
         transition: {
-            y: { type: 'spring' as const, damping: 22, stiffness: 280 },
-            opacity: { duration: 0.25 },
-            width: { type: 'spring' as const, damping: 22, stiffness: 280 },
+            y: { type: 'spring' as const, damping: 28, stiffness: 200, mass: 0.9 },
+            opacity: { duration: 0.3, ease: [0.4, 0, 0.2, 1] as const },
+            width: { type: 'spring' as const, damping: 28, stiffness: 200, mass: 0.9 },
             when: 'afterChildren' as const,
-            staggerChildren: 0.03,
+            staggerChildren: 0.035,
             staggerDirection: -1,
         },
     },
 };
 
 const expandedChildVariants = {
-    expanded: { opacity: 1, x: 0, scale: 1, transition: { type: 'spring' as const, damping: 16, stiffness: 300 } },
-    collapsed: { opacity: 0, x: -12, scale: 0.95, transition: { duration: 0.18 } },
+    expanded: { opacity: 1, x: 0, scale: 1, transition: { type: 'spring' as const, damping: 22, stiffness: 220, mass: 0.8 } },
+    collapsed: { opacity: 0, x: -10, scale: 0.96, transition: { duration: 0.22, ease: [0.4, 0, 0.2, 1] as const } },
 };
 
 const burgerVariants = {
-    expanded: { opacity: 0, scale: 0.6, transition: { duration: 0.18 } },
-    collapsed: { opacity: 1, scale: 1, transition: { type: 'spring' as const, damping: 16, stiffness: 320, delay: 0.12 } },
+    expanded: { opacity: 0, scale: 0.7, transition: { duration: 0.22, ease: [0.4, 0, 0.2, 1] as const } },
+    collapsed: { opacity: 1, scale: 1, transition: { type: 'spring' as const, damping: 22, stiffness: 240, mass: 0.8, delay: 0.14 } },
 };
 
 function DesktopTopNav({
@@ -352,7 +352,9 @@ export function MobileLayout({ children, defaultIsDesktop = false }: { children:
     return (
         <MotionConfig reducedMotion="user">
         <div className={cn(
-            "min-h-[100dvh] w-full bg-background text-foreground relative overflow-hidden font-sans select-none flex flex-col",
+            // h-[100dvh] (not min-h) so <main> is the scroll container — required for the
+            // desktop nav's useScroll(mainRef) to fire collapse on scroll-down.
+            "h-[100dvh] w-full bg-background text-foreground relative overflow-hidden font-sans select-none flex flex-col",
             isNative && "pt-[env(safe-area-inset-top)]",
             isCoupleWorkspace && "theme-couple",
             isHomeWorkspace && "theme-home"

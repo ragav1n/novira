@@ -2,7 +2,7 @@
 
 import React, { memo, useState, useEffect } from 'react';
 import { format, parseISO } from 'date-fns';
-import { History, MoreVertical, Users, RefreshCcw, Ban, MapPin, Pencil, Trash2, Globe, ArrowLeftRight } from 'lucide-react';
+import { History, MoreVertical, Users, RefreshCcw, Ban, MapPin, Pencil, Trash2, Globe, ArrowLeftRight, Cloud, AlertTriangle } from 'lucide-react';
 import type { Transaction } from '@/types/transaction';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
@@ -85,7 +85,7 @@ export const TransactionRow = memo(function TransactionRow({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canEdit]);
 
-  const snapTo = (target: number) => animate(x, target, { type: 'spring', stiffness: 400, damping: 40 });
+  const snapTo = (target: number) => animate(x, target, { type: 'spring', stiffness: 320, damping: 34, mass: 0.8 });
 
   const handleDragEnd = (_: unknown, info: { offset: { x: number } }) => {
     if (!canEdit) return;
@@ -96,6 +96,8 @@ export const TransactionRow = memo(function TransactionRow({
   const closeSwipe = () => { snapTo(0); setSwiped(false); };
 
   const paidByLabel = tx.user_id === userId ? 'You' : (tx.profile?.full_name?.split(' ')[0] ?? 'Other');
+  const isPending = !!tx._pending;
+  const isFailed = !!tx._failed;
 
   return (
     <motion.div
@@ -103,7 +105,7 @@ export const TransactionRow = memo(function TransactionRow({
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.97 }}
-      transition={{ duration: 0.2, ease: [0.32, 0.72, 0.32, 1] }}
+      transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
       className="relative overflow-hidden rounded-xl mt-1.5 first:mt-0"
     >
       {/* Swipe action buttons */}
@@ -134,7 +136,10 @@ export const TransactionRow = memo(function TransactionRow({
         onDragEnd={handleDragEnd}
         style={{ x, borderLeft: `3px solid ${color}` }}
         onClick={swiped ? closeSwipe : undefined}
-        className="relative flex items-center gap-3 px-4 py-3.5 bg-card select-none"
+        className={cn(
+          "relative flex items-center gap-3 px-4 py-3.5 bg-card select-none transition-opacity",
+          isPending && "opacity-70"
+        )}
       >
         {/* Icon */}
         <div className="relative shrink-0">
@@ -195,6 +200,18 @@ export const TransactionRow = memo(function TransactionRow({
                 tx.place_name === 'Online'
                   ? <Globe className="shrink-0 w-3 h-3 text-blue-400/60 ml-0.5" aria-label="Online purchase" />
                   : <MapPin className="shrink-0 w-3 h-3 text-emerald-400/50 ml-0.5" aria-label="Has location" />
+              )}
+              {isPending && (
+                <span className="shrink-0 flex items-center gap-1 px-1.5 py-[2px] rounded bg-sky-500/10 text-sky-400 border border-sky-500/15 text-[10px] font-medium ml-1" aria-label="Waiting to sync">
+                  <Cloud className="w-2.5 h-2.5 animate-pulse" aria-hidden="true" />
+                  Syncing
+                </span>
+              )}
+              {isFailed && (
+                <span className="shrink-0 flex items-center gap-1 px-1.5 py-[2px] rounded bg-rose-500/10 text-rose-400 border border-rose-500/15 text-[10px] font-medium ml-1" title={tx._syncError || undefined} aria-label="Sync failed">
+                  <AlertTriangle className="w-2.5 h-2.5" aria-hidden="true" />
+                  Failed
+                </span>
               )}
             </div>
 

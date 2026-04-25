@@ -761,12 +761,16 @@ export function Component({ isSignUp = false }: { isSignUp?: boolean }) {
                   type="button"
                   disabled={isLoading}
                   onClick={async () => {
+                    // Same submission lock as the email/password path — guards against
+                    // double-firing in the brief window before disabled={isLoading} commits.
+                    if (isSubmittingRef.current || isLoading) return;
+                    isSubmittingRef.current = true;
                     setIsLoading(true);
                     try {
                       // Ensure redirectTo is a fully qualified URL
                       const appUrl = (process.env.NEXT_PUBLIC_APP_URL || window.location.origin).replace(/\/$/, '');
                       const redirectTo = `${appUrl}/auth/callback`;
-                      
+
                       const { error } = await supabase.auth.signInWithOAuth({
                         provider: 'google',
                         options: {
@@ -778,10 +782,12 @@ export function Component({ isSignUp = false }: { isSignUp?: boolean }) {
                         },
                       });
                       if (error) throw error;
+                      // On success the browser is redirecting to Google — leave the lock held.
                     } catch (error: any) {
                       console.error("Google Auth error:", error);
                       setError(error.message || 'Authentication failed');
                       setIsLoading(false);
+                      isSubmittingRef.current = false;
                     }
                   }}
                   className="w-full relative group/google-button"

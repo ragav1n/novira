@@ -7,6 +7,8 @@ import {
     resetToPending,
     removeSynced,
     incrementRetry,
+    evictForCapacity,
+    MAX_QUEUE_SIZE,
     type SyncPayload,
 } from '../offline-sync-queue';
 
@@ -124,20 +126,36 @@ describe('offline sync queue state machine', () => {
             expect(queue[0].nextRetryAt).toBeGreaterThan(before);
         });
 
-        it('applies ~2s backoff on first retry', () => {
+        it('applies ~2s backoff on first retry (within ±15% jitter)', () => {
             queue = addToQueue(queue, { id: 'uuid-1', type: 'ADD_TX', data: {} });
             const before = Date.now();
             queue = incrementRetry(queue, 'uuid-1');
-            expect(queue[0].nextRetryAt).toBeLessThanOrEqual(before + 2000 + 100);
+            // Base = 2000ms; jitter window = 0.85x..1.15x = 1700ms..2300ms
+            expect(queue[0].nextRetryAt).toBeGreaterThanOrEqual(before + 1700 - 50);
+            expect(queue[0].nextRetryAt).toBeLessThanOrEqual(before + 2300 + 50);
         });
 
-        it('applies ~4s backoff on second retry', () => {
+        it('applies ~4s backoff on second retry (within ±15% jitter)', () => {
             queue = addToQueue(queue, { id: 'uuid-1', type: 'ADD_TX', data: {} });
+            queue = incrementRetry(queue, 'uuid-1'); // retry 1
             const before = Date.now();
-            queue = incrementRetry(queue, 'uuid-1');
-            queue = incrementRetry(queue, 'uuid-1');
+            queue = incrementRetry(queue, 'uuid-1'); // retry 2
             expect(queue[0].retryCount).toBe(2);
-            expect(queue[0].nextRetryAt).toBeGreaterThanOrEqual(before + 4000 - 100);
+            // Base = 4000ms; jitter window = 3400ms..4600ms
+            expect(queue[0].nextRetryAt).toBeGreaterThanOrEqual(before + 3400 - 50);
+            expect(queue[0].nextRetryAt).toBeLessThanOrEqual(before + 4600 + 50);
+        });
+
+        it('produces non-deterministic backoff (jitter)', () => {
+            // 20 independent first-retries should not all land on the exact same nextRetryAt
+            const samples: number[] = [];
+            for (let i = 0; i < 20; i++) {
+                let q = addToQueue([], { id: `uuid-${i}`, type: 'ADD_TX', data: {} });
+                q = incrementRetry(q, `uuid-${i}`);
+                samples.push(q[0].nextRetryAt!);
+            }
+            const distinct = new Set(samples);
+            expect(distinct.size).toBeGreaterThan(1);
         });
 
         it('marks as failed after 5 retries (max)', () => {
@@ -159,6 +177,51 @@ describe('offline sync queue state machine', () => {
             const after2 = queue[0].nextRetryAt!;
             // Each successive retry should have a longer nextRetryAt
             expect(after2).toBeGreaterThan(after1);
+        });
+    });
+
+    describe('evictForCapacity', () => {
+        function buildSaturatedQueue(failed: number, pending: number, syncing: number): SyncPayload[] {
+            const q: SyncPayload[] = [];
+            let t = 1000;
+            for (let i = 0; i < failed; i++) {
+                q.push({ id: `f-${i}`, type: 'ADD_TX', data: {}, status: 'failed', createdAt: t++, retryCount: 5 });
+            }
+            for (let i = 0; i < pending; i++) {
+                q.push({ id: `p-${i}`, type: 'ADD_TX', data: {}, status: 'pending', createdAt: t++, retryCount: 0 });
+            }
+            for (let i = 0; i < syncing; i++) {
+                q.push({ id: `s-${i}`, type: 'ADD_TX', data: {}, status: 'syncing', createdAt: t++, retryCount: 0 });
+            }
+            return q;
+        }
+
+        it('returns the queue unchanged when below capacity', () => {
+            const q = buildSaturatedQueue(0, 10, 0);
+            expect(evictForCapacity(q)).toBe(q);
+        });
+
+        it('evicts oldest failed items first when at capacity', () => {
+            const q = buildSaturatedQueue(MAX_QUEUE_SIZE, 0, 0);
+            const evicted = evictForCapacity(q);
+            expect(evicted.length).toBe(MAX_QUEUE_SIZE - 1);
+            // Oldest (lowest createdAt) failed item should be removed
+            expect(evicted.some(i => i.id === 'f-0')).toBe(false);
+        });
+
+        it('falls back to evicting pending items when no failed items remain', () => {
+            const q = buildSaturatedQueue(0, MAX_QUEUE_SIZE, 0);
+            const evicted = evictForCapacity(q);
+            expect(evicted.length).toBe(MAX_QUEUE_SIZE - 1);
+            expect(evicted.some(i => i.id === 'p-0')).toBe(false);
+        });
+
+        it('never evicts syncing items', () => {
+            const q = buildSaturatedQueue(0, 0, MAX_QUEUE_SIZE);
+            const evicted = evictForCapacity(q);
+            // All items are 'syncing' — none should be removed even though we're at capacity
+            expect(evicted.length).toBe(MAX_QUEUE_SIZE);
+            expect(evicted.every(i => i.status === 'syncing')).toBe(true);
         });
     });
 
