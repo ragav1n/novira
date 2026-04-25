@@ -52,12 +52,18 @@ export function DashboardView() {
     const { balances, groups, friends } = useGroups();
     const { buckets, bucketSpending } = useBuckets();
 
+    // Pass current user's profile so offline-queued transactions render with the
+    // correct payer info instead of a blank profile.
+    const currentUserProfile = useMemo(
+        () => ({ full_name: userName || 'You', avatar_url: avatarUrl || undefined }),
+        [userName, avatarUrl]
+    );
     const {
         transactions, loading, hasMore, loadingMore, loadMore,
         editingTransaction, setEditingTransaction,
         isEditOpen, setIsEditOpen, selectedAuditTx, setSelectedAuditTx,
         auditLogs, loadingAudit, handleDeleteTransaction, handleUpdateTransaction, loadAuditLogs, loadTransactions
-    } = useDashboardData(userId, activeWorkspaceId);
+    } = useDashboardData(userId, activeWorkspaceId, currentUserProfile);
 
 
     const {

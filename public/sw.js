@@ -1,4 +1,4 @@
-const CACHE_NAME = 'novira-cache-d98fafd6'; // Updated version
+const CACHE_NAME = 'novira-cache-b94a3678'; // Updated version
 const STATIC_ASSETS = [
     '/Novira.png',
     '/manifest.json',
@@ -10,6 +10,30 @@ const STATIC_ASSETS = [
 // Failures are non-fatal — they're best-effort warmers, not invariants.
 const WARM_NAVIGATION_ROUTES = ['/', '/add'];
 
+// Extract same-origin <script src> and <link rel="modulepreload" href> URLs from
+// HTML text. Used during install to pre-cache the JS chunks the warmed routes
+// reference, so a fresh-installed PWA mounts cleanly even if the user goes
+// offline before navigating.
+function extractAssetUrls(html, origin) {
+    const urls = new Set();
+    const scriptRe = /<script[^>]+src=["']([^"']+)["']/gi;
+    const preloadRe = /<link[^>]+rel=["'](?:modulepreload|preload)["'][^>]*href=["']([^"']+)["']/gi;
+    let m;
+    while ((m = scriptRe.exec(html)) !== null) {
+        try {
+            const url = new URL(m[1], origin);
+            if (url.origin === origin) urls.add(url.href);
+        } catch {}
+    }
+    while ((m = preloadRe.exec(html)) !== null) {
+        try {
+            const url = new URL(m[1], origin);
+            if (url.origin === origin) urls.add(url.href);
+        } catch {}
+    }
+    return Array.from(urls);
+}
+
 // Install: pre-cache essential static assets
 self.addEventListener('install', (event) => {
     event.waitUntil(
@@ -19,8 +43,30 @@ self.addEventListener('install', (event) => {
                 WARM_NAVIGATION_ROUTES.map(async (route) => {
                     try {
                         const response = await fetch(route, { credentials: 'include' });
-                        if (response.ok && !response.redirected) {
-                            await cache.put(route, response.clone());
+                        if (!response.ok || response.redirected) return;
+                        // Cache the HTML itself so navigation falls back here when offline.
+                        const cloneForCache = response.clone();
+                        await cache.put(route, cloneForCache);
+
+                        // Parse HTML and pre-cache its referenced JS chunks. Failures are
+                        // non-fatal — best-effort warming.
+                        try {
+                            const html = await response.text();
+                            const assetUrls = extractAssetUrls(html, self.location.origin);
+                            await Promise.all(
+                                assetUrls.map(async (url) => {
+                                    try {
+                                        const assetResponse = await fetch(url, { credentials: 'include' });
+                                        if (assetResponse.ok) {
+                                            await cache.put(url, assetResponse.clone());
+                                        }
+                                    } catch {
+                                        /* skip individual asset failures */
+                                    }
+                                })
+                            );
+                        } catch {
+                            /* HTML parse failure — skip warming */
                         }
                     } catch {
                         /* offline at install time — skip silently */

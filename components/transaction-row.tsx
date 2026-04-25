@@ -62,7 +62,7 @@ export const TransactionRow = memo(function TransactionRow({
   const [showHint, setShowHint] = useState(false);
 
   useEffect(() => {
-    if (!canEdit || _swipeHintLock) return;
+    if (!canEdit || tx._pending || tx._failed || _swipeHintLock) return;
     if (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('novira-swipe-hint')) return;
     _swipeHintLock = true;
     let cancelled = false;
@@ -98,6 +98,10 @@ export const TransactionRow = memo(function TransactionRow({
   const paidByLabel = tx.user_id === userId ? 'You' : (tx.profile?.full_name?.split(' ')[0] ?? 'Other');
   const isPending = !!tx._pending;
   const isFailed = !!tx._failed;
+  // Pending/failed rows have a faded card via opacity-70, which lets the swipe
+  // action buttons (sitting absolutely behind the card) bleed through. Disable
+  // swipe + hide those buttons until the row syncs.
+  const swipeEnabled = canEdit && !isPending && !isFailed;
 
   return (
     <motion.div
@@ -109,7 +113,7 @@ export const TransactionRow = memo(function TransactionRow({
       className="relative overflow-hidden rounded-xl mt-1.5 first:mt-0"
     >
       {/* Swipe action buttons */}
-      {canEdit && (
+      {swipeEnabled && (
         <div className="absolute inset-y-0 right-0 flex items-stretch gap-px bg-black/10">
           <button
             onClick={() => { closeSwipe(); onEdit(); }}
@@ -130,7 +134,7 @@ export const TransactionRow = memo(function TransactionRow({
 
       {/* Sliding card */}
       <motion.div
-        drag={canEdit ? 'x' : false}
+        drag={swipeEnabled ? 'x' : false}
         dragConstraints={{ left: -SNAP_DISTANCE, right: 0 }}
         dragElastic={0.07}
         onDragEnd={handleDragEnd}

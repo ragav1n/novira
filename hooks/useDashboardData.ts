@@ -4,12 +4,15 @@ import { supabase } from '@/lib/supabase';
 import { toast } from '@/utils/haptics';
 import type { Transaction, AuditLog } from '@/types/transaction';
 import type { SyncPayload } from '@/lib/offline-sync-queue';
-import { discardFailedItem } from '@/lib/sync-manager';
+import { discardFailedItem, enqueueMutation } from '@/lib/sync-manager';
 
 const PAGE_SIZE = 100;
 const QUEUE_KEY = 'novira-offline-queue';
 
-function pendingItemToTransaction(item: SyncPayload): Transaction | null {
+function pendingItemToTransaction(
+    item: SyncPayload,
+    profile?: { full_name: string; avatar_url?: string }
+): Transaction | null {
     if (item.type !== 'ADD_FULL_TRANSACTION') return null;
     if (item.status === 'synced') return null;
     const t = item.data?.transaction;
@@ -40,13 +43,18 @@ function pendingItemToTransaction(item: SyncPayload): Transaction | null {
         place_lng: t.place_lng ?? undefined,
         group_id: t.group_id ?? null,
         splits,
+        profile,
         _pending: item.status === 'pending' || item.status === 'syncing',
         _failed: item.status === 'failed',
         _syncError: item.errorReason,
     };
 }
 
-export function useDashboardData(userId: string | null, activeWorkspaceId: string | null = null) {
+export function useDashboardData(
+    userId: string | null,
+    activeWorkspaceId: string | null = null,
+    currentUserProfile?: { full_name: string; avatar_url?: string }
+) {
     const [serverTransactions, setServerTransactions] = useState<Transaction[]>([]);
     const [pendingTransactions, setPendingTransactions] = useState<Transaction[]>([]);
     const [loading, setLoading] = useState(true);
@@ -124,7 +132,7 @@ export function useDashboardData(userId: string | null, activeWorkspaceId: strin
                 return t.user_id === userId;
             });
             const pending = filtered
-                .map(pendingItemToTransaction)
+                .map(item => pendingItemToTransaction(item, currentUserProfile))
                 .filter((t): t is Transaction => t !== null);
             setPendingTransactions(pending);
         } catch (error) {
@@ -132,7 +140,7 @@ export function useDashboardData(userId: string | null, activeWorkspaceId: strin
                 console.error('Error loading pending queue items:', error);
             }
         }
-    }, [userId, activeWorkspaceId]);
+    }, [userId, activeWorkspaceId, currentUserProfile?.full_name, currentUserProfile?.avatar_url]);
 
     const loadMore = useCallback(async () => {
         if (!userId || loadingMore || !hasMore) return;
@@ -188,8 +196,25 @@ export function useDashboardData(userId: string | null, activeWorkspaceId: strin
         const onQueueUpdated = () => loadPendingFromQueue();
         const onMutationSynced = (e: Event) => {
             const detail = (e as CustomEvent<{ id: string; type: string }>).detail;
+            // Re-fetch from server so the dashboard catches up immediately. Realtime
+            // usually delivers the row, but after a long offline period the websocket
+            // can be in a stale state and miss it.
+            //
+            // For ADD: keep the pending row visible until the fetch completes — otherwise
+            // there's a flicker where the row vanishes while we wait for the server roundtrip.
+            // For UPDATE/DELETE: the optimistic UI is already on the server's data shape,
+            // so we just refresh.
             if (detail?.type === 'ADD_FULL_TRANSACTION') {
-                setPendingTransactions(prev => prev.filter(t => t.id !== detail.id));
+                if (userId) {
+                    Promise.resolve(loadTxRef.current?.(userId, activeWorkspaceId))
+                        .finally(() => {
+                            setPendingTransactions(prev => prev.filter(t => t.id !== detail.id));
+                        });
+                } else {
+                    setPendingTransactions(prev => prev.filter(t => t.id !== detail.id));
+                }
+            } else if (detail?.type === 'UPDATE_TRANSACTION' || detail?.type === 'DELETE_TRANSACTION') {
+                if (userId) loadTxRef.current?.(userId, activeWorkspaceId);
             }
         };
         window.addEventListener('novira-queue-updated', onQueueUpdated);
@@ -198,7 +223,7 @@ export function useDashboardData(userId: string | null, activeWorkspaceId: strin
             window.removeEventListener('novira-queue-updated', onQueueUpdated);
             window.removeEventListener('novira-mutation-synced', onMutationSynced);
         };
-    }, [userId, loadPendingFromQueue]);
+    }, [userId, activeWorkspaceId, loadPendingFromQueue]);
 
     // Fetch a single transaction with full profile/splits joins for surgical state updates
     const fetchFullTransaction = useCallback(async (txId: string): Promise<Transaction | null> => {
@@ -283,7 +308,25 @@ export function useDashboardData(userId: string | null, activeWorkspaceId: strin
             )
             .subscribe();
 
+        // Force-reconnect realtime when the device comes back online. Supabase usually
+        // recovers on its own, but after a long offline (laptop closed for hours) the
+        // websocket can be in a stale state without firing — leaving the dashboard
+        // frozen until the user manually refreshes.
+        const handleOnline = () => {
+            try {
+                supabase.realtime.connect();
+            } catch (e) {
+                if (process.env.NODE_ENV === 'development') {
+                    console.warn('[useDashboardData] realtime reconnect failed:', e);
+                }
+            }
+            // Also re-fetch in case mutations from other tabs were missed.
+            loadTxRef.current?.(userId, activeWorkspaceId);
+        };
+        window.addEventListener('online', handleOnline);
+
         return () => {
+            window.removeEventListener('online', handleOnline);
             supabase.removeChannel(channel);
         };
     }, [userId, activeWorkspaceId, debouncedLoadTx, fetchFullTransaction]);
@@ -338,6 +381,25 @@ export function useDashboardData(userId: string | null, activeWorkspaceId: strin
         const previousServerTransactions = [...serverTransactions];
         setServerTransactions(prev => prev.filter(t => t.id !== tx.id));
         toast.success('Transaction deleted'); // toast.success will trigger light haptic
+
+        // Offline: queue the delete so it reaches the server when we reconnect.
+        // Without this branch the direct supabase.delete below would fail offline
+        // and the row would snap back into the list — confusing for the user.
+        if (typeof navigator !== 'undefined' && !navigator.onLine) {
+            try {
+                await enqueueMutation('DELETE_TRANSACTION', { id: tx.id });
+            } catch (error: any) {
+                setServerTransactions(previousServerTransactions);
+                if (error?.name === 'QueueFullError') {
+                    toast.error(error.message);
+                } else {
+                    toast.error('Failed to queue delete: ' + error.message);
+                }
+            } finally {
+                mutatingRef.current = false;
+            }
+            return;
+        }
 
         try {
             const { error } = await supabase
@@ -411,20 +473,39 @@ export function useDashboardData(userId: string | null, activeWorkspaceId: strin
         const savedEditingTx = editingTransaction;
         setEditingTransaction(null);
 
+        const patch = {
+            description: savedEditingTx.description,
+            category: savedEditingTx.category,
+            amount: savedEditingTx.amount,
+            bucket_id: savedEditingTx.bucket_id || null,
+            exclude_from_allowance: savedEditingTx.exclude_from_allowance || false,
+            place_name: savedEditingTx.place_name || null,
+            place_address: savedEditingTx.place_address || null,
+            place_lat: savedEditingTx.place_lat || null,
+            place_lng: savedEditingTx.place_lng || null,
+        };
+
+        // Offline: queue the update; optimistic UI is already applied above.
+        if (typeof navigator !== 'undefined' && !navigator.onLine) {
+            try {
+                await enqueueMutation('UPDATE_TRANSACTION', { id: savedEditingTx.id, patch });
+            } catch (error: any) {
+                setServerTransactions(previousServerTransactions);
+                if (error?.name === 'QueueFullError') {
+                    toast.error(error.message);
+                } else {
+                    toast.error('Failed to queue update: ' + error.message);
+                }
+            } finally {
+                mutatingRef.current = false;
+            }
+            return;
+        }
+
         try {
             const { error } = await supabase
                 .from('transactions')
-                .update({
-                    description: savedEditingTx.description,
-                    category: savedEditingTx.category,
-                    amount: savedEditingTx.amount,
-                    bucket_id: savedEditingTx.bucket_id || null,
-                    exclude_from_allowance: savedEditingTx.exclude_from_allowance || false,
-                    place_name: savedEditingTx.place_name || null,
-                    place_address: savedEditingTx.place_address || null,
-                    place_lat: savedEditingTx.place_lat || null,
-                    place_lng: savedEditingTx.place_lng || null,
-                })
+                .update(patch)
                 .eq('id', savedEditingTx.id);
 
             if (error) throw error;

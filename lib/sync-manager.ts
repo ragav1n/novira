@@ -1,4 +1,5 @@
 import { get, set } from 'idb-keyval';
+import type { PostgrestError } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import {
     SyncPayload,
@@ -34,6 +35,23 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
             e => { clearTimeout(timer); reject(e); }
         );
     });
+}
+
+// Supabase Postgrest error codes that should be treated as permanent (no retry).
+// 42501 = insufficient_privilege (RLS), PGRST116 = singular row not found.
+const PERMANENT_PG_CODES = new Set(['42501', 'PGRST116']);
+
+/**
+ * Classify a Postgrest error into a stable retry vs. permanent decision.
+ * Permanent errors are marked failed; transient errors throw to trigger backoff.
+ */
+function classifyPgError(error: PostgrestError): { permanent: boolean; reason: string } {
+    const reason = error.code ? `${error.code}: ${error.message}` : error.message;
+    // Postgrest doesn't expose `status` on the type but does set it at runtime.
+    const status = (error as PostgrestError & { status?: number }).status;
+    const is4xx = typeof status === 'number' && status >= 400 && status < 500;
+    const permanent = is4xx || (typeof error.code === 'string' && PERMANENT_PG_CODES.has(error.code));
+    return { permanent, reason };
 }
 
 export class QueueFullError extends Error {
@@ -132,10 +150,8 @@ export async function attemptSync() {
                     );
 
                     if (error) {
-                        const code = (error as any).code as string | undefined;
-                        const status = (error as any).status as number | undefined;
-                        const reason = code ? `${code}: ${error.message}` : error.message;
-                        if ((status && status >= 400 && status < 500) || code === '42501' || code === 'PGRST116') {
+                        const { permanent, reason } = classifyPgError(error);
+                        if (permanent) {
                             // Permanent failure: RLS violation, not found, or other 4xx.
                             // Note: RLS-filtered deletes succeed with 0 rows (no error), so this branch
                             // is only hit on actual rejection.
@@ -165,10 +181,8 @@ export async function attemptSync() {
                     );
 
                     if (error) {
-                        const code = (error as any).code as string | undefined;
-                        const status = (error as any).status as number | undefined;
-                        const reason = code ? `${code}: ${error.message}` : error.message;
-                        if ((status && status >= 400 && status < 500) || code === '42501' || code === 'PGRST116') {
+                        const { permanent, reason } = classifyPgError(error);
+                        if (permanent) {
                             queue = markFailed(queue, item.id, reason);
                         } else {
                             throw new Error(reason);

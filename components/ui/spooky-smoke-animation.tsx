@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 const fragmentShaderSource = `#version 300 es
 precision highp float;
@@ -143,13 +143,29 @@ interface SmokeBackgroundProps {
   smokeColor?: string;
 }
 
+// Reads `prefers-reduced-motion` and updates if the user toggles it.
+function usePrefersReducedMotion(): boolean {
+  const [prefers, setPrefers] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+    setPrefers(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setPrefers(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
+  return prefers;
+}
+
 export const SmokeBackground: React.FC<SmokeBackgroundProps> = ({
   smokeColor = '#808080',
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rendererRef = useRef<Renderer | null>(null);
+  const reducedMotion = usePrefersReducedMotion();
 
   useEffect(() => {
+    // Honour prefers-reduced-motion: skip the WebGL/RAF pipeline entirely.
+    if (reducedMotion) return;
     if (!canvasRef.current) return;
     const canvas = canvasRef.current;
     const renderer = new Renderer(canvas, fragmentShaderSource);
@@ -170,8 +186,9 @@ export const SmokeBackground: React.FC<SmokeBackgroundProps> = ({
       window.removeEventListener('resize', handleResize);
       cancelAnimationFrame(animationFrameId);
       renderer.reset();
+      rendererRef.current = null;
     };
-  }, []);
+  }, [reducedMotion]);
 
   useEffect(() => {
     const renderer = rendererRef.current;
@@ -181,5 +198,17 @@ export const SmokeBackground: React.FC<SmokeBackgroundProps> = ({
     }
   }, [smokeColor]);
 
+  // When reduced motion is requested, render a static gradient stand-in.
+  if (reducedMotion) {
+    return (
+      <div
+        className="w-full h-full block"
+        style={{
+          background: `radial-gradient(60% 60% at 50% 40%, ${smokeColor}40 0%, ${smokeColor}10 50%, transparent 100%)`,
+        }}
+        aria-hidden="true"
+      />
+    );
+  }
   return <canvas ref={canvasRef} className="w-full h-full block" />;
 };

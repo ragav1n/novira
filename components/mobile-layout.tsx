@@ -38,6 +38,7 @@ const containerVariants = {
         transition: {
             y: { type: 'spring' as const, damping: 28, stiffness: 200, mass: 0.9 },
             opacity: { duration: 0.35, ease: [0.22, 1, 0.36, 1] as const },
+            // Soft expand — gentle, no overshoot
             width: { type: 'spring' as const, damping: 28, stiffness: 200, mass: 0.9 },
             staggerChildren: 0.05,
             delayChildren: 0.08,
@@ -50,7 +51,9 @@ const containerVariants = {
         transition: {
             y: { type: 'spring' as const, damping: 28, stiffness: 200, mass: 0.9 },
             opacity: { duration: 0.3, ease: [0.4, 0, 0.2, 1] as const },
-            width: { type: 'spring' as const, damping: 28, stiffness: 200, mass: 0.9 },
+            // Springy collapse — lower damping so the width bounces slightly when it
+            // settles into the burger circle.
+            width: { type: 'spring' as const, damping: 14, stiffness: 230, mass: 0.95 },
             when: 'afterChildren' as const,
             staggerChildren: 0.035,
             staggerDirection: -1,
@@ -65,8 +68,64 @@ const expandedChildVariants = {
 
 const burgerVariants = {
     expanded: { opacity: 0, scale: 0.7, transition: { duration: 0.22, ease: [0.4, 0, 0.2, 1] as const } },
-    collapsed: { opacity: 1, scale: 1, transition: { type: 'spring' as const, damping: 22, stiffness: 240, mass: 0.8, delay: 0.14 } },
+    collapsed: { opacity: 1, scale: 1, transition: { type: 'spring' as const, damping: 16, stiffness: 260, mass: 0.85, delay: 0.18 } },
 };
+
+// Minimum gap between expand/collapse flips. Prevents rapid up/down scrolling
+// from interrupting an in-flight stagger animation and leaving the nav stuck
+// halfway between states.
+const NAV_TOGGLE_COOLDOWN_MS = 380;
+
+// ─── Mobile Bottom Nav Wrapper ───────────────────────────────────────────────
+// Hide the floating bottom nav on scroll-down past 150px, show on scroll-up by 80px.
+// Same cooldown + threshold pattern as the desktop nav for consistency.
+function MobileBottomNavScroller({
+    children,
+    scrollContainerRef,
+    isNative,
+}: {
+    children: React.ReactNode;
+    scrollContainerRef: React.RefObject<HTMLElement | null>;
+    isNative: boolean;
+}) {
+    const [isVisible, setVisible] = useState(true);
+    const lastScrollY = useRef(0);
+    const scrollPositionOnHide = useRef(0);
+    const lastToggleAt = useRef(0);
+
+    const { scrollY } = useScroll({ container: scrollContainerRef as React.RefObject<HTMLElement> });
+
+    useMotionValueEvent(scrollY, 'change', (latest) => {
+        const previous = lastScrollY.current;
+        const now = performance.now();
+        const onCooldown = now - lastToggleAt.current < NAV_TOGGLE_COOLDOWN_MS;
+
+        if (isVisible && latest > previous && latest > 150 && !onCooldown) {
+            setVisible(false);
+            scrollPositionOnHide.current = latest;
+            lastToggleAt.current = now;
+        } else if (!isVisible && latest < previous && scrollPositionOnHide.current - latest > 80 && !onCooldown) {
+            setVisible(true);
+            lastToggleAt.current = now;
+        }
+        lastScrollY.current = latest;
+    });
+
+    return (
+        <motion.div
+            initial={false}
+            animate={isVisible ? { y: 0, opacity: 1 } : { y: 96, opacity: 0 }}
+            transition={{ type: 'spring', damping: 26, stiffness: 220, mass: 0.85 }}
+            className={cn(
+                "fixed bottom-6 left-0 right-0 z-50 flex justify-center px-4",
+                isNative && "bottom-[calc(1.5rem+env(safe-area-inset-bottom))]"
+            )}
+            style={{ pointerEvents: isVisible ? 'auto' : 'none' }}
+        >
+            {children}
+        </motion.div>
+    );
+}
 
 function DesktopTopNav({
     pathname,
@@ -84,6 +143,7 @@ function DesktopTopNav({
     const [isExpanded, setExpanded] = useState(true);
     const lastScrollY = useRef(0);
     const scrollPositionOnCollapse = useRef(0);
+    const lastToggleAt = useRef(0);
 
     const activeText = isCoupleWorkspace ? 'text-rose-400' : isHomeWorkspace ? 'text-amber-400' : 'text-primary';
     const activeBg   = isCoupleWorkspace ? 'bg-rose-500/10' : isHomeWorkspace ? 'bg-amber-500/10' : 'bg-primary/10';
@@ -92,11 +152,19 @@ function DesktopTopNav({
 
     useMotionValueEvent(scrollY, 'change', (latest) => {
         const previous = lastScrollY.current;
-        if (isExpanded && latest > previous && latest > 150) {
+        const now = performance.now();
+        // Cooldown: ignore toggle attempts mid-animation. Without this, rapid
+        // up/down scroll wiggles can interrupt the stagger and freeze the nav
+        // in a half-collapsed state.
+        const onCooldown = now - lastToggleAt.current < NAV_TOGGLE_COOLDOWN_MS;
+
+        if (isExpanded && latest > previous && latest > 150 && !onCooldown) {
             setExpanded(false);
             scrollPositionOnCollapse.current = latest;
-        } else if (!isExpanded && latest < previous && scrollPositionOnCollapse.current - latest > 80) {
+            lastToggleAt.current = now;
+        } else if (!isExpanded && latest < previous && scrollPositionOnCollapse.current - latest > 80 && !onCooldown) {
             setExpanded(true);
+            lastToggleAt.current = now;
         }
         lastScrollY.current = latest;
     });
@@ -407,17 +475,14 @@ export function MobileLayout({ children, defaultIsDesktop = false }: { children:
             {showNav && !showDesktop && (
                 <>
                     <PWAUpdater />
-                    <div className={cn(
-                        "fixed bottom-6 left-0 right-0 z-50 flex justify-center px-4",
-                        isNative && "bottom-[calc(1.5rem+env(safe-area-inset-bottom))]"
-                    )}>
+                    <MobileBottomNavScroller scrollContainerRef={mainRef} isNative={isNative}>
                         <ExpandableTabs
                             tabs={tabs}
                             className="bg-background/80 backdrop-blur-xl border-white/10 shadow-2xl shadow-primary/20"
                             activeColor="text-primary bg-primary/10"
                             onChange={handleTabChange}
                         />
-                    </div>
+                    </MobileBottomNavScroller>
                 </>
             )}
 
