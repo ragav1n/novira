@@ -193,7 +193,7 @@ export function AddExpenseView() {
             className="relative"
         >
             <div className={cn(
-                "p-5 space-y-6 max-w-md lg:max-w-4xl mx-auto pt-4 relative min-h-screen z-10"
+                "p-5 space-y-6 max-w-md lg:max-w-4xl mx-auto pt-4 pb-[calc(8rem+env(safe-area-inset-bottom))] lg:pb-12 relative min-h-screen z-10"
             )}>
 
                 {/* Header */}

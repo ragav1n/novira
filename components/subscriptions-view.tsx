@@ -117,11 +117,12 @@ export function SubscriptionsView() {
 
             <div className="p-5 space-y-6 max-w-md lg:max-w-4xl mx-auto relative min-h-screen z-10">
                 <div className="flex items-center justify-between relative min-h-[40px] mb-2">
-                <button 
-                    onClick={() => router.back()} 
+                <button
+                    onClick={() => router.back()}
+                    aria-label="Go back"
                     className="w-10 h-10 rounded-full bg-secondary/30 hover:bg-secondary/50 flex items-center justify-center transition-colors shrink-0 z-10"
                 >
-                    <ArrowLeft className="w-5 h-5" />
+                    <ArrowLeft className="w-5 h-5" aria-hidden="true" />
                 </button>
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                     <h1 className="text-lg font-semibold flex items-center gap-2">

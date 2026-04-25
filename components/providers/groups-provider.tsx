@@ -331,8 +331,16 @@ export function GroupsProvider({ children }: { children: React.ReactNode }) {
                     debouncedRefresh();
                 })
                 .subscribe((status, err) => {
-                    if (status === 'CHANNEL_ERROR') console.error('Realtime Channel Error:', err);
-                    if (status === 'TIMED_OUT') console.error('Realtime Connection Timed Out');
+                    // Suppress noisy errors when the device is simply offline — Supabase
+                    // surfaces a CHANNEL_ERROR with no payload as soon as the websocket
+                    // can't reach the server. It'll auto-reconnect when we go back online.
+                    const offline = typeof navigator !== 'undefined' && !navigator.onLine;
+                    if (status === 'CHANNEL_ERROR' && !offline) {
+                        console.error('Realtime Channel Error:', err);
+                    }
+                    if (status === 'TIMED_OUT' && !offline) {
+                        console.error('Realtime Connection Timed Out');
+                    }
                 });
         }, 500);
 
