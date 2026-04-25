@@ -292,7 +292,7 @@ export function SearchView() {
             initial={{ opacity: 0, scale: 0.98 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.98 }}
-            transition={{ type: 'spring', stiffness: 300, damping: 30, mass: 0.8 }}
+            transition={{ type: 'spring', stiffness: 220, damping: 28, mass: 0.9 }}
             className="relative min-h-[100dvh] w-full h-full"
         >
 

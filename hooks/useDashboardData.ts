@@ -1,12 +1,54 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import { get } from 'idb-keyval';
 import { supabase } from '@/lib/supabase';
 import { toast } from '@/utils/haptics';
 import type { Transaction, AuditLog } from '@/types/transaction';
+import type { SyncPayload } from '@/lib/offline-sync-queue';
+import { discardFailedItem } from '@/lib/sync-manager';
 
 const PAGE_SIZE = 100;
+const QUEUE_KEY = 'novira-offline-queue';
+
+function pendingItemToTransaction(item: SyncPayload): Transaction | null {
+    if (item.type !== 'ADD_FULL_TRANSACTION') return null;
+    if (item.status === 'synced') return null;
+    const t = item.data?.transaction;
+    if (!t) return null;
+    const splits = (item.data?.splitRecords ?? []).map((s: { user_id: string; amount: number }) => ({
+        user_id: s.user_id,
+        amount: s.amount,
+    }));
+    return {
+        id: item.id,
+        description: t.description,
+        amount: t.amount,
+        category: t.category,
+        date: t.date,
+        created_at: new Date(item.createdAt).toISOString(),
+        user_id: t.user_id,
+        currency: t.currency,
+        exchange_rate: t.exchange_rate,
+        base_currency: t.base_currency,
+        converted_amount: t.converted_amount,
+        is_recurring: t.is_recurring,
+        bucket_id: t.bucket_id ?? undefined,
+        exclude_from_allowance: t.exclude_from_allowance,
+        payment_method: t.payment_method,
+        place_name: t.place_name ?? undefined,
+        place_address: t.place_address ?? undefined,
+        place_lat: t.place_lat ?? undefined,
+        place_lng: t.place_lng ?? undefined,
+        group_id: t.group_id ?? null,
+        splits,
+        _pending: item.status === 'pending' || item.status === 'syncing',
+        _failed: item.status === 'failed',
+        _syncError: item.errorReason,
+    };
+}
 
 export function useDashboardData(userId: string | null, activeWorkspaceId: string | null = null) {
-    const [transactions, setTransactions] = useState<Transaction[]>([]);
+    const [serverTransactions, setServerTransactions] = useState<Transaction[]>([]);
+    const [pendingTransactions, setPendingTransactions] = useState<Transaction[]>([]);
     const [loading, setLoading] = useState(true);
     const [loadingMore, setLoadingMore] = useState(false);
     const [hasMore, setHasMore] = useState(false);
@@ -51,7 +93,7 @@ export function useDashboardData(userId: string | null, activeWorkspaceId: strin
                     profile: Array.isArray(tx.profile) ? tx.profile[0] : tx.profile,
                     splits: tx.splits || []
                 })) as Transaction[];
-                setTransactions(formattedTxs);
+                setServerTransactions(formattedTxs);
                 setHasMore(txs.length >= limit);
             }
         } catch (error) {
@@ -63,6 +105,34 @@ export function useDashboardData(userId: string | null, activeWorkspaceId: strin
 
     loadTxRef.current = loadTransactions;
     loadLimitRef.current = loadLimit;
+
+    const loadPendingFromQueue = useCallback(async () => {
+        if (!userId || typeof window === 'undefined') return;
+        try {
+            const queue = (await get<SyncPayload[]>(QUEUE_KEY)) || [];
+            const filtered = queue.filter(item => {
+                if (item.type !== 'ADD_FULL_TRANSACTION') return false;
+                if (item.status === 'synced') return false;
+                const t = item.data?.transaction;
+                if (!t) return false;
+                if (activeWorkspaceId && activeWorkspaceId !== 'personal') {
+                    return t.group_id === activeWorkspaceId;
+                }
+                if (activeWorkspaceId === 'personal') {
+                    return t.group_id == null && t.user_id === userId;
+                }
+                return t.user_id === userId;
+            });
+            const pending = filtered
+                .map(pendingItemToTransaction)
+                .filter((t): t is Transaction => t !== null);
+            setPendingTransactions(pending);
+        } catch (error) {
+            if (process.env.NODE_ENV === 'development') {
+                console.error('Error loading pending queue items:', error);
+            }
+        }
+    }, [userId, activeWorkspaceId]);
 
     const loadMore = useCallback(async () => {
         if (!userId || loadingMore || !hasMore) return;
@@ -100,14 +170,35 @@ export function useDashboardData(userId: string | null, activeWorkspaceId: strin
         const fetchInitialData = async () => {
             setLoading(true);
             try {
-                await loadTxRef.current?.(userId, activeWorkspaceId, PAGE_SIZE);
+                await Promise.allSettled([
+                    loadTxRef.current?.(userId, activeWorkspaceId, PAGE_SIZE),
+                    loadPendingFromQueue(),
+                ]);
             } finally {
                 setLoading(false);
             }
         };
 
         fetchInitialData();
-    }, [userId, activeWorkspaceId]);
+    }, [userId, activeWorkspaceId, loadPendingFromQueue]);
+
+    // Keep pending list in sync with queue events
+    useEffect(() => {
+        if (!userId) return;
+        const onQueueUpdated = () => loadPendingFromQueue();
+        const onMutationSynced = (e: Event) => {
+            const detail = (e as CustomEvent<{ id: string; type: string }>).detail;
+            if (detail?.type === 'ADD_FULL_TRANSACTION') {
+                setPendingTransactions(prev => prev.filter(t => t.id !== detail.id));
+            }
+        };
+        window.addEventListener('novira-queue-updated', onQueueUpdated);
+        window.addEventListener('novira-mutation-synced', onMutationSynced);
+        return () => {
+            window.removeEventListener('novira-queue-updated', onQueueUpdated);
+            window.removeEventListener('novira-mutation-synced', onMutationSynced);
+        };
+    }, [userId, loadPendingFromQueue]);
 
     // Fetch a single transaction with full profile/splits joins for surgical state updates
     const fetchFullTransaction = useCallback(async (txId: string): Promise<Transaction | null> => {
@@ -144,7 +235,7 @@ export function useDashboardData(userId: string | null, activeWorkspaceId: strin
                     // Fetch full transaction with profile/splits joins
                     const fullTx = await fetchFullTransaction(payload.new.id);
                     if (fullTx) {
-                        setTransactions(prev => {
+                        setServerTransactions(prev => {
                             // Avoid duplicates (e.g. from optimistic updates)
                             if (prev.some(t => t.id === fullTx.id)) {
                                 return prev.map(t => t.id === fullTx.id ? fullTx : t);
@@ -167,7 +258,7 @@ export function useDashboardData(userId: string | null, activeWorkspaceId: strin
                 async (payload) => {
                     const fullTx = await fetchFullTransaction(payload.new.id);
                     if (fullTx) {
-                        setTransactions(prev =>
+                        setServerTransactions(prev =>
                             prev.map(t => t.id === fullTx.id ? fullTx : t)
                         );
                     }
@@ -177,7 +268,7 @@ export function useDashboardData(userId: string | null, activeWorkspaceId: strin
                 'postgres_changes',
                 { event: 'DELETE', schema: 'public', table: 'transactions', filter: txFilter },
                 (payload) => {
-                    setTransactions(prev => prev.filter(t => t.id !== payload.old.id));
+                    setServerTransactions(prev => prev.filter(t => t.id !== payload.old.id));
                 }
             )
             .on(
@@ -204,30 +295,48 @@ export function useDashboardData(userId: string | null, activeWorkspaceId: strin
         if (sessionStorage.getItem('novira_expense_added')) {
             sessionStorage.removeItem('novira_expense_added');
             loadTxRef.current?.(userId, activeWorkspaceId);
+            loadPendingFromQueue();
         }
 
-        const handleExpenseAdded = () => loadTxRef.current?.(userId, activeWorkspaceId);
+        const handleExpenseAdded = () => {
+            loadTxRef.current?.(userId, activeWorkspaceId);
+            loadPendingFromQueue();
+        };
         window.addEventListener('novira:expense-added', handleExpenseAdded);
         return () => window.removeEventListener('novira:expense-added', handleExpenseAdded);
-    }, [userId, activeWorkspaceId]);
+    }, [userId, activeWorkspaceId, loadPendingFromQueue]);
 
     useEffect(() => {
         if (!userId) return;
         const handleVisibility = () => {
             if (document.visibilityState === 'visible') {
                 loadTxRef.current?.(userId, activeWorkspaceId);
+                loadPendingFromQueue();
             }
         };
         document.addEventListener('visibilitychange', handleVisibility);
         return () => document.removeEventListener('visibilitychange', handleVisibility);
-    }, [userId, activeWorkspaceId]);
+    }, [userId, activeWorkspaceId, loadPendingFromQueue]);
 
     const handleDeleteTransaction = async (tx: Transaction) => {
+        // Pending offline transaction — discard the queue entry instead of hitting Supabase.
+        if (tx._pending || tx._failed) {
+            setPendingTransactions(prev => prev.filter(t => t.id !== tx.id));
+            try {
+                await discardFailedItem(tx.id);
+                toast.success('Transaction deleted');
+            } catch {
+                toast.error('Failed to remove pending transaction');
+                loadPendingFromQueue();
+            }
+            return;
+        }
+
         if (mutatingRef.current) return;
         mutatingRef.current = true;
         // Optimistic: remove from UI immediately
-        const previousTransactions = [...transactions];
-        setTransactions(prev => prev.filter(t => t.id !== tx.id));
+        const previousServerTransactions = [...serverTransactions];
+        setServerTransactions(prev => prev.filter(t => t.id !== tx.id));
         toast.success('Transaction deleted'); // toast.success will trigger light haptic
 
         try {
@@ -277,7 +386,7 @@ export function useDashboardData(userId: string | null, activeWorkspaceId: strin
             }
         } catch (error: any) {
             // Rollback on failure
-            setTransactions(previousTransactions);
+            setServerTransactions(previousServerTransactions);
             toast.error('Failed to delete: ' + error.message);
         } finally {
             mutatingRef.current = false;
@@ -291,8 +400,8 @@ export function useDashboardData(userId: string | null, activeWorkspaceId: strin
         mutatingRef.current = true;
 
         // Optimistic: update in UI immediately
-        const previousTransactions = [...transactions];
-        setTransactions(prev => prev.map(tx =>
+        const previousServerTransactions = [...serverTransactions];
+        setServerTransactions(prev => prev.map(tx =>
             tx.id === editingTransaction.id
                 ? { ...tx, ...editingTransaction }
                 : tx
@@ -321,7 +430,7 @@ export function useDashboardData(userId: string | null, activeWorkspaceId: strin
             if (error) throw error;
         } catch (error: any) {
             // Rollback on failure
-            setTransactions(previousTransactions);
+            setServerTransactions(previousServerTransactions);
             toast.error('Failed to update: ' + error.message);
         } finally {
             mutatingRef.current = false;
@@ -350,9 +459,21 @@ export function useDashboardData(userId: string | null, activeWorkspaceId: strin
         }
     };
 
+    // Merge pending (offline-queued) items on top of server-fetched transactions.
+    // Dedupe by id to handle the rare case where a server row arrives with the same id
+    // as a still-pending queue entry (e.g. via realtime before the queue event fires).
+    const transactions = useMemo<Transaction[]>(() => {
+        if (pendingTransactions.length === 0) return serverTransactions;
+        const pendingIds = new Set(pendingTransactions.map(t => t.id));
+        return [
+            ...pendingTransactions,
+            ...serverTransactions.filter(t => !pendingIds.has(t.id))
+        ];
+    }, [pendingTransactions, serverTransactions]);
+
     return {
         transactions,
-        setTransactions,
+        setTransactions: setServerTransactions,
         loading,
         setLoading,
         hasMore,

@@ -33,6 +33,13 @@ export type Transaction = {
         avatar_url?: string;
     };
     group_id?: string | null;
+    /**
+     * Client-only flags for offline-queued transactions (not from the server).
+     * Set when an ADD_FULL_TRANSACTION mutation is queued but not yet synced.
+     */
+    _pending?: boolean;
+    _failed?: boolean;
+    _syncError?: string;
 };
 
 export type TransactionRecord = {

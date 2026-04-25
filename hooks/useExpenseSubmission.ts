@@ -236,7 +236,11 @@ export function useExpenseSubmission() {
             if (isNative) {
                 Haptics.notification({ type: NotificationType.Error }).catch(() => { });
             }
-            toast.error('Failed to add expense: ' + error.message);
+            if (error?.name === 'QueueFullError') {
+                toast.error(error.message);
+            } else {
+                toast.error('Failed to add expense: ' + error.message);
+            }
         } finally {
             setLoading(false);
         }
