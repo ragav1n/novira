@@ -62,7 +62,7 @@ const PAYMENT_METHOD_COLORS: Record<string, string> = {
 export function AddExpenseView() {
     const router = useRouter();
     const isNative = useIsNative();
-    const { currency, userId, CURRENCY_SYMBOLS, activeWorkspaceId } = useUserPreferences();
+    const { currency, userId, CURRENCY_SYMBOLS, activeWorkspaceId, fullName, avatarUrl } = useUserPreferences();
     const { groups, friends } = useGroups();
     const { buckets } = useBuckets();
     const [currentPos, setCurrentPos] = React.useState<{ lat: number, lng: number } | null>(null);
@@ -136,6 +136,7 @@ export function AddExpenseView() {
         if (isNative) Haptics.impact({ style: ImpactStyle.Medium }).catch(() => { });
         handleSubmit({
             userId, isNative, router, currency, resetForm: formState.resetForm,
+            userProfile: { full_name: fullName || 'You', avatar_url: avatarUrl || undefined },
             amount: formState.amount, description: formState.description, date: formState.date,
             selectedCategory: formState.selectedCategory, txCurrency: formState.txCurrency,
             selectedGroupId: formState.selectedGroupId, selectedBucketId: formState.selectedBucketId,

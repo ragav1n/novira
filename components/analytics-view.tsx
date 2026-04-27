@@ -12,6 +12,7 @@ import { format, startOfMonth, endOfMonth, subMonths, subYears, isSameMonth, par
 import { useUserPreferences } from '@/components/providers/user-preferences-provider';
 import { useBuckets } from '@/components/providers/buckets-provider';
 import { useWorkspaceTheme } from '@/hooks/useWorkspaceTheme';
+import { useTransactionInvalidationListener } from '@/hooks/useTransactionInvalidationListener';
 import {
     Select,
     SelectContent,
@@ -178,6 +179,8 @@ export function AnalyticsView() {
             fetchData();
         }
     }, [fetchData, userId, currency]);
+
+    useTransactionInvalidationListener(fetchData);
 
     // Real-time subscription for transactions
     const analyticsDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);

@@ -35,6 +35,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { BudgetAlertManager } from '@/components/budget-alert-manager';
 import { useSyncQueueState } from '@/hooks/use-sync-queue-state';
+import { useTransactionInvalidationListener } from '@/hooks/useTransactionInvalidationListener';
 import { retryFailedItem, discardFailedItem } from '@/lib/sync-manager';
 import { CurrencyDropdown } from '@/components/ui/currency-dropdown';
 import type { RecurringTemplate } from '@/types/transaction';
@@ -170,6 +171,8 @@ export function SettingsView() {
     getProfileRef.current = getProfile;
     const loadTemplatesRef = useRef(loadRecurringTemplates);
     loadTemplatesRef.current = loadRecurringTemplates;
+
+    useTransactionInvalidationListener(() => loadTemplatesRef.current());
 
     useEffect(() => {
         if (!userId) return;

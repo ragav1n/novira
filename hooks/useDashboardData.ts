@@ -5,6 +5,8 @@ import { toast } from '@/utils/haptics';
 import type { Transaction, AuditLog } from '@/types/transaction';
 import type { SyncPayload } from '@/lib/offline-sync-queue';
 import { discardFailedItem, enqueueMutation } from '@/lib/sync-manager';
+import { invalidateTransactionCaches } from '@/lib/sw-cache';
+import { useTransactionInvalidationListener } from './useTransactionInvalidationListener';
 
 const PAGE_SIZE = 100;
 const QUEUE_KEY = 'novira-offline-queue';
@@ -337,6 +339,39 @@ export function useDashboardData(
         // Handle case where expense was added before this component mounted (post-navigation)
         if (sessionStorage.getItem('novira_expense_added')) {
             sessionStorage.removeItem('novira_expense_added');
+            // Inject the optimistic row immediately so the dashboard renders with it
+            // before the network fetch lands. Realtime / mount-time refetch reconcile by id.
+            try {
+                const raw = sessionStorage.getItem('novira_just_created_tx');
+                if (raw) {
+                    sessionStorage.removeItem('novira_just_created_tx');
+                    const stashed = JSON.parse(raw) as Transaction;
+                    if (stashed?.id) {
+                        const inWorkspace =
+                            !activeWorkspaceId
+                                ? stashed.user_id === userId
+                                : activeWorkspaceId === 'personal'
+                                    ? stashed.group_id == null && stashed.user_id === userId
+                                    : stashed.group_id === activeWorkspaceId;
+                        if (inWorkspace) {
+                            setServerTransactions(prev => {
+                                if (prev.some(t => t.id === stashed.id)) return prev;
+                                const inserted = [stashed, ...prev];
+                                inserted.sort((a, b) => {
+                                    const dateCompare = b.date.localeCompare(a.date);
+                                    if (dateCompare !== 0) return dateCompare;
+                                    return b.created_at.localeCompare(a.created_at);
+                                });
+                                return inserted;
+                            });
+                        }
+                    }
+                }
+            } catch (error) {
+                if (process.env.NODE_ENV === 'development') {
+                    console.error('Error injecting stashed transaction:', error);
+                }
+            }
             loadTxRef.current?.(userId, activeWorkspaceId);
             loadPendingFromQueue();
         }
@@ -360,6 +395,13 @@ export function useDashboardData(
         document.addEventListener('visibilitychange', handleVisibility);
         return () => document.removeEventListener('visibilitychange', handleVisibility);
     }, [userId, activeWorkspaceId, loadPendingFromQueue]);
+
+    // Cross-tab cache invalidation. Another tab mutating transactions clears the SW
+    // cache for this origin (caches are shared) but each tab's React state is its own —
+    // refetch when we hear the broadcast so we don't sit on stale rows.
+    useTransactionInvalidationListener(() => {
+        if (userId) loadTxRef.current?.(userId, activeWorkspaceId);
+    });
 
     const handleDeleteTransaction = async (tx: Transaction) => {
         // Pending offline transaction — discard the queue entry instead of hitting Supabase.
@@ -408,6 +450,7 @@ export function useDashboardData(
                 .eq('id', tx.id);
 
             if (error) throw error;
+            invalidateTransactionCaches();
 
             // If recurring, ask if user wants to stop future ones
             if (tx.is_recurring) {
@@ -509,6 +552,7 @@ export function useDashboardData(
                 .eq('id', savedEditingTx.id);
 
             if (error) throw error;
+            invalidateTransactionCaches();
         } catch (error: any) {
             // Rollback on failure
             setServerTransactions(previousServerTransactions);

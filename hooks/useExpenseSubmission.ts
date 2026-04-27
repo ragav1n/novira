@@ -3,8 +3,9 @@ import { format } from 'date-fns';
 import { toast } from '@/utils/haptics';
 import { Haptics, NotificationType } from '@capacitor/haptics';
 import { TransactionService } from '@/lib/services/transaction-service';
+import { invalidateTransactionCaches } from '@/lib/sw-cache';
 import type { AppRouterInstance } from 'next/dist/shared/lib/app-router-context.shared-runtime';
-import type { TransactionRecord, SplitRecord, RecurringRecord } from '@/types/transaction';
+import type { Transaction, TransactionRecord, SplitRecord, RecurringRecord } from '@/types/transaction';
 
 interface ExpenseSubmissionParams {
     userId: string | null | undefined;
@@ -12,6 +13,7 @@ interface ExpenseSubmissionParams {
     router: AppRouterInstance;
     currency: string;
     resetForm: () => void;
+    userProfile?: { full_name: string; avatar_url?: string };
     // Form State
     amount: string;
     description: string;
@@ -154,7 +156,7 @@ export function useExpenseSubmission() {
 
     const handleSubmit = async (params: ExpenseSubmissionParams) => {
         const {
-            userId, isNative, router, currency, resetForm,
+            userId, isNative, router, currency, resetForm, userProfile,
             amount, description, date, selectedCategory, txCurrency,
             selectedGroupId, selectedBucketId, excludeFromAllowance,
             placeName, placeAddress, placeLat, placeLng,
@@ -227,6 +229,48 @@ export function useExpenseSubmission() {
                 }
                 
                 resetForm();
+                if (!result.offline) {
+                    invalidateTransactionCaches();
+
+                    // Stash the just-created row so the dashboard can render it
+                    // immediately on mount, before its network fetch returns. Realtime
+                    // and the mount-time refetch will reconcile by id.
+                    // Skip on idempotent retries — the row is already on the server
+                    // and likely already shown elsewhere; re-stashing risks visual churn.
+                    const typedResult = result as { data?: { id?: string }; idempotent?: boolean };
+                    const createdId = typedResult.data?.id;
+                    if (!typedResult.idempotent && createdId && typeof sessionStorage !== 'undefined') {
+                        const stashed: Transaction = {
+                            id: createdId,
+                            description: transactionRecord.description,
+                            amount: transactionRecord.amount,
+                            category: transactionRecord.category,
+                            date: transactionRecord.date,
+                            created_at: new Date().toISOString(),
+                            user_id: transactionRecord.user_id,
+                            currency: transactionRecord.currency,
+                            exchange_rate: transactionRecord.exchange_rate,
+                            base_currency: transactionRecord.base_currency,
+                            converted_amount: transactionRecord.converted_amount,
+                            is_recurring: transactionRecord.is_recurring,
+                            bucket_id: transactionRecord.bucket_id ?? undefined,
+                            exclude_from_allowance: transactionRecord.exclude_from_allowance,
+                            payment_method: transactionRecord.payment_method,
+                            place_name: transactionRecord.place_name,
+                            place_address: transactionRecord.place_address ?? undefined,
+                            place_lat: transactionRecord.place_lat ?? undefined,
+                            place_lng: transactionRecord.place_lng ?? undefined,
+                            group_id: transactionRecord.group_id,
+                            splits: (splitResult.records ?? []).map(s => ({ user_id: s.user_id, amount: s.amount })),
+                            profile: userProfile,
+                        };
+                        try {
+                            sessionStorage.setItem('novira_just_created_tx', JSON.stringify(stashed));
+                        } catch {
+                            // sessionStorage quota or serialization error — non-fatal
+                        }
+                    }
+                }
                 sessionStorage.setItem('novira_expense_added', 'true');
                 window.dispatchEvent(new Event('novira:expense-added'));
                 router.push('/');

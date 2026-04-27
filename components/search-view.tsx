@@ -19,6 +19,7 @@ import { format } from 'date-fns';
 import { useUserPreferences } from '@/components/providers/user-preferences-provider';
 import { useBuckets } from '@/components/providers/buckets-provider';
 import { useWorkspaceTheme } from '@/hooks/useWorkspaceTheme';
+import { useTransactionInvalidationListener } from '@/hooks/useTransactionInvalidationListener';
 import {
     Sheet,
     SheetContent,
@@ -233,6 +234,8 @@ export function SearchView() {
     useEffect(() => {
         fetchAndFilter();
     }, [fetchAndFilter]);
+
+    useTransactionInvalidationListener(fetchAndFilter);
 
     // Realtime subscription — re-fetch when transactions or splits change
     const fetchRef = useRef(fetchAndFilter);

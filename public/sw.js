@@ -83,8 +83,43 @@ self.addEventListener('install', (event) => {
 
 // Listen for messages from the page
 self.addEventListener('message', (event) => {
+    // Only accept messages from same-origin clients. Cross-origin pages (iframes,
+    // embeds) shouldn't be able to drop our caches.
+    const sourceUrl = event.source && event.source.url;
+    if (sourceUrl) {
+        try {
+            if (new URL(sourceUrl).origin !== self.location.origin) return;
+        } catch {
+            return;
+        }
+    }
     if (event.data && event.data.type === 'SKIP_WAITING') {
         self.skipWaiting();
+        return;
+    }
+    if (event.data && event.data.type === 'INVALIDATE_SUPABASE_CACHE') {
+        // After a mutation, the SWR cache for matching SELECT queries is stale.
+        // Drop those entries so the next read goes to network instead of returning
+        // a list missing the freshly-inserted row.
+        const pattern = event.data.pattern;
+        if (!pattern) return;
+        event.waitUntil(
+            caches.open(CACHE_NAME).then(async (cache) => {
+                const requests = await cache.keys();
+                await Promise.all(
+                    requests
+                        .filter((req) => {
+                            try {
+                                const u = new URL(req.url);
+                                return u.hostname.includes('supabase.co') && u.pathname.includes(pattern);
+                            } catch {
+                                return false;
+                            }
+                        })
+                        .map((req) => cache.delete(req))
+                );
+            })
+        );
     }
 });
 

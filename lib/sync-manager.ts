@@ -13,6 +13,7 @@ import {
     MAX_QUEUE_SIZE
 } from './offline-sync-queue';
 import { TransactionService } from './services/transaction-service';
+import { invalidateTransactionCaches } from './sw-cache';
 
 const QUEUE_KEY = 'novira-offline-queue';
 const MUTATION_TIMEOUT_MS = 20_000;
@@ -209,6 +210,11 @@ export async function attemptSync() {
         queue = removeSynced(queue);
         await set(QUEUE_KEY, queue);
         window.dispatchEvent(new CustomEvent('novira-queue-updated', { detail: { queue } }));
+
+        // After offline-queued mutations land on the server, the SW's SWR cache for
+        // transaction reads is stale until next refresh. Invalidate so the next read
+        // (here or in any other tab — caches are origin-shared) hits the network.
+        invalidateTransactionCaches();
     } finally {
         window.dispatchEvent(new Event('novira-sync-finished'));
         isSyncingLoopActive = false;
