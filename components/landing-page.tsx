@@ -87,7 +87,7 @@ function PhoneScreen() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
         <div>
           <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)' }}>Good morning,</div>
-          <div style={{ fontSize: 15, fontWeight: 700, letterSpacing: '-0.01em' }}>Saara</div>
+          <div style={{ fontSize: 15, fontWeight: 700, letterSpacing: '-0.01em' }}>Raghul</div>
         </div>
         <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'linear-gradient(135deg, #7B39FC, #C084FC)', display: 'grid', placeItems: 'center', fontSize: 12, fontWeight: 700 }}>S</div>
       </div>
@@ -136,7 +136,7 @@ function PhoneScreen() {
 
 function PhoneMockup() {
   const orbitCards = [
-    { pos: { top: '8%', left: '-8%' }, anim: 'orbA 7s ease-in-out infinite', bg: 'linear-gradient(135deg, #7B39FC, #C084FC)', label: 'R', text: <>Ragav owes you <b>₹840</b></> },
+    { pos: { top: '8%', left: '-8%' }, anim: 'orbA 7s ease-in-out infinite', bg: 'linear-gradient(135deg, #7B39FC, #C084FC)', label: 'R', text: <>Daniel owes you <b>₹840</b></> },
     { pos: { top: '28%', right: '-16%' }, anim: 'orbB 8s ease-in-out infinite', bg: 'linear-gradient(135deg, #34d399, #10b981)', label: '✓', text: <>Synced <b>12 txns</b></> },
     { pos: { bottom: '24%', left: '-14%' }, anim: 'orbC 9s ease-in-out infinite', bg: 'linear-gradient(135deg, #EC4899, #F472B6)', label: '₹', text: <>Categorized <b>Groceries</b></> },
     { pos: { bottom: '6%', right: '-8%' }, anim: 'orbD 7.5s ease-in-out infinite', bg: 'linear-gradient(135deg, #FBBF24, #F59E0B)', label: '!', text: <>Budget on track — <b>62%</b></> },
