@@ -1,0 +1,17 @@
+{
+	"appId": "com.novira.app",
+	"appName": "Novira",
+	"webDir": "out",
+	"server": {
+		"url": "https://novira-one.vercel.app",
+		"cleartext": false
+	},
+	"ios": {
+		"contentInset": "automatic",
+		"backgroundColor": "#0c081e"
+	},
+	"android": {
+		"backgroundColor": "#0c081e",
+		"allowMixedContent": false
+	}
+}

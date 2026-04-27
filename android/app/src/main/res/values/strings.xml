@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Novira</string>
+    <string name="title_activity_main">Novira</string>
+    <string name="package_name">com.novira.app</string>
+    <string name="custom_url_scheme">com.novira.app</string>
+</resources>
