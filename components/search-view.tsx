@@ -17,7 +17,7 @@ import { supabase } from '@/lib/supabase';
 import { toast, ImpactStyle } from '@/utils/haptics';
 import { format } from 'date-fns';
 import { useUserPreferences } from '@/components/providers/user-preferences-provider';
-import { useBuckets } from '@/components/providers/buckets-provider';
+import { useBucketsList } from '@/components/providers/buckets-provider';
 import { useWorkspaceTheme } from '@/hooks/useWorkspaceTheme';
 import { useTransactionInvalidationListener } from '@/hooks/useTransactionInvalidationListener';
 import {
@@ -96,7 +96,7 @@ export function SearchView() {
     const [searchQuery, setSearchQuery] = useState('');
     const [loading, setLoading] = useState(true);
     const { formatCurrency, convertAmount, currency, activeWorkspaceId, userId } = useUserPreferences();
-    const { buckets } = useBuckets();
+    const { buckets } = useBucketsList();
     const { theme: themeConfig } = useWorkspaceTheme();
 
     // Debounce search query

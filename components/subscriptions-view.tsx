@@ -7,7 +7,7 @@ import { useUserPreferences } from '@/components/providers/user-preferences-prov
 import { useWorkspaceTheme } from '@/hooks/useWorkspaceTheme';
 import { supabase } from '@/lib/supabase';
 import { Card, CardContent } from '@/components/ui/card';
-import { Calendar, CreditCard, RotateCw, Trash2, ArrowLeft } from 'lucide-react';
+import { Calendar, RotateCw, Trash2, ArrowLeft } from 'lucide-react';
 import {
     AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
     AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -144,7 +144,13 @@ export function SubscriptionsView() {
             <div className="space-y-3">
                 <h3 className="text-lg font-bold mb-4">Upcoming Renewals</h3>
                 
-                {templates.length === 0 ? (
+                {loading ? (
+                    <div className="space-y-3">
+                        <div className="h-20 w-full rounded-3xl bg-secondary/10 animate-pulse" />
+                        <div className="h-20 w-full rounded-3xl bg-secondary/10 animate-pulse" />
+                        <div className="h-20 w-full rounded-3xl bg-secondary/10 animate-pulse" />
+                    </div>
+                ) : templates.length === 0 ? (
                     <div className="text-center py-12 text-muted-foreground border border-dashed border-white/10 rounded-3xl">
                         <Calendar className="w-12 h-12 mx-auto mb-3 opacity-20" />
                         <p>No active subscriptions found.</p>

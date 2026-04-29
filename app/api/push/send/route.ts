@@ -58,8 +58,9 @@ export async function POST(request: NextRequest) {
         // Remove expired/invalid subscriptions
         const expired = subs.filter((_, i) => {
             const r = results[i];
-            return r.status === 'rejected' &&
-                (r.reason?.statusCode === 404 || r.reason?.statusCode === 410);
+            if (r.status !== 'rejected') return false;
+            const status = (r.reason as { statusCode?: number } | undefined)?.statusCode;
+            return status === 404 || status === 410;
         });
         if (expired.length) {
             await supabase.from('push_subscriptions')
@@ -68,8 +69,9 @@ export async function POST(request: NextRequest) {
         }
 
         return NextResponse.json({ sent: results.filter(r => r.status === 'fulfilled').length });
-    } catch (err: any) {
+    } catch (err: unknown) {
         console.error('[Push Send]', err);
-        return NextResponse.json({ error: err.message }, { status: 500 });
+        const message = err instanceof Error ? err.message : 'Unknown error';
+        return NextResponse.json({ error: message }, { status: 500 });
     }
 }

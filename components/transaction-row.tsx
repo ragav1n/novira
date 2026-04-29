@@ -8,7 +8,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
-import { motion, useMotionValue, animate } from 'framer-motion';
+import { motion, useMotionValue, animate, useReducedMotion } from 'framer-motion';
 import { getCategoryLabel } from '@/lib/categories';
 
 interface TransactionRowProps {
@@ -60,8 +60,10 @@ export const TransactionRow = memo(function TransactionRow({
   const x = useMotionValue(0);
   const [swiped, setSwiped] = useState(false);
   const [showHint, setShowHint] = useState(false);
+  const prefersReducedMotion = useReducedMotion();
 
   useEffect(() => {
+    if (prefersReducedMotion) return;
     if (!canEdit || tx._pending || tx._failed || _swipeHintLock) return;
     if (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('novira-swipe-hint')) return;
     _swipeHintLock = true;
@@ -83,7 +85,7 @@ export const TransactionRow = memo(function TransactionRow({
     run();
     return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canEdit]);
+  }, [canEdit, prefersReducedMotion]);
 
   const snapTo = (target: number) => animate(x, target, { type: 'spring', stiffness: 320, damping: 34, mass: 0.8 });
 

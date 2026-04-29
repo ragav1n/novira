@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useRef } from 'react';
 import { Wallet, ChevronRight, Check, Pencil, Clock, ArrowUpRight, ArrowDownLeft, LayoutGrid, MapPin } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Transaction } from '@/types/transaction';
@@ -64,6 +64,7 @@ export function TransactionListSection({
     loadingMore,
     onLoadMore
 }: TransactionListSectionProps) {
+    const drawerScrollRef = useRef<HTMLDivElement>(null);
     return (
         <div className="space-y-4">
             <div className="flex justify-between items-center">
@@ -131,6 +132,7 @@ export function TransactionListSection({
             <DashboardTransactionsDrawer
                 isOpen={isViewAllOpen}
                 onOpenChange={setIsViewAllOpen}
+                scrollRef={drawerScrollRef}
             >
                 <VirtualizedTransactionList
                     transactions={allTransactions ?? displayTransactions}
@@ -150,6 +152,7 @@ export function TransactionListSection({
                     hasMore={hasMore}
                     loadingMore={loadingMore}
                     onLoadMore={onLoadMore}
+                    scrollContainerRef={drawerScrollRef}
                 />
             </DashboardTransactionsDrawer>
         </div>

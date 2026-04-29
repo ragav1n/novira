@@ -59,19 +59,11 @@ export default function ForgotPassword() {
         }
     }, [cooldown]);
 
-    // Submission Lock
-    const isSubmittingRef = React.useRef(false);
-    // Rate Limiter Import would be at top, but we can access global if needed or import it. 
-    // Assuming we need to import it. I'll add the import in a separate block if needed or just assume it's available.
-    // Actually, I will insert the import in a separate tool call to be safe, or just use the logic here if I can't import easily in one go.
-    // Better to use the tool properly.
-
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        if (isSubmittingRef.current || isLoading || cooldown > 0) return;
+        if (isLoading || cooldown > 0) return;
 
-        // Rate Limit Check
         const remaining = authRateLimiter.check();
         if (remaining > 0) {
             setError(`Please wait ${Math.ceil(remaining / 1000)}s`);
@@ -87,8 +79,6 @@ export default function ForgotPassword() {
         }
 
         setIsLoading(true);
-        isSubmittingRef.current = true;
-        authRateLimiter.recordOK();
 
         try {
             const appUrl = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '') || window.location.origin;
@@ -98,14 +88,13 @@ export default function ForgotPassword() {
 
             if (error) throw error;
 
+            authRateLimiter.recordOK();
             setSuccess('Check your email for the password reset link.');
             setCooldown(60);
-        } catch (error: any) {
-            setError(error.message || 'Failed to send reset email');
-            isSubmittingRef.current = false; // Only unlock on error, keep locked on success to prevent re-send immediate
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : 'Failed to send reset email');
         } finally {
             setIsLoading(false);
-            if (error) isSubmittingRef.current = false;
         }
     };
 

@@ -19,7 +19,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { TimePicker } from "@/components/ui/datetime-picker";
 import { useUserPreferences } from '@/components/providers/user-preferences-provider';
 import { useGroups } from '@/components/providers/groups-provider';
-import { useBuckets } from '@/components/providers/buckets-provider';
+import { useBucketsList } from '@/components/providers/buckets-provider';
 import { Switch } from '@/components/ui/switch';
 import { CurrencyDropdown } from '@/components/ui/currency-dropdown';
 import dynamic from 'next/dynamic';
@@ -39,7 +39,7 @@ const RecurringExpenseSection = dynamic(
 
 import { CategorySelector, BucketSelector } from './add-expense/selectors';
 import { useExpenseForm } from '@/hooks/useExpenseForm';
-import { useExpenseSubmission } from '@/hooks/useExpenseSubmission';
+import { useExpenseSubmission, getExpenseFormErrors, type ExpenseFormErrors } from '@/hooks/useExpenseSubmission';
 import { getDistance } from '@/lib/location';
 
 import { CATEGORY_COLORS, getIconForCategory, CATEGORIES as SYSTEM_CATEGORIES } from '@/lib/categories';
@@ -64,7 +64,7 @@ export function AddExpenseView() {
     const isNative = useIsNative();
     const { currency, userId, CURRENCY_SYMBOLS, activeWorkspaceId, fullName, avatarUrl } = useUserPreferences();
     const { groups, friends } = useGroups();
-    const { buckets } = useBuckets();
+    const { buckets } = useBucketsList();
     const [currentPos, setCurrentPos] = React.useState<{ lat: number, lng: number } | null>(null);
 
     const activeGroup = groups.find(g => g.id === activeWorkspaceId);
@@ -75,6 +75,7 @@ export function AddExpenseView() {
     const { handleSubmit, loading } = useExpenseSubmission();
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [scanning, setScanning] = React.useState(false);
+    const [errors, setErrors] = React.useState<ExpenseFormErrors>({});
 
     const handleScan = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -133,6 +134,12 @@ export function AddExpenseView() {
     };
 
     const onSubmit = () => {
+        const validationErrors = getExpenseFormErrors(formState.amount, formState.description, formState.date);
+        if (validationErrors) {
+            setErrors(validationErrors);
+            return;
+        }
+        setErrors({});
         if (isNative) Haptics.impact({ style: ImpactStyle.Medium }).catch(() => { });
         handleSubmit({
             userId, isNative, router, currency, resetForm: formState.resetForm,
@@ -264,29 +271,51 @@ export function AddExpenseView() {
                             placeholder="0.00"
                             required
                             aria-required="true"
-                            onChange={(e) => formState.setAmount(e.target.value)}
-                            className="h-16 text-3xl font-bold pl-12 bg-secondary/10 border-primary/50 focus-visible:ring-primary/50"
+                            aria-invalid={!!errors.amount}
+                            aria-describedby={errors.amount ? 'expense-amount-error' : undefined}
+                            onChange={(e) => {
+                                formState.setAmount(e.target.value);
+                                if (errors.amount) setErrors(prev => ({ ...prev, amount: undefined }));
+                            }}
+                            className={cn(
+                                "h-16 text-3xl font-bold pl-12 bg-secondary/10 focus-visible:ring-primary/50",
+                                errors.amount ? "border-destructive focus-visible:ring-destructive/50" : "border-primary/50"
+                            )}
                         />
                         <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-bold text-primary">
                             {CURRENCY_SYMBOLS[formState.txCurrency as keyof typeof CURRENCY_SYMBOLS] || '$'}
                         </span>
                     </div>
+                    {errors.amount && (
+                        <p id="expense-amount-error" className="text-xs text-destructive font-medium">{errors.amount}</p>
+                    )}
                     <div className="mt-2">
                         <CurrencyDropdown value={formState.txCurrency} onValueChange={(val) => formState.setTxCurrency(val)} />
                     </div>
                 </div>
 
                 {/* Description */}
-                <div className="space-y-4">
+                <div className="space-y-2">
                     <FloatingLabelInput
                         id="description"
                         label="Description *"
                         value={formState.description}
                         required
                         aria-required="true"
-                        onChange={(e) => formState.setDescription(e.target.value)}
-                        className="bg-secondary/10 border-white/10 h-14"
+                        aria-invalid={!!errors.description}
+                        aria-describedby={errors.description ? 'expense-description-error' : undefined}
+                        onChange={(e) => {
+                            formState.setDescription(e.target.value);
+                            if (errors.description) setErrors(prev => ({ ...prev, description: undefined }));
+                        }}
+                        className={cn(
+                            "bg-secondary/10 h-14",
+                            errors.description ? "border-destructive" : "border-white/10"
+                        )}
                     />
+                    {errors.description && (
+                        <p id="expense-description-error" className="text-xs text-destructive font-medium">{errors.description}</p>
+                    )}
                 </div>
 
                 <div className="space-y-3 min-h-[105px]"> {/* Slightly increased and stabilized height for Quick Pins */}

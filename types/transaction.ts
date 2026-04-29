@@ -99,13 +99,16 @@ export type RecurringTemplate = {
     category: string;
     is_active: boolean;
     created_at: string;
+    user_id?: string;
+    group_id?: string | null;
+    payment_method?: string | null;
 };
 
 export type AuditLog = {
     id: string;
     action: 'INSERT' | 'UPDATE' | 'DELETE';
-    old_data: any;
-    new_data: any;
+    old_data: Record<string, unknown> | null;
+    new_data: Record<string, unknown> | null;
     created_at: string;
     changed_by_profile?: {
         full_name: string;

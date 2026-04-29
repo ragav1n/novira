@@ -21,7 +21,7 @@ import { DeleteAccountDialog } from '@/components/delete-account-dialog';
 import { ExportDateRangeModal } from '@/components/export-date-range-modal';
 import { DateRange } from 'react-day-picker';
 import { format } from 'date-fns';
-import { useBuckets } from '@/components/providers/buckets-provider';
+import { useBucketsList } from '@/components/providers/buckets-provider';
 import { useGroups } from '@/components/providers/groups-provider';
 import {
     AlertDialog,
@@ -39,6 +39,7 @@ import { useTransactionInvalidationListener } from '@/hooks/useTransactionInvali
 import { retryFailedItem, discardFailedItem } from '@/lib/sync-manager';
 import { CurrencyDropdown } from '@/components/ui/currency-dropdown';
 import type { RecurringTemplate } from '@/types/transaction';
+import { usePushNotifications } from '@/hooks/usePushNotifications';
 
 export function SettingsView() {
     const router = useRouter();
@@ -71,8 +72,9 @@ export function SettingsView() {
         CURRENCY_DETAILS
     } = useUserPreferences();
 
-    const { buckets } = useBuckets();
+    const { buckets } = useBucketsList();
     const { groups } = useGroups();
+    const push = usePushNotifications();
 
     // Local state for budget input to allow typing before saving
     const [localBudget, setLocalBudget] = useState(monthlyBudget.toString());
@@ -593,6 +595,38 @@ export function SettingsView() {
                                 }}
                             />
                         </div>
+
+                        {push.isSupported && (
+                            <div className="flex items-center justify-between p-3">
+                                <div className="flex items-center gap-3 min-w-0">
+                                    <Bell className="w-4 h-4 text-muted-foreground shrink-0" />
+                                    <div className="min-w-0">
+                                        <p className="text-sm font-medium">Push Notifications</p>
+                                        <p className="text-[11px] text-muted-foreground">
+                                            {push.permission === 'denied'
+                                                ? 'Blocked — enable in your browser settings'
+                                                : 'Reminders, sync alerts and updates'}
+                                        </p>
+                                    </div>
+                                </div>
+                                <Switch
+                                    checked={push.isSubscribed}
+                                    disabled={push.loading || push.permission === 'denied'}
+                                    onCheckedChange={async (checked) => {
+                                        if (checked) {
+                                            const ok = await push.subscribe();
+                                            if (ok) toast.success('Notifications enabled');
+                                            else if (push.permission === 'denied') toast.error('Permission denied — enable in browser settings');
+                                            else toast.error('Could not enable notifications');
+                                        } else {
+                                            const ok = await push.unsubscribe();
+                                            if (ok) toast.success('Notifications disabled');
+                                            else toast.error('Could not disable notifications');
+                                        }
+                                    }}
+                                />
+                            </div>
+                        )}
                     </div>
                 </div>
 

@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/u
 import { Tag, Plane, Home, Gift, Car, Utensils, ShoppingCart, Heart, Gamepad2, Music, Laptop, School } from 'lucide-react';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
 import { DateRange } from 'react-day-picker';
-import { useBuckets, Bucket } from '@/components/providers/buckets-provider';
+import { useBucketsList, Bucket } from '@/components/providers/buckets-provider';
 import { useUserPreferences, CURRENCY_DETAILS, type Currency } from '@/components/providers/user-preferences-provider';
 import { toast } from '@/utils/haptics';
 import { cn } from '@/lib/utils';
@@ -18,7 +18,7 @@ interface BucketDialogProps {
 }
 
 export function BucketDialog({ isOpen, onClose, editingBucket }: BucketDialogProps) {
-    const { createBucket, updateBucket } = useBuckets();
+    const { createBucket, updateBucket } = useBucketsList();
     const { currency } = useUserPreferences();
 
     const [isProcessing, setIsProcessing] = useState(false);

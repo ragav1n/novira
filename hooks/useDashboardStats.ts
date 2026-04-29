@@ -100,49 +100,55 @@ export function useDashboardStats({
         });
     }, [transactions, userId, isBucketFocused, effectiveFocus, currentMonthPrefix]);
 
-    const totalSpent = useMemo(() => {
-        return filteredTransactions.reduce((acc, tx) => {
+    // Single pass over filteredTransactions producing totalSpent + spendingByCategory + recentSpent
+    // (the run-rate window). Avoids three independent O(n) walks with redundant conversions.
+    const aggregates = useMemo(() => {
+        const today = new Date();
+        const sevenDaysAgo = new Date(today);
+        sevenDaysAgo.setDate(today.getDate() - 6);
+        const sevenDaysAgoStr = format(sevenDaysAgo, 'yyyy-MM-dd');
+        const todayStr = format(today, 'yyyy-MM-dd');
+
+        let totalSpent = 0;
+        let recentSpent = 0;
+        const byCategory: Record<string, number> = {};
+        const categoryTarget = isBucketFocused ? bucketCurrency : currency;
+
+        for (const tx of filteredTransactions) {
             const myShare = calculateUserShare(tx, userId);
-            if (myShare <= 0) return acc;
+            if (myShare <= 0) continue;
 
             const txCurr = (tx.currency || 'USD').toUpperCase();
-            const targetCurr = bucketCurrency;
-            
-            const isSameCurrency = txCurr === targetCurr;
-            
-            if (!isSameCurrency && tx.exchange_rate && tx.exchange_rate !== 1 && (tx.base_currency || '').toUpperCase() === targetCurr) {
-                return acc + (myShare * Number(tx.exchange_rate));
+            const baseCurr = (tx.base_currency || '').toUpperCase();
+            const hasExchange = !!tx.exchange_rate && tx.exchange_rate !== 1;
+
+            // Total + run-rate use bucketCurrency
+            const totalAmount = txCurr === bucketCurrency
+                ? myShare
+                : (hasExchange && baseCurr === bucketCurrency ? myShare * Number(tx.exchange_rate) : convertAmount(myShare, txCurr, bucketCurrency));
+            totalSpent += totalAmount;
+
+            const txDate = tx.date.slice(0, 10);
+            if (txDate >= sevenDaysAgoStr && txDate <= todayStr) {
+                recentSpent += totalAmount;
             }
 
-            return acc + convertAmount(myShare, txCurr, targetCurr);
-        }, 0);
-    }, [filteredTransactions, userId, calculateUserShare, bucketCurrency, convertAmount]);
+            // Category breakdown — target currency depends on focus
+            const cat = tx.category.toLowerCase();
+            const catAmount = txCurr === categoryTarget
+                ? myShare
+                : (hasExchange && baseCurr === categoryTarget ? myShare * Number(tx.exchange_rate) : convertAmount(myShare, txCurr, categoryTarget));
+            byCategory[cat] = (byCategory[cat] ?? 0) + catAmount;
+        }
+
+        return { totalSpent, recentSpent, byCategory };
+    }, [filteredTransactions, userId, calculateUserShare, bucketCurrency, currency, isBucketFocused, convertAmount]);
+
+    const totalSpent = aggregates.totalSpent;
+    const spendingByCategory = aggregates.byCategory;
 
     const remaining = displayBudget - totalSpent;
     const progress = displayBudget > 0 ? Math.min((totalSpent / displayBudget) * 100, 100) : 0;
-
-    const spendingByCategory = useMemo(() => {
-        return filteredTransactions.reduce((acc, tx) => {
-            const cat = tx.category.toLowerCase();
-            const myShare = calculateUserShare(tx, userId);
-
-            if (myShare > 0) {
-                if (!acc[cat]) acc[cat] = 0;
-
-                const txCurr = (tx.currency || 'USD').toUpperCase();
-                // When bucket focused, we should probably convert to bucketCurrency for the pie chart
-                const targetCurr = isBucketFocused ? bucketCurrency : currency;
-                const isSameCurrency = txCurr === targetCurr;
-
-                if (!isSameCurrency && tx.exchange_rate && tx.exchange_rate !== 1 && tx.base_currency === targetCurr) {
-                    acc[cat] += (myShare * Number(tx.exchange_rate));
-                } else {
-                    acc[cat] += convertAmount(myShare, txCurr, targetCurr);
-                }
-            }
-            return acc;
-        }, {} as Record<string, number>);
-    }, [filteredTransactions, userId, isBucketFocused, calculateUserShare, currency, convertAmount, bucketCurrency]);
 
     const spendingData: SpendingCategory[] = useMemo(() => Object.entries(spendingByCategory).map(([cat, value]) => ({
         name: cat.charAt(0).toUpperCase() + cat.slice(1),
@@ -169,8 +175,8 @@ export function useDashboardStats({
         });
     }, [transactions, isBucketFocused, displayTransactions, userId]);
 
-    // Run Rate Calculation — weighted toward recent 7 days to reflect current spending trend
-    // Derives from filteredTransactions instead of scanning raw transactions again
+    // Run Rate Calculation — weighted toward recent 7 days to reflect current spending trend.
+    // recentSpent is computed in the single aggregate pass above.
     const runRateData = useMemo(() => {
         if (isBucketFocused) return null;
 
@@ -179,30 +185,10 @@ export function useDashboardStats({
         const lastDay = endOfMonth(today);
         const daysInMonth = differenceInDays(lastDay, firstDay) + 1;
         const currentDayOfMonth = today.getDate();
-        const spentThisMonth = totalSpent;
 
-        // Recent 7-day spend — derived from already-filtered transactions
-        const sevenDaysAgo = new Date(today);
-        sevenDaysAgo.setDate(today.getDate() - 6);
-        const sevenDaysAgoStr = format(sevenDaysAgo, 'yyyy-MM-dd');
-        const todayStr = format(today, 'yyyy-MM-dd');
-
-        const recentSpent = filteredTransactions.reduce((acc, tx) => {
-            const txDate = tx.date.slice(0, 10);
-            if (txDate < sevenDaysAgoStr || txDate > todayStr) return acc;
-            const myShare = calculateUserShare(tx, userId);
-            if (myShare <= 0) return acc;
-            const txCurr = (tx.currency || 'USD').toUpperCase();
-            if (tx.exchange_rate && tx.exchange_rate !== 1 && (tx.base_currency || '').toUpperCase() === bucketCurrency) {
-                return acc + myShare * Number(tx.exchange_rate);
-            }
-            return acc + convertAmount(myShare, txCurr, bucketCurrency);
-        }, 0);
-
-        // Blend: 60% recent daily rate + 40% month-to-date daily rate
         const recentDays = Math.min(7, currentDayOfMonth);
-        const recentDailyRate = recentDays > 0 ? recentSpent / recentDays : 0;
-        const mtdDailyRate = currentDayOfMonth > 0 ? spentThisMonth / currentDayOfMonth : 0;
+        const recentDailyRate = recentDays > 0 ? aggregates.recentSpent / recentDays : 0;
+        const mtdDailyRate = currentDayOfMonth > 0 ? totalSpent / currentDayOfMonth : 0;
         const dailyAverage = 0.6 * recentDailyRate + 0.4 * mtdDailyRate;
         const projectedSpend = dailyAverage * daysInMonth;
 
@@ -213,7 +199,7 @@ export function useDashboardStats({
             daysInMonth,
             currentDayOfMonth
         };
-    }, [isBucketFocused, totalSpent, displayBudget, filteredTransactions, calculateUserShare, userId, bucketCurrency, convertAmount]);
+    }, [isBucketFocused, totalSpent, displayBudget, aggregates.recentSpent]);
 
     return {
         focusedBucket,

@@ -68,7 +68,12 @@ export async function enqueueMutation(type: string, data: any): Promise<string> 
 
     // Evict oldest failed/pending items if at capacity. Currently-syncing items are preserved.
     if (currentQueue.length >= MAX_QUEUE_SIZE) {
+        const beforeCount = currentQueue.length;
         currentQueue = evictForCapacity(currentQueue);
+        const evictedCount = beforeCount - currentQueue.length;
+        if (evictedCount > 0) {
+            window.dispatchEvent(new CustomEvent('novira-queue-evicted', { detail: { count: evictedCount } }));
+        }
         if (currentQueue.length >= MAX_QUEUE_SIZE) {
             throw new QueueFullError();
         }

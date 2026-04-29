@@ -1,6 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
+import { UIBoundary } from '@/components/boundaries/ui-boundary';
 
 const SubscriptionsSkeleton = () => (
   <div className="flex flex-col min-h-screen p-5 space-y-6 max-w-md mx-auto">
@@ -22,5 +23,9 @@ const SubscriptionsView = dynamic(
 );
 
 export default function SubscriptionsPage() {
-    return <SubscriptionsView />;
+    return (
+        <UIBoundary>
+            <SubscriptionsView />
+        </UIBoundary>
+    );
 }

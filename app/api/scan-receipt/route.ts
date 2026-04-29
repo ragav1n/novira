@@ -1,24 +1,44 @@
 import 'server-only'
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
+import { createClient } from '@/utils/supabase/server'
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
 
 type SupportedMediaType = 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp'
 const SUPPORTED_TYPES: SupportedMediaType[] = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024 // 5MB raw
 
 export async function POST(req: NextRequest) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
   const { imageBase64, mimeType } = await req.json()
 
   if (!imageBase64 || !mimeType) {
     return NextResponse.json({ error: 'Missing image data' }, { status: 400 })
   }
 
-  const mediaType: SupportedMediaType = SUPPORTED_TYPES.includes(mimeType) ? mimeType : 'image/jpeg'
+  if (!SUPPORTED_TYPES.includes(mimeType)) {
+    return NextResponse.json(
+      { error: `Unsupported image type. Use one of: ${SUPPORTED_TYPES.join(', ')}` },
+      { status: 400 }
+    )
+  }
+  const mediaType: SupportedMediaType = mimeType
+
+  const approxBytes = Math.floor((imageBase64.length * 3) / 4)
+  if (approxBytes > MAX_IMAGE_BYTES) {
+    return NextResponse.json(
+      { error: `Image too large (max ${MAX_IMAGE_BYTES / 1024 / 1024}MB)` },
+      { status: 413 }
+    )
+  }
+
   if (process.env.NODE_ENV === 'development') {
-    const sizeKB = Math.round((imageBase64.length * 3) / 4 / 1024)
-    console.log(`[scan-receipt] mimeType=${mimeType} mediaType=${mediaType} size≈${sizeKB}KB`)
+    console.log(`[scan-receipt] mimeType=${mediaType} size≈${Math.round(approxBytes / 1024)}KB`)
   }
 
   const message = await client.messages.create({
@@ -75,7 +95,8 @@ Category definitions — pick the best match:
   try {
     const data = JSON.parse(cleaned)
     return NextResponse.json(data)
-  } catch {
+  } catch (err) {
+    console.error('[scan-receipt] JSON parse failed', { err, raw: text })
     return NextResponse.json({ error: 'Could not parse receipt' }, { status: 422 })
   }
 }

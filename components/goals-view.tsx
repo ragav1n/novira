@@ -7,7 +7,7 @@ import { useUserPreferences, CURRENCY_SYMBOLS, type Currency } from '@/component
 import { useWorkspaceTheme } from '@/hooks/useWorkspaceTheme';
 import { supabase } from '@/lib/supabase';
 import { Card, CardContent } from '@/components/ui/card';
-import { Target, Plus, Search, HelpCircle, ArrowLeft, TrendingUp, Calendar, PiggyBank, MoreVertical, Edit2, Trash2, CheckCircle2 } from 'lucide-react';
+import { Target, Plus, ArrowLeft, Calendar, PiggyBank, MoreVertical, Edit2, Trash2, CheckCircle2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format, parseISO } from 'date-fns';
 import { useRouter } from 'next/navigation';
@@ -270,7 +270,12 @@ export function GoalsView() {
                 </Card>
 
                 <div className="space-y-4">
-                    {goals.length === 0 ? (
+                    {loading ? (
+                        <>
+                            <div className="h-32 w-full rounded-3xl bg-secondary/10 animate-pulse" />
+                            <div className="h-32 w-full rounded-3xl bg-secondary/10 animate-pulse" />
+                        </>
+                    ) : goals.length === 0 ? (
                         <div className="text-center py-16 px-4 border border-dashed border-white/10 rounded-3xl bg-card/20 backdrop-blur-sm">
                             <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 border ${themeConfig.bgLight} ${themeConfig.border}`}>
                                 <Target className={`w-8 h-8 opacity-80 ${themeConfig.textLight}`} />

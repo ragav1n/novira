@@ -22,7 +22,7 @@ export interface Bucket {
     group_id?: string | null;
 }
 
-interface BucketsContextType {
+interface BucketsListContextType {
     buckets: Bucket[];
     loading: boolean;
     createBucket: (data: Partial<Bucket>) => Promise<string | null>;
@@ -30,10 +30,14 @@ interface BucketsContextType {
     deleteBucket: (id: string) => Promise<void>;
     archiveBucket: (id: string, archive: boolean) => Promise<void>;
     refreshBuckets: () => Promise<void>;
+}
+
+interface BucketSpendingContextType {
     bucketSpending: Record<string, number>;
 }
 
-const BucketsContext = createContext<BucketsContextType | undefined>(undefined);
+const BucketsListContext = createContext<BucketsListContextType | undefined>(undefined);
+const BucketSpendingContext = createContext<BucketSpendingContextType | undefined>(undefined);
 
 interface BucketSplit {
     user_id: string;
@@ -100,7 +104,6 @@ export function BucketsProvider({ children }: { children: React.ReactNode }) {
     const fetchBuckets = useCallback(async () => {
         if (!userId) return;
         try {
-            // Fire both queries in parallel via service with workspace scoping
             const [fetchedBuckets, spendingData] = await Promise.all([
                 BucketService.getBuckets(userId, activeWorkspaceId),
                 BucketService.getBucketSpending(userId, activeWorkspaceId)
@@ -118,7 +121,6 @@ export function BucketsProvider({ children }: { children: React.ReactNode }) {
         }
     }, [userId, activeWorkspaceId, currency, convertAmount]);
 
-    // Separate spending-only refresh — avoids re-fetching the bucket list when only tx/splits change
     const bucketsRef = useRef<Bucket[]>([]);
     bucketsRef.current = buckets;
 
@@ -134,7 +136,6 @@ export function BucketsProvider({ children }: { children: React.ReactNode }) {
         }
     }, [userId, activeWorkspaceId, currency, convertAmount]);
 
-    // Debounced refresh helpers
     const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const spendingDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -148,7 +149,6 @@ export function BucketsProvider({ children }: { children: React.ReactNode }) {
         spendingDebounceRef.current = setTimeout(() => fetchSpendingOnly(), 300);
     }, [fetchSpendingOnly]);
 
-    // Clean up debounce timers on unmount
     useEffect(() => {
         return () => {
             if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -160,12 +160,9 @@ export function BucketsProvider({ children }: { children: React.ReactNode }) {
         if (userId) {
             fetchBuckets();
 
-            // Immediately re-fetch spending when an expense is added (handles post-navigation timing)
             const handleExpenseAdded = () => fetchSpendingOnly();
             window.addEventListener('novira:expense-added', handleExpenseAdded);
 
-            // Buckets table changes → full refresh (config may have changed)
-            // Transactions/splits table changes → spending only (bucket config unchanged)
             const txFilter = activeWorkspaceId && activeWorkspaceId !== 'personal'
                 ? `group_id=eq.${activeWorkspaceId}`
                 : `user_id=eq.${userId}`;
@@ -220,7 +217,7 @@ export function BucketsProvider({ children }: { children: React.ReactNode }) {
             toast.error(error.message || 'Failed to create bucket');
             return null;
         }
-    }, [userId, fetchBuckets]);
+    }, [userId, activeWorkspaceId, fetchBuckets]);
 
     const updateBucket = useCallback(async (id: string, data: Partial<Bucket>) => {
         try {
@@ -246,7 +243,9 @@ export function BucketsProvider({ children }: { children: React.ReactNode }) {
         await updateBucket(id, { is_archived: archive });
     }, [updateBucket]);
 
-    const contextValue = useMemo(() => ({
+    // List context — changes only when buckets/loading/mutators change.
+    // Spending updates do NOT invalidate this context value.
+    const listValue = useMemo(() => ({
         buckets,
         loading,
         createBucket,
@@ -254,20 +253,38 @@ export function BucketsProvider({ children }: { children: React.ReactNode }) {
         deleteBucket,
         refreshBuckets: fetchBuckets,
         archiveBucket,
-        bucketSpending
-    }), [buckets, loading, createBucket, updateBucket, deleteBucket, fetchBuckets, archiveBucket, bucketSpending]);
+    }), [buckets, loading, createBucket, updateBucket, deleteBucket, fetchBuckets, archiveBucket]);
+
+    const spendingValue = useMemo(() => ({ bucketSpending }), [bucketSpending]);
 
     return (
-        <BucketsContext.Provider value={contextValue}>
-            {children}
-        </BucketsContext.Provider>
+        <BucketsListContext.Provider value={listValue}>
+            <BucketSpendingContext.Provider value={spendingValue}>
+                {children}
+            </BucketSpendingContext.Provider>
+        </BucketsListContext.Provider>
     );
 }
 
-export function useBuckets() {
-    const context = useContext(BucketsContext);
+export function useBucketsList() {
+    const context = useContext(BucketsListContext);
     if (context === undefined) {
-        throw new Error('useBuckets must be used within a BucketsProvider');
+        throw new Error('useBucketsList must be used within a BucketsProvider');
     }
     return context;
+}
+
+export function useBucketSpending() {
+    const context = useContext(BucketSpendingContext);
+    if (context === undefined) {
+        throw new Error('useBucketSpending must be used within a BucketsProvider');
+    }
+    return context;
+}
+
+// Backwards-compat shim — combines both contexts. Consumers that only need the
+// list (or only the spending map) should migrate to the narrower hooks to avoid
+// re-rendering when the unrelated half changes.
+export function useBuckets() {
+    return { ...useBucketsList(), ...useBucketSpending() };
 }

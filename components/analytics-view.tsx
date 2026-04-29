@@ -10,7 +10,7 @@ import { TransactionService } from '@/lib/services/transaction-service';
 import { CHART_CONFIG, CATEGORY_COLORS, getIconForCategory, getCategoryLabel } from '@/lib/categories';
 import { format, startOfMonth, endOfMonth, subMonths, subYears, isSameMonth, parseISO, startOfDay, endOfDay } from 'date-fns';
 import { useUserPreferences } from '@/components/providers/user-preferences-provider';
-import { useBuckets } from '@/components/providers/buckets-provider';
+import { useBucketsList } from '@/components/providers/buckets-provider';
 import { useWorkspaceTheme } from '@/hooks/useWorkspaceTheme';
 import { useTransactionInvalidationListener } from '@/hooks/useTransactionInvalidationListener';
 import {
@@ -128,7 +128,7 @@ export function AnalyticsView() {
         return React.cloneElement(iconElement as React.ReactElement<any>, { className: "w-full h-full" });
     };
 
-    const { buckets } = useBuckets();
+    const { buckets } = useBucketsList();
 
     const fetchData = useCallback(async () => {
         setLoading(true);

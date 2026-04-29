@@ -4,6 +4,7 @@ import { Geist, Geist_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { SpeedInsights } from '@vercel/speed-insights/next'
 import './globals.css'
+import { MotionConfig } from 'framer-motion'
 import { MobileLayout } from '@/components/mobile-layout'
 import { UserPreferencesProvider } from '@/components/providers/user-preferences-provider'
 import { GroupsProvider } from '@/components/providers/groups-provider'
@@ -33,9 +34,12 @@ export const metadata: Metadata = {
   },
   description: 'Track spending, split with friends, and understand your money — in one quietly brilliant app that works anywhere, even offline. 150+ currencies, AI receipt scanning, beautiful analytics.',
   icons: {
-    icon: '/Novira.png',
-    shortcut: '/Novira.png',
-    apple: '/Novira.png',
+    icon: [
+      { url: '/icons/novira-192.png', sizes: '192x192', type: 'image/png' },
+      { url: '/icons/novira-512.png', sizes: '512x512', type: 'image/png' },
+    ],
+    shortcut: '/icons/novira-192.png',
+    apple: '/icons/novira-512.png',
   },
   manifest: '/manifest.json',
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'https://novira.one'),
@@ -79,17 +83,19 @@ export default async function RootLayout({
           Skip to main content
         </a>
         <ErrorBoundary>
-          <UserPreferencesProvider>
-            <GroupsProvider>
-              <WorkspaceThemeProvider />
-              <SyncIndicator />
-              <BucketsProvider>
-                <MobileLayout defaultIsDesktop={defaultIsDesktop}>
-                  {children}
-                </MobileLayout>
-              </BucketsProvider>
-            </GroupsProvider>
-          </UserPreferencesProvider>
+          <MotionConfig reducedMotion="user">
+            <UserPreferencesProvider>
+              <GroupsProvider>
+                <WorkspaceThemeProvider />
+                <SyncIndicator />
+                <BucketsProvider>
+                  <MobileLayout defaultIsDesktop={defaultIsDesktop}>
+                    {children}
+                  </MobileLayout>
+                </BucketsProvider>
+              </GroupsProvider>
+            </UserPreferencesProvider>
+          </MotionConfig>
         </ErrorBoundary>
         <ServiceWorkerRegistrar />
         <PWAInstallPrompt />

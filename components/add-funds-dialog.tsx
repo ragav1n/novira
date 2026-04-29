@@ -16,7 +16,7 @@ import { supabase } from '@/lib/supabase';
 import { format } from 'date-fns';
 import { toast } from '@/utils/haptics';
 import { CurrencyDropdown } from '@/components/ui/currency-dropdown';
-import { useUserPreferences, CURRENCY_DETAILS } from '@/components/providers/user-preferences-provider';
+import { useUserPreferences, CURRENCY_DETAILS, type Currency } from '@/components/providers/user-preferences-provider';
 
 type AddFundsDialogProps = {
     isOpen: boolean;
@@ -30,6 +30,7 @@ export function AddFundsDialog({ isOpen, onClose, userId, defaultBucketId, onSuc
     const [amount, setAmount] = useState('');
     const [description, setDescription] = useState('');
     const [loading, setLoading] = useState(false);
+    const [errors, setErrors] = useState<{ amount?: string; description?: string }>({});
     const { currency, CURRENCY_SYMBOLS, convertAmount } = useUserPreferences();
     const [txCurrency, setTxCurrency] = useState(currency);
 
@@ -39,17 +40,20 @@ export function AddFundsDialog({ isOpen, onClose, userId, defaultBucketId, onSuc
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        
-        if (!amount || parseFloat(amount) <= 0) {
-            toast.error('Amount is required and must be greater than 0');
-            return;
-        }
 
-        if (!description || description.trim() === '') {
-            toast.error('Description is required');
+        const nextErrors: { amount?: string; description?: string } = {};
+        const parsedAmount = parseFloat(amount);
+        if (!amount) nextErrors.amount = 'Amount is required';
+        else if (isNaN(parsedAmount)) nextErrors.amount = 'Amount must be a number';
+        else if (parsedAmount <= 0) nextErrors.amount = 'Amount must be greater than 0';
+        if (!description || !description.trim()) nextErrors.description = 'Description is required';
+
+        if (Object.keys(nextErrors).length > 0) {
+            setErrors(nextErrors);
             return;
         }
-        
+        setErrors({});
+
         if (!userId) {
             toast.error('Not logged in');
             return;
@@ -92,8 +96,9 @@ export function AddFundsDialog({ isOpen, onClose, userId, defaultBucketId, onSuc
             setDescription('');
             onSuccess?.();
             onClose();
-        } catch (error: any) {
-            toast.error('Failed to add funds: ' + error.message);
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : 'Unknown error';
+            toast.error('Failed to add funds: ' + message);
         } finally {
             setLoading(false);
         }
@@ -118,15 +123,23 @@ export function AddFundsDialog({ isOpen, onClose, userId, defaultBucketId, onSuc
                                 step="0.01"
                                 value={amount}
                                 placeholder="e.g. 500"
-                                onChange={(e) => setAmount(e.target.value)}
-                                className="pl-12"
+                                aria-invalid={!!errors.amount}
+                                aria-describedby={errors.amount ? 'fund-amount-error' : undefined}
+                                onChange={(e) => {
+                                    setAmount(e.target.value);
+                                    if (errors.amount) setErrors(prev => ({ ...prev, amount: undefined }));
+                                }}
+                                className={errors.amount ? "pl-12 border-destructive" : "pl-12"}
                             />
                             <span className="absolute left-4 top-1/2 -translate-y-1/2 text-lg font-bold text-primary">
                                 {CURRENCY_SYMBOLS[txCurrency as keyof typeof CURRENCY_SYMBOLS] || '$'}
                             </span>
                         </div>
+                        {errors.amount && (
+                            <p id="fund-amount-error" className="text-xs text-destructive font-medium">{errors.amount}</p>
+                        )}
                         <div className="mt-2">
-                            <CurrencyDropdown value={txCurrency} onValueChange={(val) => setTxCurrency(val as any)} />
+                            <CurrencyDropdown value={txCurrency} onValueChange={(val) => setTxCurrency(val as Currency)} />
                         </div>
                     </div>
                     <div className="space-y-2">
@@ -135,8 +148,17 @@ export function AddFundsDialog({ isOpen, onClose, userId, defaultBucketId, onSuc
                             id="fund-description"
                             value={description}
                             placeholder="e.g. Salary, Refund..."
-                            onChange={(e) => setDescription(e.target.value)}
+                            aria-invalid={!!errors.description}
+                            aria-describedby={errors.description ? 'fund-description-error' : undefined}
+                            onChange={(e) => {
+                                setDescription(e.target.value);
+                                if (errors.description) setErrors(prev => ({ ...prev, description: undefined }));
+                            }}
+                            className={errors.description ? "border-destructive" : undefined}
                         />
+                        {errors.description && (
+                            <p id="fund-description-error" className="text-xs text-destructive font-medium">{errors.description}</p>
+                        )}
                     </div>
                     
                     <DialogFooter className="pt-4 gap-2 sm:gap-0">

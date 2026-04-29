@@ -39,17 +39,33 @@ interface ExpenseSubmissionParams {
     frequency: 'daily' | 'weekly' | 'monthly' | 'yearly';
 }
 
-function validateExpenseForm(amount: string, description: string, date: Date | undefined): boolean {
+export type ExpenseFormErrors = {
+    amount?: string;
+    description?: string;
+    date?: string;
+};
+
+export function getExpenseFormErrors(amount: string, description: string, date: Date | undefined): ExpenseFormErrors | null {
+    const errors: ExpenseFormErrors = {};
     const parsed = parseFloat(amount);
-    if (!amount || isNaN(parsed) || parsed <= 0 || !description || !date) {
-        if (amount && (!isNaN(parsed) && parsed <= 0)) {
-            toast.error('Amount must be greater than 0');
-        } else {
-            toast.error('Please fill in all required fields');
-        }
-        return false;
-    }
-    return true;
+    if (!amount) errors.amount = 'Amount is required';
+    else if (isNaN(parsed)) errors.amount = 'Amount must be a number';
+    else if (parsed <= 0) errors.amount = 'Amount must be greater than 0';
+
+    if (!description || !description.trim()) errors.description = 'Description is required';
+    if (!date) errors.date = 'Date is required';
+
+    return Object.keys(errors).length > 0 ? errors : null;
+}
+
+function validateExpenseForm(amount: string, description: string, date: Date | undefined): boolean {
+    const errors = getExpenseFormErrors(amount, description, date);
+    if (!errors) return true;
+    // Submit-time backstop — surface the first error as a toast for callers that don't
+    // render inline messages. Forms with inline feedback should call getExpenseFormErrors
+    // directly before invoking handleSubmit.
+    toast.error(errors.amount || errors.description || errors.date || 'Please fill in all required fields');
+    return false;
 }
 
 async function buildSplitRecords(

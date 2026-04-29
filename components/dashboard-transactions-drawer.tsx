@@ -16,15 +16,18 @@ interface DashboardTransactionsDrawerProps {
     onOpenChange: (open: boolean) => void;
     children: React.ReactNode;
     loading?: boolean;
+    scrollRef?: React.RefObject<HTMLDivElement | null>;
 }
 
 export const DashboardTransactionsDrawer = React.memo(function DashboardTransactionsDrawer({
     isOpen,
     onOpenChange,
     children,
-    loading = false
+    loading = false,
+    scrollRef: externalScrollRef
 }: DashboardTransactionsDrawerProps) {
-    const scrollRef = useRef<HTMLDivElement>(null);
+    const localScrollRef = useRef<HTMLDivElement>(null);
+    const scrollRef = externalScrollRef ?? localScrollRef;
     const [hasScrolled, setHasScrolled] = useState(false);
     const [isScrollable, setIsScrollable] = useState(false);
     const [isAtBottom, setIsAtBottom] = useState(false);

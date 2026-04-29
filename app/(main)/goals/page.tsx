@@ -1,6 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
+import { UIBoundary } from '@/components/boundaries/ui-boundary';
 
 const GoalsSkeleton = () => (
   <div className="flex flex-col min-h-screen p-5 space-y-6 max-w-md mx-auto">
@@ -22,5 +23,9 @@ const GoalsView = dynamic(
 );
 
 export default function GoalsPage() {
-    return <GoalsView />;
+    return (
+        <UIBoundary>
+            <GoalsView />
+        </UIBoundary>
+    );
 }

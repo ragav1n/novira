@@ -8,7 +8,7 @@ import { startOfMonth, endOfMonth, subMonths, startOfYear, endOfYear, subYears }
 import { DateRange } from 'react-day-picker';
 import { Download, Calendar, Tag, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useBuckets } from '@/components/providers/buckets-provider';
+import { useBucketsList } from '@/components/providers/buckets-provider';
 import { useIsMobile } from '@/components/ui/use-mobile';
 import { getBucketIcon } from '@/utils/icon-utils';
 
@@ -32,7 +32,7 @@ export function ExportDateRangeModal({
     loading = false
 }: ExportDateRangeModalProps) {
     const isMobile = useIsMobile();
-    const { buckets } = useBuckets();
+    const { buckets } = useBucketsList();
     const { groups } = useGroups();
     const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
     const [selectedPreset, setSelectedPreset] = useState<string | null>(null);

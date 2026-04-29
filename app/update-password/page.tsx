@@ -86,8 +86,8 @@ export default function UpdatePassword() {
 
             toast.success('Password updated successfully');
             router.push('/signin');
-        } catch (error: any) {
-            setError(error.message || 'Failed to update password');
+        } catch (error: unknown) {
+            setError(error instanceof Error ? error.message : 'Failed to update password');
         } finally {
             setIsLoading(false);
         }

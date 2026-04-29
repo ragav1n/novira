@@ -24,9 +24,10 @@ export async function POST(request: NextRequest) {
 
         if (error) throw error;
         return NextResponse.json({ success: true });
-    } catch (err: any) {
+    } catch (err: unknown) {
         console.error('[Push Subscribe]', err);
-        return NextResponse.json({ error: err.message }, { status: 500 });
+        const message = err instanceof Error ? err.message : 'Unknown error';
+        return NextResponse.json({ error: message }, { status: 500 });
     }
 }
 
@@ -39,7 +40,8 @@ export async function DELETE(request: NextRequest) {
         const { endpoint } = await request.json();
         await supabase.from('push_subscriptions').delete().eq('endpoint', endpoint).eq('user_id', user.id);
         return NextResponse.json({ success: true });
-    } catch (err: any) {
-        return NextResponse.json({ error: err.message }, { status: 500 });
+    } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : 'Unknown error';
+        return NextResponse.json({ error: message }, { status: 500 });
     }
 }
