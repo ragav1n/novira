@@ -12,8 +12,17 @@ import { cn } from "@/lib/utils"
 
 export type { ChartConfig }
 
+type PieDatum = {
+    name?: string;
+    value?: number;
+    amount?: number;
+    color?: string;
+    fill?: string;
+    stroke?: string;
+};
+
 interface BasePieChartProps {
-    data: any[];
+    data: PieDatum[];
     config: ChartConfig;
     innerRadius?: number;
     outerRadius?: number;
@@ -56,7 +65,7 @@ export function BasePieChart({
                     startAngle={90}
                     endAngle={-270}
                 >
-                    {data.map((entry: any, index: number) => (
+                    {data.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.color || entry.fill} />
                     ))}
                 </Pie>

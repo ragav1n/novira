@@ -183,7 +183,7 @@ export const generateCSV = (
     const groupMap = Object.fromEntries(groups.map(g => [g.id, g]));
     // Drop rows that would produce NaN/undefined in the report
     transactions = transactions.filter(tx => tx.date && tx.amount != null && !isNaN(Number(tx.amount)));
-    const sorted = [...transactions].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    const sorted = [...transactions].sort((a, b) => parseISO(a.date.slice(0, 10)).getTime() - parseISO(b.date.slice(0, 10)).getTime());
 
     // ── Calculations (mirrors PDF logic) ──────────────────────────────────────
     let totalExpenses = 0, totalIncome = 0, recurringTotal = 0;
@@ -538,7 +538,9 @@ export const generatePDF = async (
             try {
                 const img = await loadImage(ownerInfo.avatarUrl);
                 doc.addImage(img, 'JPEG', pageWidth - 28, 8, 14, 14, undefined, 'FAST');
-            } catch {}
+            } catch (err) {
+                console.error('[export] avatar load failed', ownerInfo.avatarUrl, err);
+            }
         }
         doc.setFontSize(8); doc.setTextColor(200, 185, 240);
         doc.text(ownerInfo.email || '', pageWidth - 14, 39, { align: 'right' });

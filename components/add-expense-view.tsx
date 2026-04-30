@@ -75,17 +75,27 @@ export function AddExpenseView() {
     const formState = useExpenseForm(userId, currency, activeWorkspaceId, defaultSplitEnabled);
     const { handleSubmit, loading } = useExpenseSubmission();
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const scanAbortRef = useRef<AbortController | null>(null);
     const [scanning, setScanning] = React.useState(false);
     const [errors, setErrors] = React.useState<ExpenseFormErrors>({});
 
     const scanFile = React.useCallback(async (file: Blob) => {
+        scanAbortRef.current?.abort();
+        const controller = new AbortController();
+        scanAbortRef.current = controller;
         setScanning(true);
+        let objectUrl: string | null = null;
         try {
             const base64 = await new Promise<string>((resolve, reject) => {
                 const img = new Image();
-                const objectUrl = URL.createObjectURL(file);
+                objectUrl = URL.createObjectURL(file);
+                const onAbort = () => {
+                    img.src = '';
+                    reject(new DOMException('Aborted', 'AbortError'));
+                };
+                controller.signal.addEventListener('abort', onAbort, { once: true });
                 img.onload = () => {
-                    URL.revokeObjectURL(objectUrl);
+                    if (controller.signal.aborted) return;
                     const MAX = 1600;
                     const scale = Math.min(1, MAX / Math.max(img.width, img.height));
                     const canvas = document.createElement('canvas');
@@ -102,9 +112,11 @@ export function AddExpenseView() {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ imageBase64: base64, mimeType: 'image/jpeg' }),
+                signal: controller.signal,
             });
             if (!res.ok) throw new Error('Scan failed');
             const data = await res.json();
+            if (controller.signal.aborted) return;
             if (data.amount) formState.setAmount(String(data.amount));
             if (data.description) formState.setDescription(data.description);
             if (data.category) formState.setSelectedCategory(data.category);
@@ -125,11 +137,18 @@ export function AddExpenseView() {
                 formState.setDate(d);
             }
         } catch (e) {
+            if ((e as { name?: string })?.name === 'AbortError') return;
             console.error('[scan-receipt]', e);
         } finally {
+            if (objectUrl) URL.revokeObjectURL(objectUrl);
+            if (scanAbortRef.current === controller) scanAbortRef.current = null;
             setScanning(false);
         }
     }, [formState]);
+
+    useEffect(() => () => {
+        scanAbortRef.current?.abort();
+    }, []);
 
     const handleScan = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];

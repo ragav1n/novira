@@ -5,10 +5,11 @@ import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { X, UserPlus, UserMinus } from 'lucide-react';
 import { toast } from '@/utils/haptics';
+import type { Friend } from '@/components/providers/groups-provider';
 
 interface FriendsTabContentProps {
-    friendRequests: any[];
-    friends: any[];
+    friendRequests: Friend[];
+    friends: Friend[];
     acceptFriendRequest: (requestId: string) => Promise<void>;
     declineFriendRequest: (requestId: string) => Promise<void>;
     removeFriend: (requestId: string) => Promise<void>;
@@ -46,7 +47,8 @@ export function FriendsTabContent({
                                                 await declineFriendRequest(request.request_id);
                                                 toast.success('Request declined');
                                             }
-                                        } catch (error: any) {
+                                        } catch (error) {
+                                            console.error('[friends] decline failed', error);
                                             toast.error('Failed to decline');
                                         }
                                     }}
@@ -62,7 +64,7 @@ export function FriendsTabContent({
                                                 await acceptFriendRequest(request.request_id);
                                                 toast.success('Friend added!');
                                             }
-                                        } catch (error: any) {
+                                        } catch (error) {
                                             toast.error('Failed to accept');
                                             console.error(error);
                                         }
@@ -108,8 +110,10 @@ export function FriendsTabContent({
                                                         await removeFriend(friend.request_id);
                                                         toast.success('Friend removed');
                                                     }
-                                                } catch (error: any) {
-                                                    toast.error(error.message || 'Failed to remove friend');
+                                                } catch (error) {
+                                                    console.error('[friends] remove failed', error);
+                                                    const message = error instanceof Error ? error.message : 'Failed to remove friend';
+                                                    toast.error(message);
                                                 }
                                             }
                                         },

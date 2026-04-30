@@ -116,6 +116,7 @@ const AnalyticsSkeleton = () => (
 export function AnalyticsView() {
     const router = useRouter();
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
     const [transactions, setTransactions] = useState<Transaction[]>([]);
     const [dateRange, setDateRange] = useState<DateRange>('1M');
     const [selectedBucketId, setSelectedBucketId] = useState<string | 'all'>('all');
@@ -132,13 +133,14 @@ export function AnalyticsView() {
     // getIconForCategory is now imported from lib/categories.ts
     const getBucketIcon = (iconName?: string) => {
         const iconElement = getIconForCategory(iconName || 'Tag');
-        return React.cloneElement(iconElement as React.ReactElement<any>, { className: "w-full h-full" });
+        return React.cloneElement(iconElement as React.ReactElement<{ className?: string }>, { className: "w-full h-full" });
     };
 
     const { buckets } = useBucketsList();
 
     const fetchData = useCallback(async () => {
         setLoading(true);
+        setError(null);
         try {
             if (!userId) return;
 
@@ -171,10 +173,11 @@ export function AnalyticsView() {
             });
 
             if (data) {
-                setTransactions(data as any);
+                setTransactions(data);
             }
-        } catch (error) {
-            console.error("Error fetching analytics:", error);
+        } catch (err) {
+            console.error("Error fetching analytics:", err);
+            setError(err instanceof Error ? err.message : 'Failed to load analytics data');
             toast.error('Failed to load analytics data');
         } finally {
             setLoading(false);
@@ -465,14 +468,25 @@ export function AnalyticsView() {
         return () => { cancelled = true; };
     }, [loadRecap, priorMonthKey]);
 
-    // Fixed CustomTooltip inside the component
-    const AnalyticsTooltip = ({ active, payload, label }: any) => {
+    type TooltipEntry = {
+        name?: string | number;
+        value?: number | string;
+        stroke?: string;
+        color?: string;
+        fill?: string;
+    };
+    type AnalyticsTooltipProps = {
+        active?: boolean;
+        payload?: TooltipEntry[];
+        label?: string | number;
+    };
+    const AnalyticsTooltip = ({ active, payload, label }: AnalyticsTooltipProps) => {
         if (active && payload && payload.length) {
             return (
                 <div className="bg-card/95 backdrop-blur-xl border border-white/10 p-3 rounded-2xl shadow-2xl z-50">
                     <p className="text-[11px] font-bold uppercase tracking-wider mb-2 text-muted-foreground">{label}</p>
                     <div className="space-y-1.5">
-                        {payload.map((entry: any, index: number) => (
+                        {payload.map((entry, index) => (
                             <div key={index} className="flex items-center justify-between gap-4 text-xs">
                                 <div className="flex items-center gap-2">
                                     <div
@@ -591,6 +605,19 @@ export function AnalyticsView() {
 
                 {loading ? (
                     <AnalyticsSkeleton />
+                ) : error ? (
+                    <Card className="bg-card/40 border-destructive/30 shadow-none">
+                        <CardContent className="p-5 space-y-3 text-center">
+                            <p className="text-sm font-bold text-destructive">Couldn't load analytics</p>
+                            <p className="text-[12px] text-muted-foreground">{error}</p>
+                            <button
+                                onClick={() => fetchData()}
+                                className="h-9 px-4 text-[12px] font-bold rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-all"
+                            >
+                                Retry
+                            </button>
+                        </CardContent>
+                    </Card>
                 ) : (
                     <>
                 {/* Bucket Progress Highlight */}

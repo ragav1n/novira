@@ -2,6 +2,7 @@
 
 import * as React from 'react'
 import * as RechartsPrimitive from 'recharts'
+import { parseISO } from 'date-fns'
 import { cn } from '@/lib/utils'
 
 const THEMES = { light: '', dark: '.dark' } as const
@@ -203,14 +204,14 @@ function ChartTooltipContent({
 
 export { ChartContainer, ChartTooltip, ChartTooltipContent }
 
-export function Component({ data }: { data: any[] }) {
+export function Component({ data }: { data: Array<{ date: string; amount: number }> }) {
   const { LineChart, CartesianGrid, XAxis, Line } =
     RechartsPrimitive
 
   const last7Days = data
     .slice(-7)
     .map((e) => ({
-      date: new Date(e.date).toLocaleDateString('en-US', {
+      date: parseISO(e.date.slice(0, 10)).toLocaleDateString('en-US', {
         month: 'short',
         day: 'numeric',
       }),

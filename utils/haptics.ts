@@ -33,8 +33,8 @@ async function triggerHaptic(style: ImpactStyle = ImpactStyle.Light) {
             const pattern = style === ImpactStyle.Heavy ? [20] : [10];
             try {
                 navigator.vibrate(pattern);
-            } catch {
-                // Silently ignore
+            } catch (err) {
+                console.warn('[haptics] vibration unsupported', err);
             }
         }
     }

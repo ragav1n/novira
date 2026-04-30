@@ -182,7 +182,7 @@ export function Component({ data }: { data: Record<string, number> }) {
             fill: '#fff',
             fontSize: 12,
             fontWeight: 500,
-          } as any}
+          } as React.ComponentProps<typeof Pie>['label']}
         >
           {chartData.map((entry, index) => (
             <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />

@@ -62,6 +62,16 @@ function computeBucketSpending(
     convertAmount: (amount: number, from: string, to?: string) => number
 ): Record<string, number> {
     const bucketMap = new Map(buckets.map(b => [b.id, b]));
+    const rateCache = new Map<string, number>();
+    const getRate = (from: string, to: string): number => {
+        if (from === to) return 1;
+        const key = `${from}->${to}`;
+        const cached = rateCache.get(key);
+        if (cached !== undefined) return cached;
+        const rate = convertAmount(1, from, to);
+        rateCache.set(key, rate);
+        return rate;
+    };
     const spending: Record<string, number> = {};
     spendingData.forEach(tx => {
         const bId = tx.bucket_id;
@@ -88,7 +98,7 @@ function computeBucketSpending(
         } else if (tx.exchange_rate && (tx.base_currency || '').toUpperCase() === bucketCurrency) {
             amountInBucketCurrency = shareAmount * Number(tx.exchange_rate);
         } else {
-            amountInBucketCurrency = convertAmount(shareAmount, txCurrency, bucketCurrency);
+            amountInBucketCurrency = shareAmount * getRate(txCurrency, bucketCurrency);
         }
         spending[bId] = (spending[bId] || 0) + amountInBucketCurrency;
     });

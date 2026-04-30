@@ -93,7 +93,9 @@ async function reverseGeocodeRest(
                     };
                 }
             }
-        } catch { /* fall through */ }
+        } catch (err) {
+            console.warn('[location] reverse geocode failed (google)', err);
+        }
     }
     if (mapboxKey) {
         try {
@@ -111,7 +113,9 @@ async function reverseGeocodeRest(
                     };
                 }
             }
-        } catch { /* fall through */ }
+        } catch (err) {
+            console.warn('[location] reverse geocode failed (mapbox)', err);
+        }
     }
     return null;
 }

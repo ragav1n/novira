@@ -51,8 +51,11 @@ export function getExpenseFormErrors(amount: string, description: string, date: 
     if (!amount) errors.amount = 'Amount is required';
     else if (isNaN(parsed)) errors.amount = 'Amount must be a number';
     else if (parsed <= 0) errors.amount = 'Amount must be greater than 0';
+    else if (parsed > 999_999_999) errors.amount = 'Amount is too large';
 
-    if (!description || !description.trim()) errors.description = 'Description is required';
+    const trimmed = description?.trim();
+    if (!trimmed) errors.description = 'Description is required';
+    else if (trimmed.length > 300) errors.description = 'Description is too long (max 300 chars)';
     if (!date) errors.date = 'Date is required';
 
     return Object.keys(errors).length > 0 ? errors : null;
@@ -93,14 +96,18 @@ async function buildSplitRecords(
     if (debtors.length === 0) return { records: undefined };
 
     if (splitMode === 'custom') {
-        const totalCustom = debtors.reduce((sum, id) => sum + (parseFloat(customAmounts[id] || '0') || 0), 0);
+        const parsedSplits = debtors.map(id => ({ id, amount: parseFloat(customAmounts[id] || '0') }));
+        if (parsedSplits.some(s => Number.isNaN(s.amount) || s.amount < 0)) {
+            return { records: undefined, error: 'Split amounts must be non-negative numbers' };
+        }
+        const totalCustom = parsedSplits.reduce((sum, s) => sum + s.amount, 0);
         if (totalCustom <= 0) return { records: undefined, error: 'Please enter split amounts' };
         if (totalCustom > parseFloat(amount)) return { records: undefined, error: 'Split amounts exceed the total expense' };
 
         return {
-            records: debtors
-                .filter(id => parseFloat(customAmounts[id] || '0') > 0)
-                .map(id => ({ user_id: id, amount: parseFloat(customAmounts[id]) }))
+            records: parsedSplits
+                .filter(s => s.amount > 0)
+                .map(s => ({ user_id: s.id, amount: s.amount }))
         };
     } else {
         const splitAmount = parseFloat(amount) / (debtors.length + 1);

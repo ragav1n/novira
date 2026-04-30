@@ -46,7 +46,9 @@ export function AddFundsDialog({ isOpen, onClose, userId, defaultBucketId, onSuc
         if (!amount) nextErrors.amount = 'Amount is required';
         else if (isNaN(parsedAmount)) nextErrors.amount = 'Amount must be a number';
         else if (parsedAmount <= 0) nextErrors.amount = 'Amount must be greater than 0';
+        else if (parsedAmount > 999_999_999) nextErrors.amount = 'Amount is too large';
         if (!description || !description.trim()) nextErrors.description = 'Description is required';
+        else if (description.trim().length > 300) nextErrors.description = 'Description is too long';
 
         if (Object.keys(nextErrors).length > 0) {
             setErrors(nextErrors);

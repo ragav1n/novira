@@ -88,7 +88,7 @@ export function ImportView() {
     // Categories for mapping/fallback
     const CATEGORIES = SYSTEM_CATEGORIES.map(c => c.label);
 
-    const findHeaderRow = (data: any[][]): { index: number, headers: string[] } => {
+    const findHeaderRow = (data: unknown[][]): { index: number, headers: string[] } => {
         // Look for common header keywords in first 1000 rows (some banks have huge headers)
         // Added 'txn date', 'value date', 'ref no./cheque no.' for SBI
         const keywords = ['date', 'time', 'description', 'particulars', 'narration', 'amount', 'debit', 'credit', 'balance', 'withdraw', 'deposit', 'value', 'txn date', 'ref no', 'cheque no'];
@@ -119,7 +119,7 @@ export function ImportView() {
 
         // Fallback to first row
         if (data.length > 0) {
-            const headers = data[0].map((cell: any, idx: number) => {
+            const headers = data[0].map((cell, idx) => {
                 const val = String(cell).trim();
                 return val || `__EMPTY_${idx}`;
             });
@@ -129,7 +129,7 @@ export function ImportView() {
         return { index: 0, headers: [] };
     };
 
-    const processData = (rawData: any[][]) => {
+    const processData = (rawData: unknown[][]) => {
         const { index, headers } = findHeaderRow(rawData);
 
         setHeaderRowIndex(index);
@@ -197,7 +197,7 @@ export function ImportView() {
                 header: false,
                 skipEmptyLines: true,
                 complete: (results) => {
-                    processData(results.data as any[][]);
+                    processData(results.data as unknown[][]);
                 },
                 error: (error) => {
                     toast.error(`Error parsing CSV: ${error.message}`);
@@ -211,9 +211,9 @@ export function ImportView() {
                     const workbook = new ExcelJS.Workbook();
                     await workbook.xlsx.load(buffer);
                     const sheet = workbook.worksheets[0];
-                    const jsonData: any[][] = [];
+                    const jsonData: unknown[][] = [];
                     sheet.eachRow({ includeEmpty: false }, (row) => {
-                        jsonData.push((row.values as any[]).slice(1));
+                        jsonData.push((row.values as unknown[]).slice(1));
                     });
 
                     if (jsonData.length > 0) {
@@ -221,8 +221,9 @@ export function ImportView() {
                     } else {
                         toast.error('Excel file appears to be empty.');
                     }
-                } catch (error: any) {
-                    toast.error(`Error parsing Excel: ${error.message}`);
+                } catch (error) {
+                    const message = error instanceof Error ? error.message : String(error);
+                    toast.error(`Error parsing Excel: ${message}`);
                 }
             };
             arrayBuffer();
