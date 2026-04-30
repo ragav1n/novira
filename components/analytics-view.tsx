@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
-import { ChevronLeft, MoreHorizontal, Filter, Shirt } from 'lucide-react';
+import { ChevronLeft, MoreHorizontal, Filter, Shirt, Sparkles } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
@@ -119,6 +119,9 @@ export function AnalyticsView() {
     const [selectedBucketId, setSelectedBucketId] = useState<string | 'all'>('all');
     const [customStart, setCustomStart] = useState<string>('');
     const [customEnd, setCustomEnd] = useState<string>('');
+    const [recapLoading, setRecapLoading] = useState(false);
+    const [recapText, setRecapText] = useState<string | null>(null);
+    const [recapMonth, setRecapMonth] = useState<string | null>(null);
     const { formatCurrency, currency, convertAmount, userId, activeWorkspaceId } = useUserPreferences();
     const { activeWorkspace, theme: themeConfig } = useWorkspaceTheme('cyan');
 
@@ -368,6 +371,40 @@ export function AnalyticsView() {
         fill: string;
     }>;
 
+    const generateRecap = useCallback(async () => {
+        setRecapLoading(true);
+        setRecapText(null);
+        try {
+            const now = new Date();
+            // Recap targets the previous calendar month — that's the only one fully complete.
+            const target = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+            const monthKey = `${target.getFullYear()}-${String(target.getMonth() + 1).padStart(2, '0')}`;
+            const res = await fetch('/api/recap', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ month: monthKey, currency })
+            });
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err.error || 'Recap failed');
+            }
+            const data = await res.json();
+            setRecapText(data.recap || '');
+            setRecapMonth(monthKey);
+        } catch (err) {
+            console.error('[recap]', err);
+            toast.error('Could not generate recap');
+        } finally {
+            setRecapLoading(false);
+        }
+    }, [currency]);
+
+    const recapMonthLabel = useMemo(() => {
+        if (!recapMonth) return null;
+        const [y, m] = recapMonth.split('-').map(Number);
+        return format(new Date(y, m - 1, 1), 'MMMM yyyy');
+    }, [recapMonth]);
+
     // Fixed CustomTooltip inside the component
     const AnalyticsTooltip = ({ active, payload, label }: any) => {
         if (active && payload && payload.length) {
@@ -524,6 +561,40 @@ export function AnalyticsView() {
                     </Card>
                     );
                 })()}
+
+                {/* Monthly AI Recap */}
+                <Card className="bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20 shadow-none overflow-hidden relative">
+                    <div className="absolute -top-8 -right-8 w-32 h-32 rounded-full bg-primary/10 blur-3xl" />
+                    <CardContent className="p-4 space-y-3 relative z-10">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <Sparkles className="w-4 h-4 text-primary" />
+                                <h3 className="font-bold text-[13px] uppercase tracking-wider text-primary">Monthly Recap</h3>
+                            </div>
+                            {recapMonthLabel && !recapLoading && (
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground bg-secondary/30 px-2 py-0.5 rounded-full">
+                                    {recapMonthLabel}
+                                </span>
+                            )}
+                        </div>
+
+                        {recapText ? (
+                            <p className="text-[13px] leading-relaxed text-foreground/90 whitespace-pre-wrap">{recapText}</p>
+                        ) : (
+                            <p className="text-[12px] text-muted-foreground">
+                                AI-generated insights on last month's spending — biggest movers, notable patterns, and one practical takeaway.
+                            </p>
+                        )}
+
+                        <button
+                            onClick={generateRecap}
+                            disabled={recapLoading}
+                            className="w-full h-9 text-[12px] font-bold rounded-xl bg-primary/20 hover:bg-primary/30 border border-primary/30 text-primary transition-all disabled:opacity-50"
+                        >
+                            {recapLoading ? 'Generating...' : recapText ? 'Regenerate' : 'Generate Recap'}
+                        </button>
+                    </CardContent>
+                </Card>
 
                 {/* Monthly Spending Trend */}
                 <Card className="bg-card/40 backdrop-blur-md border-white/5 shadow-none">

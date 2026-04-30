@@ -93,7 +93,7 @@ export function DashboardView() {
 
     const {
         focusedBucket, displayBudget, calculateUserShare, totalSpent,
-        remaining, progress, spendingData, displayTransactions, recentFeed, runRateData
+        remaining, progress, spendingData, displayTransactions, recentFeed, runRateData, cashflowForecast
     } = useDashboardStats({
         transactions, 
         userId: activeWorkspaceId ? null : userId, // if workspace, null so we get all workspace txs
@@ -258,6 +258,7 @@ export function DashboardView() {
                     isCoupleWorkspace={isCoupleWorkspace}
                     isHomeWorkspace={isHomeWorkspace}
                     runRateData={runRateData}
+                    cashflowForecast={cashflowForecast}
                     dashboardFocus={dashboardFocus}
                     setDashboardFocus={setDashboardFocus}
                     isFocusMenuOpen={isFocusMenuOpen}

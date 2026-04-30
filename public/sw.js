@@ -197,10 +197,61 @@ function addXFromCacheHeader(response) {
     });
 }
 
+// Web Share Target: receive a shared image from the OS share sheet, stash the
+// blob in a dedicated IndexedDB store, then redirect to /add?from-share=1.
+// The /add page reads the blob and triggers receipt scanning automatically.
+const SHARE_DB_NAME = 'novira-share-target';
+const SHARE_STORE = 'files';
+const SHARE_KEY = 'pending';
+
+function openShareDB() {
+    return new Promise((resolve, reject) => {
+        const req = indexedDB.open(SHARE_DB_NAME, 1);
+        req.onupgradeneeded = () => {
+            const db = req.result;
+            if (!db.objectStoreNames.contains(SHARE_STORE)) {
+                db.createObjectStore(SHARE_STORE);
+            }
+        };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+    });
+}
+
+async function putSharedFile(blob) {
+    const db = await openShareDB();
+    await new Promise((resolve, reject) => {
+        const tx = db.transaction(SHARE_STORE, 'readwrite');
+        tx.objectStore(SHARE_STORE).put(blob, SHARE_KEY);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+    });
+    db.close();
+}
+
+async function handleShareTarget(request) {
+    try {
+        const formData = await request.formData();
+        const file = formData.get('receipt');
+        if (file && file instanceof Blob) {
+            await putSharedFile(file);
+        }
+    } catch (err) {
+        console.error('[share-target]', err);
+    }
+    return Response.redirect('/add?from-share=1', 303);
+}
+
 // Fetch: network-first for auth, stale-while-revalidate for data, cache-first for static assets
 self.addEventListener('fetch', (event) => {
     const { request } = event;
     const url = new URL(request.url);
+
+    // Web Share Target POST — intercept before the GET-only guard.
+    if (request.method === 'POST' && url.pathname === '/share-target') {
+        event.respondWith(handleShareTarget(request));
+        return;
+    }
 
     // Skip non-GET requests
     if (request.method !== 'GET') return;

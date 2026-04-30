@@ -41,6 +41,7 @@ import { CategorySelector, BucketSelector } from './add-expense/selectors';
 import { useExpenseForm } from '@/hooks/useExpenseForm';
 import { useExpenseSubmission, getExpenseFormErrors, type ExpenseFormErrors } from '@/hooks/useExpenseSubmission';
 import { getDistance } from '@/lib/location';
+import { takePendingSharedFile } from '@/lib/share-target';
 
 import { CATEGORY_COLORS, getIconForCategory, CATEGORIES as SYSTEM_CATEGORIES } from '@/lib/categories';
 
@@ -77,9 +78,7 @@ export function AddExpenseView() {
     const [scanning, setScanning] = React.useState(false);
     const [errors, setErrors] = React.useState<ExpenseFormErrors>({});
 
-    const handleScan = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
+    const scanFile = React.useCallback(async (file: Blob) => {
         setScanning(true);
         try {
             const base64 = await new Promise<string>((resolve, reject) => {
@@ -129,9 +128,34 @@ export function AddExpenseView() {
             console.error('[scan-receipt]', e);
         } finally {
             setScanning(false);
+        }
+    }, [formState]);
+
+    const handleScan = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        try {
+            await scanFile(file);
+        } finally {
             if (fileInputRef.current) fileInputRef.current.value = '';
         }
     };
+
+    // If we arrived here via the OS share sheet, the SW stashed the shared
+    // image in IndexedDB and redirected us with ?from-share=1. Pull it out and
+    // run the scanner automatically.
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('from-share') !== '1') return;
+        // Strip the param so a refresh doesn't re-trigger.
+        const url = new URL(window.location.href);
+        url.searchParams.delete('from-share');
+        window.history.replaceState({}, '', url.pathname + (url.search ? url.search : ''));
+        takePendingSharedFile().then(blob => {
+            if (blob) scanFile(blob);
+        });
+    }, [scanFile]);
 
     const onSubmit = () => {
         const validationErrors = getExpenseFormErrors(formState.amount, formState.description, formState.date);

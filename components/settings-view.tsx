@@ -38,6 +38,7 @@ import { useSyncQueueState } from '@/hooks/use-sync-queue-state';
 import { useTransactionInvalidationListener } from '@/hooks/useTransactionInvalidationListener';
 import { retryFailedItem, discardFailedItem } from '@/lib/sync-manager';
 import { CurrencyDropdown } from '@/components/ui/currency-dropdown';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { RecurringTemplate } from '@/types/transaction';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 
@@ -63,6 +64,8 @@ export function SettingsView() {
         convertAmount,
         budgetAlertsEnabled,
         setBudgetAlertsEnabled,
+        billReminderLeadDays,
+        setBillReminderLeadDays,
         monthlyBudget,
         setMonthlyBudget,
         userId,
@@ -625,6 +628,37 @@ export function SettingsView() {
                                         }
                                     }}
                                 />
+                            </div>
+                        )}
+
+                        {push.isSupported && push.isSubscribed && (
+                            <div className="flex items-center justify-between p-3">
+                                <div className="flex items-center gap-3 min-w-0">
+                                    <RefreshCcw className="w-4 h-4 text-muted-foreground shrink-0" />
+                                    <div className="min-w-0">
+                                        <p className="text-sm font-medium">Bill Reminders</p>
+                                        <p className="text-[11px] text-muted-foreground">
+                                            Notify me before recurring bills are due
+                                        </p>
+                                    </div>
+                                </div>
+                                <Select
+                                    value={billReminderLeadDays == null ? 'off' : String(billReminderLeadDays)}
+                                    onValueChange={(val) => {
+                                        const next = val === 'off' ? null : Number(val);
+                                        setBillReminderLeadDays(next);
+                                    }}
+                                >
+                                    <SelectTrigger className="w-[120px] h-9 rounded-xl bg-secondary/20 border-white/10 text-xs font-bold">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="off">Off</SelectItem>
+                                        <SelectItem value="1">1 day before</SelectItem>
+                                        <SelectItem value="3">3 days before</SelectItem>
+                                        <SelectItem value="7">1 week before</SelectItem>
+                                    </SelectContent>
+                                </Select>
                             </div>
                         )}
                     </div>

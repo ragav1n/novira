@@ -12,6 +12,7 @@ import { CHART_CONFIG } from '@/lib/categories';
 import { Currency, CURRENCY_SYMBOLS } from '@/components/providers/user-preferences-provider';
 import { Bucket } from '@/components/providers/buckets-provider';
 import { toast } from '@/utils/haptics';
+import { CashflowForecast } from './cashflow-forecast';
 
 type SpendingCategory = {
     name: string;
@@ -28,6 +29,14 @@ type RunRateData = {
     currentDayOfMonth: number;
 };
 
+type CashflowForecastData = {
+    series: { day: number; actual: number | null; forecast: number | null; budget: number }[];
+    currentDayOfMonth: number;
+    daysInMonth: number;
+    projectedSpend: number;
+    budget: number;
+};
+
 interface SpendingOverviewProps {
     totalSpent: number;
     displayBudget: number;
@@ -41,6 +50,7 @@ interface SpendingOverviewProps {
     isCoupleWorkspace: boolean;
     isHomeWorkspace: boolean;
     runRateData: RunRateData | null;
+    cashflowForecast: CashflowForecastData | null;
     dashboardFocus: string;
     setDashboardFocus: (focus: string) => void;
     isFocusMenuOpen: boolean;
@@ -84,6 +94,7 @@ export const SpendingOverview = React.memo(function SpendingOverview({
     isCoupleWorkspace,
     isHomeWorkspace,
     runRateData,
+    cashflowForecast,
     dashboardFocus,
     setDashboardFocus,
     isFocusMenuOpen,
@@ -377,6 +388,17 @@ export const SpendingOverview = React.memo(function SpendingOverview({
                         )}
                     </div>
                 </motion.div>
+            )}
+
+            {/* Cashflow Forecast Strip */}
+            {cashflowForecast && !isBucketFocused && cashflowForecast.currentDayOfMonth >= 1 && (
+                <CashflowForecast
+                    forecast={cashflowForecast}
+                    formatCurrency={formatCurrency}
+                    bucketCurrency={bucketCurrency}
+                    isCoupleWorkspace={isCoupleWorkspace}
+                    isHomeWorkspace={isHomeWorkspace}
+                />
             )}
 
             {/* Balance Summary Card */}

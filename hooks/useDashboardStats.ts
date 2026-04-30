@@ -50,6 +50,13 @@ export function useDashboardStats({
         daysInMonth: number;
         currentDayOfMonth: number;
     } | null;
+    cashflowForecast: {
+        series: { day: number; actual: number | null; forecast: number | null; budget: number }[];
+        currentDayOfMonth: number;
+        daysInMonth: number;
+        projectedSpend: number;
+        budget: number;
+    } | null;
 } {
     const focusedBucket = (isBucketFocused && Array.isArray(buckets) ? buckets.find(b => b.id === effectiveFocus) : null) ?? null;
     const displayBudget = isBucketFocused && focusedBucket ? Number(focusedBucket.budget) : (monthlyBudget || 0);
@@ -190,7 +197,8 @@ export function useDashboardStats({
         const recentDailyRate = recentDays > 0 ? aggregates.recentSpent / recentDays : 0;
         const mtdDailyRate = currentDayOfMonth > 0 ? totalSpent / currentDayOfMonth : 0;
         const dailyAverage = 0.6 * recentDailyRate + 0.4 * mtdDailyRate;
-        const projectedSpend = dailyAverage * daysInMonth;
+        const remainingDays = Math.max(0, daysInMonth - currentDayOfMonth);
+        const projectedSpend = totalSpent + remainingDays * dailyAverage;
 
         return {
             dailyAverage,
@@ -200,6 +208,65 @@ export function useDashboardStats({
             currentDayOfMonth
         };
     }, [isBucketFocused, totalSpent, displayBudget, aggregates.recentSpent]);
+
+    // Build per-day cumulative actuals for the current month (only non-bucket view).
+    // Forecast is the extrapolated trajectory from today through end-of-month using
+    // the same dailyAverage that powers runRateData, so the chart stays consistent
+    // with the "Month Forecasting" widget.
+    const cashflowForecast = useMemo(() => {
+        if (isBucketFocused || !runRateData) return null;
+        if (runRateData.currentDayOfMonth < 1) return null;
+
+        const { daysInMonth, currentDayOfMonth, dailyAverage, projectedSpend } = runRateData;
+
+        const dailyTotals = new Array(daysInMonth + 1).fill(0); // 1-indexed
+        for (const tx of filteredTransactions) {
+            const myShare = calculateUserShare(tx, userId);
+            if (myShare <= 0) continue;
+            const txCurr = (tx.currency || 'USD').toUpperCase();
+            const baseCurr = (tx.base_currency || '').toUpperCase();
+            const hasExchange = !!tx.exchange_rate && tx.exchange_rate !== 1;
+            const amt = txCurr === bucketCurrency
+                ? myShare
+                : (hasExchange && baseCurr === bucketCurrency ? myShare * Number(tx.exchange_rate) : convertAmount(myShare, txCurr, bucketCurrency));
+            const day = parseInt(tx.date.slice(8, 10), 10);
+            if (!isNaN(day) && day >= 1 && day <= daysInMonth) {
+                dailyTotals[day] += amt;
+            }
+        }
+
+        const series: { day: number; actual: number | null; forecast: number | null; budget: number }[] = [];
+        let cumulative = 0;
+        for (let d = 1; d <= daysInMonth; d++) {
+            const isPast = d <= currentDayOfMonth;
+            if (isPast) cumulative += dailyTotals[d];
+            const actual = isPast ? cumulative : null;
+            // Forecast line starts from today's cumulative and extends straight through
+            // end-of-month at the dailyAverage rate. Shows "today" twice so actual + forecast
+            // share an anchor point and render as one continuous line.
+            const forecast = d >= currentDayOfMonth
+                ? cumulative + Math.max(0, d - currentDayOfMonth) * dailyAverage
+                : null;
+            series.push({ day: d, actual, forecast, budget: displayBudget });
+        }
+
+        return {
+            series,
+            currentDayOfMonth,
+            daysInMonth,
+            projectedSpend,
+            budget: displayBudget
+        };
+    }, [
+        isBucketFocused,
+        runRateData,
+        filteredTransactions,
+        userId,
+        calculateUserShare,
+        bucketCurrency,
+        convertAmount,
+        displayBudget
+    ]);
 
     return {
         focusedBucket,
@@ -212,6 +279,7 @@ export function useDashboardStats({
         spendingData,
         displayTransactions,
         recentFeed,
-        runRateData
+        runRateData,
+        cashflowForecast
     };
 }

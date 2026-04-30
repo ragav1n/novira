@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>New Login Method Linked</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background-color: #09090b;
+            color: #ffffff;
+            margin: 0;
+            padding: 0;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+
+        .logo {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 30px;
+            text-align: center;
+            letter-spacing: -0.5px;
+        }
+
+        .card {
+            background-color: #18181b;
+            border: 1px solid #27272a;
+            border-radius: 16px;
+            padding: 40px;
+            text-align: center;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 16px;
+            color: #ffffff;
+        }
+
+        p {
+            color: #a1a1aa;
+            font-size: 16px;
+            line-height: 1.6;
+            margin-bottom: 24px;
+        }
+
+        .footer {
+            margin-top: 32px;
+            text-align: center;
+            font-size: 12px;
+            color: #52525b;
+        }
+
+        .security-notice {
+            background-color: #0d0d0f;
+            border: 1px solid #27272a;
+            border-radius: 12px;
+            padding: 20px;
+            margin-top: 32px;
+            color: #a1a1aa;
+            font-size: 14px;
+            text-align: left;
+        }
+
+        .security-notice strong {
+            color: #ffffff;
+            display: block;
+            margin-bottom: 4px;
+        }
+
+        .provider-badge {
+            display: inline-block;
+            background-color: #8A2BE2;
+            color: #ffffff;
+            padding: 4px 12px;
+            border-radius: 9999px;
+            font-size: 14px;
+            font-weight: 700;
+            text-transform: capitalize;
+            margin-top: 8px;
+        }
+
+        .highlight,
+        .highlight a {
+            color: #8A2BE2 !important;
+            font-weight: 600;
+            text-decoration: none !important;
+        }
+
+        a {
+            color: #8A2BE2 !important;
+            text-decoration: none !important;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Dark wrapper for email clients that ignore body background -->
+    <div style="background-color: #09090b; min-height: 100vh; width: 100%; margin: 0; padding: 0;">
+        <div class="container">
+            <div class="logo">
+                <img src="https://rppfrqfbmaukopnjyfiw.supabase.co/storage/v1/object/public/avatars/Novira.png"
+                    alt="Novira Logo" width="60" style="margin-bottom: 5px;">
+                <br>
+                <span style="color: #ffffff;">Novira</span>
+            </div>
+
+            <div class="card">
+                <h1>Identity Linked 🔗</h1>
+                <p>
+                    A new login method has been successfully linked to your Novira account <span class="highlight">{{
+                        .Email }}</span>.
+                </p>
+
+                <div style="margin: 24px 0;">
+                    <span style="color: #a1a1aa; font-size: 14px;">Connected Provider:</span>
+                    <br>
+                    <div class="provider-badge">{{ .Provider }}</div>
+                </div>
+
+                <p style="font-size: 14px; margin-bottom: 0;">
+                    You can now use this method to sign in to your account.
+                </p>
+
+                <div class="security-notice">
+                    <strong>Wasn't you?</strong>
+                    <br>
+                    If you did not authorize linking this provider, please secure your account immediately or contact
+                    our support team.
+                </div>
+            </div>
+
+            <div class="footer">
+                <p>&copy; 2026 Novira. All rights reserved.</p>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

@@ -46,6 +46,8 @@ interface UserPreferencesContextType {
     convertAmount: (amount: number, fromCurrency: string, toCurrency?: string) => number;
     budgetAlertsEnabled: boolean;
     setBudgetAlertsEnabled: (enabled: boolean) => Promise<void>;
+    billReminderLeadDays: number | null;
+    setBillReminderLeadDays: (days: number | null) => Promise<void>;
     monthlyBudget: number;
     setMonthlyBudget: (budget: number) => Promise<void>;
     avatarUrl: string | null;
@@ -107,6 +109,7 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
     // Preferences State
     const [currency, setCurrencyState] = useState<Currency>('INR');
     const [budgetAlertsEnabled, setBudgetAlertsEnabledState] = useState(false);
+    const [billReminderLeadDays, setBillReminderLeadDaysState] = useState<number | null>(null);
     const [monthlyBudget, setMonthlyBudgetState] = useState(DEFAULT_BUDGETS.INR);
     const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
     const [fullName, setFullName] = useState<string>('User');
@@ -141,6 +144,7 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
                     const parsed = JSON.parse(cached);
                     if (parsed.currency) setCurrencyState(parsed.currency);
                     if (parsed.budget_alerts !== null) setBudgetAlertsEnabledState(parsed.budget_alerts);
+                    if (parsed.bill_reminder_lead_days !== undefined) setBillReminderLeadDaysState(parsed.bill_reminder_lead_days);
                     if (parsed.monthly_budget != null) setMonthlyBudgetState(parsed.monthly_budget);
                     if (parsed.avatar_url) setAvatarUrl(parsed.avatar_url);
                     if (parsed.budgets) setBudgets(parsed.budgets);
@@ -152,13 +156,16 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
 
             const { data, error } = await supabase
                 .from('profiles')
-                .select('currency, budget_alerts, monthly_budget, budgets, avatar_url, full_name')
+                .select('currency, budget_alerts, bill_reminder_lead_days, monthly_budget, budgets, avatar_url, full_name')
                 .eq('id', uid)
                 .single();
- 
+
             if (data) {
                 if (data.currency) setCurrencyState(data.currency as Currency);
                 if (data.budget_alerts !== null) setBudgetAlertsEnabledState(data.budget_alerts);
+                if ((data as { bill_reminder_lead_days?: number | null }).bill_reminder_lead_days !== undefined) {
+                    setBillReminderLeadDaysState((data as { bill_reminder_lead_days?: number | null }).bill_reminder_lead_days ?? null);
+                }
                 if (data.monthly_budget != null) setMonthlyBudgetState(data.monthly_budget);
                 if (data.avatar_url) setAvatarUrl(data.avatar_url);
                 if (data.budgets) setBudgets(data.budgets as Record<string, number>);
@@ -456,6 +463,31 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
         }
     }, [userId]);
 
+    const setBillReminderLeadDays = useCallback(async (days: number | null) => {
+        setBillReminderLeadDaysState(days);
+
+        if (userId) {
+            const cacheKey = `novira_profile_${userId}`;
+            try {
+                const cached = localStorage.getItem(cacheKey);
+                const parsed = cached ? JSON.parse(cached) : {};
+                localStorage.setItem(cacheKey, JSON.stringify({ ...parsed, bill_reminder_lead_days: days }));
+            } catch { /* ignore */ }
+
+            try {
+                const { error } = await supabase
+                    .from('profiles')
+                    .update({ bill_reminder_lead_days: days })
+                    .eq('id', userId);
+                if (error) throw error;
+            } catch (error) {
+                console.error('Error updating bill reminder lead days:', error);
+                toast.error('Failed to update bill reminder preference');
+                refreshPreferences();
+            }
+        }
+    }, [userId, refreshPreferences]);
+
     const setBudgetAlertsEnabled = useCallback(async (enabled: boolean) => {
         setBudgetAlertsEnabledState(enabled);
 
@@ -561,6 +593,8 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
         convertAmount,
         budgetAlertsEnabled,
         setBudgetAlertsEnabled,
+        billReminderLeadDays,
+        setBillReminderLeadDays,
         monthlyBudget,
         setMonthlyBudget,
         avatarUrl,
@@ -588,6 +622,8 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
         convertAmount,
         budgetAlertsEnabled,
         setBudgetAlertsEnabled,
+        billReminderLeadDays,
+        setBillReminderLeadDays,
         monthlyBudget,
         setMonthlyBudget,
         avatarUrl,
