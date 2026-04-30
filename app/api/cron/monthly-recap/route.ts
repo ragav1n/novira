@@ -80,33 +80,38 @@ export async function GET(request: NextRequest) {
         icon: '/Novira.png'
     };
 
-    const dispatchResults = await Promise.allSettled(
-        activeUserIds.map(uid =>
-            fetch(workerUrl, {
-                method: 'POST',
-                headers: {
-                    'content-type': 'application/json',
-                    'x-push-secret': pushSecret
-                },
-                body: JSON.stringify({
-                    userId: uid,
-                    period: monthKey,
-                    currency: currencyByUser.get(uid) || 'USD',
-                    push: pushPayload
-                }),
-                keepalive: true
-            })
-        )
-    );
-
+    // Cap concurrent worker invocations so we don't trip Vercel concurrency
+    // limits or hold the cron alive longer than necessary on large user bases.
+    const CONCURRENCY = 25;
     let dispatched = 0;
     let dispatchFailed = 0;
-    for (const r of dispatchResults) {
-        if (r.status === 'fulfilled' && r.value.ok) dispatched++;
-        else {
-            dispatchFailed++;
-            if (r.status === 'rejected') console.error('[recap-cron] dispatch error', r.reason);
-            else console.error('[recap-cron] worker non-2xx', r.value.status);
+    for (let i = 0; i < activeUserIds.length; i += CONCURRENCY) {
+        const chunk = activeUserIds.slice(i, i + CONCURRENCY);
+        const results = await Promise.allSettled(
+            chunk.map(uid =>
+                fetch(workerUrl, {
+                    method: 'POST',
+                    headers: {
+                        'content-type': 'application/json',
+                        'x-push-secret': pushSecret
+                    },
+                    body: JSON.stringify({
+                        userId: uid,
+                        period: monthKey,
+                        currency: currencyByUser.get(uid) || 'USD',
+                        push: pushPayload
+                    }),
+                    keepalive: true
+                })
+            )
+        );
+        for (const r of results) {
+            if (r.status === 'fulfilled' && r.value.ok) dispatched++;
+            else {
+                dispatchFailed++;
+                if (r.status === 'rejected') console.error('[recap-cron] dispatch error', r.reason);
+                else console.error('[recap-cron] worker non-2xx', r.value.status);
+            }
         }
     }
 

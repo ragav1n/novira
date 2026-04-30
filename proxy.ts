@@ -4,9 +4,9 @@ import { updateSession } from '@/utils/supabase/middleware'
 export async function proxy(request: NextRequest) {
     const csp = [
         "default-src 'self'",
-        "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://unpkg.com https://cdn.jsdelivr.net https://va.vercel-scripts.com https://maps.googleapis.com",
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://unpkg.com https://cdn.jsdelivr.net https://va.vercel-scripts.com",
         "style-src 'self' 'unsafe-inline'",
-        "img-src 'self' blob: data: https://*.supabase.co https://*.mapbox.com https://*.googleusercontent.com https://maps.googleapis.com https://maps.gstatic.com https://staticmap.openstreetmap.de",
+        "img-src 'self' blob: data: https://*.supabase.co https://*.mapbox.com https://*.googleusercontent.com https://maps.googleapis.com https://maps.gstatic.com",
         "media-src 'self' blob: data:",
         "font-src 'self'",
         "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.frankfurter.dev https://v6.exchangerate-api.com https://unpkg.com https://cdn.jsdelivr.net https://*.gstatic.com https://cdnjs.cloudflare.com https://va.vercel-scripts.com https://*.mapbox.com https://maps.googleapis.com https://places.googleapis.com",

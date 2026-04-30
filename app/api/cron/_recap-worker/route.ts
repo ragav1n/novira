@@ -30,7 +30,10 @@ interface WorkerPayload {
 
 export async function POST(request: NextRequest) {
     const internal = request.headers.get('x-push-secret');
-    if (!internal || internal !== process.env.PUSH_SECRET) {
+    const auth = request.headers.get('authorization');
+    const internalOk = !!internal && internal === process.env.PUSH_SECRET;
+    const cronOk = !!process.env.CRON_SECRET && auth === `Bearer ${process.env.CRON_SECRET}`;
+    if (!internalOk && !cronOk) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
@@ -56,8 +59,14 @@ export async function POST(request: NextRequest) {
         .eq('month', period)
         .maybeSingle();
     if (!existing) {
+        const GENERATION_TIMEOUT_MS = 50_000; // keep headroom under maxDuration=60
         try {
-            await generateRecap(supabase, userId, period, (currency || 'USD').toUpperCase());
+            await Promise.race([
+                generateRecap(supabase, userId, period, (currency || 'USD').toUpperCase()),
+                new Promise<never>((_, reject) =>
+                    setTimeout(() => reject(new Error('generateRecap timeout')), GENERATION_TIMEOUT_MS)
+                )
+            ]);
             generated = true;
         } catch (err) {
             console.error('[recap-worker] generation failed', userId, period, err);

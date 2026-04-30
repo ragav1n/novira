@@ -116,6 +116,22 @@ async function reverseGeocodeRest(
     return null;
 }
 
+// ── Single-retry fetch (transient network/5xx) ─────────────────────────────
+
+async function fetchWithRetry(input: string, init: RequestInit & { signal?: AbortSignal }): Promise<Response> {
+    try {
+        const res = await fetch(input, init);
+        if (res.status >= 500 && res.status < 600) throw new Error(`upstream ${res.status}`);
+        return res;
+    } catch (err) {
+        if ((err as { name?: string })?.name === 'AbortError') throw err;
+        await new Promise(r => setTimeout(r, 500));
+        return fetch(input, init);
+    }
+}
+
+type SearchSource = 'google' | 'mapbox' | 'photon' | null;
+
 // ── Highlight matched text ─────────────────────────────────────────────────
 
 function HighlightedText({ text, query }: { text: string; query: string }) {
@@ -143,6 +159,7 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
     const [recentLocations, setRecentLocations] = useState<RecentLocation[]>([]);
     const [lastPosition, setLastPosition] = useState<{ lat: number; lng: number } | null>(null);
     const [activeIndex, setActiveIndex] = useState(-1);
+    const [activeSource, setActiveSource] = useState<SearchSource>(null);
 
     const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const abortControllerRef = useRef<AbortController | null>(null);
@@ -222,6 +239,7 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
             nearbyFetchedRef.current = false;
             setActiveIndex(-1);
             setIsLoadingNearby(false);
+            setActiveSource(null);
             // Abandon the Google session token if user closes without selecting
             googleSessionTokenRef.current = null;
         }
@@ -273,7 +291,7 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
         mapboxgl.accessToken = mapboxToken;
         const map = new mapboxgl.Map({
             container: node,
-            style: 'mapbox://styles/mapbox/navigation-night-v1',
+            style: 'mapbox://styles/mapbox/standard',
             center: [center.lng, center.lat],
             zoom: initialZoom,
             attributionControl: false,
@@ -282,6 +300,10 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
         map.on('load', () => {
             const c = map.getCenter();
             debounceReverseGeocode(c.lat, c.lng);
+            // Match expense-map aesthetic: dusk basemap preset for the dark UI
+            map.setConfigProperty('basemap', 'lightPreset', 'dusk');
+            map.setConfigProperty('basemap', 'showPointOfInterestLabels', true);
+            map.setConfigProperty('basemap', 'showTransitLabels', false);
             if (lastPositionRef.current) {
                 const coords: [number, number] = [lastPositionRef.current.lng, lastPositionRef.current.lat];
                 map.addSource('user-loc', { type: 'geojson', data: { type: 'Feature', geometry: { type: 'Point', coordinates: coords }, properties: {} } });
@@ -350,7 +372,7 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
             try {
                 const params: Record<string, string> = { q: searchQuery, limit: '8', lang: 'en' };
                 if (lastPosition) { params.lat = String(lastPosition.lat); params.lon = String(lastPosition.lng); }
-                const response = await fetch(`https://photon.komoot.io/api/?` + new URLSearchParams(params), { signal: abortControllerRef.current.signal });
+                const response = await fetchWithRetry(`https://photon.komoot.io/api/?` + new URLSearchParams(params), { signal: abortControllerRef.current.signal });
                 if (!response.ok) throw new Error('Search failed');
                 const data = await response.json();
                 const results = (data.features || []).map((f: any) => {
@@ -375,6 +397,7 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                 searchCacheKeysRef.current.push(cacheKey);
                 searchCacheRef.current.set(cacheKey, results);
                 setPredictions(results);
+                setActiveSource('photon');
                 setActiveIndex(-1);
             } catch (err: any) {
                 if (err?.name !== 'AbortError') setPredictions([]);
@@ -407,7 +430,7 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
             };
             if (lastPosition) queryParams.proximity = `${lastPosition.lng},${lastPosition.lat}`;
             try {
-                const response = await fetch(
+                const response = await fetchWithRetry(
                     `https://api.mapbox.com/search/searchbox/v1/suggest?` + new URLSearchParams(queryParams),
                     { signal: abortControllerRef.current.signal }
                 );
@@ -433,6 +456,7 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                 searchCacheKeysRef.current.push(cacheKey);
                 searchCacheRef.current.set(cacheKey, results);
                 setPredictions(results);
+                setActiveSource('mapbox');
                 setActiveIndex(-1);
                 prefetchCoords(results);
                 setIsSearching(false);
@@ -474,7 +498,7 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                         circle: { center: { latitude: currentPos.lat, longitude: currentPos.lng }, radius: 10000 }
                     };
                 }
-                const response = await fetch('https://places.googleapis.com/v1/places:autocomplete', {
+                const response = await fetchWithRetry('https://places.googleapis.com/v1/places:autocomplete', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -508,6 +532,7 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                 searchCacheKeysRef.current.push(cacheKey);
                 searchCacheRef.current.set(cacheKey, results);
                 setPredictions(results);
+                setActiveSource('google');
                 setActiveIndex(-1);
                 setIsSearching(false);
             } catch (e) {
@@ -588,6 +613,7 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                             };
                         }).sort((a: PlacePrediction, b: PlacePrediction) => (a._distance || 0) - (b._distance || 0));
                         setPredictions(results);
+                        setActiveSource('google');
                         setIsLoadingNearby(false);
                         return;
                     }
@@ -617,6 +643,7 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                                 _is_nearby: true, _distance: dist, _maki: f.properties?.maki,
                             };
                         }).sort((a: any, b: any) => (a._distance || 0) - (b._distance || 0)));
+                        setActiveSource('mapbox');
                     }
                 } catch (e: unknown) {
                     if ((e as { name?: string })?.name === 'AbortError') return;
@@ -786,7 +813,7 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
     const getStaticMapUrl = (lat: number, lng: number) => {
         if (mapboxToken) return `https://api.mapbox.com/styles/v1/mapbox/dark-v11/static/pin-s+a855f7(${lng},${lat})/${lng},${lat},14,0/400x200@2x?access_token=${mapboxToken}`;
         if (googleMapsKey) return `https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=15&size=400x200&markers=color:purple%7C${lat},${lng}&key=${googleMapsKey}`;
-        return `https://staticmap.openstreetmap.de/staticmap.php?center=${lat},${lng}&zoom=15&size=400x200&markers=${lat},${lng},red-pushpin`;
+        return null;
     };
 
     const formatDist = (d: number) => d < 1 ? `${Math.round(d * 1000)}m` : `${d.toFixed(1)}km`;
@@ -803,16 +830,20 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                         "rounded-2xl border overflow-hidden",
                         isOnline ? "border-blue-500/20 bg-blue-500/5" : "border-emerald-500/20 bg-emerald-500/5"
                     )}>
-                        {!isOnline && placeLat && placeLng && (
-                            <div onClick={() => window.open(`https://www.google.com/maps/dir/?api=1&destination=${placeLat},${placeLng}`, '_blank')}
-                                className="w-full h-[100px] bg-secondary/20 cursor-pointer relative overflow-hidden active:opacity-80 transition-opacity">
-                                <Image src={getStaticMapUrl(placeLat, placeLng)} alt="Map" fill className="object-cover opacity-80" sizes="400px" />
-                                <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
-                                <div className="absolute bottom-2 right-2 flex items-center gap-1 text-[10px] font-bold text-white bg-black/40 backdrop-blur-sm rounded-full px-2 py-1">
-                                    <Navigation className="w-2.5 h-2.5" /> Directions
+                        {!isOnline && placeLat && placeLng && (() => {
+                            const mapUrl = getStaticMapUrl(placeLat, placeLng);
+                            if (!mapUrl) return null;
+                            return (
+                                <div onClick={() => window.open(`https://www.google.com/maps/dir/?api=1&destination=${placeLat},${placeLng}`, '_blank')}
+                                    className="w-full h-[100px] bg-secondary/20 cursor-pointer relative overflow-hidden active:opacity-80 transition-opacity">
+                                    <Image src={mapUrl} alt="Map" fill className="object-cover opacity-80" sizes="400px" />
+                                    <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
+                                    <div className="absolute bottom-2 right-2 flex items-center gap-1 text-[10px] font-bold text-white bg-black/40 backdrop-blur-sm rounded-full px-2 py-1">
+                                        <Navigation className="w-2.5 h-2.5" /> Directions
+                                    </div>
                                 </div>
-                            </div>
-                        )}
+                            );
+                        })()}
                         <div className="p-3 flex items-start justify-between gap-2">
                             <div className="flex items-start gap-2.5 min-w-0">
                                 <div className={cn(
@@ -1105,9 +1136,11 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                                 );
                             })}
                         </div>
-                        {googleMapsKey && (
+                        {activeSource && (
                             <p className="text-[9px] text-muted-foreground/30 text-right pr-3 py-1 bg-white/[0.02]">
-                                Powered by Google
+                                {activeSource === 'google' ? 'Powered by Google' :
+                                    activeSource === 'mapbox' ? 'Powered by Mapbox' :
+                                        'Powered by OpenStreetMap'}
                             </p>
                         )}
                     </motion.div>
