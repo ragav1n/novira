@@ -10,7 +10,7 @@ import { CATEGORY_COLORS, getIconForCategory, CATEGORIES as SYSTEM_CATEGORIES } 
 import { TransactionRow } from '@/components/transaction-row';
 import { Transaction } from '@/types/transaction';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
@@ -92,8 +92,9 @@ const SearchSkeleton = () => (
 
 export function SearchView() {
     const router = useRouter();
+    const searchParams = useSearchParams();
     const [filteredTransactions, setFilteredTransactions] = useState<Transaction[]>([]);
-    const [searchQuery, setSearchQuery] = useState('');
+    const [searchQuery, setSearchQuery] = useState(() => searchParams?.get('q') || '');
     const [loading, setLoading] = useState(true);
     const { formatCurrency, convertAmount, currency, activeWorkspaceId, userId } = useUserPreferences();
     const { buckets } = useBucketsList();
@@ -104,9 +105,22 @@ export function SearchView() {
 
     // Advanced Filter State
     const [priceRange, setPriceRange] = useState<[number, number]>([0, 1000]);
-    const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
-    const [selectedPayments, setSelectedPayments] = useState<string[]>([]);
-    const [dateRange, setDateRange] = useState<DateRange>({ from: undefined, to: undefined });
+    const [selectedCategories, setSelectedCategories] = useState<string[]>(() => {
+        const c = searchParams?.get('category');
+        return c ? [c] : [];
+    });
+    const [selectedPayments, setSelectedPayments] = useState<string[]>(() => {
+        const p = searchParams?.get('payment');
+        return p ? [p] : [];
+    });
+    const [dateRange, setDateRange] = useState<DateRange>(() => {
+        const from = searchParams?.get('from');
+        const to = searchParams?.get('to');
+        return {
+            from: from ? new Date(from + 'T00:00:00') : undefined,
+            to: to ? new Date(to + 'T00:00:00') : undefined,
+        };
+    });
     const [selectedBucketId, setSelectedBucketId] = useState<string | null>(null);
     const [sortBy, setSortBy] = useState<SortOption>('date-desc');
     const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);

@@ -47,35 +47,6 @@ interface LocationPickerProps {
     onChange: (location: LocationData) => void;
 }
 
-// ── Custom dark-purple map style (Google Maps) ────────────────────────────────
-
-const NOVIRA_MAP_STYLE = [
-    { elementType: 'geometry', stylers: [{ color: '#0d0d1a' }] },
-    { elementType: 'labels.text.fill', stylers: [{ color: '#8888aa' }] },
-    { elementType: 'labels.text.stroke', stylers: [{ color: '#0d0d1a' }] },
-    { featureType: 'administrative', elementType: 'geometry', stylers: [{ color: '#1a1a2e' }] },
-    { featureType: 'administrative.locality', elementType: 'labels.text.fill', stylers: [{ color: '#c0b8e8' }] },
-    { featureType: 'poi', elementType: 'geometry', stylers: [{ color: '#0f0f1e' }] },
-    { featureType: 'poi', elementType: 'labels.text.fill', stylers: [{ color: '#8070c0' }] },
-    { featureType: 'poi', elementType: 'labels.icon', stylers: [{ saturation: -30 }, { lightness: -20 }] },
-    { featureType: 'poi.business', elementType: 'labels.icon', stylers: [{ visibility: 'simplified' }] },
-    { featureType: 'poi.park', elementType: 'geometry', stylers: [{ color: '#0c0c1a' }] },
-    { featureType: 'poi.park', elementType: 'labels.text.fill', stylers: [{ color: '#4a6040' }] },
-    { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#1c1c38' }] },
-    { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: '#28285a' }] },
-    { featureType: 'road', elementType: 'labels.text.fill', stylers: [{ color: '#9898c0' }] },
-    { featureType: 'road.arterial', elementType: 'geometry', stylers: [{ color: '#20203a' }] },
-    { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#2e1f6b' }] },
-    { featureType: 'road.highway', elementType: 'geometry.stroke', stylers: [{ color: '#3d2b90' }] },
-    { featureType: 'road.highway', elementType: 'labels.text.fill', stylers: [{ color: '#d0c8ff' }] },
-    { featureType: 'road.local', elementType: 'labels.text.fill', stylers: [{ color: '#7878a0' }] },
-    { featureType: 'transit', elementType: 'geometry', stylers: [{ color: '#181830' }] },
-    { featureType: 'transit.station', elementType: 'labels.text.fill', stylers: [{ color: '#a898e8' }] },
-    { featureType: 'transit.station', elementType: 'labels.icon', stylers: [{ saturation: -20 }] },
-    { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#060614' }] },
-    { featureType: 'water', elementType: 'labels.text.fill', stylers: [{ color: '#3a3870' }] },
-];
-
 // ── Maki → emoji map (no extra bundle, works perfectly on mobile) ───────────
 
 const MAKI_EMOJI: Record<string, string> = {
@@ -99,23 +70,50 @@ const getMakiEmoji = (maki?: string): string => {
     return MAKI_EMOJI[maki] || '';
 };
 
-// ── Google Maps loader (singleton) ─────────────────────────────────────────
+// ── REST reverse-geocoding ────────────────────────────────────────────────
 
-let _googleMapsPromise: Promise<any> | null = null;
-
-function loadGoogleMaps(apiKey: string): Promise<any> {
-    if (_googleMapsPromise) return _googleMapsPromise;
-    if (typeof window === 'undefined') return Promise.reject(new Error('SSR'));
-    if ((window as any).google?.maps?.places) return Promise.resolve((window as any).google);
-    _googleMapsPromise = new Promise((resolve, reject) => {
-        const script = document.createElement('script');
-        script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
-        script.async = true;
-        script.onload = () => resolve((window as any).google);
-        script.onerror = (e) => { _googleMapsPromise = null; reject(e); };
-        document.head.appendChild(script);
-    });
-    return _googleMapsPromise;
+async function reverseGeocodeRest(
+    lat: number,
+    lng: number,
+    googleKey?: string,
+    mapboxKey?: string,
+): Promise<{ name: string; address: string } | null> {
+    if (googleKey) {
+        try {
+            const res = await fetch(
+                `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${googleKey}`,
+            );
+            if (res.ok) {
+                const data = await res.json();
+                const r = data.results?.[0];
+                if (r) {
+                    return {
+                        name: r.address_components?.[0]?.long_name || (r.formatted_address?.split(',')[0]?.trim() ?? 'Current Location'),
+                        address: r.formatted_address || `${lat.toFixed(4)}, ${lng.toFixed(4)}`,
+                    };
+                }
+            }
+        } catch { /* fall through */ }
+    }
+    if (mapboxKey) {
+        try {
+            const res = await fetch(
+                `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?` +
+                new URLSearchParams({ access_token: mapboxKey, limit: '1', types: 'poi,address,place,neighborhood' }),
+            );
+            if (res.ok) {
+                const data = await res.json();
+                const f = data.features?.[0];
+                if (f) {
+                    return {
+                        name: f.text || f.place_name?.split(',')[0]?.trim() || 'Current Location',
+                        address: f.place_name || `${lat.toFixed(4)}, ${lng.toFixed(4)}`,
+                    };
+                }
+            }
+        } catch { /* fall through */ }
+    }
+    return null;
 }
 
 // ── Highlight matched text ─────────────────────────────────────────────────
@@ -170,9 +168,7 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
     const [isLoadingNearby, setIsLoadingNearby] = useState(false);
     const [dropPinMode, setDropPinMode] = useState(false);
     const [dropPinLabel, setDropPinLabel] = useState<string | null>(null);
-    const dropPinMapContainerRef = useRef<HTMLDivElement>(null);
     const dropPinMapRef = useRef<mapboxgl.Map | null>(null);
-    const dropPinGoogleMapRef = useRef<any>(null);
     const dropPinGeocodeRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const hasLocation = !!placeName;
     const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
@@ -247,17 +243,16 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
     }, [isExpanded]);
 
     // Callback ref — fires with the real DOM node the moment React mounts/unmounts.
-    // Uses Google Maps (already loaded for search) with custom dark-purple styling.
-    // Falls back to Mapbox navigation-night if no Google key.
-    const dropPinMapInit = useCallback((node: HTMLDivElement | null) => { (async () => {
+    // Uses bundled Mapbox GL (no script load) + REST reverse geocoding for speed.
+    const dropPinMapInit = useCallback((node: HTMLDivElement | null) => {
         if (!node) {
             if (dropPinGeocodeRef.current) clearTimeout(dropPinGeocodeRef.current);
             toast.dismiss('drop-pin-location');
             dropPinMapRef.current?.remove();
             dropPinMapRef.current = null;
-            dropPinGoogleMapRef.current = null;
             return;
         }
+        if (!mapboxToken) return;
 
         const center = lastPositionRef.current
             ? { lat: lastPositionRef.current.lat, lng: lastPositionRef.current.lng }
@@ -267,114 +262,39 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
         const debounceReverseGeocode = (lat: number, lng: number) => {
             if (dropPinGeocodeRef.current) clearTimeout(dropPinGeocodeRef.current);
             dropPinGeocodeRef.current = setTimeout(async () => {
-                try {
-                    // Use Google Geocoder if available, else Mapbox
-                    if (googleMapsKey) {
-                        const g = (window as any).google;
-                        if (g?.maps?.Geocoder) {
-                            new g.maps.Geocoder().geocode({ location: { lat, lng } }, (results: any[], status: string) => {
-                                if (status === 'OK' && results?.[0]) {
-                                    const name = results[0].formatted_address as string;
-                                    setDropPinLabel(name);
-                                    toast('📍 ' + (name.split(',')[0] ?? name), { id: 'drop-pin-location' });
-                                }
-                            });
-                            return;
-                        }
-                    }
-                    if (mapboxToken) {
-                        const res = await fetch(
-                            `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?` +
-                            new URLSearchParams({ access_token: mapboxToken, limit: '1', types: 'poi,address,place,neighborhood' })
-                        );
-                        const data = await res.json();
-                        const name = data.features?.[0]?.place_name ?? `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
-                        setDropPinLabel(name);
-                        toast('📍 ' + (name.split(',')[0] ?? name), { id: 'drop-pin-location' });
-                    }
-                } catch { /* ignore */ }
+                const r = await reverseGeocodeRest(lat, lng, googleMapsKey, mapboxToken);
+                if (r) {
+                    setDropPinLabel(r.address);
+                    toast('📍 ' + r.name, { id: 'drop-pin-location' });
+                }
             }, 500);
         };
 
-        if (googleMapsKey) {
-            try {
-                const g = await loadGoogleMaps(googleMapsKey);
-                const map = new g.maps.Map(node, {
-                    center,
-                    zoom: initialZoom,
-                    styles: NOVIRA_MAP_STYLE,
-                    disableDefaultUI: true,
-                    gestureHandling: 'greedy',
-                    clickableIcons: false,
-                });
-                dropPinGoogleMapRef.current = map;
-
-                // User location dot + accuracy ring
-                if (lastPositionRef.current) {
-                    const userPos = { lat: lastPositionRef.current.lat, lng: lastPositionRef.current.lng };
-                    new g.maps.Circle({
-                        map, center: userPos, radius: 80,
-                        fillColor: '#a78bfa', fillOpacity: 0.15,
-                        strokeColor: '#a78bfa', strokeOpacity: 0.35, strokeWeight: 1,
-                        zIndex: 998,
-                    });
-                    new g.maps.Marker({
-                        map, position: userPos, zIndex: 1000, title: 'Your location',
-                        icon: {
-                            path: g.maps.SymbolPath.CIRCLE,
-                            scale: 7,
-                            fillColor: '#a78bfa', fillOpacity: 1,
-                            strokeColor: '#ffffff', strokeWeight: 2.5,
-                        },
-                    });
-                }
-
-                // Geocode on initial load
-                debounceReverseGeocode(center.lat, center.lng);
-                // Geocode after every pan/zoom
-                map.addListener('idle', () => {
-                    const c = map.getCenter();
-                    if (c) debounceReverseGeocode(c.lat(), c.lng());
-                });
-                return;
-            } catch (e) {
-                console.warn('[LocationPicker] Google Maps init failed, falling back to Mapbox:', e);
+        mapboxgl.accessToken = mapboxToken;
+        const map = new mapboxgl.Map({
+            container: node,
+            style: 'mapbox://styles/mapbox/navigation-night-v1',
+            center: [center.lng, center.lat],
+            zoom: initialZoom,
+            attributionControl: false,
+        });
+        dropPinMapRef.current = map;
+        map.on('load', () => {
+            const c = map.getCenter();
+            debounceReverseGeocode(c.lat, c.lng);
+            if (lastPositionRef.current) {
+                const coords: [number, number] = [lastPositionRef.current.lng, lastPositionRef.current.lat];
+                map.addSource('user-loc', { type: 'geojson', data: { type: 'Feature', geometry: { type: 'Point', coordinates: coords }, properties: {} } });
+                map.addLayer({ id: 'user-loc-pulse', type: 'circle', source: 'user-loc', paint: { 'circle-radius': 14, 'circle-color': '#a78bfa', 'circle-opacity': 0.15 } });
+                map.addLayer({ id: 'user-loc-dot', type: 'circle', source: 'user-loc', paint: { 'circle-radius': 6, 'circle-color': '#a78bfa', 'circle-stroke-width': 2.5, 'circle-stroke-color': '#ffffff' } });
             }
-        }
-
-        if (mapboxToken) {
-            mapboxgl.accessToken = mapboxToken;
-            const map = new mapboxgl.Map({
-                container: node,
-                style: 'mapbox://styles/mapbox/navigation-night-v1',
-                center: [center.lng, center.lat],
-                zoom: initialZoom,
-                attributionControl: false,
-            });
-            dropPinMapRef.current = map;
-            map.on('load', () => {
-                const c = map.getCenter();
-                debounceReverseGeocode(c.lat, c.lng);
-                // User location dot
-                if (lastPositionRef.current) {
-                    const coords: [number, number] = [lastPositionRef.current.lng, lastPositionRef.current.lat];
-                    map.addSource('user-loc', { type: 'geojson', data: { type: 'Feature', geometry: { type: 'Point', coordinates: coords }, properties: {} } });
-                    map.addLayer({ id: 'user-loc-pulse', type: 'circle', source: 'user-loc', paint: { 'circle-radius': 14, 'circle-color': '#a78bfa', 'circle-opacity': 0.15 } });
-                    map.addLayer({ id: 'user-loc-dot', type: 'circle', source: 'user-loc', paint: { 'circle-radius': 6, 'circle-color': '#a78bfa', 'circle-stroke-width': 2.5, 'circle-stroke-color': '#ffffff' } });
-                }
-            });
-            map.on('moveend', () => { const c = map.getCenter(); debounceReverseGeocode(c.lat, c.lng); });
-        }
-    })(); }, [googleMapsKey, mapboxToken]);
+        });
+        map.on('moveend', () => { const c = map.getCenter(); debounceReverseGeocode(c.lat, c.lng); });
+    }, [googleMapsKey, mapboxToken]);
 
     const handleDropPinRecenter = useCallback(() => {
-        if (!lastPosition) return;
-        if (dropPinGoogleMapRef.current) {
-            dropPinGoogleMapRef.current.panTo({ lat: lastPosition.lat, lng: lastPosition.lng });
-            dropPinGoogleMapRef.current.setZoom(15);
-        } else if (dropPinMapRef.current) {
-            dropPinMapRef.current.flyTo({ center: [lastPosition.lng, lastPosition.lat], zoom: 15 });
-        }
+        if (!lastPosition || !dropPinMapRef.current) return;
+        dropPinMapRef.current.flyTo({ center: [lastPosition.lng, lastPosition.lat], zoom: 15 });
     }, [lastPosition]);
 
     // queryRef — kept in sync so effects can read latest query without stale closures
@@ -619,47 +539,72 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
         if (!googleMapsKey && !mapboxToken) return;
         nearbyFetchedRef.current = true;
 
+        const ac = new AbortController();
         (async () => {
             setIsLoadingNearby(true);
-            // Google nearby search (primary)
+            // Google Places API (New) — REST, no SDK load
             if (googleMapsKey) {
                 try {
-                    const g = await loadGoogleMaps(googleMapsKey);
-                    const div = document.createElement('div');
-                    const service = new g.maps.places.PlacesService(div);
-                    await new Promise<void>((resolve) => {
-                        service.nearbySearch(
-                            { location: { lat: lastPosition.lat, lng: lastPosition.lng }, radius: 500, type: 'establishment' },
-                            (results: any[], status: string) => {
-                                if (status === g.maps.places.PlacesServiceStatus.OK && results?.length) {
-                                    setPredictions(results.slice(0, 8).map((r: any) => {
-                                        const dist = getDistance(lastPosition.lat, lastPosition.lng, r.geometry.location.lat(), r.geometry.location.lng());
-                                        return {
-                                            place_id: r.place_id,
-                                            description: r.vicinity || r.name,
-                                            structured_formatting: { main_text: r.name, secondary_text: r.vicinity || '' },
-                                            _lat: String(r.geometry.location.lat()), _lon: String(r.geometry.location.lng()),
-                                            _is_nearby: true, _distance: dist, _source: 'google' as const,
-                                        };
-                                    }).sort((a: any, b: any) => (a._distance || 0) - (b._distance || 0)));
-                                }
-                                resolve();
-                            }
-                        );
+                    const response = await fetch('https://places.googleapis.com/v1/places:searchNearby', {
+                        method: 'POST',
+                        signal: ac.signal,
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-Goog-Api-Key': googleMapsKey,
+                            'X-Goog-FieldMask': 'places.id,places.displayName,places.formattedAddress,places.location',
+                        },
+                        body: JSON.stringify({
+                            locationRestriction: {
+                                circle: {
+                                    center: { latitude: lastPosition.lat, longitude: lastPosition.lng },
+                                    radius: 500,
+                                },
+                            },
+                            maxResultCount: 8,
+                            languageCode: 'en',
+                        }),
                     });
-                    setIsLoadingNearby(false);
-                    return;
-                } catch (e) {
+                    if (response.ok) {
+                        const data = await response.json();
+                        if (ac.signal.aborted) return;
+                        const results: PlacePrediction[] = (data.places || []).map((p: any) => {
+                            const lat = p.location?.latitude;
+                            const lng = p.location?.longitude;
+                            const dist = (lat != null && lng != null)
+                                ? getDistance(lastPosition.lat, lastPosition.lng, lat, lng)
+                                : 0;
+                            return {
+                                place_id: p.id,
+                                description: p.formattedAddress || p.displayName?.text || '',
+                                structured_formatting: {
+                                    main_text: p.displayName?.text || 'Unknown',
+                                    secondary_text: p.formattedAddress || '',
+                                },
+                                _lat: lat != null ? String(lat) : '',
+                                _lon: lng != null ? String(lng) : '',
+                                _is_nearby: true,
+                                _distance: dist,
+                                _source: 'google' as const,
+                            };
+                        }).sort((a: PlacePrediction, b: PlacePrediction) => (a._distance || 0) - (b._distance || 0));
+                        setPredictions(results);
+                        setIsLoadingNearby(false);
+                        return;
+                    }
+                    console.warn('[LocationPicker] Google nearby search non-OK:', response.status);
+                } catch (e: unknown) {
+                    if ((e as { name?: string })?.name === 'AbortError') return;
                     console.warn('[LocationPicker] Google nearby search failed:', e);
                 }
-            } else if (mapboxToken) {
-                // Mapbox nearby POIs (only if no Google key)
+            }
+            if (mapboxToken) {
                 try {
                     const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${lastPosition.lng},${lastPosition.lat}.json?` +
                         new URLSearchParams({ access_token: mapboxToken, types: 'poi', limit: '8' });
-                    const response = await fetch(url);
+                    const response = await fetch(url, { signal: ac.signal });
                     if (response.ok) {
                         const data = await response.json();
+                        if (ac.signal.aborted) return;
                         setPredictions((data.features || []).map((f: any) => {
                             const name = f.text || f.place_name?.split(',')[0] || 'Unknown';
                             const address = f.place_name || '';
@@ -673,12 +618,14 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                             };
                         }).sort((a: any, b: any) => (a._distance || 0) - (b._distance || 0)));
                     }
-                } catch (e) {
+                } catch (e: unknown) {
+                    if ((e as { name?: string })?.name === 'AbortError') return;
                     console.warn('[LocationPicker] Nearby POI fetch failed:', e);
                 }
             }
-            setIsLoadingNearby(false);
+            if (!ac.signal.aborted) setIsLoadingNearby(false);
         })();
+        return () => ac.abort();
     }, [isExpanded, lastPosition, query.length, googleMapsKey, mapboxToken]);
 
     // ── Selection ───────────────────────────────────────────────────────────
@@ -806,33 +753,19 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
             const { latitude, longitude } = position.coords;
             setLastPosition({ lat: latitude, lng: longitude });
             isSelectingCurrentRef.current = false;
-            try {
-                // Google reverse geocoding (primary)
-                if (googleMapsKey) {
-                    const g = await loadGoogleMaps(googleMapsKey);
-                    const geocoder = new g.maps.Geocoder();
-                    await new Promise<void>((resolve) => {
-                        geocoder.geocode({ location: { lat: latitude, lng: longitude } }, (results: any[], status: string) => {
-                            const loc: LocationData = status === 'OK' && results?.[0]
-                                ? {
-                                    place_name: results[0].address_components?.[0]?.long_name || 'Current Location',
-                                    place_address: results[0].formatted_address || 'Nearby',
-                                    place_lat: latitude, place_lng: longitude,
-                                  }
-                                : { place_name: 'Current Location', place_address: `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`, place_lat: latitude, place_lng: longitude };
-                            onChange(loc); saveToRecent(loc);
-                            resolve();
-                        });
-                    });
-                } else {
-                    const loc: LocationData = { place_name: 'Current Location', place_address: `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`, place_lat: latitude, place_lng: longitude };
-                    onChange(loc); saveToRecent(loc);
-                }
-            } catch {
-                const loc: LocationData = { place_name: 'Current Location', place_address: `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`, place_lat: latitude, place_lng: longitude };
-                onChange(loc); saveToRecent(loc);
-            }
-            setIsExpanded(false); setIsLocating(false);
+            const fallback: LocationData = {
+                place_name: 'Current Location',
+                place_address: `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`,
+                place_lat: latitude, place_lng: longitude,
+            };
+            const r = await reverseGeocodeRest(latitude, longitude, googleMapsKey, mapboxToken);
+            const loc: LocationData = r
+                ? { place_name: r.name, place_address: r.address, place_lat: latitude, place_lng: longitude }
+                : fallback;
+            onChange(loc);
+            saveToRecent(loc);
+            setIsExpanded(false);
+            setIsLocating(false);
         }, (err) => {
             const msg = err.code === err.PERMISSION_DENIED
                 ? 'Location permission denied. Enable in device settings.'
@@ -841,7 +774,7 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                     : 'Unable to get your location.';
             toast.error(msg);
             setIsLocating(false);
-        }, { enableHighAccuracy: true, timeout: 8000 });
+        }, { enableHighAccuracy: false, timeout: 5000, maximumAge: 60_000 });
     }, [googleMapsKey, mapboxToken, onChange, saveToRecent]);
 
     const handleUseCurrentLocation = () => { setIsLocating(true); handleNativeGeolocation(); };
@@ -955,7 +888,7 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
             </div>
 
             {/* Quick-select buttons */}
-            <div className={cn("grid gap-2", (googleMapsKey || mapboxToken) ? "grid-cols-3" : "grid-cols-2")}>
+            <div className={cn("grid gap-2", mapboxToken ? "grid-cols-3" : "grid-cols-2")}>
                 <button type="button" onClick={handleUseCurrentLocation}
                     className="h-[72px] flex flex-col items-center justify-center gap-2 px-2 rounded-2xl border border-primary/20 bg-primary/5 active:bg-primary/10 transition-all touch-manipulation">
                     <div className={cn('w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center shrink-0', isLocating && 'animate-pulse')}>
@@ -975,26 +908,29 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                     </div>
                     <p className="text-[10px] font-bold text-blue-400 text-center leading-tight">Online</p>
                 </button>
-                {(googleMapsKey || mapboxToken) && (
-                    <button type="button" onClick={() => { setDropPinMode(v => !v); setDropPinLabel(null); }}
+                {mapboxToken && (
+                    <button type="button"
+                        onClick={() => { setDropPinMode(v => !v); setDropPinLabel(null); }}
+                        disabled={!lastPosition && !dropPinMode}
                         className={cn(
                             "h-[72px] flex flex-col items-center justify-center gap-2 px-2 rounded-2xl border transition-all touch-manipulation",
                             dropPinMode
                                 ? "border-rose-500/40 bg-rose-500/10 active:bg-rose-500/15"
-                                : "border-rose-500/20 bg-rose-500/5 active:bg-rose-500/10"
+                                : "border-rose-500/20 bg-rose-500/5 active:bg-rose-500/10",
+                            !lastPosition && !dropPinMode && "opacity-50 cursor-not-allowed"
                         )}>
                         <div className={cn("w-8 h-8 rounded-full bg-rose-500/20 flex items-center justify-center shrink-0", dropPinMode && "ring-1 ring-rose-500/40")}>
                             <Crosshair className="w-4 h-4 text-rose-400" />
                         </div>
                         <p className="text-[10px] font-bold text-rose-400 text-center leading-tight">
-                            {dropPinMode ? 'Cancel' : 'Drop Pin'}
+                            {dropPinMode ? 'Cancel' : !lastPosition ? 'Locating…' : 'Drop Pin'}
                         </p>
                     </button>
                 )}
             </div>
 
             {/* Drop-pin mini map — rendered outside AnimatePresence so mapboxgl gets a real container */}
-            {dropPinMode && (googleMapsKey || mapboxToken) && (
+            {dropPinMode && mapboxToken && (
                 <motion.div
                     initial={{ opacity: 0, y: -6 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -1041,14 +977,10 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                     {/* Confirm button */}
                     <button type="button"
                         onClick={() => {
-                            let lat: number, lng: number;
-                            if (dropPinGoogleMapRef.current) {
-                                const c = dropPinGoogleMapRef.current.getCenter();
-                                lat = c.lat(); lng = c.lng();
-                            } else if (dropPinMapRef.current) {
-                                const c = dropPinMapRef.current.getCenter();
-                                lat = c.lat; lng = c.lng;
-                            } else return;
+                            if (!dropPinMapRef.current) return;
+                            const c = dropPinMapRef.current.getCenter();
+                            const lat = c.lat;
+                            const lng = c.lng;
                             const loc: LocationData = {
                                 place_name: dropPinLabel?.split(',')[0]?.trim() ?? `${lat.toFixed(5)}, ${lng.toFixed(5)}`,
                                 place_address: dropPinLabel ?? null,

@@ -62,7 +62,7 @@ const nextConfig = {
           {
             key: 'Content-Security-Policy',
             value: [
-              "img-src 'self' blob: data: https://*.supabase.co https://*.mapbox.com https://*.googleusercontent.com https://maps.googleapis.com https://maps.gstatic.com",
+              "img-src 'self' blob: data: https://*.supabase.co https://*.mapbox.com https://*.googleusercontent.com https://maps.googleapis.com https://maps.gstatic.com https://staticmap.openstreetmap.de",
               "worker-src 'self' blob:",
             ].join('; '),
           },

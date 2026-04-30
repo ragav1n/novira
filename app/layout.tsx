@@ -15,6 +15,7 @@ import { ErrorBoundary } from '@/components/error-boundary'
 import { ServiceWorkerRegistrar } from '@/components/service-worker-registrar'
 import { PWAInstallPrompt } from '@/components/pwa-install-prompt'
 import { AppResetModal } from '@/components/app-reset-modal'
+import { MonthlyRecapModal } from '@/components/recap/monthly-recap-modal'
 
 const geist = Geist({
   subsets: ["latin"],
@@ -92,6 +93,7 @@ export default async function RootLayout({
                   <MobileLayout defaultIsDesktop={defaultIsDesktop}>
                     {children}
                   </MobileLayout>
+                  <MonthlyRecapModal />
                 </BucketsProvider>
               </GroupsProvider>
             </UserPreferencesProvider>
