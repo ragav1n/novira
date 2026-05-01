@@ -1,18 +1,19 @@
 'use client';
 
 import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
-import { ChevronLeft, MoreHorizontal, Filter, Shirt, Sparkles, ChartLine, Tags, Store, Wallet, Repeat, Lightbulb } from 'lucide-react';
+import { ChevronLeft, Sparkles, ChartLine, Tags, Store, Wallet, Repeat, Lightbulb, MapPin } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
 import { ChartConfig, BasePieChart } from "@/components/charts/base-pie-chart";
 import { TransactionService } from '@/lib/services/transaction-service';
 import { CHART_CONFIG, CATEGORY_COLORS, getIconForCategory, getCategoryLabel } from '@/lib/categories';
-import { format, startOfMonth, endOfMonth, subMonths, subYears, isSameMonth, parseISO, startOfDay, endOfDay } from 'date-fns';
+import { format, startOfMonth, endOfMonth, startOfWeek, startOfYear, subMonths, subYears, subDays, parseISO } from 'date-fns';
 import { useUserPreferences } from '@/components/providers/user-preferences-provider';
-import { useBucketsList } from '@/components/providers/buckets-provider';
+import { useBucketsList, useBucketSpending } from '@/components/providers/buckets-provider';
 import { useWorkspaceTheme } from '@/hooks/useWorkspaceTheme';
 import { useTransactionInvalidationListener } from '@/hooks/useTransactionInvalidationListener';
+import { useAnalyticsData, type DateRange } from '@/hooks/useAnalyticsData';
 import {
     Select,
     SelectContent,
@@ -20,22 +21,21 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select"
-import { WaveLoader } from '@/components/ui/wave-loader';
-import { AnimatePresence, motion } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { LineChart, Line, XAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { Transaction } from '@/types/transaction';
 import { HolographicCard } from '@/components/ui/holographic-card';
 import { RecapBody, RecapSkeleton, type RecapData, type RecapAnalyzed } from '@/components/recap/recap-card';
-
-
+import { supabase } from '@/lib/supabase';
+import { toast, ImpactStyle } from '@/utils/haptics';
 
 const PAYMENT_COLORS: Record<string, string> = {
-    cash: '#22C55E',          // Vibrant Green
-    'debit card': '#3B82F6',  // Bright Blue
-    'credit card': '#A855F7', // Vivid Purple
-    upi: '#F59E0B',           // Bright Amber
-    'bank transfer': '#06B6D4', // Bright Cyan
-    other: '#EC4899',         // Hot Pink
+    cash: '#22C55E',
+    'debit card': '#3B82F6',
+    'credit card': '#A855F7',
+    upi: '#F59E0B',
+    'bank transfer': '#06B6D4',
+    other: '#EC4899',
 };
 
 const paymentChartConfig: ChartConfig = {
@@ -46,26 +46,6 @@ const paymentChartConfig: ChartConfig = {
     'bank transfer': { label: "Bank Transfer", color: PAYMENT_COLORS['bank transfer'] },
     other: { label: "Other", color: PAYMENT_COLORS.other },
 };
-// Custom Tooltip Component
-// Custom Tooltip Component needs access to context, but it's outside component. passing formatter?
-// Or better, define CustomTooltip inside, or pass it as prop?
-// Recharts tooltip content can be a function. 
-// Let's refactor CustomTooltip to be defined inside AnalyticsView or accept formatter.
-// Actually, for simplicity I will just update the CustomTooltip definition to use a context consumer or passing props is hard with Recharts sometimes.
-// I'll move CustomTooltip into the component or use a wrapper.
-// Moving CustomTooltip inside AnalyticsView might be performance heavy if it re-renders.
-// I'll update the component to accept a formatter prop if I can, but Recharts cloning might block it.
-// Easiest is to just use the raw symbol if I can't easily pass the function.
-// Wait, I can just use the hook if I make CustomTooltip a component that uses the hook?
-// Yes, CustomTooltip is a component.
-// Custom Tooltip component will be defined inside AnalyticsView to access context safely.
-
-
-
-import { supabase } from '@/lib/supabase';
-import { toast, ImpactStyle } from '@/utils/haptics';
-
-type DateRange = '1M' | 'LM' | '3M' | '6M' | '1Y' | 'ALL' | 'CUSTOM';
 
 const AnalyticsSkeleton = () => (
     <div className="space-y-6">
@@ -118,6 +98,8 @@ export function AnalyticsView() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [transactions, setTransactions] = useState<Transaction[]>([]);
+    const [priorTransactions, setPriorTransactions] = useState<Transaction[]>([]);
+    const [priorStart, setPriorStart] = useState<Date | null>(null);
     const [dateRange, setDateRange] = useState<DateRange>('1M');
     const [selectedBucketId, setSelectedBucketId] = useState<string | 'all'>('all');
     const [customStart, setCustomStart] = useState<string>('');
@@ -127,7 +109,7 @@ export function AnalyticsView() {
     const [recapMeta, setRecapMeta] = useState<RecapAnalyzed | null>(null);
     const [recapMonth, setRecapMonth] = useState<string | null>(null);
     const [availableMonths, setAvailableMonths] = useState<string[]>([]);
-    const { formatCurrency, currency, convertAmount, userId, activeWorkspaceId } = useUserPreferences();
+    const { formatCurrency, currency, convertAmount, userId, activeWorkspaceId, ratesLastUpdated } = useUserPreferences();
     const { activeWorkspace, theme: themeConfig } = useWorkspaceTheme('cyan');
 
     // getIconForCategory is now imported from lib/categories.ts
@@ -137,6 +119,7 @@ export function AnalyticsView() {
     };
 
     const { buckets } = useBucketsList();
+    const { bucketSpending } = useBucketSpending();
 
     const fetchData = useCallback(async () => {
         setLoading(true);
@@ -144,37 +127,74 @@ export function AnalyticsView() {
         try {
             if (!userId) return;
 
-            // Apply Date Filter
             const now = new Date();
             let startDate: Date | null = null;
             let endDate: Date | null = null;
+            let priorStart: Date | null = null;
+            let priorEnd: Date | null = null;
 
-            if (dateRange === '1M') startDate = startOfMonth(now);
-            else if (dateRange === 'LM') {
+            if (dateRange === '1M') {
+                startDate = startOfMonth(now);
+                priorStart = startOfMonth(subMonths(now, 1));
+                priorEnd = startOfMonth(now);
+            } else if (dateRange === 'LM') {
                 startDate = startOfMonth(subMonths(now, 1));
                 endDate = startOfMonth(now);
-            }
-            else if (dateRange === '3M') startDate = startOfMonth(subMonths(now, 2));
-            else if (dateRange === '6M') startDate = startOfMonth(subMonths(now, 5));
-            else if (dateRange === '1Y') startDate = startOfMonth(subYears(now, 1));
-            else if (dateRange === 'CUSTOM') {
-                if (customStart) startDate = startOfDay(new Date(customStart));
-                if (customEnd) endDate = endOfDay(new Date(customEnd));
-                // If custom range not yet set, don't fetch
+                priorStart = startOfMonth(subMonths(now, 2));
+                priorEnd = startOfMonth(subMonths(now, 1));
+            } else if (dateRange === '3M') {
+                startDate = startOfMonth(subMonths(now, 2));
+                priorStart = startOfMonth(subMonths(now, 5));
+                priorEnd = startOfMonth(subMonths(now, 2));
+            } else if (dateRange === '6M') {
+                startDate = startOfMonth(subMonths(now, 5));
+                priorStart = startOfMonth(subMonths(now, 11));
+                priorEnd = startOfMonth(subMonths(now, 5));
+            } else if (dateRange === '1Y') {
+                startDate = startOfMonth(subYears(now, 1));
+                priorStart = startOfMonth(subYears(now, 2));
+                priorEnd = startOfMonth(subYears(now, 1));
+            } else if (dateRange === 'CUSTOM') {
+                if (customStart) startDate = parseISO(customStart);
+                if (customEnd) {
+                    const e = parseISO(customEnd);
+                    e.setDate(e.getDate() + 1);
+                    endDate = e;
+                }
                 if (!customStart && !customEnd) { setLoading(false); return; }
+                if (startDate && endDate) {
+                    const len = Math.max(1, Math.round((endDate.getTime() - startDate.getTime()) / 86_400_000));
+                    priorEnd = new Date(startDate);
+                    priorStart = new Date(startDate);
+                    priorStart.setDate(priorStart.getDate() - len);
+                }
             }
+            // dateRange === 'ALL' → no prior
 
-            const data = await TransactionService.getTransactions({
+            const baseQuery = {
                 userId,
                 workspaceId: activeWorkspaceId,
                 bucketId: selectedBucketId === 'all' ? undefined : selectedBucketId,
-                startDate: startDate?.toISOString(),
-                endDate: endDate?.toISOString()
-            });
+            };
 
-            if (data) {
-                setTransactions(data);
-            }
+            const [current, prior] = await Promise.all([
+                TransactionService.getTransactions({
+                    ...baseQuery,
+                    startDate: startDate ? format(startDate, 'yyyy-MM-dd') : undefined,
+                    endDate: endDate ? format(endDate, 'yyyy-MM-dd') : undefined,
+                }),
+                priorStart && priorEnd
+                    ? TransactionService.getTransactions({
+                        ...baseQuery,
+                        startDate: format(priorStart, 'yyyy-MM-dd'),
+                        endDate: format(priorEnd, 'yyyy-MM-dd'),
+                    })
+                    : Promise.resolve([] as Transaction[]),
+            ]);
+
+            if (current) setTransactions(current);
+            setPriorTransactions(prior || []);
+            setPriorStart(priorStart);
         } catch (err) {
             console.error("Error fetching analytics:", err);
             setError(err instanceof Error ? err.message : 'Failed to load analytics data');
@@ -218,154 +238,42 @@ export function AnalyticsView() {
 
         return () => {
             supabase.removeChannel(channel);
+            if (analyticsDebounceRef.current) {
+                clearTimeout(analyticsDebounceRef.current);
+                analyticsDebounceRef.current = null;
+            }
         };
     }, [userId, activeWorkspaceId, debouncedFetchData]);
 
-    const { categoryTrendData, categoryBreakdown, paymentBreakdown, totalSpentInRange } = useMemo(() => {
-        if (!transactions.length || !userId) return {
-            categoryTrendData: [],
-            categoryBreakdown: [],
-            paymentBreakdown: [],
-            totalSpentInRange: 0
-        };
-
-        const now = new Date();
-        const monthsMap: Record<string, any> = {};
-
-        // 1. Process Trend Data Initialization
-        let monthsBack = 5;
-        if (dateRange === '1M' || dateRange === 'LM') monthsBack = -2;
-        else if (dateRange === '3M') monthsBack = 2;
-        else if (dateRange === '6M') monthsBack = 5;
-        else if (dateRange === '1Y') monthsBack = 11;
-        else if (dateRange === 'ALL' || dateRange === 'CUSTOM') monthsBack = -1;
-
-        if (monthsBack !== -1 && monthsBack !== -2) {
-            for (let i = monthsBack; i >= 0; i--) {
-                const d = subMonths(now, i);
-                const monthKey = format(d, 'MMM yyyy');
-                monthsMap[monthKey] = { month: monthKey, rawDate: d };
-                Object.keys(CATEGORY_COLORS).forEach(cat => monthsMap[monthKey][cat] = 0);
-            }
-        }
-
-        if (monthsBack === -2) {
-            const start = dateRange === 'LM' ? startOfMonth(subMonths(now, 1)) : startOfMonth(now);
-            const endRange = endOfMonth(start);
-            let current = new Date(start);
-            while (current <= endRange) {
-                const dayKey = format(current, 'd MMM');
-                monthsMap[dayKey] = { month: dayKey, rawDate: new Date(current) };
-                Object.keys(CATEGORY_COLORS).forEach(cat => monthsMap[dayKey][cat] = 0);
-                current.setDate(current.getDate() + 1);
-            }
-        }
-
-        // 2. Aggregate Data and Breakdown
-        const breakdownMap: Record<string, number> = {};
-        const paymentMap: Record<string, number> = {};
-        let total = 0;
-
-        transactions.forEach((tx: Transaction) => {
-            // Use string slicing instead of parseISO for grouping dates
-            // tx.date is ISO string: "2026-03-01T14:30:00Z"
-            // slice(0, 10) gives "YYYY-MM-DD"
-            // slice(0, 7) gives "YYYY-MM"
-            let timeKey = '';
-            
-            if (dateRange === '1M' || dateRange === 'LM') {
-                // We need day-level groupings for short ranges
-                // Reconstruct to 'd MMM' (e.g., "1 Mar") using lightweight Date just for the matched string
-                const d = parseISO(tx.date.slice(0, 10));
-                timeKey = format(d, 'd MMM');
-            } else {
-                // For long ranges, group by month
-                const yyyymm = tx.date.slice(0, 7);
-                // Convert "2026-03" to "Mar 2026" safely
-                const m = parseInt(yyyymm.slice(5, 7), 10);
-                const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-                timeKey = `${monthNames[m - 1]} ${yyyymm.slice(0, 4)}`;
-            }
-            
-            const cat = tx.category.toLowerCase();
-
-            if (monthsBack === -1 && !monthsMap[timeKey]) {
-                // Create dummy date for sorting purposes if all time
-                monthsMap[timeKey] = { month: timeKey, rawDate: parseISO(tx.date.slice(0, 10)) };
-                Object.keys(CATEGORY_COLORS).forEach(c => monthsMap[timeKey][c] = 0);
-            }
-
-            let myShare = Number(tx.amount);
-            if (tx.splits && tx.splits.length > 0) {
-                if (tx.user_id === userId) {
-                    const othersOwe = tx.splits.reduce((sum: number, s: any) => sum + Number(s.amount), 0);
-                    myShare = Number(tx.amount) - othersOwe;
-                } else {
-                    const mySplit = tx.splits.find((s: any) => s.user_id === userId);
-                    myShare = mySplit ? Number(mySplit.amount) : 0;
-                }
-            } else if (tx.user_id !== userId) {
-                myShare = 0;
-            }
-
-            if (myShare > 0) {
-                let amount = 0;
-                if (tx.exchange_rate && tx.base_currency === currency) {
-                    amount = (myShare * Number(tx.exchange_rate));
-                } else {
-                    amount = convertAmount(myShare, tx.currency || 'USD');
-                }
-
-                if (monthsMap[timeKey]) {
-                    if (!monthsMap[timeKey][cat]) monthsMap[timeKey][cat] = 0;
-                    monthsMap[timeKey][cat] += amount;
-                }
-
-                breakdownMap[cat] = (breakdownMap[cat] || 0) + amount;
-                const method = (tx.payment_method || 'Other').toLowerCase();
-                paymentMap[method] = (paymentMap[method] || 0) + amount;
-                total += amount;
-            }
-        });
-
-        // 3. Finalize Trend Data
-        const sortedTrendData = Object.values(monthsMap).sort((a: any, b: any) => a.rawDate - b.rawDate);
-        const displayTrendData = sortedTrendData.map((item: any) => ({
-            ...item,
-            month: dateRange === '1Y' || dateRange === 'ALL' || dateRange === 'CUSTOM'
-                ? format(item.rawDate, 'MMM yy')
-                : (dateRange === '1M' || dateRange === 'LM' ? format(item.rawDate, 'MMM d') : format(item.rawDate, 'MMM'))
-        }));
-
-        // 4. Finalize Breakdowns
-        const breakdownData = Object.entries(breakdownMap).map(([name, amount]: [string, number]) => ({
-            name: getCategoryLabel(name),
-            amount,
-            value: total > 0 ? (amount / total) * 100 : 0,
-            color: CATEGORY_COLORS[name] || CATEGORY_COLORS.others,
-            fill: CATEGORY_COLORS[name] || CATEGORY_COLORS.others,
-            stroke: CATEGORY_COLORS[name] || CATEGORY_COLORS.others,
-        })).sort((a, b) => b.amount - a.amount);
-
-        const paymentData = Object.entries(paymentMap).map(([name, amount]: [string, number]) => ({
-            name: name.charAt(0).toUpperCase() + name.slice(1),
-            amount,
-            value: total > 0 ? (amount / total) * 100 : 0,
-            color: PAYMENT_COLORS[name] || PAYMENT_COLORS.other,
-            fill: PAYMENT_COLORS[name] || PAYMENT_COLORS.other,
-            stroke: PAYMENT_COLORS[name] || PAYMENT_COLORS.other,
-        })).sort((a, b) => b.amount - a.amount);
-
-        return {
-            categoryTrendData: displayTrendData,
-            categoryBreakdown: breakdownData,
-            paymentBreakdown: paymentData,
-            totalSpentInRange: total
-        };
-    }, [transactions, userId, dateRange, currency, convertAmount]);
+    const {
+        categoryTrendData,
+        categoryBreakdown,
+        paymentBreakdown,
+        totalSpentInRange,
+        activeCategories,
+        topMerchants,
+        top3Largest,
+        weekdayTotals,
+        txCount,
+        avgPerDay,
+        busiestLabel,
+        priorTotal,
+        priorMTDTotal,
+        newMerchantsCount,
+        usedConversion,
+    } = useAnalyticsData({
+        transactions,
+        priorTransactions,
+        priorStart,
+        dateRange,
+        currency,
+        userId,
+        convertAmount,
+    });
 
     const categorizedBreakdown = categoryBreakdown as Array<{
         name: string;
+        rawKey: string;
         amount: number;
         value: number;
         fill: string;
@@ -377,6 +285,50 @@ export function AnalyticsView() {
         value: number;
         fill: string;
     }>;
+
+    // Whether the trend chart buckets by day (short ranges) or by month (long ranges).
+    // Drives the stat row labels ("Top Day" vs "Top Month").
+    const monthsBackKind: 'days' | 'months' = (dateRange === '1M' || dateRange === 'LM') ? 'days' : 'months';
+
+    // Simple end-of-month projection for the 1M view. Skipped in bucket-focused mode
+    // (no monthly-budget analogue) and in the first 2 days of the month (too noisy).
+    const pacingChip = useMemo(() => {
+        if (dateRange !== '1M' || selectedBucketId !== 'all' || totalSpentInRange <= 0) return null;
+        const today = new Date();
+        const day = today.getDate();
+        if (day < 3) return null;
+        const daysInMonth = endOfMonth(today).getDate();
+        const projected = (totalSpentInRange / day) * daysInMonth;
+        return { projected };
+    }, [dateRange, selectedBucketId, totalSpentInRange]);
+
+    // MoM/period-over-period delta. For 1M we compare MTD-vs-same-MTD (honest mid-month).
+    // For other ranges we compare full-period totals since both are complete windows.
+    // Resolves the active analytics window to from/to YYYY-MM-DD strings for /search URLs.
+    const analyticsDateRange = useCallback((): { from: string; to: string } | null => {
+        const now = new Date();
+        const fmt = (d: Date) => format(d, 'yyyy-MM-dd');
+        if (dateRange === '1M') return { from: fmt(startOfMonth(now)), to: fmt(now) };
+        if (dateRange === 'LM') return { from: fmt(startOfMonth(subMonths(now, 1))), to: fmt(endOfMonth(subMonths(now, 1))) };
+        if (dateRange === '3M') return { from: fmt(startOfMonth(subMonths(now, 2))), to: fmt(now) };
+        if (dateRange === '6M') return { from: fmt(startOfMonth(subMonths(now, 5))), to: fmt(now) };
+        if (dateRange === '1Y') return { from: fmt(startOfMonth(subYears(now, 1))), to: fmt(now) };
+        if (dateRange === 'CUSTOM' && customStart && customEnd) return { from: customStart, to: customEnd };
+        return null;
+    }, [dateRange, customStart, customEnd]);
+
+    const momDelta = useMemo(() => {
+        if (dateRange === 'ALL') return null;
+        const baseline = dateRange === '1M' ? priorMTDTotal : priorTotal;
+        if (baseline <= 0) return null;
+        const diff = totalSpentInRange - baseline;
+        const pct = (diff / baseline) * 100;
+        return {
+            pct,
+            absDelta: diff,
+            direction: diff > 0 ? 'up' as const : diff < 0 ? 'down' as const : 'flat' as const,
+        };
+    }, [dateRange, priorMTDTotal, priorTotal, totalSpentInRange]);
 
     const priorMonthKey = useMemo(() => {
         const now = new Date();
@@ -481,28 +433,28 @@ export function AnalyticsView() {
         label?: string | number;
     };
     const AnalyticsTooltip = ({ active, payload, label }: AnalyticsTooltipProps) => {
-        if (active && payload && payload.length) {
-            return (
-                <div className="bg-card/95 backdrop-blur-xl border border-white/10 p-3 rounded-2xl shadow-2xl z-50">
-                    <p className="text-[11px] font-bold uppercase tracking-wider mb-2 text-muted-foreground">{label}</p>
-                    <div className="space-y-1.5">
-                        {payload.map((entry, index) => (
-                            <div key={index} className="flex items-center justify-between gap-4 text-xs">
-                                <div className="flex items-center gap-2">
-                                    <div
-                                        className="w-1.5 h-1.5 rounded-full"
-                                        style={{ backgroundColor: entry.stroke || entry.color || entry.fill }}
-                                    />
-                                    <span className="text-foreground/80 font-medium capitalize">{entry.name}</span>
-                                </div>
-                                <span className="font-mono font-bold">{formatCurrency(Math.round(Number(entry.value)))}</span>
+        if (!active || !payload || !payload.length) return null;
+        const visible = payload.filter(p => Number(p.value) > 0.5);
+        if (!visible.length) return null;
+        return (
+            <div className="bg-card/95 backdrop-blur-xl border border-white/10 p-3 rounded-2xl shadow-2xl z-50">
+                <p className="text-[11px] font-bold uppercase tracking-wider mb-2 text-muted-foreground">{label}</p>
+                <div className="space-y-1.5">
+                    {visible.map((entry, index) => (
+                        <div key={index} className="flex items-center justify-between gap-4 text-xs">
+                            <div className="flex items-center gap-2">
+                                <div
+                                    className="w-1.5 h-1.5 rounded-full"
+                                    style={{ backgroundColor: entry.stroke || entry.color || entry.fill }}
+                                />
+                                <span className="text-foreground/80 font-medium capitalize">{entry.name}</span>
                             </div>
-                        ))}
-                    </div>
+                            <span className="font-mono font-bold">{formatCurrency(Math.round(Number(entry.value)))}</span>
+                        </div>
+                    ))}
                 </div>
-            );
-        }
-        return null;
+            </div>
+        );
     };
 
 
@@ -520,19 +472,30 @@ export function AnalyticsView() {
                 "p-5 space-y-6 max-w-md lg:max-w-5xl mx-auto relative transition-all duration-300",
                 loading ? "opacity-50 blur-[2px] pointer-events-none" : "opacity-100 blur-0"
             )}>
-                {/* Header */}
-                {/* Header */}
-                <div className="flex items-center justify-between relative min-h-[40px]">
-                    <button
-                        onClick={() => router.back()}
-                        className="p-1.5 rounded-full bg-secondary/30 hover:bg-secondary/50 transition-colors shrink-0 z-10"
-                    >
-                        <ChevronLeft className="w-5 h-5" />
-                    </button>
-                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                        <h2 className="text-lg font-semibold truncate text-center leading-tight">Analytics</h2>
+                {/* Sticky Header — pins to top on scroll, exposes period + running total */}
+                <div className="sticky top-0 z-20 -mx-5 px-5 py-2 bg-background/80 backdrop-blur-xl border-b border-white/5">
+                    <div className="flex items-center justify-between relative min-h-[40px]">
+                        <button
+                            onClick={() => router.back()}
+                            aria-label="Back"
+                            className="p-1.5 rounded-full bg-secondary/30 hover:bg-secondary/50 transition-colors shrink-0 z-10"
+                        >
+                            <ChevronLeft className="w-5 h-5" />
+                        </button>
+                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none gap-2">
+                            <h2 className="text-lg font-semibold truncate text-center leading-tight">Analytics</h2>
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0 z-10">
+                            <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-secondary/30 text-muted-foreground">
+                                {dateRange === 'ALL' ? 'All' : dateRange}
+                            </span>
+                            {!loading && totalSpentInRange > 0 && (
+                                <span className="text-[10px] font-bold tabular-nums px-2 py-0.5 rounded-md bg-primary/15 border border-primary/25 text-foreground/90">
+                                    {formatCurrency(Math.round(totalSpentInRange))}
+                                </span>
+                            )}
+                        </div>
                     </div>
-                    <div className="w-9 shrink-0 z-10" />
                 </div>
 
                 {/* Filters Row */}
@@ -546,16 +509,30 @@ export function AnalyticsView() {
                         </SelectTrigger>
                         <SelectContent align="center">
                             <SelectItem value="all">All Spending</SelectItem>
-                            {buckets.map(b => (
-                                <SelectItem key={b.id} value={b.id}>
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-4 h-4 flex items-center justify-center">
-                                            {getBucketIcon(b.icon)}
+                            {buckets.map(b => {
+                                const bCurr = (b.currency || currency).toUpperCase();
+                                const budgetBase = convertAmount(Number(b.budget || 0), bCurr);
+                                const spentBase = convertAmount(bucketSpending[b.id] || 0, bCurr);
+                                const remaining = budgetBase - spentBase;
+                                return (
+                                    <SelectItem key={b.id} value={b.id}>
+                                        <div className="flex items-center gap-2 w-full">
+                                            <div className="w-4 h-4 flex items-center justify-center">
+                                                {getBucketIcon(b.icon)}
+                                            </div>
+                                            <span className="flex-1 truncate">{b.name}</span>
+                                            {Number(b.budget) > 0 && (
+                                                <span className={cn(
+                                                    "ml-2 text-[10px] font-bold tabular-nums shrink-0",
+                                                    remaining < 0 ? "text-rose-400" : "text-muted-foreground/70"
+                                                )}>
+                                                    {formatCurrency(remaining)}
+                                                </span>
+                                            )}
                                         </div>
-                                        <span>{b.name}</span>
-                                    </div>
-                                </SelectItem>
-                            ))}
+                                    </SelectItem>
+                                );
+                            })}
                         </SelectContent>
                     </Select>
                     <Select value={dateRange} onValueChange={(val: DateRange) => {
@@ -579,26 +556,47 @@ export function AnalyticsView() {
 
                 {/* Custom date range inputs */}
                 {dateRange === 'CUSTOM' && (
-                    <div className="flex gap-2 px-1">
-                        <div className="flex-1">
-                            <label className="text-[10px] font-bold uppercase tracking-wider text-white/40 mb-1 block">From</label>
-                            <input
-                                type="date"
-                                value={customStart}
-                                max={customEnd || undefined}
-                                onChange={(e) => setCustomStart(e.target.value)}
-                                className="w-full h-10 px-3 rounded-xl bg-secondary/20 border border-white/5 text-[12px] font-bold text-white focus:outline-none focus:ring-1 focus:ring-primary/50 [color-scheme:dark]"
-                            />
+                    <div className="px-1 space-y-2">
+                        <div className="flex flex-wrap gap-1.5">
+                            {[
+                                { label: 'This Week', from: () => format(startOfWeek(new Date(), { weekStartsOn: 1 }), 'yyyy-MM-dd'), to: () => format(new Date(), 'yyyy-MM-dd') },
+                                { label: 'Last 7 Days', from: () => format(subDays(new Date(), 6), 'yyyy-MM-dd'), to: () => format(new Date(), 'yyyy-MM-dd') },
+                                { label: 'YTD', from: () => format(startOfYear(new Date()), 'yyyy-MM-dd'), to: () => format(new Date(), 'yyyy-MM-dd') },
+                            ].map(p => (
+                                <button
+                                    key={p.label}
+                                    onClick={() => {
+                                        setCustomStart(p.from());
+                                        setCustomEnd(p.to());
+                                        toast.haptic(ImpactStyle.Light);
+                                    }}
+                                    className="h-7 px-3 rounded-full text-[10px] font-bold uppercase tracking-wider bg-secondary/30 hover:bg-secondary/50 border border-white/5 transition-colors"
+                                >
+                                    {p.label}
+                                </button>
+                            ))}
                         </div>
-                        <div className="flex-1">
-                            <label className="text-[10px] font-bold uppercase tracking-wider text-white/40 mb-1 block">To</label>
-                            <input
-                                type="date"
-                                value={customEnd}
-                                min={customStart || undefined}
-                                onChange={(e) => setCustomEnd(e.target.value)}
-                                className="w-full h-10 px-3 rounded-xl bg-secondary/20 border border-white/5 text-[12px] font-bold text-white focus:outline-none focus:ring-1 focus:ring-primary/50 [color-scheme:dark]"
-                            />
+                        <div className="flex gap-2">
+                            <div className="flex-1">
+                                <label className="text-[10px] font-bold uppercase tracking-wider text-white/40 mb-1 block">From</label>
+                                <input
+                                    type="date"
+                                    value={customStart}
+                                    max={customEnd || undefined}
+                                    onChange={(e) => setCustomStart(e.target.value)}
+                                    className="w-full h-10 px-3 rounded-xl bg-secondary/20 border border-white/5 text-[12px] font-bold text-white focus:outline-none focus:ring-1 focus:ring-primary/50 [color-scheme:dark]"
+                                />
+                            </div>
+                            <div className="flex-1">
+                                <label className="text-[10px] font-bold uppercase tracking-wider text-white/40 mb-1 block">To</label>
+                                <input
+                                    type="date"
+                                    value={customEnd}
+                                    min={customStart || undefined}
+                                    onChange={(e) => setCustomEnd(e.target.value)}
+                                    className="w-full h-10 px-3 rounded-xl bg-secondary/20 border border-white/5 text-[12px] font-bold text-white focus:outline-none focus:ring-1 focus:ring-primary/50 [color-scheme:dark]"
+                                />
+                            </div>
                         </div>
                     </div>
                 )}
@@ -772,63 +770,291 @@ export function AnalyticsView() {
                     </div>
                 </HolographicCard>
 
+                {transactions.length === 0 ? (
+                    <Card className="bg-card/40 border-white/5 shadow-none">
+                        <CardContent className="p-8 flex flex-col items-center justify-center text-center space-y-2">
+                            <div className="w-12 h-12 rounded-2xl bg-secondary/30 flex items-center justify-center mb-1">
+                                <ChartLine className="w-5 h-5 text-muted-foreground/70" />
+                            </div>
+                            <p className="text-sm font-bold">No transactions in this range</p>
+                            <p className="text-[12px] text-muted-foreground max-w-[260px]">
+                                Try a wider period from the picker above, or add an expense to start seeing trends.
+                            </p>
+                        </CardContent>
+                    </Card>
+                ) : (
+                <>
                 {/* Monthly Spending Trend */}
                 <Card className="bg-card/40 backdrop-blur-md border-white/5 shadow-none">
                     <CardContent className="p-4 space-y-3">
-                        <div className="flex justify-between items-center">
+                        <div className="flex justify-between items-center gap-2">
                             <h3 className="font-bold text-[13px] uppercase tracking-wider text-muted-foreground/80">Spending Trend</h3>
-                            <span className="text-[10px] bg-secondary/30 px-2 py-0.5 rounded-md text-muted-foreground font-bold">{dateRange === 'ALL' ? 'All Time' : dateRange}</span>
+                            <div className="flex items-center gap-1.5">
+                                {pacingChip && (
+                                    <span
+                                        className="text-[10px] px-2 py-0.5 rounded-md font-bold border bg-emerald-500/15 border-emerald-500/30 text-emerald-300"
+                                        title="Estimated end-of-month total at current pace"
+                                    >
+                                        On pace · {formatCurrency(pacingChip.projected)}
+                                    </span>
+                                )}
+                                <span className="text-[10px] bg-secondary/30 px-2 py-0.5 rounded-md text-muted-foreground font-bold">
+                                    {dateRange === 'ALL' ? 'All Time' : dateRange}
+                                </span>
+                            </div>
+                        </div>
+
+                        {/* Compact stat row */}
+                        <div className="grid grid-cols-3 gap-2">
+                            <div className="rounded-xl bg-secondary/10 border border-white/5 px-3 py-2">
+                                <p className="text-[9px] uppercase tracking-widest font-bold text-muted-foreground/70">Avg / {monthsBackKind === 'days' ? 'Day' : 'Month'}</p>
+                                <p className="text-[13px] font-bold mt-0.5 tabular-nums">{formatCurrency(avgPerDay)}</p>
+                            </div>
+                            <div className="rounded-xl bg-secondary/10 border border-white/5 px-3 py-2">
+                                <p className="text-[9px] uppercase tracking-widest font-bold text-muted-foreground/70">Txns</p>
+                                <p className="text-[13px] font-bold mt-0.5 tabular-nums">{txCount}</p>
+                            </div>
+                            <div className="rounded-xl bg-secondary/10 border border-white/5 px-3 py-2">
+                                <p className="text-[9px] uppercase tracking-widest font-bold text-muted-foreground/70">{monthsBackKind === 'days' ? 'Top Day' : 'Top Month'}</p>
+                                <p className="text-[13px] font-bold mt-0.5 truncate">{busiestLabel || '—'}</p>
+                            </div>
                         </div>
 
                         <div className="h-[140px] w-full">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <LineChart data={categoryTrendData} margin={{ top: 5, right: 5, bottom: 0, left: 5 }}>
-                                    <XAxis
-                                        dataKey="month"
-                                        axisLine={false}
-                                        tickLine={false}
-                                        tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 9, fontWeight: 600 }}
-                                        interval={dateRange === '1M' || dateRange === 'LM' ? 4 : (dateRange === '1Y' || dateRange === 'ALL' ? 'preserveStartEnd' : 1)}
-                                    />
-                                    <Tooltip content={<AnalyticsTooltip />} cursor={{ stroke: 'rgba(255,255,255,0.1)', strokeWidth: 1 }} />
-                                    {Object.keys(CATEGORY_COLORS).map((cat: string, index: number) => (
-                                        <Line
-                                            key={cat}
-                                            type="monotone"
-                                            dataKey={cat}
-                                            stroke={CATEGORY_COLORS[cat]}
-                                            strokeWidth={2.5}
-                                            dot={false}
-                                            connectNulls
-                                            animationDuration={1500 + (index * 200)}
-                                            animationEasing="ease-in-out"
+                            {activeCategories.length > 0 ? (
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <LineChart data={categoryTrendData} margin={{ top: 5, right: 5, bottom: 0, left: 5 }}>
+                                        <XAxis
+                                            dataKey="month"
+                                            axisLine={false}
+                                            tickLine={false}
+                                            tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 9, fontWeight: 600 }}
+                                            interval={dateRange === '1M' || dateRange === 'LM' ? 4 : (dateRange === '1Y' || dateRange === 'ALL' ? 'preserveStartEnd' : 1)}
                                         />
-                                    ))}
-                                </LineChart>
-                            </ResponsiveContainer>
+                                        <Tooltip content={<AnalyticsTooltip />} cursor={{ stroke: 'rgba(255,255,255,0.1)', strokeWidth: 1 }} />
+                                        {dateRange !== 'ALL' && priorTotal > 0 && (
+                                            <Line
+                                                type="monotone"
+                                                dataKey="prior_total"
+                                                name="Prior period"
+                                                stroke="rgba(255,255,255,0.35)"
+                                                strokeWidth={1.5}
+                                                strokeDasharray="3 4"
+                                                dot={false}
+                                                connectNulls
+                                                animationDuration={1000}
+                                                animationEasing="ease-in-out"
+                                                isAnimationActive
+                                            />
+                                        )}
+                                        {activeCategories.map((cat, index) => (
+                                            <Line
+                                                key={cat}
+                                                type="monotone"
+                                                dataKey={cat}
+                                                name={getCategoryLabel(cat)}
+                                                stroke={CATEGORY_COLORS[cat] || CATEGORY_COLORS.others}
+                                                strokeWidth={2.5}
+                                                dot={false}
+                                                connectNulls
+                                                animationDuration={1200 + (index * 150)}
+                                                animationEasing="ease-in-out"
+                                            />
+                                        ))}
+                                    </LineChart>
+                                </ResponsiveContainer>
+                            ) : (
+                                <div className="flex items-center justify-center h-full text-muted-foreground text-[11px] font-bold uppercase tracking-widest">
+                                    No spending in this range
+                                </div>
+                            )}
                         </div>
 
+                        {/* Active-category legend */}
+                        {activeCategories.length > 0 && (
+                            <div className="flex flex-wrap gap-1.5">
+                                {activeCategories.slice(0, 6).map(cat => (
+                                    <span key={cat} className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-secondary/20 border border-white/5">
+                                        <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: CATEGORY_COLORS[cat] || CATEGORY_COLORS.others }} />
+                                        <span className="text-muted-foreground/90">{getCategoryLabel(cat)}</span>
+                                    </span>
+                                ))}
+                                {activeCategories.length > 6 && (
+                                    <span className="flex items-center text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-secondary/20 border border-white/5 text-muted-foreground/70">
+                                        +{activeCategories.length - 6} more
+                                    </span>
+                                )}
+                            </div>
+                        )}
+
                         <div className="flex items-center justify-between pt-2 border-t border-white/5">
-                            <span className="text-[11px] text-muted-foreground uppercase tracking-widest font-bold">Total Spent</span>
+                            <div className="flex items-center gap-2">
+                                <span className="text-[11px] text-muted-foreground uppercase tracking-widest font-bold">Total Spent</span>
+                                {momDelta && (
+                                    <span
+                                        className={cn(
+                                            "text-[10px] font-bold tabular-nums px-1.5 py-0.5 rounded-md border",
+                                            momDelta.direction === 'up'
+                                                ? "bg-rose-500/10 border-rose-500/25 text-rose-300"
+                                                : momDelta.direction === 'down'
+                                                ? "bg-emerald-500/10 border-emerald-500/25 text-emerald-300"
+                                                : "bg-secondary/20 border-white/5 text-muted-foreground"
+                                        )}
+                                        title={dateRange === '1M' ? 'Same period last month' : 'Previous period'}
+                                    >
+                                        {momDelta.direction === 'up' ? '▲' : momDelta.direction === 'down' ? '▼' : '·'} {Math.abs(momDelta.pct).toFixed(0)}%
+                                    </span>
+                                )}
+                            </div>
                             <span className="text-base font-bold">{formatCurrency(totalSpentInRange)}</span>
                         </div>
                     </CardContent>
                 </Card>
 
+                {/* Day-of-Week Spending */}
+                {totalSpentInRange > 0 && (() => {
+                    const maxWd = Math.max(...weekdayTotals.map(w => w.total));
+                    if (maxWd <= 0) return null;
+                    const peak = weekdayTotals.reduce((a, b) => (a.total >= b.total ? a : b));
+                    return (
+                        <Card className="bg-card/40 border-white/5 shadow-none backdrop-blur-md">
+                            <CardContent className="p-4 space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <h3 className="font-bold text-[13px] uppercase tracking-wider text-muted-foreground/80">By Weekday</h3>
+                                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
+                                        Peak · {peak.label}
+                                    </span>
+                                </div>
+                                <div className="grid grid-cols-7 gap-2 h-[110px] items-end">
+                                    {weekdayTotals.map((w, i) => {
+                                        const ratio = w.total / maxWd;
+                                        const isPeak = w.total === peak.total && peak.total > 0;
+                                        return (
+                                            <div key={w.label} className="flex flex-col items-center gap-1.5 h-full justify-end">
+                                                <span className="text-[9px] font-bold tabular-nums text-muted-foreground/60">
+                                                    {w.total > 0 ? formatCurrency(Math.round(w.total)) : ''}
+                                                </span>
+                                                <motion.div
+                                                    initial={{ scaleY: 0, opacity: 0 }}
+                                                    animate={{ scaleY: ratio, opacity: 1 }}
+                                                    transition={{
+                                                        delay: i * 0.05,
+                                                        duration: 0.6,
+                                                        ease: [0.22, 1, 0.36, 1],
+                                                    }}
+                                                    style={{
+                                                        transformOrigin: 'bottom',
+                                                        backgroundColor: isPeak ? '#A855F7' : 'rgba(168,85,247,0.3)',
+                                                    }}
+                                                    className="w-full rounded-md min-h-[6px] h-[60px]"
+                                                />
+                                                <span className={cn(
+                                                    "text-[9px] font-bold uppercase tracking-wider",
+                                                    isPeak ? "text-foreground" : "text-muted-foreground/60"
+                                                )}>
+                                                    {w.label}
+                                                </span>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </CardContent>
+                        </Card>
+                    );
+                })()}
+
+                {/* Top Places */}
+                {topMerchants.length > 0 && (
+                    <div className="space-y-2">
+                        <div className="flex items-center justify-between px-1">
+                            <span className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground/80">
+                                Top Places
+                            </span>
+                            {newMerchantsCount > 0 && (
+                                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/25 text-emerald-300">
+                                    {newMerchantsCount} new
+                                </span>
+                            )}
+                        </div>
+                        <Card className="bg-card/40 border-none shadow-none backdrop-blur-md overflow-hidden">
+                            <CardContent className="p-4 space-y-2.5">
+                                {topMerchants.map((m, i) => (
+                                    <button
+                                        key={m.name}
+                                        onClick={() => {
+                                            const params = new URLSearchParams({ q: m.name });
+                                            router.push(`/search?${params.toString()}`);
+                                        }}
+                                        className="w-full flex items-center gap-3 text-left rounded-lg -mx-1 px-1 py-1 hover:bg-white/5 transition-colors"
+                                    >
+                                        <div className="w-6 h-6 rounded-lg bg-secondary/20 border border-white/5 flex items-center justify-center shrink-0">
+                                            <span className="text-[10px] font-bold text-muted-foreground/70 tabular-nums">{i + 1}</span>
+                                        </div>
+                                        <MapPin className="w-3.5 h-3.5 text-muted-foreground/60 shrink-0" />
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-[12px] font-bold truncate">{m.name}</p>
+                                            <p className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground/60">
+                                                {m.count} {m.count === 1 ? 'visit' : 'visits'}
+                                            </p>
+                                        </div>
+                                        <span className="text-[12px] font-bold tabular-nums">{formatCurrency(m.amount)}</span>
+                                    </button>
+                                ))}
+                            </CardContent>
+                        </Card>
+                    </div>
+                )}
+
+                {/* Top 3 Largest */}
+                {top3Largest.length > 0 && (
+                    <div className="space-y-2">
+                        <div className="flex items-center justify-between px-1">
+                            <span className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground/80">
+                                Largest Transactions
+                            </span>
+                        </div>
+                        <Card className="bg-card/40 border-none shadow-none backdrop-blur-md overflow-hidden">
+                            <CardContent className="p-4 space-y-2.5">
+                                {top3Largest.map((tx) => {
+                                    const dotColor = CATEGORY_COLORS[tx.category.toLowerCase()] || CATEGORY_COLORS.others;
+                                    return (
+                                        <div key={tx.id} className="flex items-center gap-3">
+                                            <div
+                                                className="w-2 h-2 rounded-full shrink-0"
+                                                style={{ backgroundColor: dotColor }}
+                                            />
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-[12px] font-bold truncate">{tx.description}</p>
+                                                <p className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground/60 truncate">
+                                                    {format(parseISO(tx.date.slice(0, 10)), 'd MMM')}
+                                                    {tx.place_name ? ` · ${tx.place_name}` : ''}
+                                                </p>
+                                            </div>
+                                            <span className="text-[12px] font-bold tabular-nums">{formatCurrency(tx.amount)}</span>
+                                        </div>
+                                    );
+                                })}
+                            </CardContent>
+                        </Card>
+                    </div>
+                )}
+
                 {/* Category Breakdown including Pie Chart */}
                 <div className="space-y-2">
                     <div className="flex items-center justify-between px-1">
                         <span className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground/80">
-                            Spending by Category
+                            {selectedBucketId !== 'all' && buckets.find(b => b.id === selectedBucketId)
+                                ? `Categories within ${buckets.find(b => b.id === selectedBucketId)!.name}`
+                                : 'Spending by Category'}
                         </span>
                     </div>
                     <Card className="bg-card/40 border-none shadow-none backdrop-blur-md overflow-hidden">
                         <CardContent className="p-4 flex flex-col sm:flex-row items-center justify-start gap-6">
                             <div className="w-36 h-36 relative flex-shrink-0">
                                 {categoryBreakdown.length > 0 ? (
-                                    <BasePieChart 
-                                        data={categoryBreakdown} 
-                                        config={CHART_CONFIG} 
+                                    <BasePieChart
+                                        data={categoryBreakdown}
+                                        config={CHART_CONFIG}
                                         innerRadius={46}
                                         outerRadius={68}
                                         hideLabel={true}
@@ -842,7 +1068,19 @@ export function AnalyticsView() {
 
                             <div className="w-full flex-1 space-y-3">
                                 {categorizedBreakdown.slice(0, 5).map((cat) => (
-                                    <div key={cat.name} className="space-y-1.5">
+                                    <button
+                                        key={cat.name}
+                                        onClick={() => {
+                                            const params = new URLSearchParams({ category: cat.rawKey });
+                                            const range = analyticsDateRange();
+                                            if (range) {
+                                                params.set('from', range.from);
+                                                params.set('to', range.to);
+                                            }
+                                            router.push(`/search?${params.toString()}`);
+                                        }}
+                                        className="w-full text-left space-y-1.5 rounded-lg -mx-1 px-1 py-1 hover:bg-white/5 transition-colors"
+                                    >
                                         <div className="flex justify-between text-[11px] font-bold">
                                             <span className="flex items-center gap-2 text-muted-foreground/80">
                                                 <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: cat.fill }} />
@@ -856,7 +1094,7 @@ export function AnalyticsView() {
                                                 style={{ width: `${cat.value}%`, backgroundColor: cat.fill }}
                                             />
                                         </div>
-                                    </div>
+                                    </button>
                                 ))}
                             </div>
                         </CardContent>
@@ -874,9 +1112,9 @@ export function AnalyticsView() {
                         <CardContent className="p-4 flex flex-col sm:flex-row items-center justify-start gap-6">
                             <div className="w-32 h-32 relative flex-shrink-0">
                                 {paymentBreakdown.length > 0 ? (
-                                    <BasePieChart 
-                                        data={paymentBreakdown} 
-                                        config={paymentChartConfig} 
+                                    <BasePieChart
+                                        data={paymentBreakdown}
+                                        config={paymentChartConfig}
                                         innerRadius={40}
                                         outerRadius={60}
                                         hideLabel={true}
@@ -908,6 +1146,15 @@ export function AnalyticsView() {
                         </CardContent>
                     </Card>
                 </div>
+
+                {/* Currency conversion staleness footnote */}
+                {usedConversion && ratesLastUpdated && (Date.now() - ratesLastUpdated) > 24 * 60 * 60 * 1000 && (
+                    <p className="text-[10px] text-muted-foreground/60 text-center px-2">
+                        Some amounts converted using exchange rates last refreshed {format(new Date(ratesLastUpdated), 'd MMM, h:mm a')}.
+                    </p>
+                )}
+                </>
+                )}
                 </>
                 )}
             </div>

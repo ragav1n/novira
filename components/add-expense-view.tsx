@@ -141,8 +141,10 @@ export function AddExpenseView() {
             console.error('[scan-receipt]', e);
         } finally {
             if (objectUrl) URL.revokeObjectURL(objectUrl);
-            if (scanAbortRef.current === controller) scanAbortRef.current = null;
-            setScanning(false);
+            if (scanAbortRef.current === controller) {
+                scanAbortRef.current = null;
+                setScanning(false);
+            }
         }
     }, [formState]);
 

@@ -8,28 +8,32 @@ const FRANKFURTER_SUPPORTED = [
 
 const CACHE_TTL = 60 * 60 * 1000; // 1 hour
 
-export function useExchangeRates(currency: string): Record<string, number> {
-    const [exchangeRates, setExchangeRates] = useState<Record<string, number>>({});
+export type ExchangeRatesState = {
+    rates: Record<string, number>;
+    /** Wall-clock ms when the rates currently in memory were last fetched/cached. null until anything loads. */
+    lastUpdated: number | null;
+};
+
+export function useExchangeRates(currency: string): ExchangeRatesState {
+    const [state, setState] = useState<ExchangeRatesState>({ rates: {}, lastUpdated: null });
 
     useEffect(() => {
         const cacheKey = `novira_rates_${currency}`;
         const API_KEY = process.env.NEXT_PUBLIC_EXCHANGERATE_API_KEY;
 
-        // Synchronously restore from cache for this currency to avoid using stale
-        // rates from a previous currency during the async fetch window.
         let hasFreshCache = false;
         try {
             const cached = localStorage.getItem(cacheKey);
             if (cached) {
                 const { rates, timestamp } = JSON.parse(cached);
-                setExchangeRates(rates);
+                setState({ rates, lastUpdated: timestamp });
                 hasFreshCache = Date.now() - timestamp < CACHE_TTL;
             } else {
-                setExchangeRates({}); // No cache for this currency — reset so isRatesLoading becomes true
+                setState({ rates: {}, lastUpdated: null });
             }
         } catch (e) {
             console.warn('[useExchangeRates] Cache read failed:', e);
-            setExchangeRates({});
+            setState({ rates: {}, lastUpdated: null });
         }
 
         if (hasFreshCache) return;
@@ -65,21 +69,21 @@ export function useExchangeRates(currency: string): Record<string, number> {
             }
 
             if (ratesRes) {
-                setExchangeRates(ratesRes);
+                const ts = Date.now();
+                setState({ rates: ratesRes, lastUpdated: ts });
                 try {
                     localStorage.setItem(cacheKey, JSON.stringify({
                         rates: ratesRes,
-                        timestamp: Date.now()
+                        timestamp: ts
                     }));
                 } catch (e) {
                     console.warn('[useExchangeRates] Cache write failed:', e);
                 }
             }
-            // If fetch fails, the stale cache was already set above (or {} if no cache)
         };
 
         fetchRates();
     }, [currency]);
 
-    return exchangeRates;
+    return state;
 }

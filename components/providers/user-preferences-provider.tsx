@@ -57,6 +57,7 @@ interface UserPreferencesContextType {
     isNavigating: boolean;
     setIsNavigating: (isNavigating: boolean) => void;
     isRatesLoading: boolean;
+    ratesLastUpdated: number | null;
     CURRENCY_SYMBOLS: Record<Currency, string>;
     CURRENCY_DETAILS: Record<Currency, { name: string; symbol: string }>;
     
@@ -114,7 +115,7 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
     const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
     const [fullName, setFullName] = useState<string>('User');
     const [budgets, setBudgets] = useState<Record<string, number>>({});
-    const exchangeRates = useExchangeRates(currency);
+    const { rates: exchangeRates, lastUpdated: ratesLastUpdated } = useExchangeRates(currency);
     const [isNavigating, setIsNavigating] = useState(false);
     
     // Joint Workspaces State
@@ -604,6 +605,7 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
         isNavigating,
         setIsNavigating,
         isRatesLoading,
+        ratesLastUpdated,
         CURRENCY_SYMBOLS,
         CURRENCY_DETAILS,
         activeWorkspaceId,
@@ -630,6 +632,7 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
         fullName,
         isNavigating,
         isRatesLoading,
+        ratesLastUpdated,
         activeWorkspaceId,
         workspaceBudgets,
         convertedWorkspaceBudgets,
