@@ -207,14 +207,21 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
     }, []);
 
     const saveToRecent = useCallback((loc: LocationData) => {
+        // Identity = coords (rounded to 4dp ≈ 11m) when available, else name+address.
+        // Prevents same-name places in different cities from overwriting each other.
+        const idOf = (l: LocationData) =>
+            l.place_lat != null && l.place_lng != null
+                ? `${l.place_lat.toFixed(4)},${l.place_lng.toFixed(4)}`
+                : `${l.place_name}|${l.place_address ?? ''}`;
+        const id = idOf(loc);
         setRecentLocations(prev => {
-            const existing = prev.find(r => r.place_name === loc.place_name);
+            const existing = prev.find(r => idOf(r) === id);
             const updated: RecentLocation = {
                 ...loc,
                 visitCount: (existing?.visitCount || 0) + 1,
                 lastVisited: Date.now(),
             };
-            const filtered = prev.filter(r => r.place_name !== loc.place_name);
+            const filtered = prev.filter(r => idOf(r) !== id);
             // Sort by visit frequency, then recency — keep top 10
             const next = [updated, ...filtered]
                 .sort((a, b) => b.visitCount - a.visitCount || b.lastVisited - a.lastVisited)
@@ -485,6 +492,9 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
         setIsSearching(true);
         if (debounceRef.current) clearTimeout(debounceRef.current);
         debounceRef.current = setTimeout(async () => {
+            abortControllerRef.current?.abort();
+            abortControllerRef.current = new AbortController();
+            const signal = abortControllerRef.current.signal;
             try {
                 // Rotate session token per search session
                 if (!googleSessionTokenRef.current) {
@@ -504,6 +514,7 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                 }
                 const response = await fetchWithRetry('https://places.googleapis.com/v1/places:autocomplete', {
                     method: 'POST',
+                    signal,
                     headers: {
                         'Content-Type': 'application/json',
                         'X-Goog-Api-Key': googleMapsKey,
@@ -511,6 +522,7 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                     },
                     body: JSON.stringify(body),
                 });
+                if (signal.aborted) return;
                 if (!response.ok) throw new Error(`Places API ${response.status}`);
                 const data = await response.json();
                 const results: PlacePrediction[] = (data.suggestions || []).map((s: any) => {
@@ -524,6 +536,7 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                         },
                         _lat: '', _lon: '',
                         _distance: p.distanceMeters != null ? p.distanceMeters / 1000 : undefined,
+                        _is_nearby: p.distanceMeters != null && p.distanceMeters < 15000,
                         _source: 'google' as const,
                     };
                 }).sort((a: PlacePrediction, b: PlacePrediction) =>
@@ -540,6 +553,7 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                 setActiveIndex(-1);
                 setIsSearching(false);
             } catch (e) {
+                if ((e as { name?: string })?.name === 'AbortError') return;
                 console.warn('[LocationPicker] Google Places API (New) failed, falling back to Photon:', e);
                 searchWithPhoton(searchQuery);
                 setIsSearching(false);
@@ -946,19 +960,17 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                 {mapboxToken && (
                     <button type="button"
                         onClick={() => { setDropPinMode(v => !v); setDropPinLabel(null); }}
-                        disabled={!lastPosition && !dropPinMode}
                         className={cn(
                             "h-[72px] flex flex-col items-center justify-center gap-2 px-2 rounded-2xl border transition-all touch-manipulation",
                             dropPinMode
                                 ? "border-rose-500/40 bg-rose-500/10 active:bg-rose-500/15"
-                                : "border-rose-500/20 bg-rose-500/5 active:bg-rose-500/10",
-                            !lastPosition && !dropPinMode && "opacity-50 cursor-not-allowed"
+                                : "border-rose-500/20 bg-rose-500/5 active:bg-rose-500/10"
                         )}>
                         <div className={cn("w-8 h-8 rounded-full bg-rose-500/20 flex items-center justify-center shrink-0", dropPinMode && "ring-1 ring-rose-500/40")}>
                             <Crosshair className="w-4 h-4 text-rose-400" />
                         </div>
                         <p className="text-[10px] font-bold text-rose-400 text-center leading-tight">
-                            {dropPinMode ? 'Cancel' : !lastPosition ? 'Locating…' : 'Drop Pin'}
+                            {dropPinMode ? 'Cancel' : 'Drop Pin'}
                         </p>
                     </button>
                 )}
@@ -1048,37 +1060,43 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                 {!dropPinMode && showRecents && (
                     <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
                         id="loc-listbox" role="listbox" aria-label="Recent locations"
-                        className="absolute left-0 right-0 top-full mt-2 z-[100] rounded-2xl border border-white/10 bg-[#0A0A0A] shadow-2xl overflow-hidden ring-1 ring-white/5">
-                        <p className="text-[9px] font-bold text-muted-foreground/50 uppercase tracking-widest px-3 pt-2.5 pb-1">Recent</p>
-                        <div className="max-h-[260px] overflow-y-auto no-scrollbar" ref={listRef}>
+                        className="absolute left-0 right-0 top-full mt-2 z-[100] rounded-2xl border border-white/10 bg-gradient-to-b from-[#0E0E14] to-[#08080B] shadow-[0_24px_60px_-12px_rgba(0,0,0,0.7)] overflow-hidden ring-1 ring-white/[0.04] backdrop-blur-xl">
+                        <div className="flex items-center gap-1.5 px-4 pt-3 pb-1.5">
+                            <div className="w-1 h-1 rounded-full bg-primary/60" />
+                            <p className="text-[9px] font-bold text-muted-foreground/60 uppercase tracking-[0.15em]">Recent</p>
+                        </div>
+                        <div className="max-h-[280px] overflow-y-auto no-scrollbar" ref={listRef}>
                             {recentLocations.map((loc, i) => {
                                 const dist = lastPosition && loc.place_lat && loc.place_lng
                                     ? getDistance(lastPosition.lat, lastPosition.lng, loc.place_lat, loc.place_lng)
                                     : undefined;
+                                const isActive = activeIndex === i;
                                 return (
                                     <button key={`${loc.place_name}-${i}`} type="button"
-                                        id={`loc-option-${i}`} role="option" aria-selected={activeIndex === i}
+                                        id={`loc-option-${i}`} role="option" aria-selected={isActive}
                                         onClick={() => handleSelectPlace(loc)}
                                         className={cn(
-                                            'w-full flex items-center gap-3 px-3 py-3.5 transition-colors border-b border-white/5 last:border-b-0 text-left touch-manipulation min-h-[56px]',
-                                            activeIndex === i ? 'bg-white/10' : 'active:bg-white/5'
+                                            'group w-full flex items-center gap-3.5 px-4 py-3 transition-colors border-b border-white/[0.04] last:border-b-0 text-left touch-manipulation min-h-[64px]',
+                                            isActive ? 'bg-white/[0.06]' : 'active:bg-white/[0.04]'
                                         )}>
-                                        <div className="w-9 h-9 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
-                                            <MapPin className="w-4 h-4 text-primary" />
+                                        <div className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 bg-gradient-to-br from-primary/35 via-primary/15 to-primary/5 ring-1 ring-inset ring-primary/30 shadow-inner">
+                                            <MapPin className="w-[18px] h-[18px] text-primary" strokeWidth={2.5} />
                                         </div>
                                         <div className="min-w-0 flex-1">
-                                            <p className="text-sm font-semibold line-clamp-1">{loc.place_name}</p>
+                                            <p className="text-[13.5px] font-semibold tracking-tight line-clamp-1 text-foreground">{loc.place_name}</p>
                                             {loc.place_address && (
-                                                <p className="text-[11px] text-muted-foreground line-clamp-1 mt-0.5 truncate">{loc.place_address}</p>
+                                                <p className="text-[11px] text-muted-foreground/70 line-clamp-1 mt-0.5 truncate">{loc.place_address}</p>
                                             )}
                                         </div>
                                         <div className="flex items-center gap-1.5 shrink-0 ml-1">
-                                            {dist !== undefined && (
-                                                <span className="text-[10px] text-primary/60 font-semibold">{formatDist(dist)}</span>
-                                            )}
                                             {loc.visitCount > 1 && (
-                                                <span className="text-[9px] font-bold text-primary/50 bg-primary/10 px-1.5 py-0.5 rounded-full">
+                                                <span className="text-[9px] font-bold text-primary/70 bg-primary/10 ring-1 ring-inset ring-primary/15 px-1.5 py-0.5 rounded-full tabular-nums">
                                                     {loc.visitCount}×
+                                                </span>
+                                            )}
+                                            {dist !== undefined && (
+                                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold tabular-nums tracking-tight bg-white/5 text-primary/80 ring-1 ring-inset ring-primary/15">
+                                                    {formatDist(dist)}
                                                 </span>
                                             )}
                                         </div>
@@ -1095,8 +1113,8 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                 {!dropPinMode && predictions.length > 0 && (
                     <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
                         id="loc-listbox" role="listbox" aria-label="Location suggestions"
-                        className="absolute left-0 right-0 top-full mt-2 z-[100] rounded-2xl border border-white/10 bg-[#0A0A0A] shadow-2xl overflow-hidden ring-1 ring-white/5">
-                        <div className="max-h-[280px] overflow-y-auto no-scrollbar" ref={listRef}>
+                        className="absolute left-0 right-0 top-full mt-2 z-[100] rounded-2xl border border-white/10 bg-gradient-to-b from-[#0E0E14] to-[#08080B] shadow-[0_24px_60px_-12px_rgba(0,0,0,0.7)] overflow-hidden ring-1 ring-white/[0.04] backdrop-blur-xl">
+                        <div className="max-h-[300px] overflow-y-auto no-scrollbar" ref={listRef}>
                             {predictions.map((prediction, i) => {
                                 const emoji = getMakiEmoji(prediction._maki);
                                 const isActive = activeIndex === i;
@@ -1105,47 +1123,56 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                                         id={`loc-option-${i}`} role="option" aria-selected={isActive}
                                         onClick={() => handleSelectPlace(prediction)}
                                         className={cn(
-                                            'w-full flex items-center gap-3 px-3 py-3.5 transition-colors border-b border-white/5 last:border-b-0 text-left touch-manipulation min-h-[56px]',
-                                            isActive ? 'bg-white/10' : 'active:bg-white/5'
+                                            'group w-full flex items-center gap-3.5 px-4 py-3 transition-colors border-b border-white/[0.04] last:border-b-0 text-left touch-manipulation min-h-[64px]',
+                                            isActive ? 'bg-white/[0.06]' : 'active:bg-white/[0.04]'
                                         )}>
-                                        {/* Category icon */}
+                                        {/* Category icon — gradient + ring with proximity dot */}
                                         <div className={cn(
-                                            'w-9 h-9 rounded-full flex items-center justify-center shrink-0 border text-base',
-                                            prediction._is_nearby ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-primary/10 border-primary/20'
+                                            'w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 relative bg-gradient-to-br ring-1 ring-inset shadow-inner',
+                                            prediction._is_nearby
+                                                ? 'from-emerald-500/30 via-emerald-500/15 to-emerald-500/5 ring-emerald-500/35'
+                                                : 'from-primary/35 via-primary/15 to-primary/5 ring-primary/30'
                                         )}>
                                             {emoji
-                                                ? <span className="text-base leading-none">{emoji}</span>
-                                                : <MapPin className={cn('w-4 h-4', prediction._is_nearby ? 'text-emerald-500' : 'text-primary')} />
+                                                ? <span className="text-lg leading-none">{emoji}</span>
+                                                : <MapPin className={cn('w-[18px] h-[18px]', prediction._is_nearby ? 'text-emerald-300' : 'text-primary')} strokeWidth={2.5} />
                                             }
+                                            {prediction._is_nearby && (
+                                                <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 ring-2 ring-[#0A0A0F] shadow-[0_0_8px_rgba(52,211,153,0.6)]" />
+                                            )}
                                         </div>
 
                                         <div className="min-w-0 flex-1">
-                                            <p className="text-sm font-semibold break-words line-clamp-1">
+                                            <p className="text-[13.5px] font-semibold tracking-tight break-words line-clamp-1 text-foreground">
                                                 <HighlightedText text={prediction.structured_formatting.main_text} query={query} />
                                             </p>
-                                            <p className="text-[11px] text-muted-foreground line-clamp-1 mt-0.5 flex items-center gap-1">
-                                                {prediction._is_nearby && (
-                                                    <span className="text-[9px] font-bold text-emerald-500 uppercase tracking-wider bg-emerald-500/10 px-1 rounded-sm shrink-0">Near</span>
-                                                )}
-                                                <span className="truncate">{prediction.structured_formatting.secondary_text}</span>
+                                            <p className="text-[11px] text-muted-foreground/70 line-clamp-1 mt-0.5 truncate">
+                                                {prediction.structured_formatting.secondary_text}
                                             </p>
                                         </div>
 
                                         {prediction._distance !== undefined && (
-                                            <span className="text-[10px] text-primary/60 font-semibold shrink-0 ml-1">
+                                            <div className={cn(
+                                                'shrink-0 ml-1 px-2 py-0.5 rounded-full text-[10px] font-bold tabular-nums tracking-tight ring-1 ring-inset',
+                                                prediction._is_nearby
+                                                    ? 'bg-emerald-500/10 text-emerald-400 ring-emerald-500/20'
+                                                    : 'bg-white/5 text-primary/80 ring-primary/15'
+                                            )}>
                                                 {formatDist(prediction._distance)}
-                                            </span>
+                                            </div>
                                         )}
                                     </button>
                                 );
                             })}
                         </div>
                         {activeSource && (
-                            <p className="text-[9px] text-muted-foreground/30 text-right pr-3 py-1 bg-white/[0.02]">
-                                {activeSource === 'google' ? 'Powered by Google' :
-                                    activeSource === 'mapbox' ? 'Powered by Mapbox' :
-                                        'Powered by OpenStreetMap'}
-                            </p>
+                            <div className="flex items-center justify-end gap-1 px-3 py-1.5 bg-white/[0.015] border-t border-white/[0.04]">
+                                <span className="text-[9px] text-muted-foreground/40 tracking-wide">
+                                    {activeSource === 'google' ? 'via Google' :
+                                        activeSource === 'mapbox' ? 'via Mapbox' :
+                                            'via OpenStreetMap'}
+                                </span>
+                            </div>
                         )}
                     </motion.div>
                 )}
@@ -1153,8 +1180,14 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
 
             {/* Empty state */}
             {!dropPinMode && query.length >= 2 && !isSearching && predictions.length === 0 && (
-                <div className="text-center py-4">
-                    <p className="text-xs text-muted-foreground">No places found. Try a different search.</p>
+                <div className="flex flex-col items-center justify-center gap-2 py-8 px-4">
+                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-white/[0.04] to-white/[0.01] ring-1 ring-inset ring-white/5 flex items-center justify-center">
+                        <Search className="w-5 h-5 text-muted-foreground/40" strokeWidth={2} />
+                    </div>
+                    <div className="text-center">
+                        <p className="text-[13px] font-semibold text-foreground/80">No places found</p>
+                        <p className="text-[11px] text-muted-foreground/60 mt-0.5">Try a different search or drop a pin</p>
+                    </div>
                 </div>
             )}
         </div>
