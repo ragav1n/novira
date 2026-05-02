@@ -38,14 +38,14 @@ export const DashboardTransactionsDrawer = React.memo(function DashboardTransact
         const scrollable = el.scrollHeight > el.clientHeight + 20;
         setIsScrollable(scrollable);
         if (!scrollable) setIsAtBottom(true);
-    }, []);
+    }, [scrollRef]);
 
     const handleScroll = useCallback(() => {
         const el = scrollRef.current;
         if (!el) return;
         if (!hasScrolled && el.scrollTop > 10) setHasScrolled(true);
         setIsAtBottom(el.scrollHeight - el.scrollTop - el.clientHeight < 40);
-    }, [hasScrolled]);
+    }, [hasScrolled, scrollRef]);
 
     useEffect(() => {
         if (!isOpen) {
@@ -69,7 +69,7 @@ export const DashboardTransactionsDrawer = React.memo(function DashboardTransact
                 aria-describedby={undefined}
                 onInteractOutside={e => e.preventDefault()}
                 onPointerDownOutside={e => e.preventDefault()}
-                className="fixed inset-0 top-0 left-0 right-0 bottom-0 max-w-none w-full h-full bg-background border-none rounded-none p-0 overflow-hidden flex flex-col z-[110] translate-x-0 translate-y-0 shadow-none elevation-0"
+                className="fixed inset-0 top-0 left-0 right-0 bottom-0 max-w-none sm:max-w-none w-full h-full bg-background border-none rounded-none p-0 overflow-hidden flex flex-col z-[110] translate-x-0 translate-y-0 shadow-none elevation-0"
             >
                 <DialogHeader className="p-6 pt-12 pb-4 border-b border-white/5 shrink-0">
                     <div className="flex items-center justify-between">

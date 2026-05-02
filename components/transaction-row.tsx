@@ -1,6 +1,6 @@
 'use client';
 
-import React, { memo, useState, useEffect } from 'react';
+import React, { memo, useState, useEffect, useRef } from 'react';
 import { format, parseISO } from 'date-fns';
 import { History, MoreVertical, Users, RefreshCcw, Ban, MapPin, Pencil, Trash2, Globe, ArrowLeftRight, Cloud, AlertTriangle } from 'lucide-react';
 import type { Transaction } from '@/types/transaction';
@@ -61,6 +61,22 @@ export const TransactionRow = memo(function TransactionRow({
   const [swiped, setSwiped] = useState(false);
   const [showHint, setShowHint] = useState(false);
   const prefersReducedMotion = useReducedMotion();
+  const rowRef = useRef<HTMLDivElement>(null);
+  const [isNear, setIsNear] = useState(false);
+
+  useEffect(() => {
+    const el = rowRef.current;
+    if (!el || isNear) return;
+    if (typeof IntersectionObserver === 'undefined') { setIsNear(true); return; }
+    const io = new IntersectionObserver((entries) => {
+      if (entries.some(e => e.isIntersecting)) {
+        setIsNear(true);
+        io.disconnect();
+      }
+    }, { rootMargin: '400px' });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [isNear]);
 
   useEffect(() => {
     if (prefersReducedMotion) return;
@@ -102,11 +118,13 @@ export const TransactionRow = memo(function TransactionRow({
   const isFailed = !!tx._failed;
   // Pending/failed rows have a faded card via opacity-70, which lets the swipe
   // action buttons (sitting absolutely behind the card) bleed through. Disable
-  // swipe + hide those buttons until the row syncs.
-  const swipeEnabled = canEdit && !isPending && !isFailed;
+  // swipe + hide those buttons until the row syncs. Also gate by `isNear` so
+  // off-screen rows in long lists don't pay the drag/overlay cost.
+  const swipeEnabled = canEdit && !isPending && !isFailed && isNear;
 
   return (
     <motion.div
+      ref={rowRef}
       layout
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}

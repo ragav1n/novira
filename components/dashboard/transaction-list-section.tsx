@@ -9,7 +9,7 @@ import { getIconForCategory, CATEGORY_COLORS } from '@/lib/categories';
 import { toast } from '@/utils/haptics';
 import { Currency } from '@/components/providers/user-preferences-provider';
 import { DashboardTransactionsDrawer } from '@/components/dashboard-transactions-drawer';
-import { VirtualizedTransactionList } from '@/components/virtualized-transaction-list';
+import { TransactionList } from '@/components/transaction-list';
 
 interface TransactionListSectionProps {
     isBucketFocused: boolean;
@@ -134,7 +134,7 @@ export function TransactionListSection({
                 onOpenChange={setIsViewAllOpen}
                 scrollRef={drawerScrollRef}
             >
-                <VirtualizedTransactionList
+                <TransactionList
                     transactions={allTransactions ?? displayTransactions}
                     userId={userId}
                     currency={currency}
@@ -152,7 +152,6 @@ export function TransactionListSection({
                     hasMore={hasMore}
                     loadingMore={loadingMore}
                     onLoadMore={onLoadMore}
-                    scrollContainerRef={drawerScrollRef}
                 />
             </DashboardTransactionsDrawer>
         </div>
