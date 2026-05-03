@@ -142,6 +142,7 @@ export function BucketDialog({ isOpen, onClose, editingBucket }: BucketDialogPro
                         <div className="space-y-2 text-left w-full">
                             <label htmlFor="bucket-name" className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest pl-1">Bucket Name</label>
                             <Input
+                                autoFocus
                                 id="bucket-name"
                                 name="bucket-name"
                                 placeholder="e.g. Trip, New iPhone, Gift..."

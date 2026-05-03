@@ -186,8 +186,9 @@ export function SubscriptionsView() {
                                         onClick={() => setCancelTarget(template.id)}
                                         className="text-rose-400 hover:text-rose-300 opacity-0 group-hover:opacity-100 transition-opacity p-1"
                                         title="Cancel Subscription"
+                                        aria-label="Cancel subscription"
                                     >
-                                        <Trash2 className="w-4 h-4" />
+                                        <Trash2 className="w-4 h-4" aria-hidden="true" />
                                     </button>
                                 </div>
                             </CardContent>

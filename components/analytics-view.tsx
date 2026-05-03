@@ -336,10 +336,15 @@ export function AnalyticsView() {
         return `${target.getFullYear()}-${String(target.getMonth() + 1).padStart(2, '0')}`;
     }, []);
 
+    const recapAbortRef = useRef<AbortController | null>(null);
+
     const loadRecap = useCallback(async (monthKey: string) => {
+        recapAbortRef.current?.abort();
+        const ac = new AbortController();
+        recapAbortRef.current = ac;
         setRecapLoading(true);
         try {
-            const res = await fetch(`/api/recap?month=${monthKey}`);
+            const res = await fetch(`/api/recap?month=${monthKey}`, { signal: ac.signal });
             if (res.status === 404) {
                 setRecap(null);
                 setRecapMeta(null);
@@ -353,15 +358,19 @@ export function AnalyticsView() {
             setRecapMonth(monthKey);
             return true;
         } catch (err) {
+            if ((err as { name?: string })?.name === 'AbortError') return false;
             console.error('[recap load]', err);
             return false;
         } finally {
-            setRecapLoading(false);
+            if (!ac.signal.aborted) setRecapLoading(false);
         }
     }, []);
 
     const generateRecap = useCallback(async (monthKey?: string, force = false) => {
         const target = monthKey || recapMonth || priorMonthKey;
+        recapAbortRef.current?.abort();
+        const ac = new AbortController();
+        recapAbortRef.current = ac;
         setRecapLoading(true);
         if (force) {
             setRecap(null);
@@ -371,7 +380,8 @@ export function AnalyticsView() {
             const res = await fetch('/api/recap', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ month: target, currency, force })
+                body: JSON.stringify({ month: target, currency, force }),
+                signal: ac.signal,
             });
             if (!res.ok) {
                 const err = await res.json().catch(() => ({}));
@@ -383,12 +393,15 @@ export function AnalyticsView() {
             setRecapMonth(target);
             setAvailableMonths((prev) => prev.includes(target) ? prev : [target, ...prev]);
         } catch (err) {
+            if ((err as { name?: string })?.name === 'AbortError') return;
             console.error('[recap]', err);
             toast.error('Could not generate recap');
         } finally {
-            setRecapLoading(false);
+            if (!ac.signal.aborted) setRecapLoading(false);
         }
     }, [currency, priorMonthKey, recapMonth]);
+
+    useEffect(() => () => recapAbortRef.current?.abort(), []);
 
     const recapMonthLabel = useMemo(() => {
         if (!recapMonth) return null;

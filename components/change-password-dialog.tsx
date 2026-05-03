@@ -161,6 +161,7 @@ export function ChangePasswordDialog({ trigger, mode = 'change', onSuccess }: Ch
                                         <Lock className={`absolute left-3 w-4 h-4 transition-all duration-300 ${focusedInput === "currentPassword" ? 'text-primary' : 'text-muted-foreground'}`} />
 
                                         <Input
+                                            autoFocus
                                             id="current-password"
                                             name="current-password"
                                             type={showCurrentPassword ? "text" : "password"}
@@ -200,6 +201,7 @@ export function ChangePasswordDialog({ trigger, mode = 'change', onSuccess }: Ch
                                     <Lock className={`absolute left-3 w-4 h-4 transition-all duration-300 ${focusedInput === "password" ? 'text-primary' : 'text-muted-foreground'}`} />
 
                                     <Input
+                                        autoFocus={mode !== 'change'}
                                         id="new-password"
                                         name="new-password"
                                         type={showPassword ? "text" : "password"}

@@ -89,15 +89,17 @@ export function BucketsTabContent({
                                                 onClick={() => handleEditBucket(bucket)}
                                                 className="p-2 rounded-full hover:bg-secondary/30 transition-colors"
                                                 title="Edit Bucket"
+                                                aria-label={`Edit bucket ${bucket.name}`}
                                             >
-                                                <Settings2 className="w-4 h-4 text-muted-foreground" />
+                                                <Settings2 className="w-4 h-4 text-muted-foreground" aria-hidden="true" />
                                             </button>
                                             <button
                                                 onClick={() => archiveBucket(bucket.id, true)}
                                                 className="p-2 rounded-full hover:bg-secondary/30 transition-colors"
                                                 title="Archive Bucket"
+                                                aria-label={`Archive bucket ${bucket.name}`}
                                             >
-                                                <Archive className="w-4 h-4 text-muted-foreground" />
+                                                <Archive className="w-4 h-4 text-muted-foreground" aria-hidden="true" />
                                             </button>
                                             <button
                                                 onClick={() => {
@@ -111,8 +113,9 @@ export function BucketsTabContent({
                                                 }}
                                                 className="p-2 rounded-full hover:bg-rose-500/20 hover:text-rose-500 transition-colors"
                                                 title="Delete Bucket"
+                                                aria-label={`Delete bucket ${bucket.name}`}
                                             >
-                                                <Trash2 className="w-4 h-4" />
+                                                <Trash2 className="w-4 h-4" aria-hidden="true" />
                                             </button>
                                         </div>
                                     </div>

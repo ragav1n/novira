@@ -8,7 +8,7 @@ const STATIC_ASSETS = [
 // Navigation routes to warm so the app shell loads if the user goes offline before
 // their first navigation has populated the cache (e.g. install PWA → quit → open offline).
 // Failures are non-fatal — they're best-effort warmers, not invariants.
-const WARM_NAVIGATION_ROUTES = ['/', '/add'];
+const WARM_NAVIGATION_ROUTES = ['/', '/add', '/analytics', '/subscriptions'];
 
 // Extract same-origin <script src> and <link rel="modulepreload" href> URLs from
 // HTML text. Used during install to pre-cache the JS chunks the warmed routes

@@ -14,6 +14,10 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import {
+    AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+    AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/utils/haptics';
 import { Progress } from '@/components/ui/progress';
@@ -52,6 +56,7 @@ export function GoalsView() {
     const [isAddDepositOpen, setIsAddDepositOpen] = useState(false);
     const [selectedGoalId, setSelectedGoalId] = useState<string | null>(null);
     const [depositAmount, setDepositAmount] = useState('');
+    const [goalPendingDelete, setGoalPendingDelete] = useState<SavingsGoal | null>(null);
 
         const loadGoals = async () => {
         if (!userId) return;
@@ -170,15 +175,13 @@ export function GoalsView() {
     };
 
     const handleDeleteGoal = async (id: string) => {
-        if (!confirm('Are you sure you want to delete this goal? This cannot be undone.')) return;
-        
         setGoals(prev => prev.filter(g => g.id !== id));
-        
+
         const { error } = await supabase
             .from('savings_goals')
             .delete()
             .eq('id', id);
-            
+
         if (error) {
             toast.error('Failed to delete goal');
             loadGoals();
@@ -195,6 +198,15 @@ export function GoalsView() {
         const goal = goals.find(g => g.id === selectedGoalId);
         if (!goal) return;
 
+        const previousAmount = Number(goal.current_amount);
+        setGoals(prev => prev.map(g => g.id === selectedGoalId
+            ? { ...g, current_amount: previousAmount + amount }
+            : g
+        ));
+        setIsAddDepositOpen(false);
+        setDepositAmount('');
+        setSelectedGoalId(null);
+
         const { data, error: rpcError } = await supabase.rpc('add_savings_deposit_atomic', {
             p_goal_id: selectedGoalId,
             p_user_id: userId,
@@ -203,14 +215,15 @@ export function GoalsView() {
         });
 
         if (rpcError || (data && !data.success)) {
+            setGoals(prev => prev.map(g => g.id === selectedGoalId
+                ? { ...g, current_amount: previousAmount }
+                : g
+            ));
             toast.error('Failed to add deposit: ' + (rpcError?.message || data?.error));
             return;
         }
 
         toast.success('Deposit added successfully!');
-        setIsAddDepositOpen(false);
-        setDepositAmount('');
-        setSelectedGoalId(null);
         loadGoals();
     };
 
@@ -348,7 +361,7 @@ export function GoalsView() {
                                                         <DropdownMenuItem onClick={() => openEditModal(goal)} className="gap-2 cursor-pointer">
                                                             <Edit2 className="w-4 h-4" /> Edit Goal
                                                         </DropdownMenuItem>
-                                                        <DropdownMenuItem onClick={() => handleDeleteGoal(goal.id)} className="gap-2 cursor-pointer text-rose-400 focus:text-rose-400 focus:bg-rose-500/10">
+                                                        <DropdownMenuItem onClick={() => setGoalPendingDelete(goal)} className="gap-2 cursor-pointer text-rose-400 focus:text-rose-400 focus:bg-rose-500/10">
                                                             <Trash2 className="w-4 h-4" /> Delete
                                                         </DropdownMenuItem>
                                                     </DropdownMenuContent>
@@ -390,8 +403,9 @@ export function GoalsView() {
                     <div className="space-y-3 pt-3">
                         <div className="space-y-1">
                             <Label className="text-xs">Goal Name</Label>
-                            <Input 
-                                placeholder="e.g. Dream Vacation" 
+                            <Input
+                                autoFocus
+                                placeholder="e.g. Dream Vacation"
                                 value={goalName}
                                 onChange={(e) => setGoalName(e.target.value)}
                                 className="bg-secondary/20 border-white/10 h-10 text-sm"
@@ -454,6 +468,26 @@ export function GoalsView() {
                 </DialogContent>
             </Dialog>
 
+            <AlertDialog open={!!goalPendingDelete} onOpenChange={(open) => !open && setGoalPendingDelete(null)}>
+                <AlertDialogContent className="bg-card/95 backdrop-blur-xl border-white/10 rounded-3xl">
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Delete this goal?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            {goalPendingDelete ? `"${goalPendingDelete.name}" and all its deposit history will be permanently removed. This cannot be undone.` : ''}
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel onClick={() => setGoalPendingDelete(null)}>Keep</AlertDialogCancel>
+                        <AlertDialogAction
+                            className="bg-rose-500/20 text-rose-400 border border-rose-500/30 hover:bg-rose-500/30"
+                            onClick={() => { if (goalPendingDelete) { handleDeleteGoal(goalPendingDelete.id); setGoalPendingDelete(null); } }}
+                        >
+                            Delete Goal
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
             {/* Add Deposit Dialog */}
             <Dialog open={isAddDepositOpen} onOpenChange={setIsAddDepositOpen}>
                 <DialogContent className="max-w-md rounded-3xl border-white/10 bg-card/95 backdrop-blur-xl p-5">
@@ -464,10 +498,11 @@ export function GoalsView() {
                         <div className="space-y-1">
                             <Label className="text-xs">Deposit Amount</Label>
                             <div className="relative">
-                                <Input 
-                                    type="number" 
+                                <Input
+                                    autoFocus
+                                    type="number"
                                     step="0.01"
-                                    placeholder="0.00" 
+                                    placeholder="0.00"
                                     value={depositAmount}
                                     onChange={(e) => setDepositAmount(e.target.value)}
                                     className="bg-secondary/20 border-white/10 h-14 text-2xl font-bold pl-10"

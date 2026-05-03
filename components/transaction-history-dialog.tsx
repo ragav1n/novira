@@ -14,22 +14,12 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { WaveLoader } from '@/components/ui/wave-loader';
 import { cn } from '@/lib/utils';
-
-interface AuditLog {
-    id: string;
-    action: 'INSERT' | 'UPDATE' | 'DELETE';
-    old_data: any;
-    new_data: any;
-    created_at: string;
-    changed_by_profile?: {
-        full_name: string;
-    };
-}
+import type { AuditLog, Transaction } from '@/types/transaction';
 
 interface TransactionHistoryDialogProps {
     isOpen: boolean;
     onOpenChange: (open: boolean) => void;
-    transaction: any | null;
+    transaction: Transaction | null;
     auditLogs: AuditLog[];
     isLoading: boolean;
 }
@@ -97,23 +87,26 @@ export const TransactionHistoryDialog = React.memo(function TransactionHistoryDi
                                                     By {log.changed_by_profile?.full_name?.split(' ')[0] || 'Unknown'}
                                                 </p>
 
-                                                {log.action === 'UPDATE' && log.new_data && (
-                                                    <div className="mt-2 p-3 rounded-2xl bg-white/5 border border-white/5 text-[11px] space-y-1.5">
-                                                        {Object.keys(log.new_data).map(key => {
-                                                            if (key === 'updated_at' || key === 'id' || JSON.stringify(log.new_data[key]) === JSON.stringify(log.old_data?.[key])) return null;
-                                                            return (
-                                                                <div key={key} className="flex flex-col">
-                                                                    <span className="text-muted-foreground capitalize font-bold text-[9px] uppercase tracking-wider">{key}</span>
-                                                                    <div className="flex items-center gap-2 flex-wrap">
-                                                                        <span className="text-rose-400/70 line-through decoration-rose-400/30 truncate max-w-[100px]">{String(log.old_data?.[key] || 'None')}</span>
-                                                                        <span className="text-white/40">→</span>
-                                                                        <span className="text-emerald-400 font-bold truncate max-w-[120px]">{String(log.new_data[key])}</span>
+                                                {log.action === 'UPDATE' && log.new_data && (() => {
+                                                    const newData = log.new_data;
+                                                    return (
+                                                        <div className="mt-2 p-3 rounded-2xl bg-white/5 border border-white/5 text-[11px] space-y-1.5">
+                                                            {Object.keys(newData).map(key => {
+                                                                if (key === 'updated_at' || key === 'id' || JSON.stringify(newData[key]) === JSON.stringify(log.old_data?.[key])) return null;
+                                                                return (
+                                                                    <div key={key} className="flex flex-col">
+                                                                        <span className="text-muted-foreground capitalize font-bold text-[9px] uppercase tracking-wider">{key}</span>
+                                                                        <div className="flex items-center gap-2 flex-wrap">
+                                                                            <span className="text-rose-400/70 line-through decoration-rose-400/30 truncate max-w-[100px]">{String(log.old_data?.[key] || 'None')}</span>
+                                                                            <span className="text-white/40">→</span>
+                                                                            <span className="text-emerald-400 font-bold truncate max-w-[120px]">{String(newData[key])}</span>
+                                                                        </div>
                                                                     </div>
-                                                                </div>
-                                                            )
-                                                        })}
-                                                    </div>
-                                                )}
+                                                                )
+                                                            })}
+                                                        </div>
+                                                    );
+                                                })()}
                                             </div>
                                         </div>
                                     ))}

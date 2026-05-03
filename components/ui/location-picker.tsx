@@ -47,6 +47,57 @@ interface LocationPickerProps {
     onChange: (location: LocationData) => void;
 }
 
+interface PhotonFeature {
+    properties?: {
+        name?: string;
+        street?: string;
+        osm_id?: string | number;
+        city?: string;
+        town?: string;
+        village?: string;
+        state?: string;
+        country?: string;
+    };
+    geometry?: { coordinates?: [number, number] };
+}
+
+interface MapboxSuggestion {
+    mapbox_id: string;
+    name?: string;
+    full_address?: string;
+    address?: string;
+    place_formatted?: string;
+    maki?: string;
+    distance?: number;
+}
+
+interface MapboxFeature {
+    id: string;
+    text?: string;
+    place_name?: string;
+    properties?: { maki?: string };
+    geometry: { coordinates: [number, number] };
+}
+
+interface GooglePlaceSuggestion {
+    placePrediction: {
+        placeId: string;
+        text?: { text?: string };
+        structuredFormat?: {
+            mainText?: { text?: string };
+            secondaryText?: { text?: string };
+        };
+        distanceMeters?: number;
+    };
+}
+
+interface GooglePlaceNearby {
+    id: string;
+    displayName?: { text?: string };
+    formattedAddress?: string;
+    location?: { latitude?: number; longitude?: number };
+}
+
 // ── Maki → emoji map (no extra bundle, works perfectly on mobile) ───────────
 
 const MAKI_EMOJI: Record<string, string> = {
@@ -386,11 +437,11 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                 const response = await fetchWithRetry(`https://photon.komoot.io/api/?` + new URLSearchParams(params), { signal: abortControllerRef.current.signal });
                 if (!response.ok) throw new Error('Search failed');
                 const data = await response.json();
-                const results = (data.features || []).map((f: any) => {
+                const results: PlacePrediction[] = ((data.features || []) as PhotonFeature[]).map((f) => {
                     const props = f.properties || {};
-                    const coords = f.geometry?.coordinates || [];
+                    const coords = f.geometry?.coordinates || [0, 0];
                     const name = props.name || props.street || 'Unknown';
-                    const parts = [props.city || props.town || props.village, props.state, props.country].filter(Boolean);
+                    const parts = [props.city || props.town || props.village, props.state, props.country].filter(Boolean) as string[];
                     const lat = coords[1], lon = coords[0];
                     const dist = lastPosition ? getDistance(lastPosition.lat, lastPosition.lng, lat, lon) : undefined;
                     return {
@@ -400,7 +451,7 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                         _lat: String(lat), _lon: String(lon), _distance: dist,
                         _is_nearby: dist !== undefined && dist < 15,
                     };
-                }).sort((a: any, b: any) => (a._distance || 999) - (b._distance || 999));
+                }).sort((a, b) => (a._distance || 999) - (b._distance || 999));
                 if (searchCacheKeysRef.current.length >= 50) {
                     const evicted = searchCacheKeysRef.current.shift()!;
                     searchCacheRef.current.delete(evicted);
@@ -447,19 +498,19 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                 );
                 if (!response.ok) { searchWithPhoton(searchQuery); return; }
                 const data = await response.json();
-                const results = (data.suggestions || []).map((s: any) => ({
+                const results: PlacePrediction[] = ((data.suggestions || []) as MapboxSuggestion[]).map((s) => ({
                     place_id: s.mapbox_id,
-                    description: s.full_address || s.address || s.place_formatted || s.name,
+                    description: s.full_address || s.address || s.place_formatted || s.name || '',
                     structured_formatting: {
                         main_text: s.name || s.place_formatted || 'Unknown',
                         secondary_text: (s.full_address || s.address || s.place_formatted || '')
-                            .split(',').map((p: string) => p.trim()).filter((p: string) => p !== s.name).slice(0, 2).join(', '),
+                            .split(',').map((p) => p.trim()).filter((p) => p !== s.name).slice(0, 2).join(', '),
                     },
                     _lat: '', _lon: '', _mapbox_id: s.mapbox_id,
                     _maki: s.maki,
                     _is_nearby: s.distance !== undefined && s.distance < 15000,
                     _distance: s.distance ? s.distance / 1000 : undefined,
-                })).sort((a: any, b: any) => (a._distance || 999) - (b._distance || 999));
+                })).sort((a, b) => (a._distance || 999) - (b._distance || 999));
                 if (searchCacheKeysRef.current.length >= 50) {
                     const evicted = searchCacheKeysRef.current.shift()!;
                     searchCacheRef.current.delete(evicted);
@@ -525,7 +576,7 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                 if (signal.aborted) return;
                 if (!response.ok) throw new Error(`Places API ${response.status}`);
                 const data = await response.json();
-                const results: PlacePrediction[] = (data.suggestions || []).map((s: any) => {
+                const results: PlacePrediction[] = ((data.suggestions || []) as GooglePlaceSuggestion[]).map((s) => {
                     const p = s.placePrediction;
                     return {
                         place_id: p.placeId,
@@ -610,7 +661,7 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                     if (response.ok) {
                         const data = await response.json();
                         if (ac.signal.aborted) return;
-                        const results: PlacePrediction[] = (data.places || []).map((p: any) => {
+                        const results: PlacePrediction[] = ((data.places || []) as GooglePlaceNearby[]).map((p) => {
                             const lat = p.location?.latitude;
                             const lng = p.location?.longitude;
                             const dist = (lat != null && lng != null)
@@ -649,7 +700,7 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                     if (response.ok) {
                         const data = await response.json();
                         if (ac.signal.aborted) return;
-                        setPredictions((data.features || []).map((f: any) => {
+                        const features: PlacePrediction[] = ((data.features || []) as MapboxFeature[]).map((f) => {
                             const name = f.text || f.place_name?.split(',')[0] || 'Unknown';
                             const address = f.place_name || '';
                             const secondary = address.replace(name, '').replace(/^,\s*/, '').trim();
@@ -660,7 +711,8 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                                 _lat: String(f.geometry.coordinates[1]), _lon: String(f.geometry.coordinates[0]),
                                 _is_nearby: true, _distance: dist, _maki: f.properties?.maki,
                             };
-                        }).sort((a: any, b: any) => (a._distance || 0) - (b._distance || 0)));
+                        }).sort((a, b) => (a._distance || 0) - (b._distance || 0));
+                        setPredictions(features);
                         setActiveSource('mapbox');
                     }
                 } catch (e: unknown) {

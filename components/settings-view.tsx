@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
-import { useUserPreferences } from '@/components/providers/user-preferences-provider';
+import { useUserPreferences, type Currency } from '@/components/providers/user-preferences-provider';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/lib/supabase';
@@ -160,7 +160,11 @@ export function SettingsView() {
                     .eq('user_id', userId)
                     .order('created_at', { ascending: false });
                 if (fallbackError) throw fallbackError;
-                setRecurringTemplates((fallbackData || []).map((t: any) => ({ ...t, next_occurrence: t.next_occurrence ?? '', last_processed: t.last_processed ?? null })).filter((t: any) => t.is_active));
+                setRecurringTemplates(
+                    ((fallbackData || []) as RecurringTemplate[])
+                        .map((t) => ({ ...t, next_occurrence: t.next_occurrence ?? '', last_processed: t.last_processed ?? null }))
+                        .filter((t) => t.is_active)
+                );
                 return;
             }
             setRecurringTemplates((data || []).filter(t => t.is_active));
@@ -483,7 +487,28 @@ export function SettingsView() {
                     </div>
                     <div className="bg-secondary/5 rounded-xl border border-white/5 divide-y divide-white/5 min-h-[48px]">
                         {loadingTemplates ? (
-                            <div className="p-4 text-center text-xs text-muted-foreground">Loading...</div>
+                            <>
+                                <div className="flex items-center justify-between p-3">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-8 h-8 rounded-full bg-secondary/20 animate-pulse" />
+                                        <div className="space-y-2">
+                                            <div className="h-3 w-32 rounded bg-secondary/20 animate-pulse" />
+                                            <div className="h-2 w-24 rounded bg-secondary/20 animate-pulse" />
+                                        </div>
+                                    </div>
+                                    <div className="h-8 w-8 rounded-full bg-secondary/20 animate-pulse" />
+                                </div>
+                                <div className="flex items-center justify-between p-3">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-8 h-8 rounded-full bg-secondary/20 animate-pulse" />
+                                        <div className="space-y-2">
+                                            <div className="h-3 w-28 rounded bg-secondary/20 animate-pulse" />
+                                            <div className="h-2 w-20 rounded bg-secondary/20 animate-pulse" />
+                                        </div>
+                                    </div>
+                                    <div className="h-8 w-8 rounded-full bg-secondary/20 animate-pulse" />
+                                </div>
+                            </>
                         ) : recurringTemplates.length > 0 ? (
                             recurringTemplates.map((template) => (
                                 <div key={template.id} className="flex items-center justify-between p-3">
@@ -573,7 +598,7 @@ export function SettingsView() {
                                 </div>
                             </div>
                             <div className="mt-1">
-                                <CurrencyDropdown value={currency} onValueChange={(val) => setCurrency(val as any)} />
+                                <CurrencyDropdown value={currency} onValueChange={(val) => setCurrency(val as Currency)} />
                             </div>
                         </div>
 

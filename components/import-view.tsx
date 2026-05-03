@@ -49,6 +49,9 @@ interface ColumnMapping {
     category?: string;
 }
 
+type RawCell = string | number | null | undefined;
+type RawRow = RawCell[];
+
 interface ParsedTransaction {
     date: Date;
     description: string;
@@ -56,7 +59,7 @@ interface ParsedTransaction {
     category: string;
     isValid: boolean;
     error?: string;
-    originalRow: any;
+    originalRow: RawRow;
     paymentMethod: string;
 }
 
@@ -66,7 +69,7 @@ export function ImportView() {
     const [step, setStep] = useState<ImportStep>('upload');
     const [file, setFile] = useState<File | null>(null);
     const [headers, setHeaders] = useState<string[]>([]);
-    const [originalData, setOriginalData] = useState<any[][]>([]); // Raw data rows
+    const [originalData, setOriginalData] = useState<RawRow[]>([]);
     const [headerRowIndex, setHeaderRowIndex] = useState(0);
 
     const [mapping, setMapping] = useState<ColumnMapping>({
@@ -134,7 +137,7 @@ export function ImportView() {
 
         setHeaderRowIndex(index);
         setHeaders(headers);
-        setOriginalData(rawData);
+        setOriginalData(rawData as RawRow[]);
 
         // Auto-detect columns based on detected headers
         const lowerHeaders = headers.map(h => h.toLowerCase());
@@ -259,7 +262,7 @@ export function ImportView() {
         const dataRows = originalData.slice(headerRowIndex + 1);
 
         // Helper to find value by column name
-        const getValue = (row: any[], colName: string) => {
+        const getValue = (row: RawRow, colName: string): RawCell => {
             if (!colName) return undefined;
             const colIdx = headers.indexOf(colName);
             if (colIdx === -1) return undefined;
@@ -268,7 +271,7 @@ export function ImportView() {
 
         const parsed = dataRows.map((row) => {
             // Skip empty rows
-            if (!row || row.length === 0 || row.every((c: any) => !c)) return null;
+            if (!row || row.length === 0 || row.every((c) => !c)) return null;
 
             const dateStr = getValue(row, mapping.date);
             const descStr = getValue(row, mapping.description);

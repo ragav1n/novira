@@ -41,7 +41,8 @@ export function Component({ isSignUp = false }: { isSignUp?: boolean }) {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [name, setName] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [focusedInput, setFocusedInput] = useState(null);
+  type FocusedInput = "name" | "email" | "password" | "confirmPassword" | null;
+  const [focusedInput, setFocusedInput] = useState<FocusedInput>(null);
 
   // For 3D card effect - Optimized with spring for smoothness and reduced main-thread load
   const mouseX = useMotionValue(0);
@@ -521,7 +522,7 @@ export function Component({ isSignUp = false }: { isSignUp?: boolean }) {
                           placeholder="Full Name"
                           value={name}
                           onChange={(e) => setName(e.target.value)}
-                          onFocus={() => setFocusedInput("name" as any)}
+                          onFocus={() => setFocusedInput("name")}
                           onBlur={() => setFocusedInput(null)}
                           className="w-full bg-primary/10 border-transparent focus:border-primary/40 text-foreground placeholder:text-foreground/30 h-10 transition-all duration-300 pl-3 pr-3 focus:bg-primary/15"
                         />
@@ -558,7 +559,7 @@ export function Component({ isSignUp = false }: { isSignUp?: boolean }) {
                         placeholder="Email address"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
-                        onFocus={() => setFocusedInput("email" as any)}
+                        onFocus={() => setFocusedInput("email")}
                         onBlur={() => setFocusedInput(null)}
                         className="w-full bg-primary/10 border-transparent focus:border-primary/40 text-foreground placeholder:text-foreground/30 h-10 transition-all duration-300 pl-10 pr-3 focus:bg-primary/15"
                       />
@@ -595,7 +596,7 @@ export function Component({ isSignUp = false }: { isSignUp?: boolean }) {
                         placeholder="Password"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
-                        onFocus={() => setFocusedInput("password" as any)}
+                        onFocus={() => setFocusedInput("password")}
                         onBlur={() => setFocusedInput(null)}
                         className="w-full bg-primary/10 border-transparent focus:border-primary/40 text-foreground placeholder:text-foreground/30 h-10 transition-all duration-300 pl-10 pr-10 focus:bg-primary/15"
                       />
@@ -645,7 +646,7 @@ export function Component({ isSignUp = false }: { isSignUp?: boolean }) {
                           placeholder="Confirm Password"
                           value={confirmPassword}
                           onChange={(e) => setConfirmPassword(e.target.value)}
-                          onFocus={() => setFocusedInput("confirmPassword" as any)}
+                          onFocus={() => setFocusedInput("confirmPassword")}
                           onBlur={() => setFocusedInput(null)}
                           className="w-full bg-primary/10 border-transparent focus:border-primary/40 text-foreground placeholder:text-foreground/30 h-10 transition-all duration-300 pl-10 pr-10 focus:bg-primary/15"
                         />

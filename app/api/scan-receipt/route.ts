@@ -37,10 +37,6 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  if (process.env.NODE_ENV === 'development') {
-    console.log(`[scan-receipt] mimeType=${mediaType} size≈${Math.round(approxBytes / 1024)}KB`)
-  }
-
   const message = await client.messages.create({
     model: 'claude-haiku-4-5-20251001',
     max_tokens: 512,
@@ -87,10 +83,6 @@ Category definitions — pick the best match:
   })
 
   const text = message.content[0].type === 'text' ? message.content[0].text : ''
-  if (process.env.NODE_ENV === 'development') {
-    console.log(`[scan-receipt] response: ${text}`)
-  }
-
   const cleaned = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim()
   try {
     const data = JSON.parse(cleaned)
