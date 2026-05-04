@@ -507,6 +507,13 @@ export function AddExpenseView() {
                     categories={dropdownCategories}
                     selectedCategory={formState.selectedCategory}
                     onSelect={formState.setSelectedCategory}
+                    suggestedCategoryId={formState.suggestedCategory}
+                    onApplySuggestion={() => {
+                        if (formState.suggestedCategory) {
+                            formState.setSelectedCategory(formState.suggestedCategory);
+                            formState.setSuggestedCategory(null);
+                        }
+                    }}
                 />
 
                 {/* Personal Bucket Selection */}

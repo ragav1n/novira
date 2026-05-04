@@ -48,6 +48,8 @@ interface UserPreferencesContextType {
     setBudgetAlertsEnabled: (enabled: boolean) => Promise<void>;
     billReminderLeadDays: number | null;
     setBillReminderLeadDays: (days: number | null) => Promise<void>;
+    digestFrequency: 'off' | 'daily' | 'weekly';
+    setDigestFrequency: (freq: 'off' | 'daily' | 'weekly') => Promise<void>;
     monthlyBudget: number;
     setMonthlyBudget: (budget: number) => Promise<void>;
     avatarUrl: string | null;
@@ -60,6 +62,12 @@ interface UserPreferencesContextType {
     ratesLastUpdated: number | null;
     CURRENCY_SYMBOLS: Record<Currency, string>;
     CURRENCY_DETAILS: Record<Currency, { name: string; symbol: string }>;
+
+    // Privacy Mode (per-device, not synced)
+    privacyMode: boolean;                       // user has opted into masking
+    setPrivacyMode: (enabled: boolean) => void;
+    isPrivacyHidden: boolean;                   // currently masking (privacyMode && hidden)
+    togglePrivacyHidden: () => void;
     
     // Joint Workspaces
     activeWorkspaceId: string | null;
@@ -111,6 +119,7 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
     const [currency, setCurrencyState] = useState<Currency>('INR');
     const [budgetAlertsEnabled, setBudgetAlertsEnabledState] = useState(false);
     const [billReminderLeadDays, setBillReminderLeadDaysState] = useState<number | null>(null);
+    const [digestFrequency, setDigestFrequencyState] = useState<'off' | 'daily' | 'weekly'>('off');
     const [monthlyBudget, setMonthlyBudgetState] = useState(DEFAULT_BUDGETS.INR);
     const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
     const [fullName, setFullName] = useState<string>('User');
@@ -121,6 +130,10 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
     // Joint Workspaces State
     const [activeWorkspaceId, setActiveWorkspaceId] = useState<string | null>(null);
     const [workspaceBudgets, setWorkspaceBudgets] = useState<Record<string, { amount: number; currency: string }>>({});
+
+    // Privacy Mode State (per-device localStorage; not in profile so each device is independent)
+    const [privacyMode, setPrivacyModeState] = useState(false);
+    const [isPrivacyHidden, setIsPrivacyHidden] = useState(false);
 
     const processRecurringExpenses = useCallback(async (uid: string) => {
         try {
@@ -149,6 +162,7 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
                     if (parsed.currency) setCurrencyState(parsed.currency);
                     if (parsed.budget_alerts !== null) setBudgetAlertsEnabledState(parsed.budget_alerts);
                     if (parsed.bill_reminder_lead_days !== undefined) setBillReminderLeadDaysState(parsed.bill_reminder_lead_days);
+                    if (parsed.digest_frequency) setDigestFrequencyState(parsed.digest_frequency);
                     if (parsed.monthly_budget != null) setMonthlyBudgetState(parsed.monthly_budget);
                     if (parsed.avatar_url) setAvatarUrl(parsed.avatar_url);
                     if (parsed.budgets) setBudgets(parsed.budgets);
@@ -166,7 +180,7 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
 
             const { data, error } = await supabase
                 .from('profiles')
-                .select('currency, budget_alerts, bill_reminder_lead_days, monthly_budget, budgets, avatar_url, full_name')
+                .select('currency, budget_alerts, bill_reminder_lead_days, digest_frequency, monthly_budget, budgets, avatar_url, full_name')
                 .eq('id', uid)
                 .single();
 
@@ -176,6 +190,8 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
                 if ((data as { bill_reminder_lead_days?: number | null }).bill_reminder_lead_days !== undefined) {
                     setBillReminderLeadDaysState((data as { bill_reminder_lead_days?: number | null }).bill_reminder_lead_days ?? null);
                 }
+                const digestVal = (data as { digest_frequency?: 'off' | 'daily' | 'weekly' | null }).digest_frequency;
+                if (digestVal) setDigestFrequencyState(digestVal);
                 if (data.monthly_budget != null) setMonthlyBudgetState(data.monthly_budget);
                 if (data.avatar_url) setAvatarUrl(data.avatar_url);
                 if (data.budgets) setBudgets(data.budgets as Record<string, number>);
@@ -241,6 +257,33 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
     useEffect(() => {
         userIdRef.current = userId;
     }, [userId]);
+
+    // Hydrate privacyMode from localStorage on mount; auto-mask when the tab is hidden.
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        const stored = localStorage.getItem('novira_privacy_mode') === '1';
+        setPrivacyModeState(stored);
+        setIsPrivacyHidden(stored);
+        const onVisibility = () => {
+            if (localStorage.getItem('novira_privacy_mode') !== '1') return;
+            if (document.visibilityState === 'hidden') setIsPrivacyHidden(true);
+        };
+        document.addEventListener('visibilitychange', onVisibility);
+        return () => document.removeEventListener('visibilitychange', onVisibility);
+    }, []);
+
+    const setPrivacyMode = useCallback((enabled: boolean) => {
+        setPrivacyModeState(enabled);
+        setIsPrivacyHidden(enabled);
+        try {
+            if (enabled) localStorage.setItem('novira_privacy_mode', '1');
+            else localStorage.removeItem('novira_privacy_mode');
+        } catch { /* ignore */ }
+    }, []);
+
+    const togglePrivacyHidden = useCallback(() => {
+        setIsPrivacyHidden(prev => !prev);
+    }, []);
 
     // Initialize Auth and Listen for Changes
     useEffect(() => {
@@ -364,6 +407,10 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
 
     const formatCurrency = useCallback((amount: number, currencyOverride?: string) => {
         const targetCurrency = currencyOverride || currency;
+        if (isPrivacyHidden) {
+            const symbol = CURRENCY_SYMBOLS[targetCurrency as Currency] || '$';
+            return `${symbol}••••`;
+        }
 
         const locales: Record<string, string> = {
             EUR: 'en-IE',
@@ -398,7 +445,7 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
         }
 
         return `${symbol}${formatter.format(amount)}`;
-    }, [currency]);
+    }, [currency, isPrivacyHidden]);
 
     const convertAmount = useCallback((amount: number, fromCurrency: string, toCurrency?: string): number => {
         if (!fromCurrency) return amount;
@@ -474,6 +521,30 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
             } catch { /* ignore */ }
         }
     }, [userId]);
+
+    const setDigestFrequency = useCallback(async (freq: 'off' | 'daily' | 'weekly') => {
+        setDigestFrequencyState(freq);
+        if (userId) {
+            const cacheKey = `novira_profile_${userId}`;
+            try {
+                const cached = localStorage.getItem(cacheKey);
+                const parsed = cached ? JSON.parse(cached) : {};
+                localStorage.setItem(cacheKey, JSON.stringify({ ...parsed, digest_frequency: freq }));
+            } catch { /* ignore */ }
+
+            try {
+                const { error } = await supabase
+                    .from('profiles')
+                    .update({ digest_frequency: freq })
+                    .eq('id', userId);
+                if (error) throw error;
+            } catch (error) {
+                console.error('Error updating digest frequency:', error);
+                toast.error('Failed to update digest preference');
+                refreshPreferences();
+            }
+        }
+    }, [userId, refreshPreferences]);
 
     const setBillReminderLeadDays = useCallback(async (days: number | null) => {
         setBillReminderLeadDaysState(days);
@@ -607,6 +678,8 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
         setBudgetAlertsEnabled,
         billReminderLeadDays,
         setBillReminderLeadDays,
+        digestFrequency,
+        setDigestFrequency,
         monthlyBudget,
         setMonthlyBudget,
         avatarUrl,
@@ -623,7 +696,11 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
         setActiveWorkspaceId: setActiveWorkspaceIdWithCache,
         workspaceBudgets,
         convertedWorkspaceBudgets,
-        setWorkspaceBudget
+        setWorkspaceBudget,
+        privacyMode,
+        setPrivacyMode,
+        isPrivacyHidden,
+        togglePrivacyHidden
     }), [
         user,
         userId,
@@ -637,6 +714,8 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
         setBudgetAlertsEnabled,
         billReminderLeadDays,
         setBillReminderLeadDays,
+        digestFrequency,
+        setDigestFrequency,
         monthlyBudget,
         setMonthlyBudget,
         avatarUrl,
@@ -647,7 +726,11 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
         activeWorkspaceId,
         workspaceBudgets,
         convertedWorkspaceBudgets,
-        setWorkspaceBudget
+        setWorkspaceBudget,
+        privacyMode,
+        setPrivacyMode,
+        isPrivacyHidden,
+        togglePrivacyHidden
     ]);
 
     return (

@@ -3,9 +3,10 @@
 import React from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { HelpCircle, Plus, UserCircle, Heart, Home, Users } from 'lucide-react';
+import { Eye, EyeOff, HelpCircle, Plus, UserCircle, Heart, Home, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { FluidDropdown } from '@/components/ui/fluid-dropdown';
+import { useUserPreferences } from '@/components/providers/user-preferences-provider';
 
 interface WorkspaceHeaderProps {
     userName: string;
@@ -31,6 +32,7 @@ export function WorkspaceHeader({
     isHomeWorkspace
 }: WorkspaceHeaderProps) {
     const router = useRouter();
+    const { privacyMode, isPrivacyHidden, togglePrivacyHidden } = useUserPreferences();
 
     return (
         <div className="flex justify-between items-center pt-2 gap-2 relative z-[70]">
@@ -97,6 +99,16 @@ export function WorkspaceHeader({
                         userName.substring(0, 2)
                     )}
                 </button>
+                {privacyMode && (
+                    <button
+                        onClick={togglePrivacyHidden}
+                        aria-label={isPrivacyHidden ? 'Reveal amounts' : 'Hide amounts'}
+                        className="w-10 h-10 rounded-full bg-secondary/20 hover:bg-secondary/40 flex items-center justify-center border border-white/5 transition-colors shrink-0"
+                        title={isPrivacyHidden ? 'Reveal amounts' : 'Hide amounts'}
+                    >
+                        {isPrivacyHidden ? <Eye className="w-5 h-5 text-white/70" /> : <EyeOff className="w-5 h-5 text-white/70" />}
+                    </button>
+                )}
                 <button
                     onClick={() => setIsHowToUseOpen(true)}
                     className="w-10 h-10 rounded-full bg-secondary/20 hover:bg-secondary/40 flex items-center justify-center border border-white/5 transition-colors shrink-0"

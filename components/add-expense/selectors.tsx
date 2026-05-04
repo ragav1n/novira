@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Tag, Plane, Home, Gift, Car, Utensils, ShoppingCart, Heart, Gamepad2, School, Laptop, Music } from 'lucide-react';
+import { Sparkles, X, Tag, Plane, Home, Gift, Car, Utensils, ShoppingCart, Heart, Gamepad2, School, Laptop, Music } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { FluidDropdown, type Category } from '@/components/ui/fluid-dropdown';
 import type { Bucket } from '@/components/providers/buckets-provider';
@@ -12,12 +12,30 @@ interface CategorySelectorProps {
     categories: Category[];
     selectedCategory: string;
     onSelect: (id: string) => void;
+    suggestedCategoryId?: string | null;
+    onApplySuggestion?: () => void;
 }
 
-export function CategorySelector({ categories, selectedCategory, onSelect }: CategorySelectorProps) {
+export function CategorySelector({ categories, selectedCategory, onSelect, suggestedCategoryId, onApplySuggestion }: CategorySelectorProps) {
+    const suggestion = suggestedCategoryId
+        ? categories.find(c => c.id === suggestedCategoryId)
+        : null;
+
     return (
         <div className="space-y-2">
-            <p className="text-sm font-medium">Category *</p>
+            <div className="flex items-center justify-between gap-2">
+                <p className="text-sm font-medium">Category *</p>
+                {suggestion && onApplySuggestion && (
+                    <button
+                        type="button"
+                        onClick={onApplySuggestion}
+                        className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary/15 hover:bg-primary/25 border border-primary/30 text-primary text-[11px] font-medium transition-colors"
+                    >
+                        <Sparkles className="w-3 h-3" />
+                        <span>Try {suggestion.label}</span>
+                    </button>
+                )}
+            </div>
             <FluidDropdown
                 items={categories}
                 activeId={selectedCategory}

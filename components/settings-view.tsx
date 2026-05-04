@@ -60,7 +60,11 @@ export function SettingsView() {
         user,
         activeWorkspaceId,
         setAvatarUrl: setAvatarUrlProvider,
-        CURRENCY_DETAILS
+        CURRENCY_DETAILS,
+        privacyMode,
+        setPrivacyMode,
+        digestFrequency,
+        setDigestFrequency,
     } = useUserPreferences();
 
     const { buckets } = useBucketsList();
@@ -500,6 +504,10 @@ export function SettingsView() {
                     billReminderLeadDays={billReminderLeadDays}
                     setBillReminderLeadDays={setBillReminderLeadDays}
                     push={push}
+                    privacyMode={privacyMode}
+                    setPrivacyMode={setPrivacyMode}
+                    digestFrequency={digestFrequency}
+                    setDigestFrequency={setDigestFrequency}
                 />
 
                 <AnimatePresence>

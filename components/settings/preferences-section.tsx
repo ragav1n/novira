@@ -1,6 +1,6 @@
 'use client';
 
-import { AlertTriangle, Banknote, Bell, RefreshCcw, SlidersHorizontal } from 'lucide-react';
+import { AlertTriangle, Banknote, Bell, EyeOff, Newspaper, RefreshCcw, SlidersHorizontal } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { CurrencyDropdown } from '@/components/ui/currency-dropdown';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -18,6 +18,10 @@ interface Props {
     billReminderLeadDays: number | null;
     setBillReminderLeadDays: (days: number | null) => void;
     push: PushState;
+    privacyMode: boolean;
+    setPrivacyMode: (enabled: boolean) => void;
+    digestFrequency: 'off' | 'daily' | 'weekly';
+    setDigestFrequency: (freq: 'off' | 'daily' | 'weekly') => Promise<void> | void;
 }
 
 export function PreferencesSection({
@@ -28,6 +32,10 @@ export function PreferencesSection({
     billReminderLeadDays,
     setBillReminderLeadDays,
     push,
+    privacyMode,
+    setPrivacyMode,
+    digestFrequency,
+    setDigestFrequency,
 }: Props) {
     return (
         <div className="space-y-3 pt-2">
@@ -64,6 +72,20 @@ export function PreferencesSection({
                     />
                 </div>
 
+                <div className="flex items-center justify-between p-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                        <EyeOff className="w-4 h-4 text-muted-foreground shrink-0" />
+                        <div className="min-w-0">
+                            <p className="text-sm font-medium">Privacy Mode</p>
+                            <p className="text-[11px] text-muted-foreground">Hide amounts; tap eye in header to reveal</p>
+                        </div>
+                    </div>
+                    <Switch
+                        checked={privacyMode}
+                        onCheckedChange={setPrivacyMode}
+                    />
+                </div>
+
                 {push.isSupported && (
                     <div className="flex items-center justify-between p-3">
                         <div className="flex items-center gap-3 min-w-0">
@@ -93,6 +115,33 @@ export function PreferencesSection({
                                 }
                             }}
                         />
+                    </div>
+                )}
+
+                {push.isSupported && push.isSubscribed && (
+                    <div className="flex items-center justify-between p-3">
+                        <div className="flex items-center gap-3 min-w-0">
+                            <Newspaper className="w-4 h-4 text-muted-foreground shrink-0" />
+                            <div className="min-w-0">
+                                <p className="text-sm font-medium">Spending Digest</p>
+                                <p className="text-[11px] text-muted-foreground">
+                                    Recap of your recent spending
+                                </p>
+                            </div>
+                        </div>
+                        <Select
+                            value={digestFrequency}
+                            onValueChange={(val) => setDigestFrequency(val as 'off' | 'daily' | 'weekly')}
+                        >
+                            <SelectTrigger className="w-[120px] h-9 rounded-xl bg-secondary/20 border-white/10 text-xs font-bold">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="off">Off</SelectItem>
+                                <SelectItem value="daily">Daily</SelectItem>
+                                <SelectItem value="weekly">Weekly</SelectItem>
+                            </SelectContent>
+                        </Select>
                     </div>
                 )}
 

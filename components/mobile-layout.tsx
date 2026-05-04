@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { Home, Plus, BarChart2, Search, Settings, Users, Calendar, Target, Menu } from 'lucide-react';
+import { Home, Plus, BarChart2, Search, Settings, Users, Calendar, CalendarDays, Target, Menu } from 'lucide-react';
 import Image from 'next/image';
 import { ExpandableTabs } from '@/components/ui/expandable-tabs';
 import { Toaster } from 'sonner';
@@ -24,6 +24,7 @@ const DESKTOP_NAV = [
     { title: 'Analytics',icon: BarChart2, route: '/analytics' },
     { title: 'Groups',   icon: Users,    route: '/groups' },
     { title: 'Subs',     icon: Calendar, route: '/subscriptions' },
+    { title: 'Cash Flow',icon: CalendarDays, route: '/calendar' },
     { title: 'Goals',    icon: Target,   route: '/goals' },
     { title: 'Search',   icon: Search,   route: '/search' },
     { title: 'Settings', icon: Settings, route: '/settings' },
@@ -334,13 +335,14 @@ export function MobileLayout({ children, defaultIsDesktop = false }: { children:
         { title: "Analytics", icon: BarChart2 },
         { title: "Groups", icon: Users },
         { title: "Subs", icon: Calendar },
+        { title: "Cash Flow", icon: CalendarDays },
         { title: "Goals", icon: Target },
         { title: "Search", icon: Search },
         { type: "separator" } as const,
         { title: "Settings", icon: Settings },
     ];
 
-    const routes = ['/', '/add', '/analytics', '/groups', '/subscriptions', '/goals', '/search', null, '/settings'];
+    const routes = ['/', '/add', '/analytics', '/groups', '/subscriptions', '/calendar', '/goals', '/search', null, '/settings'];
 
     const pathname = usePathname();
     const isPublicPage = ['/privacy', '/terms'].includes(pathname);
@@ -358,7 +360,7 @@ export function MobileLayout({ children, defaultIsDesktop = false }: { children:
 
     useEffect(() => {
         if (!isAuthenticated) return;
-        const navRoutes = ['/add', '/analytics', '/groups', '/subscriptions', '/goals', '/search', '/settings'];
+        const navRoutes = ['/add', '/analytics', '/groups', '/subscriptions', '/calendar', '/goals', '/search', '/settings'];
         navRoutes.forEach(route => router.prefetch(route));
 
         import('@/components/analytics-view').catch(() => {});

@@ -7,7 +7,7 @@ import { useUserPreferences } from '@/components/providers/user-preferences-prov
 import { useWorkspaceTheme } from '@/hooks/useWorkspaceTheme';
 import { supabase } from '@/lib/supabase';
 import { Card, CardContent } from '@/components/ui/card';
-import { Calendar, RotateCw, Trash2, ArrowLeft, Tag, X } from 'lucide-react';
+import { Calendar, RotateCw, Trash2, ArrowLeft, Tag, X, TrendingUp, TrendingDown } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useBucketsList } from '@/components/providers/buckets-provider';
 import { getBucketIcon } from '@/utils/icon-utils';
@@ -39,6 +39,10 @@ export function SubscriptionsView() {
     const [loading, setLoading] = useState(true);
     const [cancelTarget, setCancelTarget] = useState<string | null>(null);
 
+    type PriceChange = { lastAmount: number; lastDate: string; pctChange: number; templateAmount: number };
+    const [priceChanges, setPriceChanges] = useState<Record<string, PriceChange>>({});
+    const [updateTarget, setUpdateTarget] = useState<{ template: RecurringTemplateWithMeta; change: PriceChange } | null>(null);
+
     const loadTemplates = useCallback(async () => {
         if (!userId) return;
         setLoading(true);
@@ -66,6 +70,81 @@ export function SubscriptionsView() {
     useEffect(() => {
         loadTemplates();
     }, [loadTemplates]);
+
+    // Detect silent price changes: compare each active template's amount against
+    // the most recent matching transaction. Flag if drift > 5% so the user can
+    // bump the template before the next charge cycle.
+    useEffect(() => {
+        if (!userId || templates.length === 0) {
+            setPriceChanges({});
+            return;
+        }
+        let cancelled = false;
+        (async () => {
+            const active = templates.filter(t => t.is_active);
+            const results: Record<string, PriceChange> = {};
+            await Promise.all(active.map(async (t) => {
+                try {
+                    const escapedDesc = t.description.replace(/[%_\\]/g, '\\$&');
+                    let q = supabase
+                        .from('transactions')
+                        .select('amount, date, currency')
+                        .eq('user_id', userId)
+                        .eq('category', t.category)
+                        .ilike('description', escapedDesc)
+                        .order('date', { ascending: false })
+                        .limit(1);
+                    if (activeWorkspaceId && activeWorkspaceId !== 'personal') {
+                        q = q.eq('group_id', activeWorkspaceId);
+                    } else if (activeWorkspaceId === 'personal') {
+                        q = q.is('group_id', null);
+                    }
+                    const { data } = await q;
+                    if (!data || data.length === 0) return;
+                    const last = data[0];
+                    const lastAmt = Number(last.amount);
+                    const tplAmt = Number(t.amount);
+                    if (!lastAmt || !tplAmt) return;
+                    if ((last.currency || 'USD').toUpperCase() !== (t.currency || 'USD').toUpperCase()) return;
+                    const pct = ((lastAmt - tplAmt) / tplAmt) * 100;
+                    if (Math.abs(pct) >= 5) {
+                        results[t.id] = {
+                            lastAmount: lastAmt,
+                            lastDate: last.date,
+                            pctChange: pct,
+                            templateAmount: tplAmt,
+                        };
+                    }
+                } catch (error) {
+                    console.error('Error checking price change for template', t.id, error);
+                }
+            }));
+            if (!cancelled) setPriceChanges(results);
+        })();
+        return () => { cancelled = true; };
+    }, [templates, userId, activeWorkspaceId]);
+
+    const handleApplyPriceChange = async () => {
+        if (!updateTarget) return;
+        const { template, change } = updateTarget;
+        setTemplates(prev => prev.map(t => t.id === template.id ? { ...t, amount: change.lastAmount } : t));
+        setPriceChanges(prev => {
+            const next = { ...prev };
+            delete next[template.id];
+            return next;
+        });
+        const { error } = await supabase
+            .from('recurring_templates')
+            .update({ amount: change.lastAmount })
+            .eq('id', template.id);
+        if (error) {
+            toast.error('Failed to update price');
+            loadTemplates();
+        } else {
+            toast.success('Subscription price updated');
+        }
+        setUpdateTarget(null);
+    };
 
     // Real-time subscription for recurring templates
     useEffect(() => {
@@ -277,6 +356,27 @@ export function SubscriptionsView() {
                                 </div>
                                 <div className="flex flex-col items-end gap-2 shrink-0">
                                     <span className="font-bold text-base">{formatCurrency(template.amount, template.currency)}</span>
+                                    {priceChanges[template.id] && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setUpdateTarget({ template, change: priceChanges[template.id] })}
+                                            className={cn(
+                                                "inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] font-bold transition-colors",
+                                                priceChanges[template.id].pctChange > 0
+                                                    ? "bg-rose-500/15 border-rose-500/30 text-rose-300 hover:bg-rose-500/25"
+                                                    : "bg-emerald-500/15 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/25"
+                                            )}
+                                            aria-label="Update template price"
+                                        >
+                                            {priceChanges[template.id].pctChange > 0
+                                                ? <TrendingUp className="w-3 h-3" aria-hidden="true" />
+                                                : <TrendingDown className="w-3 h-3" aria-hidden="true" />}
+                                            <span>
+                                                {priceChanges[template.id].pctChange > 0 ? '+' : ''}
+                                                {priceChanges[template.id].pctChange.toFixed(0)}%
+                                            </span>
+                                        </button>
+                                    )}
                                     <button
                                         onClick={() => setCancelTarget(template.id)}
                                         className="text-rose-400 hover:text-rose-300 opacity-0 group-hover:opacity-100 transition-opacity p-1"
@@ -318,6 +418,35 @@ export function SubscriptionsView() {
             
             </div>
         </motion.div>
+
+        <AlertDialog open={!!updateTarget} onOpenChange={(open) => !open && setUpdateTarget(null)}>
+            <AlertDialogContent className="bg-card/95 backdrop-blur-xl border-white/10 rounded-3xl">
+                <AlertDialogHeader>
+                    <AlertDialogTitle>Update subscription price?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        {updateTarget && (
+                            <>
+                                Most recent <span className="font-semibold text-foreground">{updateTarget.template.description}</span> charge was{' '}
+                                <span className="font-bold text-foreground">{formatCurrency(updateTarget.change.lastAmount, updateTarget.template.currency)}</span>{' '}
+                                on {format(parseISO(updateTarget.change.lastDate), 'MMM d, yyyy')}.
+                                Template currently shows{' '}
+                                <span className="font-bold text-foreground">{formatCurrency(updateTarget.change.templateAmount, updateTarget.template.currency)}</span>.
+                                Update template to match the new price?
+                            </>
+                        )}
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel onClick={() => setUpdateTarget(null)}>Keep current</AlertDialogCancel>
+                    <AlertDialogAction
+                        className={cn("border", themeConfig.bgSolid, themeConfig.borderSolid, themeConfig.textWhite, themeConfig.hoverBg)}
+                        onClick={handleApplyPriceChange}
+                    >
+                        Update price
+                    </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
 
         <AlertDialog open={!!cancelTarget} onOpenChange={(open) => !open && setCancelTarget(null)}>
             <AlertDialogContent className="bg-card/95 backdrop-blur-xl border-white/10 rounded-3xl">

@@ -4,11 +4,12 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
     ChevronLeft, Search, SlidersHorizontal, Tag, Plane, Home, Gift,
     Car, Utensils, ShoppingCart, Heart, Gamepad2, School, Laptop, Music,
-    X, Check, Calendar as CalendarIcon, Filter, Shirt
+    X, Check, Calendar as CalendarIcon, Filter, Shirt, CheckSquare, Square, Trash2
 } from "lucide-react";
 import { CATEGORY_COLORS, getIconForCategory, CATEGORIES as SYSTEM_CATEGORIES } from '@/lib/categories';
 import { TransactionRow } from '@/components/transaction-row';
 import { Transaction } from '@/types/transaction';
+import { enqueueMutation } from '@/lib/sync-manager';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Input } from '@/components/ui/input';
@@ -129,6 +130,53 @@ export function SearchView() {
     const [knownTags, setKnownTags] = useState<string[]>([]);
     const [sortBy, setSortBy] = useState<SortOption>('date-desc');
     const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
+
+    // Bulk-edit mode state
+    const [bulkMode, setBulkMode] = useState(false);
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+    const [isRecategorizeOpen, setIsRecategorizeOpen] = useState(false);
+
+    const exitBulkMode = useCallback(() => {
+        setBulkMode(false);
+        setSelectedIds(new Set());
+    }, []);
+
+    const toggleSelection = useCallback((id: string) => {
+        setSelectedIds(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id); else next.add(id);
+            return next;
+        });
+    }, []);
+
+    const bulkDelete = useCallback(async () => {
+        if (selectedIds.size === 0) return;
+        const ids = [...selectedIds];
+        try {
+            await Promise.all(ids.map(id => enqueueMutation('DELETE_TRANSACTION', { id })));
+            toast.success(`Deleted ${ids.length} transaction${ids.length === 1 ? '' : 's'}`);
+            setFilteredTransactions(prev => prev.filter(t => !selectedIds.has(t.id)));
+            exitBulkMode();
+        } catch (error) {
+            console.error('Bulk delete failed:', error);
+            toast.error('Failed to delete some transactions');
+        }
+    }, [selectedIds, exitBulkMode]);
+
+    const bulkRecategorize = useCallback(async (categoryId: string) => {
+        if (selectedIds.size === 0) return;
+        const ids = [...selectedIds];
+        try {
+            await Promise.all(ids.map(id => enqueueMutation('UPDATE_TRANSACTION', { id, patch: { category: categoryId } })));
+            toast.success(`Recategorized ${ids.length} transaction${ids.length === 1 ? '' : 's'}`);
+            setFilteredTransactions(prev => prev.map(t => selectedIds.has(t.id) ? { ...t, category: categoryId } : t));
+            setIsRecategorizeOpen(false);
+            exitBulkMode();
+        } catch (error) {
+            console.error('Bulk recategorize failed:', error);
+            toast.error('Failed to recategorize some transactions');
+        }
+    }, [selectedIds, exitBulkMode]);
 
     // Dynamic Max Price calculation
     const [maxPossiblePrice, setMaxPossiblePrice] = useState(1000);
@@ -390,6 +438,20 @@ export function SearchView() {
                         <div className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full border-2 border-primary border-t-transparent animate-spin" aria-hidden="true" />
                     )}
                 </div>
+
+                <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => bulkMode ? exitBulkMode() : setBulkMode(true)}
+                    className={cn(
+                        "h-10 w-10 shrink-0 rounded-xl bg-secondary/10 border-white/10",
+                        bulkMode && `${themeConfig.bgMedium} ${themeConfig.borderMedium} ${themeConfig.text}`
+                    )}
+                    aria-label={bulkMode ? 'Exit selection mode' : 'Enter selection mode'}
+                    title={bulkMode ? 'Exit selection mode' : 'Select multiple'}
+                >
+                    <CheckSquare className="w-4 h-4" />
+                </Button>
 
                 <Sheet open={isFilterSheetOpen} onOpenChange={setIsFilterSheetOpen}>
                     <SheetTrigger asChild>
@@ -696,7 +758,8 @@ export function SearchView() {
                                     const myShare = calculateUserShare(tx, userId);
                                     const showConverted = !!(tx.currency && tx.currency.toUpperCase() !== currency.toUpperCase());
                                     const color = CATEGORY_COLORS[tx.category?.toLowerCase()] || CATEGORY_COLORS.uncategorized;
-                                    return (
+                                    const isSelected = selectedIds.has(tx.id);
+                                    const row = (
                                         <TransactionRow
                                             key={tx.id}
                                             tx={tx}
@@ -713,6 +776,26 @@ export function SearchView() {
                                             onEdit={() => {}}
                                             onDelete={() => {}}
                                         />
+                                    );
+                                    if (!bulkMode) return row;
+                                    return (
+                                        <div
+                                            key={tx.id}
+                                            onClick={() => toggleSelection(tx.id)}
+                                            className={cn(
+                                                "relative flex items-center gap-2 cursor-pointer rounded-xl transition-colors",
+                                                isSelected && `${themeConfig.bgMedium}`
+                                            )}
+                                        >
+                                            <div className="pl-2 shrink-0">
+                                                {isSelected
+                                                    ? <CheckSquare className={cn("w-5 h-5", themeConfig.text)} />
+                                                    : <Square className="w-5 h-5 text-muted-foreground" />}
+                                            </div>
+                                            <div className="flex-1 min-w-0 pointer-events-none">
+                                                {row}
+                                            </div>
+                                        </div>
                                     );
                                 })
                         ) : (
@@ -737,6 +820,68 @@ export function SearchView() {
                 </div>
             </div>
             </div>
+
+            {/* Bulk action bar */}
+            <AnimatePresence>
+                {bulkMode && selectedIds.size > 0 && (
+                    <motion.div
+                        initial={{ y: 60, opacity: 0 }}
+                        animate={{ y: 0, opacity: 1 }}
+                        exit={{ y: 60, opacity: 0 }}
+                        transition={{ type: 'spring', stiffness: 280, damping: 28 }}
+                        className="fixed bottom-20 lg:bottom-6 left-1/2 -translate-x-1/2 z-[80] flex items-center gap-2 px-3 py-2 rounded-2xl bg-card/95 backdrop-blur-xl border border-white/10 shadow-2xl"
+                    >
+                        <span className="text-xs font-semibold px-2">{selectedIds.size} selected</span>
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setIsRecategorizeOpen(true)}
+                            className="h-8 rounded-lg bg-secondary/20 border-white/10 text-xs"
+                        >
+                            <Tag className="w-3.5 h-3.5 mr-1.5" /> Recategorize
+                        </Button>
+                        <Button
+                            size="sm"
+                            onClick={bulkDelete}
+                            className="h-8 rounded-lg bg-rose-500/20 border border-rose-500/30 text-rose-300 hover:bg-rose-500/30 text-xs"
+                        >
+                            <Trash2 className="w-3.5 h-3.5 mr-1.5" /> Delete
+                        </Button>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            <Sheet open={isRecategorizeOpen} onOpenChange={setIsRecategorizeOpen}>
+                <SheetContent side="bottom" className="border-white/5 bg-background rounded-t-2xl">
+                    <SheetHeader>
+                        <SheetTitle>Recategorize {selectedIds.size}</SheetTitle>
+                        <SheetDescription>Pick a new category for the selected transactions.</SheetDescription>
+                    </SheetHeader>
+                    <div className="grid grid-cols-1 gap-2 max-h-[60vh] overflow-y-auto py-4">
+                        {categories.map(cat => (
+                            <button
+                                key={cat.id}
+                                type="button"
+                                onClick={() => bulkRecategorize(cat.id)}
+                                className="flex items-center gap-3 p-3 rounded-xl border bg-secondary/10 border-white/5 hover:border-white/20 transition-colors text-left"
+                            >
+                                <div
+                                    className="w-8 h-8 rounded-full flex items-center justify-center border"
+                                    style={{
+                                        backgroundColor: `${CATEGORY_COLORS[cat.id] || '#8A2BE2'}20`,
+                                        borderColor: `${CATEGORY_COLORS[cat.id] || '#8A2BE2'}40`,
+                                    }}
+                                >
+                                    {React.cloneElement(getIconForCategory(cat.id) as React.ReactElement<{ style?: React.CSSProperties }>, {
+                                        style: { color: CATEGORY_COLORS[cat.id] || '#8A2BE2' },
+                                    })}
+                                </div>
+                                <span className="text-sm font-medium">{cat.label}</span>
+                            </button>
+                        ))}
+                    </div>
+                </SheetContent>
+            </Sheet>
         </motion.div>
     );
 }
