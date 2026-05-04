@@ -65,7 +65,8 @@ export function GoalsView() {
             .from('savings_goals')
             .select('*')
             .eq('user_id', userId)
-            .order('created_at', { ascending: false });
+            .order('created_at', { ascending: false })
+            .limit(200);
 
         if (activeWorkspaceId && activeWorkspaceId !== 'personal') {
             query = query.eq('group_id', activeWorkspaceId);

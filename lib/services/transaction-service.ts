@@ -97,20 +97,18 @@ export const TransactionService = {
                 }
             }
 
-            // Step 2: Fallback to ExchangeRate-API
+            // Step 2: Fallback to ExchangeRate-API via the server proxy so the
+            // upstream API key stays server-side.
             if (!rate) {
-                const API_KEY = process.env.NEXT_PUBLIC_EXCHANGERATE_API_KEY;
-                if (API_KEY) {
-                    const isToday = format(new Date(), 'yyyy-MM-dd') === dateStr;
-                    const url = isToday
-                        ? `https://v6.exchangerate-api.com/v6/${API_KEY}/latest/${from}`
-                        : `https://v6.exchangerate-api.com/v6/${API_KEY}/history/${from}/${format(date, 'yyyy/MM/dd')}`;
+                const isToday = format(new Date(), 'yyyy-MM-dd') === dateStr;
+                const url = isToday
+                    ? `/api/exchange-rate?from=${from}`
+                    : `/api/exchange-rate?from=${from}&date=${dateStr}`;
 
-                    const response = await fetch(url);
-                    if (response.ok) {
-                        const data = await response.json();
-                        rate = data.conversion_rates?.[to] ?? null;
-                    }
+                const response = await fetch(url);
+                if (response.ok) {
+                    const data = await response.json();
+                    rate = data.conversion_rates?.[to] ?? null;
                 }
             }
 

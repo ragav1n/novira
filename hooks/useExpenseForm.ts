@@ -1,18 +1,70 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 
+// Persist a subset of the form to sessionStorage so an accidental refresh or
+// background-tab eviction doesn't lose what the user typed. Workspace + user
+// scoping keeps drafts from one context bleeding into another.
+const DRAFT_KEY_PREFIX = 'novira_expense_draft';
+
+type DraftShape = {
+    amount: string;
+    description: string;
+    notes: string;
+    selectedCategory: string;
+    paymentMethod: 'Cash' | 'Debit Card' | 'Credit Card' | 'UPI' | 'Bank Transfer';
+    txCurrency: string;
+    selectedBucketId: string | null;
+    placeName: string | null;
+    placeAddress: string | null;
+    placeLat: number | null;
+    placeLng: number | null;
+    tags: string[];
+    excludeFromAllowance: boolean;
+    isRecurring: boolean;
+    frequency: 'daily' | 'weekly' | 'monthly' | 'yearly';
+    date: string | null;
+};
+
+function readDraft(key: string): Partial<DraftShape> | null {
+    if (typeof window === 'undefined') return null;
+    try {
+        const raw = sessionStorage.getItem(key);
+        if (!raw) return null;
+        return JSON.parse(raw) as Partial<DraftShape>;
+    } catch {
+        return null;
+    }
+}
+
 export function useExpenseForm(userId: string | null | undefined, defaultCurrency: string, activeWorkspaceId: string | null = null, defaultSplitEnabled: boolean = !!activeWorkspaceId) {
-    const [selectedCategory, setSelectedCategory] = useState('food');
-    const [amount, setAmount] = useState('');
-    const [description, setDescription] = useState('');
-    const [notes, setNotes] = useState('');
-    const [date, setDate] = useState<Date | undefined>(new Date());
-    const [paymentMethod, setPaymentMethod] = useState<'Cash' | 'Debit Card' | 'Credit Card' | 'UPI' | 'Bank Transfer'>('Cash');
-    const [txCurrency, setTxCurrency] = useState(defaultCurrency);
-    const [selectedBucketId, setSelectedBucketId] = useState<string | null>(null);
+    const draftKey = `${DRAFT_KEY_PREFIX}_${userId ?? 'anon'}_${activeWorkspaceId ?? 'personal'}`;
+    // Lazy-init: only read sessionStorage once on mount, not on every render.
+    const initialDraftRef = useRef<Partial<DraftShape> | null>(null);
+    if (initialDraftRef.current === null) {
+        initialDraftRef.current = readDraft(draftKey) ?? {};
+    }
+    const initialDraft = initialDraftRef.current;
+    const hadDraftCurrencyRef = useRef(!!initialDraft.txCurrency);
+
+    const [selectedCategory, setSelectedCategory] = useState(initialDraft.selectedCategory ?? 'food');
+    const [amount, setAmount] = useState(initialDraft.amount ?? '');
+    const [description, setDescription] = useState(initialDraft.description ?? '');
+    const [notes, setNotes] = useState(initialDraft.notes ?? '');
+    const [date, setDate] = useState<Date | undefined>(
+        initialDraft.date ? new Date(initialDraft.date) : new Date()
+    );
+    const [paymentMethod, setPaymentMethod] = useState<'Cash' | 'Debit Card' | 'Credit Card' | 'UPI' | 'Bank Transfer'>(
+        initialDraft.paymentMethod ?? 'Cash'
+    );
+    const [txCurrency, setTxCurrency] = useState(initialDraft.txCurrency ?? defaultCurrency);
+    const [selectedBucketId, setSelectedBucketId] = useState<string | null>(initialDraft.selectedBucketId ?? null);
 
     useEffect(() => {
-        setTxCurrency(defaultCurrency);
+        // Only force-reset to the user's preferred currency if the draft on mount
+        // didn't carry one — otherwise we'd overwrite the user's in-progress choice.
+        if (!hadDraftCurrencyRef.current) {
+            setTxCurrency(defaultCurrency);
+        }
     }, [defaultCurrency]);
 
     // Splitting State
@@ -23,23 +75,58 @@ export function useExpenseForm(userId: string | null | undefined, defaultCurrenc
     const [customAmounts, setCustomAmounts] = useState<Record<string, string>>({});
 
     // Recurring State
-    const [isRecurring, setIsRecurring] = useState(false);
-    const [frequency, setFrequency] = useState<'daily' | 'weekly' | 'monthly' | 'yearly'>('monthly');
+    const [isRecurring, setIsRecurring] = useState(initialDraft?.isRecurring ?? false);
+    const [frequency, setFrequency] = useState<'daily' | 'weekly' | 'monthly' | 'yearly'>(initialDraft?.frequency ?? 'monthly');
 
     // Exclusion State
-    const [excludeFromAllowance, setExcludeFromAllowance] = useState(false);
+    const [excludeFromAllowance, setExcludeFromAllowance] = useState(initialDraft?.excludeFromAllowance ?? false);
 
     // Location State
-    const [placeName, setPlaceName] = useState<string | null>(null);
-    const [placeAddress, setPlaceAddress] = useState<string | null>(null);
-    const [placeLat, setPlaceLat] = useState<number | null>(null);
-    const [placeLng, setPlaceLng] = useState<number | null>(null);
+    const [placeName, setPlaceName] = useState<string | null>(initialDraft?.placeName ?? null);
+    const [placeAddress, setPlaceAddress] = useState<string | null>(initialDraft?.placeAddress ?? null);
+    const [placeLat, setPlaceLat] = useState<number | null>(initialDraft?.placeLat ?? null);
+    const [placeLng, setPlaceLng] = useState<number | null>(initialDraft?.placeLng ?? null);
     const [suggestedLocations, setSuggestedLocations] = useState<{ name: string, address: string, lat: number, lng: number, type: 'last' | 'frequent' | 'category' }[]>([]);
 
     // Tag State
-    const [tags, setTags] = useState<string[]>([]);
+    const [tags, setTags] = useState<string[]>(initialDraft?.tags ?? []);
     const [knownTags, setKnownTags] = useState<string[]>([]);
     const [suggestedCategory, setSuggestedCategory] = useState<string | null>(null);
+
+    // Persist the current draft. Debounced so rapid typing doesn't thrash storage.
+    const draftWriteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        if (draftWriteTimerRef.current) clearTimeout(draftWriteTimerRef.current);
+        draftWriteTimerRef.current = setTimeout(() => {
+            // Only persist if the user has typed something meaningful — empty drafts
+            // shouldn't pollute storage when the user just opens the screen.
+            const hasContent = !!amount || !!description || !!notes || !!placeName || tags.length > 0;
+            if (!hasContent) {
+                sessionStorage.removeItem(draftKey);
+                return;
+            }
+            try {
+                const draft: DraftShape = {
+                    amount, description, notes, selectedCategory, paymentMethod,
+                    txCurrency, selectedBucketId, placeName, placeAddress,
+                    placeLat, placeLng, tags, excludeFromAllowance, isRecurring,
+                    frequency,
+                    date: date ? date.toISOString() : null,
+                };
+                sessionStorage.setItem(draftKey, JSON.stringify(draft));
+            } catch {
+                // sessionStorage may be full or disabled — silently no-op
+            }
+        }, 300);
+        return () => {
+            if (draftWriteTimerRef.current) clearTimeout(draftWriteTimerRef.current);
+        };
+    }, [
+        draftKey, amount, description, notes, selectedCategory, paymentMethod,
+        txCurrency, selectedBucketId, placeName, placeAddress, placeLat, placeLng,
+        tags, excludeFromAllowance, isRecurring, frequency, date,
+    ]);
 
     // Smart Location Memory: Suggest locations from previous transactions
     useEffect(() => {
@@ -235,6 +322,9 @@ export function useExpenseForm(userId: string | null | undefined, defaultCurrenc
         setPlaceLng(null);
         setTags([]);
         setSuggestedCategory(null);
+        if (typeof window !== 'undefined') {
+            try { sessionStorage.removeItem(draftKey); } catch { /* noop */ }
+        }
     };
 
     return {

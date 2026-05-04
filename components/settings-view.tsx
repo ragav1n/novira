@@ -412,7 +412,7 @@ export function SettingsView() {
                         <div className="relative group self-start">
                             <div className="w-16 h-16 rounded-2xl bg-primary flex items-center justify-center text-xl font-bold shadow-lg shadow-primary/20 text-white uppercase overflow-hidden relative">
                                 {avatarUrl ? (
-                                    <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                                    <img src={avatarUrl} alt="Avatar" width={64} height={64} className="w-full h-full object-cover" />
                                 ) : (
                                     fullName ? fullName.substring(0, 2) : userEmail.substring(0, 2)
                                 )}

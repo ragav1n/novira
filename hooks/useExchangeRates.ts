@@ -7,6 +7,34 @@ const FRANKFURTER_SUPPORTED = [
 ];
 
 const CACHE_TTL = 60 * 60 * 1000; // 1 hour
+const STALE_PRUNE_THRESHOLD = 24 * 60 * 60 * 1000; // 24h — entries older than this are evicted
+
+// Drop stale entries for currencies the user no longer uses, so the cache can't
+// grow unboundedly across sessions where the user has cycled through 20 currencies.
+function pruneStaleCaches() {
+    if (typeof window === 'undefined') return;
+    const now = Date.now();
+    try {
+        const toRemove: string[] = [];
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (!key || !key.startsWith('novira_rates_')) continue;
+            try {
+                const raw = localStorage.getItem(key);
+                if (!raw) continue;
+                const parsed = JSON.parse(raw) as { timestamp?: number };
+                if (typeof parsed.timestamp === 'number' && now - parsed.timestamp > STALE_PRUNE_THRESHOLD) {
+                    toRemove.push(key);
+                }
+            } catch {
+                toRemove.push(key);
+            }
+        }
+        toRemove.forEach(k => localStorage.removeItem(k));
+    } catch {
+        // localStorage unavailable — no-op
+    }
+}
 
 export type ExchangeRatesState = {
     rates: Record<string, number>;
@@ -18,8 +46,8 @@ export function useExchangeRates(currency: string): ExchangeRatesState {
     const [state, setState] = useState<ExchangeRatesState>({ rates: {}, lastUpdated: null });
 
     useEffect(() => {
+        pruneStaleCaches();
         const cacheKey = `novira_rates_${currency}`;
-        const API_KEY = process.env.NEXT_PUBLIC_EXCHANGERATE_API_KEY;
 
         let hasFreshCache = false;
         try {
@@ -54,9 +82,9 @@ export function useExchangeRates(currency: string): ExchangeRatesState {
                 }
             }
 
-            if (!ratesRes && API_KEY) {
+            if (!ratesRes) {
                 try {
-                    const response = await fetch(`https://v6.exchangerate-api.com/v6/${API_KEY}/latest/${currency}`);
+                    const response = await fetch(`/api/exchange-rate?from=${currency}`);
                     if (response.ok) {
                         const data = await response.json();
                         if (data.result === 'success') {

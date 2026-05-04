@@ -289,8 +289,17 @@ export function GroupsProvider({ children }: { children: React.ReactNode }) {
         };
     }, []);
 
+    // Generation counter so callbacks from a stale (replaced-but-not-yet-removed)
+    // channel during rapid sign-in/out don't kick off refetches against the wrong userId.
+    const realtimeGenRef = useRef(0);
+
     useEffect(() => {
         if (!userId) return;
+        const myGen = ++realtimeGenRef.current;
+        const guarded = (fn: () => void) => () => {
+            if (realtimeGenRef.current !== myGen) return;
+            fn();
+        };
 
         // Initial fetch
         refreshData();
@@ -301,35 +310,36 @@ export function GroupsProvider({ children }: { children: React.ReactNode }) {
 
         // Listen for settlement broadcasts from other users
         const settlementChannel = supabase
-            .channel(`settlement-notify-${userId}`)
-            .on('broadcast', { event: 'settled' }, () => {
+            .channel(`settlement-notify-${userId}-${myGen}`)
+            .on('broadcast', { event: 'settled' }, guarded(() => {
                 debouncedRefresh();
                 window.dispatchEvent(new Event('novira:expense-added'));
-            })
+            }))
             .subscribe();
 
         let channel: ReturnType<typeof supabase.channel> | null = null;
 
         const timer = setTimeout(() => {
-            channel = supabase.channel(`realtime-groups-${userId}`)
+            if (realtimeGenRef.current !== myGen) return;
+            channel = supabase.channel(`realtime-groups-${userId}-${myGen}`)
                 // splits: no filter — a split can belong to any user involved in the transaction
-                .on('postgres_changes', { event: '*', schema: 'public', table: 'splits' }, () => {
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'splits' }, guarded(() => {
                     debouncedRefresh();
                     // Also refresh the dashboard so settlement transactions appear immediately
                     window.dispatchEvent(new Event('novira:expense-added'));
-                })
-                .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions', filter: `user_id=eq.${userId}` }, () => {
+                }))
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions', filter: `user_id=eq.${userId}` }, guarded(() => {
                     debouncedRefresh();
-                })
-                .on('postgres_changes', { event: '*', schema: 'public', table: 'groups' }, () => {
+                }))
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'groups' }, guarded(() => {
                     debouncedRefresh();
-                })
-                .on('postgres_changes', { event: '*', schema: 'public', table: 'group_members' }, () => {
+                }))
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'group_members' }, guarded(() => {
                     debouncedRefresh();
-                })
-                .on('postgres_changes', { event: '*', schema: 'public', table: 'friendships' }, () => {
+                }))
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'friendships' }, guarded(() => {
                     debouncedRefresh();
-                })
+                }))
                 .subscribe((status, err) => {
                     // Suppress noisy errors when the device is simply offline — Supabase
                     // surfaces a CHANNEL_ERROR with no payload as soon as the websocket

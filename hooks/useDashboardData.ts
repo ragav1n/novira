@@ -74,6 +74,7 @@ export function useDashboardData(
     const loadTxRef = useRef<((uid: string, workspaceId: string | null, limit?: number) => Promise<void>) | null>(null);
     const loadLimitRef = useRef(PAGE_SIZE);
     const mutatingRef = useRef(false);
+    const recurringToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const TX_SELECT = 'id, description, amount, category, date, created_at, user_id, group_id, currency, exchange_rate, base_currency, bucket_id, exclude_from_allowance, is_recurring, is_settlement, place_name, place_address, place_lat, place_lng, tags, profile:profiles(full_name, avatar_url), splits(user_id, amount, is_paid)';
 
@@ -168,6 +169,7 @@ export function useDashboardData(
     useEffect(() => {
         return () => {
             if (txDebounceRef.current) clearTimeout(txDebounceRef.current);
+            if (recurringToastTimerRef.current) clearTimeout(recurringToastTimerRef.current);
         };
     }, []);
 
@@ -198,23 +200,11 @@ export function useDashboardData(
         const onQueueUpdated = () => loadPendingFromQueue();
         const onMutationSynced = (e: Event) => {
             const detail = (e as CustomEvent<{ id: string; type: string }>).detail;
-            // Re-fetch from server so the dashboard catches up immediately. Realtime
-            // usually delivers the row, but after a long offline period the websocket
-            // can be in a stale state and miss it.
-            //
-            // For ADD: keep the pending row visible until the fetch completes — otherwise
-            // there's a flicker where the row vanishes while we wait for the server roundtrip.
-            // For UPDATE/DELETE: the optimistic UI is already on the server's data shape,
-            // so we just refresh.
             if (detail?.type === 'ADD_FULL_TRANSACTION') {
-                if (userId) {
-                    Promise.resolve(loadTxRef.current?.(userId, activeWorkspaceId))
-                        .finally(() => {
-                            setPendingTransactions(prev => prev.filter(t => t.id !== detail.id));
-                        });
-                } else {
-                    setPendingTransactions(prev => prev.filter(t => t.id !== detail.id));
-                }
+                // Remove pending row first so the realtime INSERT (which arrives with
+                // the server-side id) doesn't briefly visually duplicate it.
+                setPendingTransactions(prev => prev.filter(t => t.id !== detail.id));
+                if (userId) loadTxRef.current?.(userId, activeWorkspaceId);
             } else if (detail?.type === 'UPDATE_TRANSACTION' || detail?.type === 'DELETE_TRANSACTION') {
                 if (userId) loadTxRef.current?.(userId, activeWorkspaceId);
             }
@@ -454,7 +444,9 @@ export function useDashboardData(
 
             // If recurring, ask if user wants to stop future ones
             if (tx.is_recurring) {
-                setTimeout(async () => {
+                if (recurringToastTimerRef.current) clearTimeout(recurringToastTimerRef.current);
+                recurringToastTimerRef.current = setTimeout(async () => {
+                    recurringToastTimerRef.current = null;
                     // Find the matching template first to get a specific ID
                     const { data: templates } = await supabase
                         .from('recurring_templates')

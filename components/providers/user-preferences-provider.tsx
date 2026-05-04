@@ -137,8 +137,11 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
 
     const loadPreferences = useCallback(async (uid: string) => {
         try {
-            // First, hydrate from localStorage for instant UI feedback
+            // First, hydrate from localStorage for instant UI feedback.
+            // Active workspace is stored under its own key so rapid workspace switches
+            // can't lose-clobber a currency/budget update happening in parallel.
             const cacheKey = `novira_profile_${uid}`;
+            const workspaceKey = `novira_active_workspace_${uid}`;
             const cached = localStorage.getItem(cacheKey);
             if (cached) {
                 try {
@@ -149,11 +152,17 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
                     if (parsed.monthly_budget != null) setMonthlyBudgetState(parsed.monthly_budget);
                     if (parsed.avatar_url) setAvatarUrl(parsed.avatar_url);
                     if (parsed.budgets) setBudgets(parsed.budgets);
-                    if (parsed.active_workspace_id) setActiveWorkspaceId(parsed.active_workspace_id);
+                    // Migration: if active_workspace_id was previously stored in the
+                    // consolidated blob, surface it so the new dedicated key takes over.
+                    if (parsed.active_workspace_id && !localStorage.getItem(workspaceKey)) {
+                        localStorage.setItem(workspaceKey, parsed.active_workspace_id);
+                    }
                 } catch {
                     localStorage.removeItem(cacheKey);
                 }
             }
+            const storedWorkspace = localStorage.getItem(workspaceKey);
+            if (storedWorkspace) setActiveWorkspaceId(storedWorkspace);
 
             const { data, error } = await supabase
                 .from('profiles')
@@ -296,12 +305,17 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
         };
     }, [handleSession, processRecurringExpenses]);
 
-    // Realtime subscriptions for profile and workspace budgets
+    // Realtime subscriptions for profile and workspace budgets.
+    // Use a generation counter so callbacks from a stale subscription (rapid workspace
+    // switch faster than removeChannel resolves) don't trigger refetches against the
+    // wrong userId/workspace.
+    const realtimeGenRef = useRef(0);
     useEffect(() => {
         if (!userId) return;
+        const myGen = ++realtimeGenRef.current;
 
         const profileChannel = supabase
-            .channel(`profile-changes-${userId}`)
+            .channel(`profile-changes-${userId}-${myGen}`)
             .on(
                 'postgres_changes',
                 {
@@ -311,13 +325,14 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
                     filter: `id=eq.${userId}`
                 },
                 () => {
+                    if (realtimeGenRef.current !== myGen) return;
                     loadPreferences(userId);
                 }
             )
             .subscribe();
 
         const workspaceChannel = supabase
-            .channel(`workspace-budget-changes-${userId}-${activeWorkspaceId || 'personal'}`)
+            .channel(`workspace-budget-changes-${userId}-${activeWorkspaceId || 'personal'}-${myGen}`)
             .on(
                 'postgres_changes',
                 {
@@ -326,6 +341,7 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
                     table: 'workspace_budgets'
                 },
                 () => {
+                    if (realtimeGenRef.current !== myGen) return;
                     loadPreferences(userId);
                 }
             )
@@ -335,7 +351,7 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
             supabase.removeChannel(profileChannel);
             supabase.removeChannel(workspaceChannel);
         };
-    }, [userId, loadPreferences]);
+    }, [userId, activeWorkspaceId, loadPreferences]);
 
     const refreshPreferences = useCallback(async () => {
         if (userId) {
@@ -451,16 +467,11 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
     const setActiveWorkspaceIdWithCache = useCallback((id: string | null) => {
         setActiveWorkspaceId(id);
         if (userId) {
-            const cacheKey = `novira_profile_${userId}`;
-            const cached = localStorage.getItem(cacheKey);
-            if (cached) {
-                try {
-                    const parsed = JSON.parse(cached);
-                    localStorage.setItem(cacheKey, JSON.stringify({ ...parsed, active_workspace_id: id }));
-                } catch {
-                    localStorage.setItem(cacheKey, JSON.stringify({ active_workspace_id: id }));
-                }
-            }
+            const workspaceKey = `novira_active_workspace_${userId}`;
+            try {
+                if (id) localStorage.setItem(workspaceKey, id);
+                else localStorage.removeItem(workspaceKey);
+            } catch { /* ignore */ }
         }
     }, [userId]);
 

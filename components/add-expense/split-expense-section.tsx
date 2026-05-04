@@ -149,7 +149,7 @@ export function SplitExpenseSection({
                                 >
                                     <div className="w-10 h-10 rounded-full overflow-hidden border border-white/5 relative">
                                         {friend.avatar_url ? (
-                                            <img src={friend.avatar_url} alt={friend.full_name} className="w-full h-full object-cover" />
+                                            <img src={friend.avatar_url} alt={friend.full_name} width={40} height={40} className="w-full h-full object-cover" />
                                         ) : (
                                             <div className="w-full h-full flex items-center justify-center bg-secondary/30">
                                                 <User className="w-5 h-5" />
@@ -183,7 +183,7 @@ export function SplitExpenseSection({
                                             <div className="flex items-center gap-2 min-w-[100px]">
                                                 <div className="w-7 h-7 rounded-full overflow-hidden border border-white/5 shrink-0">
                                                     {friend.avatar_url ? (
-                                                        <img src={friend.avatar_url} alt={friend.full_name} className="w-full h-full object-cover" />
+                                                        <img src={friend.avatar_url} alt={friend.full_name} width={28} height={28} className="w-full h-full object-cover" />
                                                     ) : (
                                                         <div className="w-full h-full flex items-center justify-center bg-secondary/30">
                                                             <User className="w-3.5 h-3.5" />

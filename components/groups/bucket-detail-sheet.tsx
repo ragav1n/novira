@@ -322,7 +322,7 @@ export function BucketDetailSheet({ bucket, spent, open, onOpenChange }: Props) 
                                                     <div className="w-7 h-7 rounded-full bg-primary/15 border border-primary/20 flex items-center justify-center text-[11px] font-bold text-primary shrink-0 overflow-hidden">
                                                         {m.avatar ? (
                                                             // eslint-disable-next-line @next/next/no-img-element
-                                                            <img src={m.avatar} alt="" className="w-full h-full object-cover" />
+                                                            <img src={m.avatar} alt="" width={28} height={28} className="w-full h-full object-cover" />
                                                         ) : (
                                                             m.name.charAt(0).toUpperCase()
                                                         )}

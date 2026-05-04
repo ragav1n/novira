@@ -384,8 +384,11 @@ export function SearchView() {
                             setSearchQuery(e.target.value);
                             if (e.target.value.length === 0) toast.haptic(ImpactStyle.Light);
                         }}
-                        className={`pl-9 bg-secondary/10 border-white/10 h-10 rounded-xl ${themeConfig.ring}`}
+                        className={`pl-9 pr-9 bg-secondary/10 border-white/10 h-10 rounded-xl ${themeConfig.ring}`}
                     />
+                    {(searchQuery !== debouncedSearchQuery || (loading && !!searchQuery)) && (
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full border-2 border-primary border-t-transparent animate-spin" aria-hidden="true" />
+                    )}
                 </div>
 
                 <Sheet open={isFilterSheetOpen} onOpenChange={setIsFilterSheetOpen}>

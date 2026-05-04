@@ -538,7 +538,11 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency, 
                     `;
 
                     if (avatarImg) {
-                        badge.innerHTML = `<img src="${avatarImg}" style="width: 100%; height: 100%; object-fit: cover;" />`;
+                        const avatarEl = document.createElement('img');
+                        avatarEl.src = avatarImg;
+                        avatarEl.style.cssText = 'width: 100%; height: 100%; object-fit: cover;';
+                        avatarEl.alt = '';
+                        badge.appendChild(avatarEl);
                     } else {
                         badge.innerText = abbr;
                     }

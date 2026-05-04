@@ -11,11 +11,20 @@ import { toast } from '@/utils/haptics';
 
 interface AddFriendDialogProps {
     userId: string | null;
+    /** When provided, the dialog is fully controlled and the default trigger button is hidden. */
+    open?: boolean;
+    onOpenChange?: (open: boolean) => void;
 }
 
-export function AddFriendDialog({ userId }: AddFriendDialogProps) {
+export function AddFriendDialog({ userId, open, onOpenChange }: AddFriendDialogProps) {
     const { addFriendByEmail, addFriendById } = useGroups();
-    const [isOpen, setIsOpen] = useState(false);
+    const isControlled = open !== undefined;
+    const [internalOpen, setInternalOpen] = useState(false);
+    const isOpen = isControlled ? open! : internalOpen;
+    const setIsOpen = (next: boolean) => {
+        if (isControlled) onOpenChange?.(next);
+        else setInternalOpen(next);
+    };
     const [friendEmail, setFriendEmail] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
 
@@ -42,11 +51,13 @@ export function AddFriendDialog({ userId }: AddFriendDialogProps) {
 
     return (
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
-            <DialogTrigger asChild>
-                <button className="p-2 rounded-full bg-primary/20 hover:bg-primary/30 text-primary transition-colors border border-primary/20">
-                    <UserPlus className="w-5 h-5" />
-                </button>
-            </DialogTrigger>
+            {!isControlled && (
+                <DialogTrigger asChild>
+                    <button className="p-2 rounded-full bg-primary/20 hover:bg-primary/30 text-primary transition-colors border border-primary/20">
+                        <UserPlus className="w-5 h-5" />
+                    </button>
+                </DialogTrigger>
+            )}
             <DialogContent className="max-w-[400px] w-[95vw] rounded-3xl border-white/10 bg-card/90 backdrop-blur-xl p-0 overflow-hidden shadow-2xl">
                 <div className="p-6 space-y-4 w-full max-w-full overflow-hidden flex flex-col box-border">
                     <DialogHeader className="text-left px-0 w-full">

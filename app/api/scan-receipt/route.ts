@@ -84,11 +84,46 @@ Category definitions — pick the best match:
 
   const text = message.content[0].type === 'text' ? message.content[0].text : ''
   const cleaned = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim()
+  let parsed: unknown
   try {
-    const data = JSON.parse(cleaned)
-    return NextResponse.json(data)
+    parsed = JSON.parse(cleaned)
   } catch (err) {
     console.error('[scan-receipt] JSON parse failed', { err, raw: text })
     return NextResponse.json({ error: 'Could not parse receipt' }, { status: 422 })
   }
+
+  if (!parsed || typeof parsed !== 'object') {
+    return NextResponse.json({ error: 'Receipt response missing fields' }, { status: 422 })
+  }
+
+  const r = parsed as Record<string, unknown>
+  const amount = typeof r.amount === 'number' && Number.isFinite(r.amount) && r.amount >= 0 ? r.amount : null
+  if (amount === null) {
+    return NextResponse.json({ error: 'Receipt amount could not be read' }, { status: 422 })
+  }
+
+  const VALID_CATEGORIES = new Set([
+    'food', 'groceries', 'transport', 'fashion', 'beauty', 'healthcare',
+    'rent', 'bills', 'shopping', 'entertainment', 'education', 'others',
+  ])
+  const category = typeof r.category === 'string' && VALID_CATEGORIES.has(r.category) ? r.category : 'others'
+  const description = typeof r.description === 'string' ? r.description.slice(0, 80) : ''
+  const date = typeof r.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(r.date) ? r.date : null
+  const time = typeof r.time === 'string' && /^\d{2}:\d{2}$/.test(r.time) ? r.time : null
+  const currency = typeof r.currency === 'string' && /^[A-Z]{3}$/.test(r.currency) ? r.currency : null
+  const is_online = typeof r.is_online === 'boolean' ? r.is_online : false
+  const place_name = typeof r.place_name === 'string' ? r.place_name : null
+  const place_address = typeof r.place_address === 'string' ? r.place_address : null
+
+  return NextResponse.json({
+    amount,
+    description,
+    date,
+    time,
+    currency,
+    is_online,
+    place_name,
+    place_address,
+    category,
+  })
 }

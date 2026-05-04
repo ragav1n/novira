@@ -3,6 +3,18 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
 import { generateRecap, VALID_PERIOD_RE } from '@/lib/recap-generator';
 
+// VALID_PERIOD_RE allows shapes like "2099-99" or "0000-13". Bound the numeric
+// pieces here so callers can't trigger needlessly expensive queries.
+function isValidMonthPeriod(value: string): boolean {
+    if (!VALID_PERIOD_RE.test(value)) return false;
+    const year = parseInt(value.slice(0, 4), 10);
+    if (year < 2000 || year > 2100) return false;
+    const tail = value.slice(5);
+    if (tail === 'FY') return true;
+    const month = parseInt(tail, 10);
+    return month >= 1 && month <= 12;
+}
+
 // GET /api/recap                   → list of months the user has stored recaps for
 // GET /api/recap?month=YYYY-MM     → stored recap for that month, or 404
 export async function GET(req: NextRequest) {
@@ -14,7 +26,7 @@ export async function GET(req: NextRequest) {
     const month = url.searchParams.get('month');
 
     if (month) {
-        if (!VALID_PERIOD_RE.test(month)) {
+        if (!isValidMonthPeriod(month)) {
             return NextResponse.json({ error: 'month must be YYYY-MM or YYYY-FY' }, { status: 400 });
         }
         const { data, error } = await supabase
@@ -51,7 +63,7 @@ export async function POST(req: NextRequest) {
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const { month, currency, force } = (await req.json()) as { month?: string; currency?: string; force?: boolean };
-    if (!month || !VALID_PERIOD_RE.test(month)) {
+    if (!month || !isValidMonthPeriod(month)) {
         return NextResponse.json({ error: 'month must be YYYY-MM or YYYY-FY' }, { status: 400 });
     }
     const baseCurrency = (currency || 'USD').toUpperCase();
@@ -85,7 +97,7 @@ export async function PATCH(req: NextRequest) {
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const { month } = (await req.json()) as { month?: string };
-    if (!month || !VALID_PERIOD_RE.test(month)) {
+    if (!month || !isValidMonthPeriod(month)) {
         return NextResponse.json({ error: 'month must be YYYY-MM or YYYY-FY' }, { status: 400 });
     }
     const { error } = await supabase

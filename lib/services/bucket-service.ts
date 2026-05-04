@@ -25,7 +25,8 @@ export const BucketService = {
         let query = supabase
             .from('transactions')
             .select('id, amount, category, currency, bucket_id, exchange_rate, base_currency, user_id, group_id, splits(user_id, amount)')
-            .not('bucket_id', 'is', null);
+            .not('bucket_id', 'is', null)
+            .limit(5000);
 
         if (workspaceId && workspaceId !== 'personal') {
             query = query.eq('group_id', workspaceId);

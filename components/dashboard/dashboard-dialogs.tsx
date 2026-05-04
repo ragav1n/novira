@@ -25,6 +25,7 @@ import dynamic from 'next/dynamic';
 import { WelcomeModal } from '@/components/welcome-modal';
 import { FeatureAnnouncementModal } from '@/components/feature-announcement-modal';
 import { LATEST_FEATURE_ANNOUNCEMENT } from '@/lib/feature-flags';
+import { UIBoundary } from '@/components/boundaries/ui-boundary';
 
 const LocationPicker = dynamic(
     () => import('@/components/ui/location-picker').then(mod => mod.LocationPicker),
@@ -282,14 +283,18 @@ export function DashboardDialogs({
                 </DialogContent>
             </Dialog>
 
-            <ExpenseMapView 
-                isOpen={isMapOpen}
-                onClose={() => setIsMapOpen(false)}
-                transactions={transactions}
-                formatCurrency={formatCurrency}
-                convertAmount={convertAmount}
-                currency={currency}
-            />
+            {isMapOpen && (
+                <UIBoundary onReset={() => setIsMapOpen(false)}>
+                    <ExpenseMapView
+                        isOpen={isMapOpen}
+                        onClose={() => setIsMapOpen(false)}
+                        transactions={transactions}
+                        formatCurrency={formatCurrency}
+                        convertAmount={convertAmount}
+                        currency={currency}
+                    />
+                </UIBoundary>
+            )}
 
             <WelcomeModal
                 isOpen={activeModal === 'welcome'}

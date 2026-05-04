@@ -283,25 +283,52 @@ self.addEventListener('fetch', (event) => {
 
     // --- 2. API Data Layer (Stale-While-Revalidate) ---
     if (url.hostname.includes('supabase.co') || url.hostname.includes('frankfurter')) {
-         event.respondWith(
+        // Exchange-rate hosts get a 6h max-age. Without it, a single bad upstream
+        // response could be served from cache for days until the SW version bumps.
+        const RATE_API_MAX_AGE_MS = 6 * 60 * 60 * 1000;
+        const isRateApi = url.hostname.includes('frankfurter');
+
+        event.respondWith(
             caches.open(CACHE_NAME).then((cache) => {
                 return cache.match(request).then((cachedResponse) => {
                     const fetchPromise = fetch(request).then((networkResponse) => {
                         if (networkResponse.ok) {
-                            cache.put(request, networkResponse.clone());
+                            // Stamp a cached-at header on rate-API responses so we
+                            // can age them out without bumping the cache version.
+                            if (isRateApi) {
+                                const stamped = new Response(networkResponse.clone().body, {
+                                    status: networkResponse.status,
+                                    statusText: networkResponse.statusText,
+                                    headers: (() => {
+                                        const h = new Headers(networkResponse.headers);
+                                        h.set('x-novira-cached-at', String(Date.now()));
+                                        return h;
+                                    })(),
+                                });
+                                cache.put(request, stamped);
+                            } else {
+                                cache.put(request, networkResponse.clone());
+                            }
                         }
                         return networkResponse;
                     }).catch(() => {
                          // Network failed, silently fail over to cached if available
                          return cachedResponse;
                     });
-                    
+
                     if (cachedResponse) {
-                        // Return the cached response immediately, but flagged
-                        // The network promise will still run in the background
+                        if (isRateApi) {
+                            const stamped = cachedResponse.headers.get('x-novira-cached-at');
+                            const cachedAt = stamped ? parseInt(stamped, 10) : 0;
+                            if (!cachedAt || (Date.now() - cachedAt) > RATE_API_MAX_AGE_MS) {
+                                // Cache expired — wait for fresh network instead of serving stale.
+                                return fetchPromise;
+                            }
+                        }
+                        // Return the cached response immediately; network refresh runs in background.
                         return addXFromCacheHeader(cachedResponse.clone());
                     }
-                    
+
                     // If no cache, wait for the network
                     return fetchPromise;
                 });

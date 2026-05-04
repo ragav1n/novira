@@ -18,6 +18,7 @@ import { SpendingOverview } from './dashboard/spending-overview';
 import { TransactionListSection } from './dashboard/transaction-list-section';
 import { DashboardDialogs } from './dashboard/dashboard-dialogs';
 import { DashboardSkeleton } from './dashboard/dashboard-skeleton';
+import { AddFriendDialog } from './groups/add-friend-dialog';
 
 
 
@@ -43,11 +44,12 @@ export function DashboardView() {
     }, []);
 
     const router = useRouter();
-    const { 
-        formatCurrency, currency, convertAmount, monthlyBudget, setMonthlyBudget, 
-        userId, isRatesLoading, avatarUrl, fullName: userName, 
-        activeWorkspaceId, setActiveWorkspaceId, 
-        workspaceBudgets, convertedWorkspaceBudgets, setWorkspaceBudget 
+    const [isAddFriendOpen, setIsAddFriendOpen] = useState(false);
+    const {
+        formatCurrency, currency, convertAmount, monthlyBudget, setMonthlyBudget,
+        userId, isRatesLoading, avatarUrl, fullName: userName,
+        activeWorkspaceId, setActiveWorkspaceId,
+        workspaceBudgets, convertedWorkspaceBudgets, setWorkspaceBudget
     } = useUserPreferences();
     const { balances, groups, friends } = useGroups();
     const { buckets, bucketSpending } = useBuckets();
@@ -234,7 +236,7 @@ export function DashboardView() {
                                     Start a Group
                                 </button>
                                 <button
-                                    onClick={() => router.push('/groups')}
+                                    onClick={() => setIsAddFriendOpen(true)}
                                     className="flex-1 bg-transparent text-primary text-xs font-bold py-2.5 px-4 rounded-xl hover:bg-primary/10 transition-colors flex items-center justify-center gap-2 border border-primary/30"
                                 >
                                     <Users className="w-4 h-4" />
@@ -244,6 +246,7 @@ export function DashboardView() {
                         </CardContent>
                     </Card>
                 )}
+                <AddFriendDialog userId={userId} open={isAddFriendOpen} onOpenChange={setIsAddFriendOpen} />
 
                 <SpendingOverview
                     totalSpent={isBucketFocused ? (bucketSpending[dashboardFocus] ?? totalSpent) : totalSpent}

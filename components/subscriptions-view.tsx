@@ -46,7 +46,8 @@ export function SubscriptionsView() {
             .from('recurring_templates')
             .select('*')
             .eq('user_id', userId)
-            .order('next_occurrence', { ascending: true });
+            .order('next_occurrence', { ascending: true })
+            .limit(200);
 
         if (activeWorkspaceId && activeWorkspaceId !== 'personal') {
             query = query.eq('group_id', activeWorkspaceId);

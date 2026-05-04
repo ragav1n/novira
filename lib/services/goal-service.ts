@@ -67,38 +67,18 @@ export const GoalService = {
     },
 
     async addDeposit(userId: string, goalId: string, amount: number, currency: string) {
-        // Insert deposit
-        const { error: depositError } = await supabase
-            .from('savings_deposits')
-            .insert({
-                goal_id: goalId,
-                user_id: userId,
-                amount: amount,
-                currency: currency
-            });
+        // Atomic RPC: inserts the deposit and updates goal.current_amount in a single
+        // transaction so concurrent deposits (double-tap, two tabs) can't race.
+        const { data, error } = await supabase.rpc('add_savings_deposit_atomic', {
+            p_goal_id: goalId,
+            p_user_id: userId,
+            p_amount: amount,
+            p_currency: currency,
+        });
 
-        if (depositError) {
+        if (error || (data && (data as { success?: boolean }).success === false)) {
             toast.error('Failed to add deposit');
-            throw depositError;
-        }
-
-        // The current_amount update could be handled by a DB trigger, 
-        // but since the original code did it manually, I'll keep it for now 
-        // but ideally it should be atomic or server-side.
-        // For now, let's keep the client-side logic but centralized.
-        
-        // Fetch current amount first to be safe, or use RPC
-        const { data: goal } = await supabase.from('savings_goals').select('current_amount').eq('id', goalId).single();
-        if (goal) {
-             const { error: updateError } = await supabase
-                .from('savings_goals')
-                .update({ current_amount: Number(goal.current_amount) + amount })
-                .eq('id', goalId);
-                
-             if (updateError) {
-                 toast.error('Failed to update goal total');
-                 throw updateError;
-             }
+            throw error ?? new Error((data as { error?: string })?.error || 'Failed to add deposit');
         }
 
         toast.success('Deposit added successfully!');
