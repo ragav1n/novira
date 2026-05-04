@@ -1,21 +1,18 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { ChevronLeft, User, Download, AlertTriangle, Shield, Lock, ChevronRight, SlidersHorizontal, LogOut, Banknote, FileSpreadsheet, ShieldCheck, RefreshCcw, Camera, Trash2, Plus, Save, Wallet, Bell, Mail, Moon, Sun, Smartphone, Globe, CreditCard, Wrench } from 'lucide-react';
+import { ChevronLeft, User, Shield, ChevronRight, LogOut, Trash2, Wrench } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
-import { useUserPreferences, type Currency } from '@/components/providers/user-preferences-provider';
+import { useUserPreferences } from '@/components/providers/user-preferences-provider';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/lib/supabase';
 import { toast } from '@/utils/haptics';
-import { WaveLoader } from '@/components/ui/wave-loader';
 import { AlertBanner } from '@/components/ui/alert-banner';
 import { AnimatePresence, motion } from 'framer-motion';
 import { generateCSV, generatePDF } from '@/utils/export-utils';
-import { ChangePasswordDialog } from '@/components/change-password-dialog';
 import { FileTriggerButton } from '@/components/ui/file-trigger';
 import { DeleteAccountDialog } from '@/components/delete-account-dialog';
 import { ExportDateRangeModal } from '@/components/export-date-range-modal';
@@ -23,24 +20,15 @@ import { DateRange } from 'react-day-picker';
 import { format } from 'date-fns';
 import { useBucketsList } from '@/components/providers/buckets-provider';
 import { useGroups } from '@/components/providers/groups-provider';
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { BudgetAlertManager } from '@/components/budget-alert-manager';
 import { useSyncQueueState } from '@/hooks/use-sync-queue-state';
 import { useTransactionInvalidationListener } from '@/hooks/useTransactionInvalidationListener';
-import { retryFailedItem, discardFailedItem } from '@/lib/sync-manager';
-import { CurrencyDropdown } from '@/components/ui/currency-dropdown';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { RecurringTemplate } from '@/types/transaction';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
+import { RecurringExpensesSection } from '@/components/settings/recurring-expenses-section';
+import { DataManagementSection } from '@/components/settings/data-management-section';
+import { PreferencesSection } from '@/components/settings/preferences-section';
+import { SecuritySection } from '@/components/settings/security-section';
+import { FailedSyncSection } from '@/components/settings/failed-sync-section';
 
 export function SettingsView() {
     const router = useRouter();
@@ -86,7 +74,6 @@ export function SettingsView() {
     const [hasGoogleIdentity, setHasGoogleIdentity] = useState(false);
     const [recurringTemplates, setRecurringTemplates] = useState<RecurringTemplate[]>([]);
     const [loadingTemplates, setLoadingTemplates] = useState(true);
-    const [templateToDelete, setTemplateToDelete] = useState<RecurringTemplate | null>(null);
 
     const { failedItems, pending } = useSyncQueueState();
 
@@ -483,215 +470,37 @@ export function SettingsView() {
                     </div>
                 </div>
 
-                {/* Recurring Expenses Management */}
-                <div className="space-y-3 pt-2">
-                    <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
-                        <RefreshCcw className="w-4 h-4" />
-                        <span>Recurring Expenses</span>
-                    </div>
-                    <div className="bg-secondary/5 rounded-xl border border-white/5 divide-y divide-white/5 min-h-[48px]">
-                        {loadingTemplates ? (
-                            <>
-                                <div className="flex items-center justify-between p-3">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-8 h-8 rounded-full bg-secondary/20 animate-pulse" />
-                                        <div className="space-y-2">
-                                            <div className="h-3 w-32 rounded bg-secondary/20 animate-pulse" />
-                                            <div className="h-2 w-24 rounded bg-secondary/20 animate-pulse" />
-                                        </div>
-                                    </div>
-                                    <div className="h-8 w-8 rounded-full bg-secondary/20 animate-pulse" />
-                                </div>
-                                <div className="flex items-center justify-between p-3">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-8 h-8 rounded-full bg-secondary/20 animate-pulse" />
-                                        <div className="space-y-2">
-                                            <div className="h-3 w-28 rounded bg-secondary/20 animate-pulse" />
-                                            <div className="h-2 w-20 rounded bg-secondary/20 animate-pulse" />
-                                        </div>
-                                    </div>
-                                    <div className="h-8 w-8 rounded-full bg-secondary/20 animate-pulse" />
-                                </div>
-                            </>
-                        ) : recurringTemplates.length > 0 ? (
-                            recurringTemplates.map((template) => (
-                                <div key={template.id} className="flex items-center justify-between p-3">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                                            <RefreshCcw className="w-4 h-4 text-primary" />
-                                        </div>
-                                        <div>
-                                            <p className="text-sm font-medium truncate max-w-[150px]">{template.description}</p>
-                                            <p className="text-[11px] text-muted-foreground">
-                                                {formatCurrency(template.amount, template.currency)} • {template.frequency}
-                                                {template.created_at && ` • Started ${format(new Date(template.created_at), 'MMM d, yyyy')}`}
-                                            </p>
-                                        </div>
-                                    </div>
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                                        onClick={() => setTemplateToDelete(template)}
-                                    >
-                                        <Trash2 className="w-4 h-4" />
-                                    </Button>
-                                </div>
-                            ))
-                        ) : (
-                            <div className="p-4 text-center text-xs text-muted-foreground italic">
-                                No active recurring expenses
-                            </div>
-                        )}
-                    </div>
-                    <p className="text-[11px] text-muted-foreground">Manage your automated recurring transactions.</p>
-                </div>
+                <RecurringExpensesSection
+                    templates={recurringTemplates}
+                    loading={loadingTemplates}
+                    formatCurrency={formatCurrency}
+                    onDelete={deleteRecurringTemplate}
+                />
 
-                {/* Data Management */}
-                <div className="space-y-3 pt-2">
-                    <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
-                        <Download className="w-4 h-4" />
-                        <span>Data Management</span>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                        <Button
-                            variant="outline"
-                            onClick={() => router.push('/import')}
-                            disabled={loadingExport}
-                            className="h-16 flex flex-col items-center justify-center gap-1 bg-secondary/5 border-primary/20 hover:bg-primary/10 hover:border-primary/50 transition-all group col-span-2"
-                        >
-                            <FileSpreadsheet className="w-5 h-5 text-primary group-hover:scale-110 transition-transform" />
-                            <span className="text-xs font-medium">Import Bank Statement (Excel/CSV)</span>
-                        </Button>
-                        <Button
-                            variant="outline"
-                            onClick={() => handleExportClick('csv')}
-                            disabled={loadingExport}
-                            className="h-16 flex flex-col items-center justify-center gap-1 bg-secondary/5 border-primary/20 hover:bg-primary/10 hover:border-primary/50 transition-all group"
-                        >
-                            <Download className="w-5 h-5 text-primary group-hover:scale-110 transition-transform" />
-                            <span className="text-xs font-medium">{loadingExport ? 'Exporting...' : 'Export CSV'}</span>
-                        </Button>
-                        <Button
-                            variant="outline"
-                            onClick={() => handleExportClick('pdf')}
-                            disabled={loadingExport}
-                            className="h-16 flex flex-col items-center justify-center gap-1 bg-secondary/5 border-primary/20 hover:bg-primary/10 hover:border-primary/50 transition-all group"
-                        >
-                            <Download className="w-5 h-5 text-primary group-hover:scale-110 transition-transform" />
-                            <span className="text-xs font-medium">{loadingExport ? 'Exporting...' : 'Export PDF'}</span>
-                        </Button>
-                    </div>
-                    <p className="text-[11px] text-muted-foreground">Import bank statements or export your expense data.</p>
-                </div>
+                <DataManagementSection
+                    loading={loadingExport}
+                    onImport={() => router.push('/import')}
+                    onExportCSV={() => handleExportClick('csv')}
+                    onExportPDF={() => handleExportClick('pdf')}
+                />
 
-                {/* Preferences */}
-                <div className="space-y-3 pt-2">
-                    <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
-                        <SlidersHorizontal className="w-4 h-4" />
-                        <span>Preferences</span>
-                    </div>
-
-                    <div className="bg-secondary/5 rounded-xl border border-white/5 divide-y divide-white/5">
-                        <div className="flex flex-col gap-3 p-3">
-                            <div className="flex items-center gap-3">
-                                <Banknote className="w-4 h-4 text-muted-foreground" />
-                                <div>
-                                    <p className="text-sm font-medium">Currency</p>
-                                    <p className="text-[11px] text-muted-foreground">Select your preferred currency</p>
-                                </div>
-                            </div>
-                            <div className="mt-1">
-                                <CurrencyDropdown value={currency} onValueChange={(val) => setCurrency(val as Currency)} />
-                            </div>
-                        </div>
-
-                        <div className="flex items-center justify-between p-3">
-                            <div className="flex items-center gap-3">
-                                <AlertTriangle className="w-4 h-4 text-muted-foreground" />
-                                <div>
-                                    <p className="text-sm font-medium">Budget Alerts</p>
-                                    <p className="text-[11px] text-muted-foreground">Alert when overspending</p>
-                                </div>
-                            </div>
-                            <Switch
-                                checked={budgetAlertsEnabled}
-                                onCheckedChange={(checked) => {
-                                    setBudgetAlertsEnabled(checked);
-                                    if (checked) {
-                                        setShowAlert(true);
-                                        setTimeout(() => setShowAlert(false), 5000);
-                                    } else {
-                                        setShowAlert(false);
-                                    }
-                                }}
-                            />
-                        </div>
-
-                        {push.isSupported && (
-                            <div className="flex items-center justify-between p-3">
-                                <div className="flex items-center gap-3 min-w-0">
-                                    <Bell className="w-4 h-4 text-muted-foreground shrink-0" />
-                                    <div className="min-w-0">
-                                        <p className="text-sm font-medium">Push Notifications</p>
-                                        <p className="text-[11px] text-muted-foreground">
-                                            {push.permission === 'denied'
-                                                ? 'Blocked — enable in your browser settings'
-                                                : 'Reminders, sync alerts and updates'}
-                                        </p>
-                                    </div>
-                                </div>
-                                <Switch
-                                    checked={push.isSubscribed}
-                                    disabled={push.loading || push.permission === 'denied'}
-                                    onCheckedChange={async (checked) => {
-                                        if (checked) {
-                                            const ok = await push.subscribe();
-                                            if (ok) toast.success('Notifications enabled');
-                                            else if (push.permission === 'denied') toast.error('Permission denied — enable in browser settings');
-                                            else toast.error('Could not enable notifications');
-                                        } else {
-                                            const ok = await push.unsubscribe();
-                                            if (ok) toast.success('Notifications disabled');
-                                            else toast.error('Could not disable notifications');
-                                        }
-                                    }}
-                                />
-                            </div>
-                        )}
-
-                        {push.isSupported && push.isSubscribed && (
-                            <div className="flex items-center justify-between p-3">
-                                <div className="flex items-center gap-3 min-w-0">
-                                    <RefreshCcw className="w-4 h-4 text-muted-foreground shrink-0" />
-                                    <div className="min-w-0">
-                                        <p className="text-sm font-medium">Bill Reminders</p>
-                                        <p className="text-[11px] text-muted-foreground">
-                                            Notify me before recurring bills are due
-                                        </p>
-                                    </div>
-                                </div>
-                                <Select
-                                    value={billReminderLeadDays == null ? 'off' : String(billReminderLeadDays)}
-                                    onValueChange={(val) => {
-                                        const next = val === 'off' ? null : Number(val);
-                                        setBillReminderLeadDays(next);
-                                    }}
-                                >
-                                    <SelectTrigger className="w-[120px] h-9 rounded-xl bg-secondary/20 border-white/10 text-xs font-bold">
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="off">Off</SelectItem>
-                                        <SelectItem value="1">1 day before</SelectItem>
-                                        <SelectItem value="3">3 days before</SelectItem>
-                                        <SelectItem value="7">1 week before</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                        )}
-                    </div>
-                </div>
+                <PreferencesSection
+                    currency={currency}
+                    setCurrency={setCurrency}
+                    budgetAlertsEnabled={budgetAlertsEnabled}
+                    onToggleBudgetAlerts={(checked) => {
+                        setBudgetAlertsEnabled(checked);
+                        if (checked) {
+                            setShowAlert(true);
+                            setTimeout(() => setShowAlert(false), 5000);
+                        } else {
+                            setShowAlert(false);
+                        }
+                    }}
+                    billReminderLeadDays={billReminderLeadDays}
+                    setBillReminderLeadDays={setBillReminderLeadDays}
+                    push={push}
+                />
 
                 <AnimatePresence>
                     {showAlert && (
@@ -715,124 +524,14 @@ export function SettingsView() {
                 </AnimatePresence>
 
 
-                {/* Security */}
-                <div className="space-y-3 pt-2">
-                    <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
-                        <Shield className="w-4 h-4" />
-                        <span>Security & Privacy</span>
-                    </div>
+                <SecuritySection
+                    userEmail={userEmail}
+                    hasPassword={hasPassword}
+                    hasGoogleIdentity={hasGoogleIdentity}
+                    onPasswordChangeSuccess={getProfile}
+                />
 
-                    <div className="bg-secondary/5 rounded-xl border border-white/5 divide-y divide-white/5 min-h-[144px]">
-                        {/* Primary Email (ReadOnly) */}
-                        <div className="flex items-center justify-between p-3">
-                            <div className="flex items-center gap-3">
-                                <Lock className="w-4 h-4 text-muted-foreground" />
-                                <div>
-                                    <p className="text-sm font-medium">Account Email</p>
-                                    <p className="text-[11px] text-muted-foreground">{userEmail}</p>
-                                </div>
-                            </div>
-                            <div className="px-2 py-0.5 rounded text-[11px] font-bold uppercase bg-white/5 text-muted-foreground border border-white/10">
-                                Primary
-                            </div>
-                        </div>
-
-                        {hasPassword && (
-                            <ChangePasswordDialog
-                                mode="change"
-                                onSuccess={getProfile}
-                                trigger={
-                                    <button className="w-full flex items-center justify-between p-3 hover:bg-white/5 transition-colors text-left outline-none group/btn">
-                                        <div className="flex items-center gap-3">
-                                            <Lock className="w-4 h-4 text-muted-foreground group-hover/btn:text-primary transition-colors" />
-                                            <span className="text-sm font-medium text-muted-foreground group-hover/btn:text-foreground transition-colors">Change Password</span>
-                                        </div>
-                                        <ChevronRight className="w-4 h-4 text-muted-foreground group-hover/btn:translate-x-0.5 transition-all" />
-                                    </button>
-                                }
-                            />
-                        )}
-
-                        {hasGoogleIdentity && (
-                            <div className={cn(
-                                "flex items-center justify-between p-3",
-                                hasPassword ? "bg-transparent border-t border-white/5" : "bg-white/[0.02]"
-                            )}>
-                                <div className="flex items-center gap-3">
-                                    <svg className="w-4 h-4" viewBox="0 0 24 24">
-                                        <path
-                                            d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                                            fill="#4285F4"
-                                        />
-                                        <path
-                                            d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                                            fill="#34A853"
-                                        />
-                                        <path
-                                            d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-                                            fill="#FBBC05"
-                                        />
-                                        <path
-                                            d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-                                            fill="#EA4335"
-                                        />
-                                    </svg>
-                                    <span className="text-sm font-medium text-muted-foreground">
-                                        {hasPassword ? "Google Account Linked" : "Connected via Google"}
-                                    </span>
-                                </div>
-                                {hasPassword && (
-                                    <div className="px-2 py-0.5 rounded text-[11px] font-bold uppercase bg-primary/10 text-primary border border-primary/20">
-                                        Linked
-                                    </div>
-                                )}
-                            </div>
-                        )}
-                    </div>
-                </div>
-
-                {/* Dead-Letter Queue UI for Failed Syncs */}
-                {failedItems.length > 0 && (
-                    <div className="bg-destructive/10 border border-destructive/20 p-4 rounded-3xl space-y-3 animate-in fade-in slide-in-from-bottom-4">
-                        <div className="flex items-center gap-2 text-destructive">
-                            <AlertTriangle className="w-5 h-5" />
-                            <h3 className="font-semibold text-sm">Offline Sync Failures</h3>
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                            {failedItems.length} transaction{failedItems.length > 1 ? 's' : ''} failed to sync permanently due to server conflicts.
-                        </p>
-                        <div className="space-y-2">
-                            {failedItems.map(item => (
-                                <div key={item.id} className="bg-background/80 p-3 rounded-2xl flex flex-col gap-2 shadow-sm border border-destructive/20 backdrop-blur-md">
-                                    <div className="flex items-start justify-between">
-                                        <div className="min-w-0">
-                                            <p className="text-sm font-bold truncate">{item.data.transaction?.description || 'Unknown Item'}</p>
-                                            <p className="text-[10px] font-bold text-destructive/80 mt-0.5 uppercase tracking-tighter">Error: {item.errorReason || 'Server Conflict'}</p>
-                                        </div>
-                                        {item.failedAt && <span className="text-[9px] text-muted-foreground whitespace-nowrap">{format(new Date(item.failedAt), 'HH:mm')}</span>}
-                                    </div>
-                                    <div className="flex gap-2 justify-end mt-1">
-                                        <Button 
-                                            size="sm" 
-                                            variant="ghost" 
-                                            onClick={() => discardFailedItem(item.id)} 
-                                            className="h-8 px-4 text-[11px] font-bold hover:bg-destructive/10 hover:text-destructive text-muted-foreground border border-transparent hover:border-destructive/20 rounded-xl transition-all"
-                                        >
-                                            Discard
-                                        </Button>
-                                        <Button 
-                                            size="sm" 
-                                            onClick={() => retryFailedItem(item.id)} 
-                                            className="h-8 px-4 text-[11px] font-bold bg-primary hover:bg-primary/90 text-white rounded-xl shadow-lg shadow-primary/20"
-                                        >
-                                            Retry Sync
-                                        </Button>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                )}
+                <FailedSyncSection failedItems={failedItems} />
 
                 {/* Logout */}
                 <div className="pt-2">
@@ -905,31 +604,6 @@ export function SettingsView() {
                     loading={loadingExport}
                     title={exportType === 'csv' ? 'Export CSV' : 'Export PDF'}
                 />
-
-                <AlertDialog open={!!templateToDelete} onOpenChange={(open) => !open && setTemplateToDelete(null)}>
-                    <AlertDialogContent className="bg-card/95 backdrop-blur-xl border-white/10 rounded-3xl">
-                        <AlertDialogHeader>
-                            <AlertDialogTitle>Stop this recurring expense?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                                Future transactions for "{templateToDelete?.description}" will not be created automatically.
-                            </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter className="gap-2 sm:gap-0 mt-4">
-                            <AlertDialogCancel className="rounded-xl border-white/10">Cancel</AlertDialogCancel>
-                            <AlertDialogAction
-                                className="bg-destructive hover:bg-destructive/90 text-white rounded-xl"
-                                onClick={() => {
-                                    if (templateToDelete) {
-                                        deleteRecurringTemplate(templateToDelete.id);
-                                        setTemplateToDelete(null);
-                                    }
-                                }}
-                            >
-                                Stop Series
-                            </AlertDialogAction>
-                        </AlertDialogFooter>
-                    </AlertDialogContent>
-                </AlertDialog>
             </div>
         </motion.div>
     );

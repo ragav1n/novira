@@ -1,14 +1,13 @@
 'use client';
 
-import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
-import { ChevronLeft, Sparkles, ChartLine, Tags, Store, Wallet, Repeat, Lightbulb, MapPin } from 'lucide-react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { ChevronLeft, ChartLine } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
-import { ChartConfig, BasePieChart } from "@/components/charts/base-pie-chart";
 import { TransactionService } from '@/lib/services/transaction-service';
-import { CHART_CONFIG, CATEGORY_COLORS, getIconForCategory, getCategoryLabel } from '@/lib/categories';
-import { format, startOfMonth, endOfMonth, startOfWeek, startOfYear, subMonths, subYears, subDays, parseISO, isAfter } from 'date-fns';
+import { getIconForCategory } from '@/lib/categories';
+import { format, startOfMonth, endOfMonth, startOfWeek, startOfYear, subMonths, subYears, subDays, parseISO } from 'date-fns';
 import { useUserPreferences } from '@/components/providers/user-preferences-provider';
 import { useBucketsList, useBucketSpending } from '@/components/providers/buckets-provider';
 import { useWorkspaceTheme } from '@/hooks/useWorkspaceTheme';
@@ -22,76 +21,17 @@ import {
     SelectValue,
 } from "@/components/ui/select"
 import { motion } from 'framer-motion';
-import { LineChart, Line, XAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { Transaction } from '@/types/transaction';
-import { HolographicCard } from '@/components/ui/holographic-card';
-import { RecapBody, RecapSkeleton, type RecapData, type RecapAnalyzed } from '@/components/recap/recap-card';
 import { supabase } from '@/lib/supabase';
 import { toast, ImpactStyle } from '@/utils/haptics';
-
-const PAYMENT_COLORS: Record<string, string> = {
-    cash: '#22C55E',
-    'debit card': '#3B82F6',
-    'credit card': '#A855F7',
-    upi: '#F59E0B',
-    'bank transfer': '#06B6D4',
-    other: '#EC4899',
-};
-
-const paymentChartConfig: ChartConfig = {
-    cash: { label: "Cash", color: PAYMENT_COLORS.cash },
-    'debit card': { label: "Debit Card", color: PAYMENT_COLORS['debit card'] },
-    'credit card': { label: "Credit Card", color: PAYMENT_COLORS['credit card'] },
-    upi: { label: "UPI", color: PAYMENT_COLORS.upi },
-    'bank transfer': { label: "Bank Transfer", color: PAYMENT_COLORS['bank transfer'] },
-    other: { label: "Other", color: PAYMENT_COLORS.other },
-};
-
-const AnalyticsSkeleton = () => (
-    <div className="space-y-6">
-        {/* Header Skeleton is handled by the main layout or simple spacing */}
-        <div className="flex gap-2 px-1">
-            <div className="flex-1 h-10 rounded-xl bg-secondary/10 animate-pulse" />
-            <div className="flex-1 h-10 rounded-xl bg-secondary/10 animate-pulse" />
-        </div>
-        
-        {/* Trend Card Skeleton */}
-        <Card className="bg-card/40 border-white/5 shadow-none">
-            <CardContent className="p-4 space-y-4">
-                <div className="flex justify-between">
-                    <div className="h-4 w-24 bg-secondary/20 rounded animate-pulse" />
-                    <div className="h-4 w-12 bg-secondary/20 rounded animate-pulse" />
-                </div>
-                <div className="h-[140px] w-full bg-secondary/10 rounded-xl animate-pulse" />
-                <div className="pt-2 border-t border-white/5 flex justify-between">
-                    <div className="h-4 w-16 bg-secondary/20 rounded animate-pulse" />
-                    <div className="h-5 w-24 bg-secondary/20 rounded animate-pulse" />
-                </div>
-            </CardContent>
-        </Card>
-
-        {/* Breakdown Card Skeleton */}
-        <div className="space-y-2">
-            <div className="h-3 w-32 bg-secondary/20 rounded animate-pulse ml-1" />
-            <Card className="bg-card/40 border-none shadow-none overflow-hidden">
-                <CardContent className="p-4 flex flex-col sm:flex-row items-center gap-6">
-                    <div className="w-36 h-36 rounded-full border-8 border-secondary/10 animate-pulse shrink-0" />
-                    <div className="w-full space-y-3">
-                        {[1, 2, 3].map(i => (
-                            <div key={i} className="space-y-2">
-                                <div className="flex justify-between">
-                                    <div className="h-3 w-20 bg-secondary/20 rounded animate-pulse" />
-                                    <div className="h-3 w-16 bg-secondary/20 rounded animate-pulse" />
-                                </div>
-                                <div className="h-1 w-full bg-secondary/10 rounded-full" />
-                            </div>
-                        ))}
-                    </div>
-                </CardContent>
-            </Card>
-        </div>
-    </div>
-);
+import { AnalyticsSkeleton } from '@/components/analytics/analytics-skeleton';
+import { MonthlyRecapCard } from '@/components/analytics/monthly-recap-card';
+import { SpendingTrendCard } from '@/components/analytics/spending-trend-card';
+import { WeekdayChartCard } from '@/components/analytics/weekday-chart-card';
+import { TopMerchantsCard } from '@/components/analytics/top-merchants-card';
+import { LargestTransactionsCard } from '@/components/analytics/largest-transactions-card';
+import { CategoryBreakdownCard } from '@/components/analytics/category-breakdown-card';
+import { PaymentBreakdownCard } from '@/components/analytics/payment-breakdown-card';
 
 export function AnalyticsView() {
     const router = useRouter();
@@ -104,11 +44,6 @@ export function AnalyticsView() {
     const [selectedBucketId, setSelectedBucketId] = useState<string | 'all'>('all');
     const [customStart, setCustomStart] = useState<string>('');
     const [customEnd, setCustomEnd] = useState<string>('');
-    const [recapLoading, setRecapLoading] = useState(false);
-    const [recap, setRecap] = useState<RecapData | null>(null);
-    const [recapMeta, setRecapMeta] = useState<RecapAnalyzed | null>(null);
-    const [recapMonth, setRecapMonth] = useState<string | null>(null);
-    const [availableMonths, setAvailableMonths] = useState<string[]>([]);
     const { formatCurrency, currency, convertAmount, userId, activeWorkspaceId, ratesLastUpdated } = useUserPreferences();
     const { activeWorkspace, theme: themeConfig } = useWorkspaceTheme('cyan');
 
@@ -286,94 +221,6 @@ export function AnalyticsView() {
         fill: string;
     }>;
 
-    // Whether the trend chart buckets by day (short ranges) or by month (long ranges).
-    // Drives the stat row labels ("Top Day" vs "Top Month").
-    const monthsBackKind: 'days' | 'months' = (dateRange === '1M' || dateRange === 'LM') ? 'days' : 'months';
-
-    // Active recurring templates feed the forecast overlay; cheap one-shot fetch.
-    type RecurringLite = { id: string; amount: number; currency: string; frequency: 'daily' | 'weekly' | 'monthly' | 'yearly'; next_occurrence: string };
-    const [recurringForecast, setRecurringForecast] = useState<RecurringLite[]>([]);
-    useEffect(() => {
-        if (!userId) return;
-        let cancelled = false;
-        (async () => {
-            try {
-                const { data } = await supabase
-                    .from('recurring_templates')
-                    .select('id, amount, currency, frequency, next_occurrence')
-                    .eq('user_id', userId)
-                    .eq('is_active', true);
-                if (!cancelled && data) setRecurringForecast(data as RecurringLite[]);
-            } catch (error) {
-                console.error('Error fetching recurring templates for forecast:', error);
-            }
-        })();
-        return () => { cancelled = true; };
-    }, [userId]);
-
-    // Simple end-of-month projection for the 1M view. Skipped in bucket-focused mode
-    // (no monthly-budget analogue) and in the first 2 days of the month (too noisy).
-    const pacingChip = useMemo(() => {
-        if (dateRange !== '1M' || selectedBucketId !== 'all' || totalSpentInRange <= 0) return null;
-        const today = new Date();
-        const day = today.getDate();
-        if (day < 3) return null;
-        const daysInMonth = endOfMonth(today).getDate();
-        const projected = (totalSpentInRange / day) * daysInMonth;
-        return { projected };
-    }, [dateRange, selectedBucketId, totalSpentInRange]);
-
-    // Forecast overlay: only meaningful for the current month (1M, all-buckets) past
-    // day 3. Each future day in the chart gets `forecast_total = run_rate + recurring_spike`,
-    // where the run rate is derived from MTD spend and recurrings come from the templates
-    // we fetched above. Recharts renders this as a dashed line that picks up where the
-    // solid spend lines stop.
-    const forecastChartData = useMemo(() => {
-        if (dateRange !== '1M' || selectedBucketId !== 'all') return categoryTrendData;
-        const today = new Date();
-        const dom = today.getDate();
-        const monthEnd = endOfMonth(today);
-        const dim = monthEnd.getDate();
-        if (dom < 3 || dom >= dim) return categoryTrendData;
-
-        const runRate = totalSpentInRange / dom;
-
-        // Build a map: bucket label ('MMM d') -> projected recurring amount on that day.
-        const recurringMap = new Map<string, number>();
-        for (const t of recurringForecast) {
-            const occ = parseISO(t.next_occurrence);
-            if (isNaN(occ.getTime())) continue;
-            const cursor = new Date(occ);
-            // Bound the projection: don't loop more than 60 iterations even on bad data.
-            for (let i = 0; i < 60 && cursor <= monthEnd; i++) {
-                if (isAfter(cursor, today)) {
-                    const key = format(cursor, 'MMM d');
-                    const amt = convertAmount(Number(t.amount), (t.currency || 'USD').toUpperCase());
-                    recurringMap.set(key, (recurringMap.get(key) || 0) + amt);
-                }
-                if (t.frequency === 'daily') cursor.setDate(cursor.getDate() + 1);
-                else if (t.frequency === 'weekly') cursor.setDate(cursor.getDate() + 7);
-                else if (t.frequency === 'monthly') { cursor.setMonth(cursor.getMonth() + 1); break; }
-                else if (t.frequency === 'yearly') break;
-                else break;
-            }
-        }
-
-        return categoryTrendData.map(b => {
-            const date = b.rawDate as Date;
-            if (!date || date <= today) return b;
-            const spike = recurringMap.get(b.month) || 0;
-            return { ...b, forecast_total: runRate + spike };
-        });
-    }, [categoryTrendData, recurringForecast, dateRange, selectedBucketId, totalSpentInRange, convertAmount]);
-
-    const hasForecast = useMemo(
-        () => dateRange === '1M' && selectedBucketId === 'all' && forecastChartData.some(b => typeof (b as { forecast_total?: number }).forecast_total === 'number'),
-        [forecastChartData, dateRange, selectedBucketId]
-    );
-
-    // MoM/period-over-period delta. For 1M we compare MTD-vs-same-MTD (honest mid-month).
-    // For other ranges we compare full-period totals since both are complete windows.
     // Resolves the active analytics window to from/to YYYY-MM-DD strings for /search URLs.
     const analyticsDateRange = useCallback((): { from: string; to: string } | null => {
         const now = new Date();
@@ -386,160 +233,6 @@ export function AnalyticsView() {
         if (dateRange === 'CUSTOM' && customStart && customEnd) return { from: customStart, to: customEnd };
         return null;
     }, [dateRange, customStart, customEnd]);
-
-    const momDelta = useMemo(() => {
-        if (dateRange === 'ALL') return null;
-        const baseline = dateRange === '1M' ? priorMTDTotal : priorTotal;
-        if (baseline <= 0) return null;
-        const diff = totalSpentInRange - baseline;
-        const pct = (diff / baseline) * 100;
-        return {
-            pct,
-            absDelta: diff,
-            direction: diff > 0 ? 'up' as const : diff < 0 ? 'down' as const : 'flat' as const,
-        };
-    }, [dateRange, priorMTDTotal, priorTotal, totalSpentInRange]);
-
-    const priorMonthKey = useMemo(() => {
-        const now = new Date();
-        const target = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-        return `${target.getFullYear()}-${String(target.getMonth() + 1).padStart(2, '0')}`;
-    }, []);
-
-    const recapAbortRef = useRef<AbortController | null>(null);
-
-    const loadRecap = useCallback(async (monthKey: string) => {
-        recapAbortRef.current?.abort();
-        const ac = new AbortController();
-        recapAbortRef.current = ac;
-        setRecapLoading(true);
-        try {
-            const res = await fetch(`/api/recap?month=${monthKey}`, { signal: ac.signal });
-            if (res.status === 404) {
-                setRecap(null);
-                setRecapMeta(null);
-                setRecapMonth(monthKey);
-                return false;
-            }
-            if (!res.ok) throw new Error('Failed to load recap');
-            const data = await res.json();
-            setRecap(data.recap || null);
-            setRecapMeta(data.analyzed || null);
-            setRecapMonth(monthKey);
-            return true;
-        } catch (err) {
-            if ((err as { name?: string })?.name === 'AbortError') return false;
-            console.error('[recap load]', err);
-            return false;
-        } finally {
-            if (!ac.signal.aborted) setRecapLoading(false);
-        }
-    }, []);
-
-    const generateRecap = useCallback(async (monthKey?: string, force = false) => {
-        const target = monthKey || recapMonth || priorMonthKey;
-        recapAbortRef.current?.abort();
-        const ac = new AbortController();
-        recapAbortRef.current = ac;
-        setRecapLoading(true);
-        if (force) {
-            setRecap(null);
-            setRecapMeta(null);
-        }
-        try {
-            const res = await fetch('/api/recap', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ month: target, currency, force }),
-                signal: ac.signal,
-            });
-            if (!res.ok) {
-                const err = await res.json().catch(() => ({}));
-                throw new Error(err.error || 'Recap failed');
-            }
-            const data = await res.json();
-            setRecap(data.recap || null);
-            setRecapMeta(data.analyzed || null);
-            setRecapMonth(target);
-            setAvailableMonths((prev) => prev.includes(target) ? prev : [target, ...prev]);
-        } catch (err) {
-            if ((err as { name?: string })?.name === 'AbortError') return;
-            console.error('[recap]', err);
-            toast.error('Could not generate recap');
-        } finally {
-            if (!ac.signal.aborted) setRecapLoading(false);
-        }
-    }, [currency, priorMonthKey, recapMonth]);
-
-    useEffect(() => () => recapAbortRef.current?.abort(), []);
-
-    const recapMonthLabel = useMemo(() => {
-        if (!recapMonth) return null;
-        const [y, m] = recapMonth.split('-').map(Number);
-        return format(new Date(y, m - 1, 1), 'MMMM yyyy');
-    }, [recapMonth]);
-
-    // Prefetch months list and last available recap on mount
-    useEffect(() => {
-        let cancelled = false;
-        (async () => {
-            try {
-                const res = await fetch('/api/recap');
-                if (!res.ok) return;
-                const data = await res.json();
-                if (cancelled) return;
-                const months: string[] = (data.months || []).map((m: { month: string }) => m.month);
-                setAvailableMonths(months);
-                // Default to the most recent stored recap, if any
-                if (months.length > 0) {
-                    await loadRecap(months[0]);
-                } else {
-                    setRecapMonth(priorMonthKey);
-                }
-            } catch (err) {
-                console.error('[recap prefetch]', err);
-            }
-        })();
-        return () => { cancelled = true; };
-    }, [loadRecap, priorMonthKey]);
-
-    type TooltipEntry = {
-        name?: string | number;
-        value?: number | string;
-        stroke?: string;
-        color?: string;
-        fill?: string;
-    };
-    type AnalyticsTooltipProps = {
-        active?: boolean;
-        payload?: TooltipEntry[];
-        label?: string | number;
-    };
-    const AnalyticsTooltip = ({ active, payload, label }: AnalyticsTooltipProps) => {
-        if (!active || !payload || !payload.length) return null;
-        const visible = payload.filter(p => Number(p.value) > 0.5);
-        if (!visible.length) return null;
-        return (
-            <div className="bg-card/95 backdrop-blur-xl border border-white/10 p-3 rounded-2xl shadow-2xl z-50">
-                <p className="text-[11px] font-bold uppercase tracking-wider mb-2 text-muted-foreground">{label}</p>
-                <div className="space-y-1.5">
-                    {visible.map((entry, index) => (
-                        <div key={index} className="flex items-center justify-between gap-4 text-xs">
-                            <div className="flex items-center gap-2">
-                                <div
-                                    className="w-1.5 h-1.5 rounded-full"
-                                    style={{ backgroundColor: entry.stroke || entry.color || entry.fill }}
-                                />
-                                <span className="text-foreground/80 font-medium capitalize">{entry.name}</span>
-                            </div>
-                            <span className="font-mono font-bold">{formatCurrency(Math.round(Number(entry.value)))}</span>
-                        </div>
-                    ))}
-                </div>
-            </div>
-        );
-    };
-
 
     return (
         <motion.div 
@@ -730,128 +423,7 @@ export function AnalyticsView() {
                     );
                 })()}
 
-                {/* Monthly AI Recap — Holographic Card */}
-                <HolographicCard className="border-primary/30">
-                    <div className="p-5 space-y-4">
-                        <div className="flex items-center justify-between gap-3">
-                            <div className="flex items-center gap-2.5 min-w-0">
-                                <div className="w-9 h-9 rounded-2xl bg-primary/25 border border-primary/40 flex items-center justify-center shadow-[0_0_18px_-4px_rgba(168,85,247,0.55)] shrink-0">
-                                    <ChartLine className="w-[18px] h-[18px] text-primary-foreground" />
-                                </div>
-                                <div className="min-w-0">
-                                    <h3 className="font-bold text-[12px] uppercase tracking-wider text-foreground">Monthly Recap</h3>
-                                    <p className="text-[10px] text-muted-foreground font-medium truncate">A look at last month's spending</p>
-                                </div>
-                            </div>
-                            {availableMonths.length > 0 ? (
-                                <Select
-                                    value={recapMonth || availableMonths[0]}
-                                    onValueChange={(v) => loadRecap(v)}
-                                >
-                                    <SelectTrigger className="h-8 w-auto min-w-[120px] text-[10px] font-bold uppercase tracking-wider bg-primary/15 border-primary/30 text-foreground/90 rounded-full px-3">
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {availableMonths.map((m) => {
-                                            const [y, mm] = m.split('-').map(Number);
-                                            return (
-                                                <SelectItem key={m} value={m} className="text-[11px]">
-                                                    {format(new Date(y, mm - 1, 1), 'MMMM yyyy')}
-                                                </SelectItem>
-                                            );
-                                        })}
-                                    </SelectContent>
-                                </Select>
-                            ) : recapMonthLabel ? (
-                                <span className="text-[10px] font-bold uppercase tracking-wider text-foreground/80 bg-primary/15 border border-primary/30 px-2 py-1 rounded-full whitespace-nowrap">
-                                    {recapMonthLabel}
-                                </span>
-                            ) : null}
-                        </div>
-
-                        {recapLoading ? (
-                            <RecapSkeleton />
-                        ) : recap ? (
-                            <RecapBody
-                                recap={recap}
-                                analyzed={recapMeta}
-                                formatCurrency={formatCurrency}
-                                onInsightClick={(subject, kind) => {
-                                    if (!recapMonth || !subject) return;
-                                    const params = new URLSearchParams();
-                                    if (kind === 'category' || kind === 'new') params.set('category', subject);
-                                    else if (kind === 'payment') params.set('payment', subject);
-                                    else params.set('q', subject);
-                                    if (!recapMonth.endsWith('-FY')) {
-                                        const [y, m] = recapMonth.split('-').map(Number);
-                                        if (y && m) {
-                                            const start = new Date(y, m - 1, 1);
-                                            const end = new Date(y, m, 0);
-                                            params.set('from', format(start, 'yyyy-MM-dd'));
-                                            params.set('to', format(end, 'yyyy-MM-dd'));
-                                        }
-                                    } else {
-                                        const y = Number(recapMonth.slice(0, 4));
-                                        params.set('from', `${y}-01-01`);
-                                        params.set('to', `${y}-12-31`);
-                                    }
-                                    router.push(`/search?${params.toString()}`);
-                                }}
-                            />
-                        ) : (
-                            <div className="space-y-3">
-                                <p className="text-[13px] text-foreground/80 leading-relaxed">
-                                    Compare last month against the one before, in plain language.
-                                </p>
-                                <div className="space-y-2">
-                                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70">You'll see</p>
-                                    <ul className="space-y-2">
-                                        {[
-                                            { icon: Tags, label: 'Where you spent more or less', sub: 'by category' },
-                                            { icon: Store, label: 'Which places you visited most', sub: 'and how much they cost' },
-                                            { icon: Wallet, label: 'Cash vs card mix', sub: 'and how it changed' },
-                                            { icon: Repeat, label: 'How often you spent', sub: 'and your average ticket size' },
-                                            { icon: Lightbulb, label: 'One concrete thing to try', sub: 'tied to your numbers' },
-                                        ].map(({ icon: Icon, label, sub }) => (
-                                            <li key={label} className="flex items-start gap-2.5">
-                                                <div className="w-6 h-6 rounded-lg bg-primary/15 border border-primary/25 flex items-center justify-center shrink-0 mt-0.5">
-                                                    <Icon className="w-3 h-3 text-primary" />
-                                                </div>
-                                                <div className="text-[12px] leading-snug">
-                                                    <span className="text-foreground/90 font-medium">{label}</span>
-                                                    <span className="text-muted-foreground"> — {sub}</span>
-                                                </div>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                </div>
-                            </div>
-                        )}
-
-                        <button
-                            onClick={() => generateRecap(recap ? recapMonth || priorMonthKey : priorMonthKey, !!recap)}
-                            disabled={recapLoading}
-                            className="w-full h-11 text-[13px] font-bold rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 active:scale-[0.99] shadow-[0_6px_22px_-6px_rgba(168,85,247,0.7)] ring-1 ring-inset ring-white/15 transition-all disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                        >
-                            {recapLoading ? (
-                                <>
-                                    <span className="w-3.5 h-3.5 rounded-full border-2 border-primary-foreground/30 border-t-primary-foreground animate-spin" />
-                                    Analyzing your spending…
-                                </>
-                            ) : recap ? (
-                                <>
-                                    <Repeat className="w-3.5 h-3.5" />
-                                    Regenerate
-                                </>
-                            ) : (
-                                <>
-                                    <Sparkles className="w-3.5 h-3.5" />
-                                    Generate Recap
-                                </>
-                            )}
-                        </button>
-                    </div>
-                </HolographicCard>
+                <MonthlyRecapCard currency={currency} formatCurrency={formatCurrency} />
 
                 {transactions.length === 0 ? (
                     <Card className="bg-card/40 border-white/5 shadow-none">
@@ -867,390 +439,56 @@ export function AnalyticsView() {
                     </Card>
                 ) : (
                 <>
-                {/* Monthly Spending Trend */}
-                <Card className="bg-card/40 backdrop-blur-md border-white/5 shadow-none">
-                    <CardContent className="p-4 space-y-3">
-                        <div className="flex justify-between items-center gap-2">
-                            <h3 className="font-bold text-[13px] uppercase tracking-wider text-muted-foreground/80">Spending Trend</h3>
-                            <div className="flex items-center gap-1.5">
-                                {pacingChip && (
-                                    <span
-                                        className="text-[10px] px-2 py-0.5 rounded-md font-bold border bg-emerald-500/15 border-emerald-500/30 text-emerald-300"
-                                        title="Estimated end-of-month total at current pace"
-                                    >
-                                        On pace · {formatCurrency(pacingChip.projected)}
-                                    </span>
-                                )}
-                                {hasForecast && (
-                                    <span
-                                        className="text-[10px] px-2 py-0.5 rounded-md font-bold border bg-cyan-500/15 border-cyan-500/30 text-cyan-300"
-                                        title="Run-rate plus upcoming recurring charges"
-                                    >
-                                        Forecast on
-                                    </span>
-                                )}
-                                <span className="text-[10px] bg-secondary/30 px-2 py-0.5 rounded-md text-muted-foreground font-bold">
-                                    {dateRange === 'ALL' ? 'All Time' : dateRange}
-                                </span>
-                            </div>
-                        </div>
+                <SpendingTrendCard
+                    userId={userId}
+                    dateRange={dateRange}
+                    selectedBucketId={selectedBucketId}
+                    categoryTrendData={categoryTrendData}
+                    activeCategories={activeCategories}
+                    totalSpentInRange={totalSpentInRange}
+                    avgPerDay={avgPerDay}
+                    txCount={txCount}
+                    busiestLabel={busiestLabel}
+                    priorTotal={priorTotal}
+                    priorMTDTotal={priorMTDTotal}
+                    formatCurrency={formatCurrency}
+                    convertAmount={convertAmount}
+                />
 
-                        {/* Compact stat row */}
-                        <div className="grid grid-cols-3 gap-2">
-                            <div className="rounded-xl bg-secondary/10 border border-white/5 px-3 py-2">
-                                <p className="text-[9px] uppercase tracking-widest font-bold text-muted-foreground/70">Avg / {monthsBackKind === 'days' ? 'Day' : 'Month'}</p>
-                                <p className="text-[13px] font-bold mt-0.5 tabular-nums">{formatCurrency(avgPerDay)}</p>
-                            </div>
-                            <div className="rounded-xl bg-secondary/10 border border-white/5 px-3 py-2">
-                                <p className="text-[9px] uppercase tracking-widest font-bold text-muted-foreground/70">Txns</p>
-                                <p className="text-[13px] font-bold mt-0.5 tabular-nums">{txCount}</p>
-                            </div>
-                            <div className="rounded-xl bg-secondary/10 border border-white/5 px-3 py-2">
-                                <p className="text-[9px] uppercase tracking-widest font-bold text-muted-foreground/70">{monthsBackKind === 'days' ? 'Top Day' : 'Top Month'}</p>
-                                <p className="text-[13px] font-bold mt-0.5 truncate">{busiestLabel || '—'}</p>
-                            </div>
-                        </div>
+                <WeekdayChartCard
+                    weekdayTotals={weekdayTotals}
+                    totalSpentInRange={totalSpentInRange}
+                    formatCurrency={formatCurrency}
+                />
 
-                        <div className="h-[140px] w-full">
-                            {activeCategories.length > 0 ? (
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <LineChart data={forecastChartData} margin={{ top: 5, right: 5, bottom: 0, left: 5 }}>
-                                        <XAxis
-                                            dataKey="month"
-                                            axisLine={false}
-                                            tickLine={false}
-                                            tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 9, fontWeight: 600 }}
-                                            interval={dateRange === '1M' || dateRange === 'LM' ? 4 : (dateRange === '1Y' || dateRange === 'ALL' ? 'preserveStartEnd' : 1)}
-                                        />
-                                        <Tooltip content={<AnalyticsTooltip />} cursor={{ stroke: 'rgba(255,255,255,0.1)', strokeWidth: 1 }} />
-                                        {dateRange !== 'ALL' && priorTotal > 0 && (
-                                            <Line
-                                                type="monotone"
-                                                dataKey="prior_total"
-                                                name="Prior period"
-                                                stroke="rgba(255,255,255,0.35)"
-                                                strokeWidth={1.5}
-                                                strokeDasharray="3 4"
-                                                dot={false}
-                                                connectNulls
-                                                animationDuration={1000}
-                                                animationEasing="ease-in-out"
-                                                isAnimationActive
-                                            />
-                                        )}
-                                        {activeCategories.map((cat, index) => (
-                                            <Line
-                                                key={cat}
-                                                type="monotone"
-                                                dataKey={cat}
-                                                name={getCategoryLabel(cat)}
-                                                stroke={CATEGORY_COLORS[cat] || CATEGORY_COLORS.others}
-                                                strokeWidth={2.5}
-                                                dot={false}
-                                                connectNulls
-                                                animationDuration={1200 + (index * 150)}
-                                                animationEasing="ease-in-out"
-                                            />
-                                        ))}
-                                        {hasForecast && (
-                                            <Line
-                                                type="monotone"
-                                                dataKey="forecast_total"
-                                                name="Forecast"
-                                                stroke="#06B6D4"
-                                                strokeWidth={2}
-                                                strokeDasharray="4 3"
-                                                dot={false}
-                                                connectNulls
-                                                animationDuration={1000}
-                                                animationEasing="ease-in-out"
-                                            />
-                                        )}
-                                    </LineChart>
-                                </ResponsiveContainer>
-                            ) : (
-                                <div className="flex items-center justify-center h-full text-muted-foreground text-[11px] font-bold uppercase tracking-widest">
-                                    No spending in this range
-                                </div>
-                            )}
-                        </div>
+                <TopMerchantsCard
+                    topMerchants={topMerchants}
+                    newMerchantsCount={newMerchantsCount}
+                    formatCurrency={formatCurrency}
+                />
 
-                        {/* Active-category legend */}
-                        {activeCategories.length > 0 && (
-                            <div className="flex flex-wrap gap-1.5">
-                                {activeCategories.slice(0, 6).map(cat => (
-                                    <span key={cat} className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-secondary/20 border border-white/5">
-                                        <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: CATEGORY_COLORS[cat] || CATEGORY_COLORS.others }} />
-                                        <span className="text-muted-foreground/90">{getCategoryLabel(cat)}</span>
-                                    </span>
-                                ))}
-                                {activeCategories.length > 6 && (
-                                    <span className="flex items-center text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-secondary/20 border border-white/5 text-muted-foreground/70">
-                                        +{activeCategories.length - 6} more
-                                    </span>
-                                )}
-                            </div>
-                        )}
+                <LargestTransactionsCard
+                    top3Largest={top3Largest}
+                    formatCurrency={formatCurrency}
+                />
 
-                        <div className="flex items-center justify-between pt-2 border-t border-white/5">
-                            <div className="flex items-center gap-2">
-                                <span className="text-[11px] text-muted-foreground uppercase tracking-widest font-bold">Total Spent</span>
-                                {momDelta && (
-                                    <span
-                                        className={cn(
-                                            "text-[10px] font-bold tabular-nums px-1.5 py-0.5 rounded-md border",
-                                            momDelta.direction === 'up'
-                                                ? "bg-rose-500/10 border-rose-500/25 text-rose-300"
-                                                : momDelta.direction === 'down'
-                                                ? "bg-emerald-500/10 border-emerald-500/25 text-emerald-300"
-                                                : "bg-secondary/20 border-white/5 text-muted-foreground"
-                                        )}
-                                        title={dateRange === '1M' ? 'Same period last month' : 'Previous period'}
-                                    >
-                                        {momDelta.direction === 'up' ? '▲' : momDelta.direction === 'down' ? '▼' : '·'} {Math.abs(momDelta.pct).toFixed(0)}%
-                                    </span>
-                                )}
-                            </div>
-                            <span className="text-base font-bold">{formatCurrency(totalSpentInRange)}</span>
-                        </div>
-                    </CardContent>
-                </Card>
+                <CategoryBreakdownCard
+                    title={
+                        selectedBucketId !== 'all' && buckets.find(b => b.id === selectedBucketId)
+                            ? `Categories within ${buckets.find(b => b.id === selectedBucketId)!.name}`
+                            : 'Spending by Category'
+                    }
+                    categoryBreakdown={categoryBreakdown}
+                    categorizedBreakdown={categorizedBreakdown}
+                    formatCurrency={formatCurrency}
+                    analyticsDateRange={analyticsDateRange}
+                />
 
-                {/* Day-of-Week Spending */}
-                {totalSpentInRange > 0 && (() => {
-                    const maxWd = Math.max(...weekdayTotals.map(w => w.total));
-                    if (maxWd <= 0) return null;
-                    const peak = weekdayTotals.reduce((a, b) => (a.total >= b.total ? a : b));
-                    return (
-                        <Card className="bg-card/40 border-white/5 shadow-none backdrop-blur-md">
-                            <CardContent className="p-4 space-y-3">
-                                <div className="flex items-center justify-between">
-                                    <h3 className="font-bold text-[13px] uppercase tracking-wider text-muted-foreground/80">By Weekday</h3>
-                                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
-                                        Peak · {peak.label}
-                                    </span>
-                                </div>
-                                <div className="grid grid-cols-7 gap-2 h-[110px] items-end">
-                                    {weekdayTotals.map((w, i) => {
-                                        const ratio = w.total / maxWd;
-                                        const isPeak = w.total === peak.total && peak.total > 0;
-                                        return (
-                                            <div key={w.label} className="flex flex-col items-center gap-1.5 h-full justify-end">
-                                                <span className="text-[9px] font-bold tabular-nums text-muted-foreground/60">
-                                                    {w.total > 0 ? formatCurrency(Math.round(w.total)) : ''}
-                                                </span>
-                                                <motion.div
-                                                    initial={{ scaleY: 0, opacity: 0 }}
-                                                    animate={{ scaleY: ratio, opacity: 1 }}
-                                                    transition={{
-                                                        delay: i * 0.05,
-                                                        duration: 0.6,
-                                                        ease: [0.22, 1, 0.36, 1],
-                                                    }}
-                                                    style={{
-                                                        transformOrigin: 'bottom',
-                                                        backgroundColor: isPeak ? '#A855F7' : 'rgba(168,85,247,0.3)',
-                                                    }}
-                                                    className="w-full rounded-md min-h-[6px] h-[60px]"
-                                                />
-                                                <span className={cn(
-                                                    "text-[9px] font-bold uppercase tracking-wider",
-                                                    isPeak ? "text-foreground" : "text-muted-foreground/60"
-                                                )}>
-                                                    {w.label}
-                                                </span>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            </CardContent>
-                        </Card>
-                    );
-                })()}
-
-                {/* Top Places */}
-                {topMerchants.length > 0 && (
-                    <div className="space-y-2">
-                        <div className="flex items-center justify-between px-1">
-                            <span className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground/80">
-                                Top Places
-                            </span>
-                            {newMerchantsCount > 0 && (
-                                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/25 text-emerald-300">
-                                    {newMerchantsCount} new
-                                </span>
-                            )}
-                        </div>
-                        <Card className="bg-card/40 border-none shadow-none backdrop-blur-md overflow-hidden">
-                            <CardContent className="p-4 space-y-2.5">
-                                {topMerchants.map((m, i) => (
-                                    <button
-                                        key={m.name}
-                                        onClick={() => {
-                                            const params = new URLSearchParams({ q: m.name });
-                                            router.push(`/search?${params.toString()}`);
-                                        }}
-                                        className="w-full flex items-center gap-3 text-left rounded-lg -mx-1 px-1 py-1 hover:bg-white/5 transition-colors"
-                                    >
-                                        <div className="w-6 h-6 rounded-lg bg-secondary/20 border border-white/5 flex items-center justify-center shrink-0">
-                                            <span className="text-[10px] font-bold text-muted-foreground/70 tabular-nums">{i + 1}</span>
-                                        </div>
-                                        <MapPin className="w-3.5 h-3.5 text-muted-foreground/60 shrink-0" />
-                                        <div className="flex-1 min-w-0">
-                                            <p className="text-[12px] font-bold truncate">{m.name}</p>
-                                            <p className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground/60">
-                                                {m.count} {m.count === 1 ? 'visit' : 'visits'}
-                                            </p>
-                                        </div>
-                                        <span className="text-[12px] font-bold tabular-nums">{formatCurrency(m.amount)}</span>
-                                    </button>
-                                ))}
-                            </CardContent>
-                        </Card>
-                    </div>
-                )}
-
-                {/* Top 3 Largest */}
-                {top3Largest.length > 0 && (
-                    <div className="space-y-2">
-                        <div className="flex items-center justify-between px-1">
-                            <span className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground/80">
-                                Largest Transactions
-                            </span>
-                        </div>
-                        <Card className="bg-card/40 border-none shadow-none backdrop-blur-md overflow-hidden">
-                            <CardContent className="p-4 space-y-2.5">
-                                {top3Largest.map((tx) => {
-                                    const dotColor = CATEGORY_COLORS[tx.category.toLowerCase()] || CATEGORY_COLORS.others;
-                                    return (
-                                        <div key={tx.id} className="flex items-center gap-3">
-                                            <div
-                                                className="w-2 h-2 rounded-full shrink-0"
-                                                style={{ backgroundColor: dotColor }}
-                                            />
-                                            <div className="flex-1 min-w-0">
-                                                <p className="text-[12px] font-bold truncate">{tx.description}</p>
-                                                <p className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground/60 truncate">
-                                                    {format(parseISO(tx.date.slice(0, 10)), 'd MMM')}
-                                                    {tx.place_name ? ` · ${tx.place_name}` : ''}
-                                                </p>
-                                            </div>
-                                            <span className="text-[12px] font-bold tabular-nums">{formatCurrency(tx.amount)}</span>
-                                        </div>
-                                    );
-                                })}
-                            </CardContent>
-                        </Card>
-                    </div>
-                )}
-
-                {/* Category Breakdown including Pie Chart */}
-                <div className="space-y-2">
-                    <div className="flex items-center justify-between px-1">
-                        <span className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground/80">
-                            {selectedBucketId !== 'all' && buckets.find(b => b.id === selectedBucketId)
-                                ? `Categories within ${buckets.find(b => b.id === selectedBucketId)!.name}`
-                                : 'Spending by Category'}
-                        </span>
-                    </div>
-                    <Card className="bg-card/40 border-none shadow-none backdrop-blur-md overflow-hidden">
-                        <CardContent className="p-4 flex flex-col sm:flex-row items-center justify-start gap-6">
-                            <div className="w-36 h-36 relative flex-shrink-0">
-                                {categoryBreakdown.length > 0 ? (
-                                    <BasePieChart
-                                        data={categoryBreakdown}
-                                        config={CHART_CONFIG}
-                                        innerRadius={46}
-                                        outerRadius={68}
-                                        hideLabel={true}
-                                    />
-                                ) : (
-                                    <div className="flex items-center justify-center h-full text-muted-foreground text-[10px] font-bold uppercase">
-                                        No Data
-                                    </div>
-                                )}
-                            </div>
-
-                            <div className="w-full flex-1 space-y-3">
-                                {categorizedBreakdown.slice(0, 5).map((cat) => (
-                                    <button
-                                        key={cat.name}
-                                        onClick={() => {
-                                            const params = new URLSearchParams({ category: cat.rawKey });
-                                            const range = analyticsDateRange();
-                                            if (range) {
-                                                params.set('from', range.from);
-                                                params.set('to', range.to);
-                                            }
-                                            router.push(`/search?${params.toString()}`);
-                                        }}
-                                        className="w-full text-left space-y-1.5 rounded-lg -mx-1 px-1 py-1 hover:bg-white/5 transition-colors"
-                                    >
-                                        <div className="flex justify-between text-[11px] font-bold">
-                                            <span className="flex items-center gap-2 text-muted-foreground/80">
-                                                <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: cat.fill }} />
-                                                {cat.name}
-                                            </span>
-                                            <span className="text-foreground">{formatCurrency(cat.amount)}</span>
-                                        </div>
-                                        <div className="h-1 w-full bg-secondary/20 rounded-full overflow-hidden">
-                                            <div
-                                                className="h-full rounded-full transition-all duration-700"
-                                                style={{ width: `${cat.value}%`, backgroundColor: cat.fill }}
-                                            />
-                                        </div>
-                                    </button>
-                                ))}
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
-
-                {/* Payment Methods Breakdown */}
-                <div className="space-y-2">
-                    <div className="flex items-center justify-between px-1">
-                        <span className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground/80">
-                            Spending by Payment Method
-                        </span>
-                    </div>
-                    <Card className="bg-card/40 border-none shadow-none backdrop-blur-md overflow-hidden">
-                        <CardContent className="p-4 flex flex-col sm:flex-row items-center justify-start gap-6">
-                            <div className="w-32 h-32 relative flex-shrink-0">
-                                {paymentBreakdown.length > 0 ? (
-                                    <BasePieChart
-                                        data={paymentBreakdown}
-                                        config={paymentChartConfig}
-                                        innerRadius={40}
-                                        outerRadius={60}
-                                        hideLabel={true}
-                                    />
-                                ) : (
-                                    <div className="flex items-center justify-center h-full text-muted-foreground text-[10px] font-bold uppercase">
-                                        No Data
-                                    </div>
-                                )}
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-3 flex-1 w-full">
-                                {categorizedPayment.map((pay) => (
-                                    <div key={pay.name} className="flex flex-col p-3 rounded-2xl bg-secondary/10 border border-white/5">
-                                        <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground/80 uppercase tracking-widest font-bold">
-                                            <div className="w-1 h-1 rounded-full shadow-glow" style={{ backgroundColor: pay.fill }} />
-                                            {pay.name}
-                                        </span>
-                                        <span className="text-sm font-bold mt-1">{formatCurrency(pay.amount)}</span>
-                                        <div className="h-1 w-full bg-secondary/20 rounded-full mt-2 overflow-hidden">
-                                            <div
-                                                className="h-full rounded-full transition-all duration-1000"
-                                                style={{ width: `${pay.value}%`, backgroundColor: pay.fill }}
-                                            />
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
+                <PaymentBreakdownCard
+                    paymentBreakdown={paymentBreakdown}
+                    categorizedPayment={categorizedPayment}
+                    formatCurrency={formatCurrency}
+                />
 
                 {/* Currency conversion staleness footnote */}
                 {usedConversion && ratesLastUpdated && (Date.now() - ratesLastUpdated) > 24 * 60 * 60 * 1000 && (
