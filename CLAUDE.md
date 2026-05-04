@@ -28,6 +28,7 @@ Supabase backend (PostgreSQL + Auth + Realtime). Deployed on Vercel at novira-on
 - Do not add docstrings/comments to code that wasn't changed
 - Do not over-engineer — minimum complexity for the task
 - Always run `npx tsc --noEmit` before finishing any coding task
+- **Always bump `version` in `package.json`** whenever code changes — patch for fixes, minor for features, major for breaking changes. The settings footer reads this value via `import { version } from '@/package.json'` so users see the bump too
 
 ## CSP Notes
 - CSP is set in `proxy.ts` (the middleware), NOT in `next.config.mjs`

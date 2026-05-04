@@ -31,10 +31,14 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    const pushSecret = process.env.PUSH_SECRET;
-    if (!pushSecret) {
-        return NextResponse.json({ error: 'PUSH_SECRET not configured' }, { status: 503 });
+    // Worker fanout authenticates with whichever secret is configured. CRON_SECRET
+    // is preferred (Vercel's standard); PUSH_SECRET is supported for parity with
+    // older internal callers.
+    const fanoutSecret = process.env.CRON_SECRET || process.env.PUSH_SECRET;
+    if (!fanoutSecret) {
+        return NextResponse.json({ error: 'CRON_SECRET or PUSH_SECRET must be configured' }, { status: 503 });
     }
+    const useCronAuth = !!process.env.CRON_SECRET;
 
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -88,7 +92,9 @@ export async function GET(request: NextRequest) {
                     method: 'POST',
                     headers: {
                         'content-type': 'application/json',
-                        'x-push-secret': pushSecret
+                        ...(useCronAuth
+                            ? { authorization: `Bearer ${fanoutSecret}` }
+                            : { 'x-push-secret': fanoutSecret })
                     },
                     body: JSON.stringify({
                         userId: uid,

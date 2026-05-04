@@ -18,13 +18,14 @@ import {
     startOfWeek,
     subMonths,
 } from 'date-fns';
-import { ArrowLeft, ChevronLeft, ChevronRight, RotateCw, Target, Tag, CalendarDays } from 'lucide-react';
+import { ArrowLeft, ChevronLeft, ChevronRight, Plus, RotateCw, Target, Tag, CalendarDays } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useUserPreferences } from '@/components/providers/user-preferences-provider';
 import { useBucketsList } from '@/components/providers/buckets-provider';
 import { useWorkspaceTheme } from '@/hooks/useWorkspaceTheme';
 import { cn } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { getCategoryLabel, CATEGORY_COLORS } from '@/lib/categories';
 
 type EventKind = 'recurring' | 'goal' | 'bucket-end';
@@ -352,13 +353,65 @@ export function CalendarView() {
                 </div>
 
                 <div className="space-y-3">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between gap-2">
                         <h3 className="text-sm font-semibold">{format(selectedDate, 'EEEE, MMM d')}</h3>
-                        {selectedEvents.length > 0 && (
-                            <span className="text-[11px] text-muted-foreground font-medium">
-                                {selectedEvents.length} item{selectedEvents.length === 1 ? '' : 's'}
-                            </span>
-                        )}
+                        <div className="flex items-center gap-2">
+                            {selectedEvents.length > 0 && (
+                                <span className="text-[11px] text-muted-foreground font-medium">
+                                    {selectedEvents.length} item{selectedEvents.length === 1 ? '' : 's'}
+                                </span>
+                            )}
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                    <button
+                                        type="button"
+                                        className={cn(
+                                            'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold border transition-colors',
+                                            themeConfig.bgMedium, themeConfig.borderMedium, themeConfig.text, themeConfig.hoverBg
+                                        )}
+                                    >
+                                        <Plus className="w-3 h-3" /> Schedule
+                                    </button>
+                                </PopoverTrigger>
+                                <PopoverContent
+                                    align="end"
+                                    sideOffset={6}
+                                    className={cn(
+                                        'w-56 p-1.5 bg-card/95 backdrop-blur-xl border-white/10 shadow-xl',
+                                        // Tighter slide + faster duration overrides the default
+                                        // popover's drawn-out slide-from-top-2 animation.
+                                        'duration-150 ease-out',
+                                        'data-[side=bottom]:slide-in-from-top-1 data-[side=top]:slide-in-from-bottom-1',
+                                        'data-[side=left]:slide-in-from-right-1 data-[side=right]:slide-in-from-left-1'
+                                    )}
+                                >
+                                    <button
+                                        type="button"
+                                        onClick={() => router.push(`/add?recurring=1&date=${format(selectedDate, 'yyyy-MM-dd')}`)}
+                                        className="group w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs text-left transition-all duration-150 hover:bg-primary/15 hover:translate-x-0.5"
+                                    >
+                                        <RotateCw className={cn('w-3.5 h-3.5 transition-transform duration-150 group-hover:scale-110 group-hover:rotate-45', themeConfig.text)} />
+                                        <span className="flex-1 group-hover:text-foreground transition-colors">Recurring expense</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => router.push(`/groups?bucket=new&end=${format(selectedDate, 'yyyy-MM-dd')}`)}
+                                        className="group w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs text-left transition-all duration-150 hover:bg-cyan-500/15 hover:translate-x-0.5"
+                                    >
+                                        <Tag className="w-3.5 h-3.5 text-cyan-300 transition-transform duration-150 group-hover:scale-110" />
+                                        <span className="flex-1 group-hover:text-foreground transition-colors">Bucket ending here</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => router.push(`/goals?goal=new&deadline=${format(selectedDate, 'yyyy-MM-dd')}`)}
+                                        className="group w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs text-left transition-all duration-150 hover:bg-emerald-500/15 hover:translate-x-0.5"
+                                    >
+                                        <Target className="w-3.5 h-3.5 text-emerald-300 transition-transform duration-150 group-hover:scale-110" />
+                                        <span className="flex-1 group-hover:text-foreground transition-colors">Goal deadline</span>
+                                    </button>
+                                </PopoverContent>
+                            </Popover>
+                        </div>
                     </div>
                     {loading ? (
                         <div className="space-y-2">

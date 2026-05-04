@@ -2,11 +2,12 @@
 
 import React, { memo, useState, useEffect, useRef } from 'react';
 import { format, parseISO } from 'date-fns';
-import { History, MoreVertical, Users, RefreshCcw, Ban, MapPin, Pencil, Trash2, Globe, ArrowLeftRight, Cloud, AlertTriangle } from 'lucide-react';
+import { History, MoreVertical, Users, RefreshCcw, Ban, MapPin, Pencil, Trash2, Globe, ArrowLeftRight, Cloud, AlertTriangle, StickyNote } from 'lucide-react';
 import type { Transaction } from '@/types/transaction';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import { motion, useMotionValue, animate, useReducedMotion } from 'framer-motion';
 import { getCategoryLabel } from '@/lib/categories';
@@ -225,6 +226,29 @@ export const TransactionRow = memo(function TransactionRow({
                   ? <Globe className="shrink-0 w-3 h-3 text-blue-400/60 ml-0.5" aria-label="Online purchase" />
                   : <MapPin className="shrink-0 w-3 h-3 text-emerald-400/50 ml-0.5" aria-label="Has location" />
               )}
+              {/* Note indicator — tap to reveal */}
+              {tx.notes && tx.notes.trim() && (
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button
+                      type="button"
+                      onClick={(e) => e.stopPropagation()}
+                      className="shrink-0 ml-0.5 p-0.5 -m-0.5 rounded text-amber-300/70 hover:text-amber-300 transition-colors"
+                      aria-label="Show note"
+                    >
+                      <StickyNote className="w-3 h-3" />
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent
+                    align="start"
+                    side="top"
+                    className="max-w-[280px] p-3 bg-card/95 backdrop-blur-xl border-white/10 text-xs leading-relaxed text-white/85 whitespace-pre-wrap break-words"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {tx.notes}
+                  </PopoverContent>
+                </Popover>
+              )}
               {isPending && (
                 <span className="shrink-0 flex items-center gap-1 px-1.5 py-[2px] rounded bg-sky-500/10 text-sky-400 border border-sky-500/15 text-[10px] font-medium ml-1" aria-label="Waiting to sync">
                   <Cloud className="w-2.5 h-2.5 animate-pulse" aria-hidden="true" />
@@ -240,9 +264,9 @@ export const TransactionRow = memo(function TransactionRow({
               {tx.tags && tx.tags.length > 0 && (
                 <span className="shrink-0 flex items-center gap-1 ml-0.5 truncate" aria-label={`Tags: ${tx.tags.join(', ')}`}>
                   <span className="text-white/20 text-[10px]">·</span>
-                  <span className="text-[10.5px] text-primary/70 font-medium leading-none truncate">
-                    {tx.tags.slice(0, 2).map(t => `#${t}`).join(' ')}
-                    {tx.tags.length > 2 && <span className="text-white/30"> +{tx.tags.length - 2}</span>}
+                  <span className="text-[10.5px] text-primary font-semibold leading-none truncate">
+                    {tx.tags.slice(0, 3).map(t => `#${t}`).join(' ')}
+                    {tx.tags.length > 3 && <span className="text-white/40"> +{tx.tags.length - 3}</span>}
                   </span>
                 </span>
               )}

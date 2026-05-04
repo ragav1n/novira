@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/lib/supabase';
 import { toast } from '@/utils/haptics';
+import { version as APP_VERSION } from '@/package.json';
 import { AlertBanner } from '@/components/ui/alert-banner';
 import { AnimatePresence, motion } from 'framer-motion';
 import { generateCSV, generatePDF } from '@/utils/export-utils';
@@ -139,7 +140,7 @@ export function SettingsView() {
         try {
             const { data, error } = await supabase
                 .from('recurring_templates')
-                .select('id, description, amount, currency, frequency, created_at, next_occurrence, last_processed, category, is_active')
+                .select('id, description, amount, currency, frequency, created_at, next_occurrence, category, is_active')
                 .eq('user_id', userId)
                 .order('created_at', { ascending: false });
 
@@ -158,7 +159,11 @@ export function SettingsView() {
                 );
                 return;
             }
-            setRecurringTemplates((data || []).filter(t => t.is_active));
+            setRecurringTemplates(
+                (data || [])
+                    .map(t => ({ ...t, last_processed: null as string | null }))
+                    .filter(t => t.is_active)
+            );
         } catch (error) {
             console.warn('Error loading recurring templates:', error);
         } finally {
@@ -593,7 +598,7 @@ export function SettingsView() {
 
                 {/* Footer Info */}
                 <div className="text-center py-4 space-y-2">
-                    <p className="text-xs text-muted-foreground font-medium">Novira v2.7.2</p>
+                    <p className="text-xs text-muted-foreground font-medium">Novira v{APP_VERSION}</p>
                     <div className="flex justify-center items-center gap-3 text-[11px] text-muted-foreground">
                         <Link href="/privacy" className="hover:text-primary transition-colors">Privacy Policy</Link>
                         <span className="w-1 h-1 rounded-full bg-white/10" />

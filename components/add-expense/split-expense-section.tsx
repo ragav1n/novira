@@ -4,6 +4,7 @@ import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import type { Group, Friend } from '@/components/providers/groups-provider';
+import { evaluateExpression } from '@/lib/expression-eval';
 
 interface SplitExpenseSectionProps {
     isSplitEnabled: boolean;
@@ -178,34 +179,56 @@ export function SplitExpenseSection({
                                 selectedFriendIds.map((friendId) => {
                                     const friend = friends.find(f => f.id === friendId);
                                     if (!friend) return null;
+                                    const raw = customAmounts[friendId] || '';
+                                    const preview = evaluateExpression(raw);
                                     return (
-                                        <div key={friendId} className="flex items-center gap-3">
-                                            <div className="flex items-center gap-2 min-w-[100px]">
-                                                <div className="w-7 h-7 rounded-full overflow-hidden border border-white/5 shrink-0">
-                                                    {friend.avatar_url ? (
-                                                        <img src={friend.avatar_url} alt={friend.full_name} width={28} height={28} className="w-full h-full object-cover" />
-                                                    ) : (
-                                                        <div className="w-full h-full flex items-center justify-center bg-secondary/30">
-                                                            <User className="w-3.5 h-3.5" />
-                                                        </div>
-                                                    )}
+                                        <div key={friendId} className="space-y-1">
+                                            <div className="flex items-center gap-3">
+                                                <div className="flex items-center gap-2 min-w-[100px]">
+                                                    <div className="w-7 h-7 rounded-full overflow-hidden border border-white/5 shrink-0">
+                                                        {friend.avatar_url ? (
+                                                            <img src={friend.avatar_url} alt={friend.full_name} width={28} height={28} className="w-full h-full object-cover" />
+                                                        ) : (
+                                                            <div className="w-full h-full flex items-center justify-center bg-secondary/30">
+                                                                <User className="w-3.5 h-3.5" />
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    <span className="text-xs font-medium truncate">{friend.full_name.split(' ')[0]}</span>
                                                 </div>
-                                                <span className="text-xs font-medium truncate">{friend.full_name.split(' ')[0]}</span>
+                                                <div className="relative flex-1">
+                                                    <Input
+                                                        type="text"
+                                                        inputMode="decimal"
+                                                        placeholder="0.00"
+                                                        value={raw}
+                                                        onChange={(e) => setCustomAmounts(prev => ({ ...prev, [friendId]: e.target.value }))}
+                                                        onBlur={() => {
+                                                            const r = evaluateExpression(customAmounts[friendId] || '');
+                                                            if (r !== null) setCustomAmounts(prev => ({ ...prev, [friendId]: String(r) }));
+                                                        }}
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === 'Enter') {
+                                                                const r = evaluateExpression(customAmounts[friendId] || '');
+                                                                if (r !== null) {
+                                                                    e.preventDefault();
+                                                                    setCustomAmounts(prev => ({ ...prev, [friendId]: String(r) }));
+                                                                }
+                                                            }
+                                                        }}
+                                                        className="h-9 text-sm pl-8 bg-secondary/10 border-white/10 rounded-lg"
+                                                    />
+                                                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+                                                        {CURRENCY_SYMBOLS[currency] || '$'}
+                                                    </span>
+                                                </div>
                                             </div>
-                                            <div className="relative flex-1">
-                                                <Input
-                                                    type="number"
-                                                    min="0"
-                                                    step="0.01"
-                                                    placeholder="0.00"
-                                                    value={customAmounts[friendId] || ''}
-                                                    onChange={(e) => setCustomAmounts(prev => ({ ...prev, [friendId]: e.target.value }))}
-                                                    className="h-9 text-sm pl-8 bg-secondary/10 border-white/10 rounded-lg"
-                                                />
-                                                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
-                                                    {CURRENCY_SYMBOLS[currency] || '$'}
-                                                </span>
-                                            </div>
+                                            {preview !== null && (
+                                                <p className="text-[10px] text-muted-foreground font-medium pl-[112px]">
+                                                    = <span className="font-bold text-primary">{CURRENCY_SYMBOLS[currency] || '$'}{preview.toFixed(2)}</span>
+                                                    <span className="text-muted-foreground/60"> · tap away or press Enter to apply</span>
+                                                </p>
+                                            )}
                                         </div>
                                     );
                                 })
@@ -213,8 +236,14 @@ export function SplitExpenseSection({
 
                             {/* Running total */}
                             {selectedFriendIds.length > 0 && !selectedGroupId && (() => {
-                                const totalAllocated = selectedFriendIds.reduce((sum, id) => sum + (parseFloat(customAmounts[id] || '0') || 0), 0);
-                                const expenseAmount = parseFloat(amount) || 0;
+                                const resolveAmount = (raw: string): number => {
+                                    const evaluated = evaluateExpression(raw);
+                                    if (evaluated !== null) return evaluated;
+                                    const n = parseFloat(raw);
+                                    return Number.isFinite(n) ? n : 0;
+                                };
+                                const totalAllocated = selectedFriendIds.reduce((sum, id) => sum + resolveAmount(customAmounts[id] || ''), 0);
+                                const expenseAmount = resolveAmount(amount);
                                 const yourShare = expenseAmount - totalAllocated;
                                 return (
                                     <div className="space-y-1.5 pt-2 border-t border-white/5">
@@ -248,7 +277,7 @@ export function SplitExpenseSection({
                                 ) : (
                                     <>Each person pays <span className="font-medium text-primary">
                                         {CURRENCY_SYMBOLS[currency] || '$'}
-                                        {(parseFloat(amount) / (selectedFriendIds.length + 1)).toFixed(2)}
+                                        {((evaluateExpression(amount) ?? parseFloat(amount) ?? 0) / (selectedFriendIds.length + 1)).toFixed(2)}
                                     </span></>
                                 )}
                             </p>

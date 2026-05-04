@@ -34,6 +34,7 @@ type SpendingCategory = {
 import { useDashboardData } from '@/hooks/useDashboardData';
 import { useDashboardState } from '@/hooks/useDashboardState';
 import { useDashboardStats } from '@/hooks/useDashboardStats';
+import { useUpcomingRecurring } from '@/hooks/useUpcomingRecurring';
 
 
 
@@ -53,6 +54,7 @@ export function DashboardView() {
     } = useUserPreferences();
     const { balances, groups, friends } = useGroups();
     const { buckets, bucketSpending } = useBuckets();
+    const { items: upcomingRecurring } = useUpcomingRecurring(userId, activeWorkspaceId);
 
     // Pass current user's profile so offline-queued transactions render with the
     // correct payer info instead of a blank profile.
@@ -95,7 +97,8 @@ export function DashboardView() {
 
     const {
         focusedBucket, displayBudget, calculateUserShare, totalSpent,
-        remaining, progress, spendingData, displayTransactions, recentFeed, runRateData, cashflowForecast
+        remaining, progress, spendingData, displayTransactions, recentFeed, runRateData, cashflowForecast,
+        todaySpent, lastMonthComparison
     } = useDashboardStats({
         transactions, 
         userId: activeWorkspaceId ? null : userId, // if workspace, null so we get all workspace txs
@@ -277,6 +280,10 @@ export function DashboardView() {
                     balances={balances}
                     setIsAddFundsOpen={setIsAddFundsOpen}
                     baseCurrency={currency}
+                    todaySpent={todaySpent}
+                    lastMonthComparison={lastMonthComparison}
+                    upcomingRecurring={upcomingRecurring}
+                    convertAmount={convertAmount}
                 />
                 <TransactionListSection
                     isBucketFocused={isBucketFocused}

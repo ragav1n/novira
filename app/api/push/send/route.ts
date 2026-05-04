@@ -29,9 +29,14 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Push notifications not configured. Set NEXT_PUBLIC_VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY env vars.' }, { status: 503 });
     }
 
-    // Verify internal secret
-    const authHeader = request.headers.get('x-push-secret');
-    if (authHeader !== process.env.PUSH_SECRET) {
+    // Verify shared secret. Accepts either:
+    //   - x-push-secret: <PUSH_SECRET>          (legacy/internal callers)
+    //   - Authorization: Bearer <CRON_SECRET>   (Vercel Cron + manual curl tests)
+    const xPushSecret = request.headers.get('x-push-secret');
+    const auth = request.headers.get('authorization');
+    const pushOk = !!process.env.PUSH_SECRET && xPushSecret === process.env.PUSH_SECRET;
+    const cronOk = !!process.env.CRON_SECRET && auth === `Bearer ${process.env.CRON_SECRET}`;
+    if (!pushOk && !cronOk) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 

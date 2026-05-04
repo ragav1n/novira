@@ -221,7 +221,7 @@ export function SearchView() {
         try {
             let query = supabase
                 .from('transactions')
-                .select('id, description, amount, category, date, payment_method, created_at, user_id, group_id, currency, exchange_rate, base_currency, is_recurring, is_settlement, exclude_from_allowance, bucket_id, place_name, place_address, place_lat, place_lng, tags, profile:profiles(full_name, avatar_url), splits(user_id, amount, is_paid)');
+                .select('id, description, amount, category, date, payment_method, created_at, user_id, group_id, currency, exchange_rate, base_currency, is_recurring, is_settlement, exclude_from_allowance, bucket_id, place_name, place_address, place_lat, place_lng, tags, notes, profile:profiles(full_name, avatar_url), splits(user_id, amount, is_paid)');
 
             // Workspace filter
             if (activeWorkspaceId && activeWorkspaceId !== 'personal') {
@@ -230,9 +230,17 @@ export function SearchView() {
                 query = query.is('group_id', null);
             }
 
-            // Text search
+            // Text search across description, place name, place address, and notes.
+            // Wrap in double quotes so commas/periods in the user's query don't
+            // break PostgREST's `or` filter parser; escape ilike wildcards so a
+            // literal `%` or `_` in the query doesn't act as a pattern char.
             if (debouncedSearchQuery) {
-                query = query.ilike('description', `%${debouncedSearchQuery}%`);
+                const escaped = debouncedSearchQuery
+                    .replace(/[%_\\]/g, '\\$&')
+                    .replace(/"/g, '');
+                query = query.or(
+                    `description.ilike."%${escaped}%",place_name.ilike."%${escaped}%",place_address.ilike."%${escaped}%",notes.ilike."%${escaped}%"`
+                );
             }
 
             // Category filter

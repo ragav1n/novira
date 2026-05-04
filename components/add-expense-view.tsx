@@ -2,10 +2,10 @@
 
 import React, { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronLeft, CreditCard, Utensils, Car, Zap, ShoppingBag, HeartPulse, Clapperboard, Wallet, Banknote, HelpCircle, Calendar as CalendarIcon, Home, School, LayoutGrid, Building2, MapPin, Shirt, ShoppingCart, LocateFixed, ScanSearch, Sparkles } from 'lucide-react';
+import { ChevronLeft, CreditCard, Utensils, Car, Zap, ShoppingBag, HeartPulse, Clapperboard, Wallet, Banknote, HelpCircle, Calendar as CalendarIcon, Home, School, LayoutGrid, Building2, MapPin, Shirt, ShoppingCart, LocateFixed, ScanSearch, Sparkles, Camera, Image as ImageIcon } from 'lucide-react';
 import UniqueLoading from '@/components/ui/grid-loading';
 import { AnimatePresence, motion } from 'framer-motion';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { useIsNative } from '@/hooks/use-native';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
@@ -46,6 +46,7 @@ import { takePendingSharedFile } from '@/lib/share-target';
 import { toast } from '@/utils/haptics';
 
 import { CATEGORY_COLORS, getIconForCategory, CATEGORIES as SYSTEM_CATEGORIES } from '@/lib/categories';
+import { evaluateExpression } from '@/lib/expression-eval';
 
 const dropdownCategories = SYSTEM_CATEGORIES.map(cat => ({
     id: cat.id,
@@ -75,8 +76,26 @@ export function AddExpenseView() {
     const defaultSplitEnabled = activeWorkspaceId ? !isSharedWorkspace : false;
 
     const formState = useExpenseForm(userId, currency, activeWorkspaceId, defaultSplitEnabled);
+    const searchParams = useSearchParams();
+
+    // Calendar deep-link: ?recurring=1&date=YYYY-MM-DD pre-fills the form for
+    // scheduling a recurring item on a specific day.
+    const appliedDeepLinkRef = useRef(false);
+    React.useEffect(() => {
+        if (appliedDeepLinkRef.current || !searchParams) return;
+        const wantsRecurring = searchParams.get('recurring') === '1';
+        const dateParam = searchParams.get('date');
+        if (!wantsRecurring && !dateParam) return;
+        appliedDeepLinkRef.current = true;
+        if (wantsRecurring) formState.setIsRecurring(true);
+        if (dateParam) {
+            const parsed = parseISO(dateParam);
+            if (!isNaN(parsed.getTime())) formState.setDate(parsed);
+        }
+    }, [searchParams, formState]);
     const { handleSubmit, loading } = useExpenseSubmission();
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const cameraInputRef = useRef<HTMLInputElement>(null);
     const scanAbortRef = useRef<AbortController | null>(null);
     const [scanning, setScanning] = React.useState(false);
     const [errors, setErrors] = React.useState<ExpenseFormErrors>({});
@@ -161,10 +180,11 @@ export function AddExpenseView() {
     const handleScan = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
+        const target = e.currentTarget;
         try {
             await scanFile(file);
         } finally {
-            if (fileInputRef.current) fileInputRef.current.value = '';
+            target.value = '';
         }
     };
 
@@ -185,17 +205,29 @@ export function AddExpenseView() {
     }, [scanFile]);
 
     const onSubmit = () => {
-        const validationErrors = getExpenseFormErrors(formState.amount, formState.description, formState.date);
+        // Finalize any unevaluated calculator expression before validating.
+        const evaluated = evaluateExpression(formState.amount);
+        const finalAmount = evaluated !== null ? String(evaluated) : formState.amount;
+        if (evaluated !== null && finalAmount !== formState.amount) {
+            formState.setAmount(finalAmount);
+        }
+        const validationErrors = getExpenseFormErrors(finalAmount, formState.description, formState.date);
         if (validationErrors) {
             setErrors(validationErrors);
             return;
         }
         setErrors({});
         if (isNative) Haptics.impact({ style: ImpactStyle.Medium }).catch(() => { });
+        // Also finalize any custom-split expressions before submission.
+        const finalCustomAmounts: Record<string, string> = {};
+        for (const [k, v] of Object.entries(formState.customAmounts)) {
+            const r = evaluateExpression(v);
+            finalCustomAmounts[k] = r !== null ? String(r) : v;
+        }
         handleSubmit({
             userId, isNative, router, currency, resetForm: formState.resetForm,
             userProfile: { full_name: fullName || 'You', avatar_url: avatarUrl || undefined },
-            amount: formState.amount, description: formState.description, date: formState.date,
+            amount: finalAmount, description: formState.description, date: formState.date,
             selectedCategory: formState.selectedCategory, txCurrency: formState.txCurrency,
             selectedGroupId: formState.selectedGroupId, selectedBucketId: formState.selectedBucketId,
             excludeFromAllowance: formState.excludeFromAllowance, placeName: formState.placeName,
@@ -203,7 +235,7 @@ export function AddExpenseView() {
             paymentMethod: formState.paymentMethod, notes: formState.notes, tags: formState.tags,
             isSplitEnabled: formState.isSplitEnabled,
             selectedFriendIds: formState.selectedFriendIds, splitMode: formState.splitMode,
-            customAmounts: formState.customAmounts, isRecurring: formState.isRecurring, frequency: formState.frequency
+            customAmounts: finalCustomAmounts, isRecurring: formState.isRecurring, frequency: formState.frequency
         });
     };
     
@@ -285,7 +317,8 @@ export function AddExpenseView() {
                     </button>
                 </div>
 
-                {/* Scan Receipt Button */}
+                {/* Scan Receipt — primary CTA opens the camera. A separate, clearly
+                    secondary "Choose from gallery" row below covers the upload path. */}
                 <input
                     ref={fileInputRef}
                     type="file"
@@ -293,33 +326,58 @@ export function AddExpenseView() {
                     className="hidden"
                     onChange={handleScan}
                 />
-                <button
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={scanning}
-                    aria-label="Scan receipt"
-                    className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl border border-primary/30 bg-primary/10 hover:bg-primary/20 transition-all disabled:opacity-50 group"
-                >
-                    <div className="w-9 h-9 rounded-xl bg-primary/20 border border-primary/30 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
-                        <ScanSearch className="w-4 h-4 text-primary" />
-                    </div>
-                    <div className="text-left">
-                        <p className="text-sm font-semibold text-primary">Scan Receipt</p>
-                        <p className="text-[11px] text-primary/60">Auto-fill amount, date & more</p>
-                    </div>
-                </button>
+                <input
+                    ref={cameraInputRef}
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    className="hidden"
+                    onChange={handleScan}
+                />
+                <div className="space-y-2">
+                    <button
+                        type="button"
+                        onClick={() => cameraInputRef.current?.click()}
+                        disabled={scanning}
+                        aria-label="Scan receipt — take a photo"
+                        className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl border border-primary/30 bg-primary/10 hover:bg-primary/20 transition-all disabled:opacity-50 group"
+                    >
+                        <div className="w-9 h-9 rounded-xl bg-primary/20 border border-primary/30 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                            <Camera className="w-4 h-4 text-primary" />
+                        </div>
+                        <div className="text-left min-w-0 flex-1">
+                            <p className="text-sm font-semibold text-primary">Scan Receipt</p>
+                            <p className="text-[11px] text-primary/60">Take a photo · auto-fills amount, date & more</p>
+                        </div>
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={scanning}
+                        aria-label="Choose a receipt image from your gallery"
+                        className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-[12px] font-semibold text-muted-foreground hover:text-primary hover:bg-primary/5 transition-all disabled:opacity-50"
+                    >
+                        <ImageIcon className="w-3.5 h-3.5" />
+                        Or choose from gallery
+                    </button>
+                </div>
 
 
                 {/* Amount Input */}
                 <div className="space-y-2">
-                    <label htmlFor="expense-amount" className="text-sm font-medium">Amount *</label>
+                    <div className="flex items-center justify-between">
+                        <label htmlFor="expense-amount" className="text-sm font-medium">Amount *</label>
+                        <span className="text-[10px] text-muted-foreground/60 font-medium uppercase tracking-wider">
+                            Tip: type <span className="text-primary/80 font-mono">12+3.5</span> to add
+                        </span>
+                    </div>
                     <div className="relative">
                         <Input
                             id="expense-amount"
                             name="amount"
                             value={formState.amount}
-                            type="number"
-                            min="0"
-                            step="0.01"
+                            type="text"
+                            inputMode="decimal"
                             placeholder="0.00"
                             required
                             aria-required="true"
@@ -328,6 +386,19 @@ export function AddExpenseView() {
                             onChange={(e) => {
                                 formState.setAmount(e.target.value);
                                 if (errors.amount) setErrors(prev => ({ ...prev, amount: undefined }));
+                            }}
+                            onBlur={() => {
+                                const result = evaluateExpression(formState.amount);
+                                if (result !== null) formState.setAmount(String(result));
+                            }}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                    const result = evaluateExpression(formState.amount);
+                                    if (result !== null) {
+                                        e.preventDefault();
+                                        formState.setAmount(String(result));
+                                    }
+                                }
                             }}
                             className={cn(
                                 "h-16 text-3xl font-bold pl-12 bg-secondary/10 focus-visible:ring-primary/50",
@@ -338,6 +409,16 @@ export function AddExpenseView() {
                             {CURRENCY_SYMBOLS[formState.txCurrency as keyof typeof CURRENCY_SYMBOLS] || '$'}
                         </span>
                     </div>
+                    {(() => {
+                        const preview = evaluateExpression(formState.amount);
+                        if (preview === null) return null;
+                        return (
+                            <p className="text-[11px] text-muted-foreground font-medium pl-1">
+                                = <span className="font-bold text-primary">{CURRENCY_SYMBOLS[formState.txCurrency as keyof typeof CURRENCY_SYMBOLS] || '$'}{preview.toFixed(2)}</span>
+                                <span className="text-muted-foreground/60"> · tap away or press Enter to apply</span>
+                            </p>
+                        );
+                    })()}
                     {errors.amount && (
                         <p id="expense-amount-error" className="text-xs text-destructive font-medium">{errors.amount}</p>
                     )}
@@ -384,6 +465,51 @@ export function AddExpenseView() {
                             <span className="font-bold text-primary capitalize">{formState.suggestedCategory}</span>
                             <span className="text-muted-foreground/60">— tap to apply</span>
                         </button>
+                    )}
+
+                    {formState.descriptionSuggestions.length > 0 && (
+                        <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-hide">
+                            {formState.descriptionSuggestions.map((s, idx) => {
+                                const color = CATEGORY_COLORS[s.category] || CATEGORY_COLORS.uncategorized;
+                                return (
+                                    <button
+                                        key={`${s.description}-${idx}`}
+                                        type="button"
+                                        onClick={() => {
+                                            if (isNative) Haptics.impact({ style: ImpactStyle.Light }).catch(() => { });
+                                            formState.setDescription(s.description);
+                                            if (s.category) formState.setSelectedCategory(s.category);
+                                            if (s.payment_method) {
+                                                const allowed = ['Cash', 'Debit Card', 'Credit Card', 'UPI', 'Bank Transfer'] as const;
+                                                if ((allowed as readonly string[]).includes(s.payment_method)) {
+                                                    formState.setPaymentMethod(s.payment_method as typeof allowed[number]);
+                                                }
+                                            }
+                                            if (s.place_name) {
+                                                formState.setPlaceName(s.place_name);
+                                                formState.setPlaceAddress(s.place_address);
+                                                formState.setPlaceLat(s.place_lat);
+                                                formState.setPlaceLng(s.place_lng);
+                                            }
+                                            if (s.bucket_id) formState.setSelectedBucketId(s.bucket_id);
+                                            formState.setDescriptionSuggestions([]);
+                                            formState.setSuggestedCategory(null);
+                                            formState.setSuggestedBucket(null);
+                                        }}
+                                        className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/10 bg-secondary/20 hover:bg-secondary/40 transition-colors shrink-0"
+                                        aria-label={`Use previous: ${s.description}`}
+                                    >
+                                        <div
+                                            className="w-5 h-5 rounded-full flex items-center justify-center shrink-0"
+                                            style={{ backgroundColor: `${color}25`, color }}
+                                        >
+                                            {getIconForCategory(s.category, 'w-3 h-3')}
+                                        </div>
+                                        <span className="text-[11px] font-medium truncate max-w-[140px]">{s.description}</span>
+                                    </button>
+                                );
+                            })}
+                        </div>
                     )}
                 </div>
 
@@ -502,6 +628,51 @@ export function AddExpenseView() {
                     />
                 </div>
 
+                {formState.smartDefaults && formState.placeName && (() => {
+                    const sd = formState.smartDefaults;
+                    const bucket = sd.bucket_id ? buckets.find(b => b.id === sd.bucket_id && !b.is_archived) : null;
+                    const parts: string[] = [];
+                    if (sd.category) parts.push(sd.category);
+                    if (sd.payment_method) parts.push(sd.payment_method);
+                    if (bucket) parts.push(bucket.name);
+                    if (parts.length === 0) return null;
+                    return (
+                        <div className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-2xl border border-amber-500/20 bg-amber-500/10">
+                            <div className="flex items-center gap-2 min-w-0">
+                                <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                                <p className="text-[11px] text-amber-200/90 font-medium truncate">
+                                    Usual at <span className="font-bold text-amber-300">{formState.placeName}</span>: {parts.map((p, i) => (
+                                        <span key={i} className="font-bold text-amber-300 capitalize">{p}{i < parts.length - 1 ? ' · ' : ''}</span>
+                                    ))}
+                                </p>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        if (isNative) Haptics.impact({ style: ImpactStyle.Light }).catch(() => { });
+                                        if (sd.category) formState.setSelectedCategory(sd.category);
+                                        if (sd.payment_method) formState.setPaymentMethod(sd.payment_method);
+                                        if (sd.bucket_id) formState.setSelectedBucketId(sd.bucket_id);
+                                        formState.setSmartDefaults(null);
+                                    }}
+                                    className="text-[11px] font-bold text-amber-300 hover:text-amber-200 px-2 py-1 rounded-full bg-amber-400/15 border border-amber-400/30"
+                                >
+                                    Apply
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => formState.setSmartDefaults(null)}
+                                    aria-label="Dismiss suggestion"
+                                    className="text-[11px] text-amber-300/70 hover:text-amber-200 px-1"
+                                >
+                                    ×
+                                </button>
+                            </div>
+                        </div>
+                    );
+                })()}
+
                 {/* Category Selection */}
                 <CategorySelector
                     categories={dropdownCategories}
@@ -517,6 +688,27 @@ export function AddExpenseView() {
                 />
 
                 {/* Personal Bucket Selection */}
+                {formState.suggestedBucket && (() => {
+                    const sb = buckets.find(b => b.id === formState.suggestedBucket && !b.is_archived);
+                    if (!sb) return null;
+                    return (
+                        <button
+                            type="button"
+                            onClick={() => {
+                                if (isNative) Haptics.impact({ style: ImpactStyle.Light }).catch(() => { });
+                                formState.setSelectedBucketId(sb.id);
+                                formState.setSuggestedBucket(null);
+                            }}
+                            className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-cyan-400 transition-colors pl-1 -mb-1"
+                            aria-label={`Use suggested bucket: ${sb.name}`}
+                        >
+                            <Sparkles className="w-3 h-3 text-cyan-400/70" aria-hidden="true" />
+                            <span>Suggested bucket</span>
+                            <span className="font-bold text-cyan-400">{sb.name}</span>
+                            <span className="text-muted-foreground/60">— tap to apply</span>
+                        </button>
+                    );
+                })()}
                 <BucketSelector
                     buckets={buckets}
                     selectedBucketId={formState.selectedBucketId}

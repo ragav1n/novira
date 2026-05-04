@@ -92,6 +92,31 @@ export function useExpenseForm(userId: string | null | undefined, defaultCurrenc
     const [tags, setTags] = useState<string[]>(initialDraft?.tags ?? []);
     const [knownTags, setKnownTags] = useState<string[]>([]);
     const [suggestedCategory, setSuggestedCategory] = useState<string | null>(null);
+    const [suggestedBucket, setSuggestedBucket] = useState<string | null>(null);
+
+    // Description autocomplete: top 3 distinct past descriptions matching the prefix,
+    // each carrying its full prior context for one-tap prefill.
+    type DescriptionSuggestion = {
+        description: string;
+        category: string;
+        payment_method: string | null;
+        place_name: string | null;
+        place_address: string | null;
+        place_lat: number | null;
+        place_lng: number | null;
+        bucket_id: string | null;
+        amount: number | null;
+        currency: string | null;
+    };
+    const [descriptionSuggestions, setDescriptionSuggestions] = useState<DescriptionSuggestion[]>([]);
+
+    // Smart defaults derived from a picked place — most common (category, payment, bucket) at this exact place.
+    type SmartDefaults = {
+        category: string | null;
+        payment_method: 'Cash' | 'Debit Card' | 'Credit Card' | 'UPI' | 'Bank Transfer' | null;
+        bucket_id: string | null;
+    };
+    const [smartDefaults, setSmartDefaults] = useState<SmartDefaults | null>(null);
 
     // Persist the current draft. Debounced so rapid typing doesn't thrash storage.
     const draftWriteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -254,17 +279,21 @@ export function useExpenseForm(userId: string | null | undefined, defaultCurrenc
         return () => { cancelled = true; };
     }, [userId]);
 
-    // Smart category suggestion: when description matches a past transaction,
-    // surface its category as a tap-to-apply chip. Skips when the user has
-    // already changed the category from the default.
+    // Description-driven suggestions: pulls past transactions whose description matches
+    // the current input, then derives (a) the suggestedCategory chip, (b) the suggestedBucket
+    // chip, and (c) up to 3 distinct prior descriptions for the autocomplete pills row.
     useEffect(() => {
         if (!userId) {
             setSuggestedCategory(null);
+            setSuggestedBucket(null);
+            setDescriptionSuggestions([]);
             return;
         }
         const trimmed = description.trim();
-        if (trimmed.length < 3) {
+        if (trimmed.length < 2) {
             setSuggestedCategory(null);
+            setSuggestedBucket(null);
+            setDescriptionSuggestions([]);
             return;
         }
         let cancelled = false;
@@ -273,31 +302,103 @@ export function useExpenseForm(userId: string | null | undefined, defaultCurrenc
                 const escaped = trimmed.replace(/[%_\\]/g, '\\$&');
                 const { data } = await supabase
                     .from('transactions')
-                    .select('category')
+                    .select('description, category, payment_method, place_name, place_address, place_lat, place_lng, bucket_id, amount, currency')
                     .eq('user_id', userId)
                     .ilike('description', `%${escaped}%`)
                     .order('created_at', { ascending: false })
-                    .limit(8);
+                    .limit(20);
                 if (cancelled) return;
 
                 if (!data || data.length === 0) {
                     setSuggestedCategory(null);
+                    setSuggestedBucket(null);
+                    setDescriptionSuggestions([]);
                     return;
                 }
-                // Pick the most common category among recent matches.
-                const tally = new Map<string, number>();
-                for (const r of data as { category: string }[]) {
-                    if (!r.category) continue;
-                    tally.set(r.category, (tally.get(r.category) || 0) + 1);
+
+                const catTally = new Map<string, number>();
+                const bucketTally = new Map<string, number>();
+                for (const r of data as { category: string; bucket_id: string | null }[]) {
+                    if (r.category) catTally.set(r.category, (catTally.get(r.category) || 0) + 1);
+                    if (r.bucket_id) bucketTally.set(r.bucket_id, (bucketTally.get(r.bucket_id) || 0) + 1);
                 }
-                const top = [...tally.entries()].sort((a, b) => b[1] - a[1])[0];
-                setSuggestedCategory(top && top[0] !== selectedCategory ? top[0] : null);
+                const topCat = [...catTally.entries()].sort((a, b) => b[1] - a[1])[0];
+                setSuggestedCategory(topCat && topCat[0] !== selectedCategory ? topCat[0] : null);
+                const topBucket = [...bucketTally.entries()].sort((a, b) => b[1] - a[1])[0];
+                setSuggestedBucket(topBucket && topBucket[0] !== selectedBucketId ? topBucket[0] : null);
+
+                // Top 3 distinct descriptions (case-insensitive)
+                const seen = new Set<string>();
+                const distinct: DescriptionSuggestion[] = [];
+                for (const r of data as DescriptionSuggestion[]) {
+                    const key = (r.description || '').trim().toLowerCase();
+                    if (!key) continue;
+                    if (seen.has(key)) continue;
+                    if (key === trimmed.toLowerCase()) continue;
+                    seen.add(key);
+                    distinct.push(r);
+                    if (distinct.length >= 3) break;
+                }
+                setDescriptionSuggestions(distinct);
             } catch (error) {
-                console.error('Error fetching category suggestion:', error);
+                console.error('Error fetching description suggestions:', error);
             }
-        }, 350);
+        }, 300);
         return () => { cancelled = true; clearTimeout(timer); };
-    }, [description, userId, selectedCategory]);
+    }, [description, userId, selectedCategory, selectedBucketId]);
+
+    // Place-based smart defaults: when user picks a place (or it's auto-set by scan/Quick Pin),
+    // fetch the most common category/payment/bucket for that exact place_name and surface
+    // a single "Apply suggestions" chip the user can tap to fill all three at once.
+    useEffect(() => {
+        if (!userId || !placeName) {
+            setSmartDefaults(null);
+            return;
+        }
+        let cancelled = false;
+        const timer = setTimeout(async () => {
+            try {
+                const { data } = await supabase
+                    .from('transactions')
+                    .select('category, payment_method, bucket_id')
+                    .eq('user_id', userId)
+                    .eq('place_name', placeName)
+                    .order('created_at', { ascending: false })
+                    .limit(20);
+                if (cancelled) return;
+                if (!data || data.length < 2) {
+                    setSmartDefaults(null);
+                    return;
+                }
+                const tallyOf = <T extends string | null>(rows: { v: T }[]) => {
+                    const m = new Map<T, number>();
+                    for (const r of rows) {
+                        if (r.v == null) continue;
+                        m.set(r.v, (m.get(r.v) || 0) + 1);
+                    }
+                    return [...m.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+                };
+                const cat = tallyOf(data.map(r => ({ v: r.category as string | null })));
+                const pay = tallyOf(data.map(r => ({ v: r.payment_method as SmartDefaults['payment_method'] })));
+                const buck = tallyOf(data.map(r => ({ v: r.bucket_id as string | null })));
+
+                // Only surface fields that differ from current form state.
+                const next: SmartDefaults = {
+                    category: cat && cat !== selectedCategory ? cat : null,
+                    payment_method: pay && pay !== paymentMethod ? pay : null,
+                    bucket_id: buck && buck !== selectedBucketId ? buck : null,
+                };
+                if (!next.category && !next.payment_method && !next.bucket_id) {
+                    setSmartDefaults(null);
+                } else {
+                    setSmartDefaults(next);
+                }
+            } catch (error) {
+                console.error('Error fetching place smart defaults:', error);
+            }
+        }, 250);
+        return () => { cancelled = true; clearTimeout(timer); };
+    }, [userId, placeName, selectedCategory, paymentMethod, selectedBucketId]);
 
     const resetForm = () => {
         setAmount('');
@@ -322,6 +423,9 @@ export function useExpenseForm(userId: string | null | undefined, defaultCurrenc
         setPlaceLng(null);
         setTags([]);
         setSuggestedCategory(null);
+        setSuggestedBucket(null);
+        setDescriptionSuggestions([]);
+        setSmartDefaults(null);
         if (typeof window !== 'undefined') {
             try { sessionStorage.removeItem(draftKey); } catch { /* noop */ }
         }
@@ -352,6 +456,9 @@ export function useExpenseForm(userId: string | null | undefined, defaultCurrenc
         tags, setTags,
         knownTags,
         suggestedCategory, setSuggestedCategory,
+        suggestedBucket, setSuggestedBucket,
+        descriptionSuggestions, setDescriptionSuggestions,
+        smartDefaults, setSmartDefaults,
         resetForm
     };
 }

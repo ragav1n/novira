@@ -94,7 +94,9 @@ export function ExpandableTabs({
         <div
             ref={outsideClickRef}
             className={cn(
-                "flex flex-nowrap items-center gap-1 sm:gap-2 rounded-2xl border bg-background p-1 shadow-sm overflow-x-auto no-scrollbar",
+                // min-h pins the row height so width/padding animations on children
+                // can't reflow vertically when the row overflows horizontally.
+                "flex flex-nowrap items-center gap-1 sm:gap-2 rounded-2xl border bg-background p-1 shadow-sm overflow-x-auto no-scrollbar min-h-[44px] sm:min-h-[48px]",
                 className
             )}
         >
@@ -111,7 +113,6 @@ export function ExpandableTabs({
                             tabRefs.current[index] = el as HTMLButtonElement | null;
                         }}
                         variants={buttonVariants}
-                        layout
                         initial="initial"
                         animate="animate"
                         custom={{ isSelected: selected === index, hasSelected: selected !== null }}
@@ -128,13 +129,12 @@ export function ExpandableTabs({
                         <AnimatePresence initial={false}>
                             {selected === index && (
                                 <motion.span
-                                    layout
                                     variants={spanVariants}
                                     initial="initial"
                                     animate="animate"
                                     exit="exit"
                                     transition={transition}
-                                    className="overflow-hidden"
+                                    className="overflow-hidden whitespace-nowrap"
                                 >
                                     {tab.title}
                                 </motion.span>

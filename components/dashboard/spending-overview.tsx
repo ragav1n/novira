@@ -2,7 +2,7 @@
 
 import React, { startTransition } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronRight, Check, Wallet, Tag, Pencil, ArrowUpRight, ArrowDownLeft, Clock, LayoutGrid, Plus } from 'lucide-react';
+import { ChevronRight, Check, Wallet, Tag, Pencil, ArrowUpRight, ArrowDownLeft, Clock, LayoutGrid, Plus, TrendingUp, TrendingDown } from 'lucide-react';
 import { format, differenceInDays } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { Progress } from '@/components/ui/progress';
@@ -13,6 +13,8 @@ import { Currency, CURRENCY_SYMBOLS } from '@/components/providers/user-preferen
 import { Bucket } from '@/components/providers/buckets-provider';
 import { toast } from '@/utils/haptics';
 import { CashflowForecast } from './cashflow-forecast';
+import { UpcomingRecurringCard } from './upcoming-recurring-card';
+import type { UpcomingCharge } from '@/hooks/useUpcomingRecurring';
 
 type SpendingCategory = {
     name: string;
@@ -69,6 +71,14 @@ interface SpendingOverviewProps {
     };
     setIsAddFundsOpen: (open: boolean) => void;
     baseCurrency: Currency;
+    todaySpent: number;
+    lastMonthComparison: {
+        lastMonthMTD: number;
+        deltaPct: number;
+        isUp: boolean;
+    } | null;
+    upcomingRecurring: UpcomingCharge[];
+    convertAmount: (amount: number, fromCurrency: string, toCurrency?: string) => number;
 }
 
 const containerVariants = {
@@ -109,7 +119,11 @@ export const SpendingOverview = React.memo(function SpendingOverview({
     spendingData,
     balances,
     setIsAddFundsOpen,
-    baseCurrency
+    baseCurrency,
+    todaySpent,
+    lastMonthComparison,
+    upcomingRecurring,
+    convertAmount
 }: SpendingOverviewProps) {
     return (
         <div className="space-y-6">
@@ -250,6 +264,27 @@ export const SpendingOverview = React.memo(function SpendingOverview({
                                     ? <span className="inline-block h-9 w-36 bg-white/20 rounded-lg animate-pulse align-middle" />
                                     : formatCurrency(totalSpent, bucketCurrency)}
                             </h2>
+                            {!isBucketFocused && !isRatesLoading && (
+                                <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                                    {lastMonthComparison && (
+                                        <span
+                                            className={cn(
+                                                "inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full backdrop-blur-sm border",
+                                                lastMonthComparison.isUp
+                                                    ? "bg-black/25 text-white border-white/15"
+                                                    : "bg-white/15 text-white border-white/20"
+                                            )}
+                                            title={`Last month at this point: ${formatCurrency(lastMonthComparison.lastMonthMTD, bucketCurrency)}`}
+                                        >
+                                            {lastMonthComparison.isUp ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                                            {lastMonthComparison.isUp ? '+' : ''}{lastMonthComparison.deltaPct.toFixed(0)}% vs last month
+                                        </span>
+                                    )}
+                                    <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-white/15 text-white border border-white/20 backdrop-blur-sm">
+                                        Today {formatCurrency(todaySpent, bucketCurrency)}
+                                    </span>
+                                </div>
+                            )}
                         </div>
                         <div className="w-10 h-10 shrink-0 rounded-full bg-white/20 flex items-center justify-center backdrop-blur-sm shadow-sm">
                             <span className="text-xl font-bold text-white">
@@ -396,6 +431,18 @@ export const SpendingOverview = React.memo(function SpendingOverview({
                     forecast={cashflowForecast}
                     formatCurrency={formatCurrency}
                     bucketCurrency={bucketCurrency}
+                    isCoupleWorkspace={isCoupleWorkspace}
+                    isHomeWorkspace={isHomeWorkspace}
+                />
+            )}
+
+            {/* Upcoming Recurring Charges */}
+            {!isBucketFocused && upcomingRecurring.length > 0 && (
+                <UpcomingRecurringCard
+                    items={upcomingRecurring}
+                    formatCurrency={formatCurrency}
+                    convertAmount={convertAmount}
+                    displayCurrency={bucketCurrency}
                     isCoupleWorkspace={isCoupleWorkspace}
                     isHomeWorkspace={isHomeWorkspace}
                 />

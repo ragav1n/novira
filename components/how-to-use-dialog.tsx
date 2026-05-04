@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Zap, Users, Tag, PieChart, Plus, Wallet, Globe, X, CheckCircle2, MapPin, RefreshCcw, Search, Home, Target } from 'lucide-react';
+import { Compass, Users, Tag, PieChart, Plus, Wallet, X, CheckCircle2, MapPin, RefreshCcw, Search, Home, Target, CalendarClock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 type HowToUseDialogProps = {
@@ -21,102 +21,114 @@ export function HowToUseDialog({ isOpen, onClose }: HowToUseDialogProps) {
     const steps = [
         {
             icon: <Plus className="w-6 h-6 text-emerald-400" />,
-            title: "Precision Recording",
-            desc: "Hit the floating (+) button anywhere to record a spend. Point your camera at a receipt and Novira reads the amount and merchant for you — no typing needed. Travelling? Select a different currency and we'll convert the amount to your base currency in real-time.",
+            title: "Smart Expense Capture",
+            desc: "Tap (+) to log a spend in seconds. Take Photo to scan a receipt with the camera, or pick one from files — Novira auto-fills amount, merchant, and date. Type expressions like 12.5+3.20 right in the amount field and they're calculated for you. Description pills suggest your past expenses for one-tap fill.",
             subPoints: [
-                "Receipt scanner — auto-fills amount & merchant",
-                "Smart Location & Merchant memory",
-                "Real-time FX for 160+ currencies"
+                "Take Photo or Scan Receipt — auto-fill amount, merchant, date",
+                "Inline calculator in amount and split fields",
+                "Description autocomplete pills with full prefill",
+                "Real-time FX across 160+ currencies"
+            ]
+        },
+        {
+            icon: <Wallet className="w-6 h-6 text-primary" />,
+            title: "Living Dashboard",
+            desc: "Your home screen reads your money at a glance. The big Spent card shows month-to-date with a vs-last-month delta and today's spend pill. The Month Forecasting widget projects where you'll land using a weighted recent run-rate, and the Cashflow Forecast chart plots your month's trajectory.",
+            subPoints: [
+                "vs-last-month delta and Today's spend pill",
+                "Month Forecasting + Cashflow Forecast chart",
+                "Coming-Up-This-Week strip for upcoming recurring charges",
+                "Mid-bucket threshold alerts and digest pushes"
             ]
         },
         {
             icon: <Users className="w-6 h-6 text-blue-400" />,
-            title: "Social Connectivity",
-            desc: "Money shouldn't be awkward. Add friends by scanning their unique QR codes or via email. Create shared Groups for trips, rent, or dinner parties. Split bills by percentage, exact amounts, or shares. Use Smart Settle to clear all debts in one tap — or mark incoming payments as received instantly.",
+            title: "Splits & Friends",
+            desc: "Money shouldn't be awkward. Add friends by scanning a QR code or by email. Create Groups for trips, rent, or dinners. Split evenly or by custom amounts (each split field accepts expressions too). Smart Settle clears multiple debts in one tap.",
             subPoints: [
+                "Even or custom-amount splits with calculator support",
                 "Scan-to-add friend QR codes",
-                "Advanced bill splitting rules",
                 "Smart Settle — clear all debts in one tap"
-            ]
-        },
-        {
-            icon: <MapPin className="w-6 h-6 text-rose-400" />,
-            title: "Spatial Intelligence",
-            desc: "Location is everything. Use the 'Expense Map' to visualize your finances in 3D. Drag and drop a custom pin to tag any spot on earth — not just auto-detected places. Enable 'Heatmap' mode for density hotspots or 'Trip Trails' to see your spending pulse flow through the city.",
-            subPoints: [
-                "Drag & drop a pin anywhere on the map",
-                "Animated Flow Trails & Hover Insights",
-                "Spending Density Heatmaps"
             ]
         },
         {
             icon: <Home className="w-6 h-6 text-indigo-400" />,
             title: "Dedicated Workspaces",
-            desc: "Don't mix personal and shared finances. Use the Workspace Switcher dropdown at the top of the dashboard to seamlessly swap into a 'Couple' or 'Household' dashboard. The entire app's budget and transactions will isolate to that group.",
+            desc: "Keep personal and shared finances apart. Switch into a Couple or Household workspace from the top of the dashboard — budgets, transactions, and analytics isolate to that group instantly.",
             subPoints: [
-                "100% isolated shared dashboards",
+                "Isolated shared dashboards",
                 "Custom joint monthly budgets",
-                "Auto-calculation of household spending"
+                "Per-workspace transaction history"
             ]
         },
         {
             icon: <Tag className="w-6 h-6 text-cyan-500" />,
-            title: "Mission Buckets & Focus",
-            desc: "Create a Mission Bucket for specific travel or big purchases. Use the Dashboard Focus pill to isolate your entire view to ONLY that mission's localized budget and pacing.",
+            title: "Mission Buckets",
+            desc: "Create a Mission Bucket for trips or big purchases — each bucket has its own budget, currency, and date range. Use the Focus pill on the dashboard to isolate everything to one mission. Tags add a second dimension you can filter by anywhere.",
             subPoints: [
-                "Isolated goal-based Mission views",
-                "Localized currency and budget targets",
-                "Archive completed & settled missions"
+                "Localized currency and budget per mission",
+                "Focus mode to isolate the dashboard",
+                "Transaction tags for cross-cutting filters"
             ]
         },
         {
             icon: <Target className="w-6 h-6 text-emerald-400" />,
             title: "Savings Goals",
-            desc: "Set ambitious financial targets like 'New Car' or 'Emergency Fund'. Make periodic deposits towards your target and watch the progress bar fill up over time in the dedicated Goals tab.",
+            desc: "Set targets like 'New Car' or 'Emergency Fund' and log periodic deposits. The Goals tab tracks progress, deposit history, and milestones over time.",
             subPoints: [
-                "Visual target progress tracking",
+                "Visual progress tracking",
                 "Deposit log history",
-                "Achieve long-term milestones"
-            ]
-        },
-        {
-            icon: <Wallet className="w-6 h-6 text-primary" />,
-            title: "Predictive Guardrails",
-            desc: "Set a Monthly Allowance in Settings to see your 'Safe to Spend' limit. We'll send smart alerts when you hit 80% of your budget. Use 'Add Funds' for income, bonuses, or refunds without skewing your expense reports. Our calculator tracks your burn rate in real-time.",
-            subPoints: [
-                "Monthly allowance & pacing tracker",
-                "80% overspend safety alerts",
-                "Income/Refund tracking via Add Funds"
+                "Long-term milestones"
             ]
         },
         {
             icon: <RefreshCcw className="w-6 h-6 text-orange-400" />,
-            title: "Automation & Subs",
-            desc: "Track all your recurring expenses in the Subscriptions tab calendar to manage your monthly drain. Save hours by importing bank statements (CSV) with smart category mapping.",
+            title: "Recurring & Subscriptions",
+            desc: "Track everything that hits monthly in the Subscriptions tab. Novira detects silent price changes on your subs and surfaces them. Bulk edit lets you fix many transactions at once. Privacy mode hides amounts when you're not alone.",
             subPoints: [
-                "Subscription calendar manager",
-                "Smart Bank Statement Import",
-                "Proactive background app updates"
+                "Subscription calendar with price-change detection",
+                "Bulk edit and privacy mode",
+                "Daily / weekly digest push notifications"
             ]
         },
         {
-            icon: <Search className="w-6 h-6 text-amber-400" />,
-            title: "Advanced Discovery",
-            desc: "Find anything instantly. Search transactions by description, category, or bucket. Use powerful filters to narrow down by price range, payment method, or specific dates. Get a 'Total Filtered' summary to audit specific clusters of your spending life.",
+            icon: <CalendarClock className="w-6 h-6 text-amber-400" />,
+            title: "Calendar & Cashflow",
+            desc: "The cash flow calendar visualises your day-by-day spending so you can spot heavy weeks at a glance. Tap any day to drill in. Combined with Cashflow Forecast on the dashboard, you always know what's behind and what's ahead.",
             subPoints: [
-                "Multi-criteria advanced filtering",
-                "Unified global transaction search",
-                "Total Filtered amount summaries"
+                "Day-by-day cash flow calendar",
+                "Drill into any day's transactions",
+                "Forecast trajectory through end of month"
             ]
         },
         {
-            icon: <PieChart className="w-6 h-6 text-violet-400" />,
-            title: "CFO-Grade Analytics",
-            desc: "Knowledge is power. The Analytics tab breaks down spending into interactive pie charts and trend lines. Switch between category and payment views for a 360-degree audit. Export professional multi-page PDF reports with full summaries for tax or reimbursement.",
+            icon: <MapPin className="w-6 h-6 text-rose-400" />,
+            title: "Expense Map",
+            desc: "Every geo-tagged spend appears on the Expense Map. Drag a pin anywhere, switch to Heatmap for density, or Trip Trails to see flows. The map remembers merchants so suggestions get sharper over time.",
             subPoints: [
-                "Interactive Pie & Trend analytics",
-                "Professional PDF recaps with charts",
-                "Raw CSV data backups & exports"
+                "Drag-drop pins, Heatmap & Trip Trails",
+                "Smart Quick Pins from your visit history",
+                "Place-aware smart default suggestions"
+            ]
+        },
+        {
+            icon: <Search className="w-6 h-6 text-violet-400" />,
+            title: "Search & Analytics",
+            desc: "Find anything by description, category, bucket, payment method, or date range — server-side, so it's fast even on 10k+ rows. The Analytics tab breaks down spending with interactive charts and exports professional multi-page PDF reports.",
+            subPoints: [
+                "Multi-criteria search with totals",
+                "Interactive pie & trend analytics",
+                "PDF reports and CSV exports"
+            ]
+        },
+        {
+            icon: <PieChart className="w-6 h-6 text-pink-400" />,
+            title: "Allowance & Guardrails",
+            desc: "Set a Monthly Allowance to see your Safe-to-Spend at all times. Smart alerts fire at 80% and again as you near the limit. Use Add Funds for income, refunds, or bonuses without polluting your expense reports.",
+            subPoints: [
+                "Monthly allowance with pacing",
+                "Overspend safety alerts",
+                "Add Funds for income & refunds"
             ]
         }
     ];
@@ -147,35 +159,37 @@ export function HowToUseDialog({ isOpen, onClose }: HowToUseDialogProps) {
                         <div className="absolute -bottom-32 -right-32 w-80 h-80 bg-purple-600/20 rounded-full blur-[100px] opacity-40 animate-pulse pointer-events-none" />
 
                         <div className="flex flex-col max-h-[90vh]">
-                            
-                            {/* Header - Fixed with Premium Style */}
-                            <div className="relative p-8 pb-6 shrink-0 border-b border-white/5 bg-white/5 z-10 text-center flex flex-col items-center">
+
+                            {/* Header — compact so the first content card is visible without scrolling */}
+                            <div className="relative px-5 sm:px-8 pt-5 pb-4 shrink-0 border-b border-white/5 bg-white/5 z-10 flex items-center gap-3">
                                 <motion.div
                                     initial={{ scale: 0.8, opacity: 0 }}
                                     animate={{ scale: 1, opacity: 1 }}
-                                    transition={{ delay: 0.2 }}
-                                    className="inline-flex items-center justify-center p-3.5 rounded-2xl bg-white/5 border border-white/10 mb-5"
+                                    transition={{ delay: 0.15 }}
+                                    className="shrink-0 inline-flex items-center justify-center w-10 h-10 rounded-xl bg-white/5 border border-white/10"
                                 >
-                                    <Zap className="w-8 h-8 text-primary drop-shadow-[0_0_12px_rgba(138,43,226,0.8)]" />
+                                    <Compass className="w-5 h-5 text-primary drop-shadow-[0_0_8px_rgba(138,43,226,0.6)]" />
                                 </motion.div>
-                                <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight leading-tight px-4">
-                                    Master Your <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-purple-400">Financial Flow</span>
-                                </h1>
-                                <p className="text-white/50 text-xs sm:text-sm max-w-[360px] mx-auto leading-relaxed mt-3">
-                                    Novira is a living pulse of your finances. Explore these 10 core mechanics to master your financial universe.
-                                </p>
-                                
-                                <button 
+                                <div className="min-w-0 flex-1">
+                                    <h1 className="text-base sm:text-lg font-extrabold text-white tracking-tight leading-tight truncate">
+                                        Master Your <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-purple-400">Financial Flow</span>
+                                    </h1>
+                                    <p className="text-white/70 text-[11px] sm:text-xs leading-snug mt-0.5 line-clamp-2">
+                                        A quick tour of the 11 core mechanics that make Novira tick.
+                                    </p>
+                                </div>
+                                <button
                                     onClick={onClose}
-                                    className="absolute top-6 right-6 p-2 rounded-full hover:bg-white/10 text-white/30 hover:text-white transition-all duration-300"
+                                    aria-label="Close"
+                                    className="shrink-0 p-2 rounded-full hover:bg-white/10 text-white/60 hover:text-white transition-all duration-300"
                                 >
                                     <X className="w-5 h-5" />
                                 </button>
                             </div>
 
                             {/* Scrollable Content Area - Single Column */}
-                            <div className="flex-1 overflow-y-auto custom-scrollbar px-6 sm:px-10 py-6 sm:py-8">
-                                <div className="space-y-4 pb-4">
+                            <div className="flex-1 overflow-y-auto custom-scrollbar px-4 sm:px-8 py-4 sm:py-5">
+                                <div className="space-y-3 pb-2">
                                     {steps.map((step, i) => (
                                         <motion.div
                                             key={i}
@@ -192,13 +206,13 @@ export function HowToUseDialog({ isOpen, onClose }: HowToUseDialogProps) {
                                                     <h3 className="text-base sm:text-lg font-extrabold text-white group-hover:text-primary transition-colors">
                                                         {step.title}
                                                     </h3>
-                                                    <p className="text-[12px] sm:text-[13px] text-white/50 leading-relaxed group-hover:text-white/70 transition-colors">
+                                                    <p className="text-[12px] sm:text-[13px] text-white/80 leading-relaxed transition-colors">
                                                         {step.desc}
                                                     </p>
                                                     <div className="pt-3 grid grid-cols-1 gap-2">
                                                         {step.subPoints.map((point, idx) => (
-                                                            <div key={idx} className="flex items-start gap-2.5 text-[11px] sm:text-[11px] font-semibold text-white/30 group-hover:text-white/50 transition-colors">
-                                                                <CheckCircle2 className="w-3.5 h-3.5 text-primary/40 mt-0.5 shrink-0" />
+                                                            <div key={idx} className="flex items-start gap-2.5 text-[11px] sm:text-[11px] font-semibold text-white/75 transition-colors">
+                                                                <CheckCircle2 className="w-3.5 h-3.5 text-primary mt-0.5 shrink-0" />
                                                                 <span className="leading-tight">{point}</span>
                                                             </div>
                                                         ))}
@@ -211,10 +225,10 @@ export function HowToUseDialog({ isOpen, onClose }: HowToUseDialogProps) {
                             </div>
 
                             {/* Fixed Footer Action */}
-                            <div className="p-8 border-t border-white/5 bg-black/98 backdrop-blur-xl shrink-0 z-10">
+                            <div className="px-5 py-4 sm:px-8 sm:py-5 border-t border-white/5 bg-black/98 backdrop-blur-xl shrink-0 z-10">
                                 <Button
                                     onClick={onClose}
-                                    className="w-full bg-white text-black hover:bg-white/90 font-black h-14 rounded-2xl shadow-[0_0_30px_-5px_rgba(255,255,255,0.3)] transition-all duration-300 hover:scale-[1.01] active:scale-[0.99] text-sm uppercase tracking-widest"
+                                    className="w-full bg-white text-black hover:bg-white/90 font-black h-12 rounded-2xl shadow-[0_0_30px_-5px_rgba(255,255,255,0.3)] transition-all duration-300 hover:scale-[1.01] active:scale-[0.99] text-sm uppercase tracking-widest"
                                 >
                                     Got it! Let's Go
                                 </Button>

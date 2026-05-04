@@ -49,7 +49,7 @@ export const BucketService = {
     async getBucketTransactions(bucketId: string) {
         const { data, error } = await supabase
             .from('transactions')
-            .select('id, description, amount, category, date, created_at, user_id, currency, exchange_rate, base_currency, bucket_id, group_id, place_name, place_address, place_lat, place_lng, tags, profile:profiles(full_name, avatar_url), splits(user_id, amount, is_paid, profile:profiles(full_name, avatar_url))')
+            .select('id, description, amount, category, date, created_at, user_id, currency, exchange_rate, base_currency, bucket_id, group_id, place_name, place_address, place_lat, place_lng, tags, notes, profile:profiles(full_name, avatar_url), splits(user_id, amount, is_paid, profile:profiles(full_name, avatar_url))')
             .eq('bucket_id', bucketId)
             .order('date', { ascending: false })
             .order('created_at', { ascending: false });

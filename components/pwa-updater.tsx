@@ -17,9 +17,9 @@ export function PWAUpdater() {
             hasShownToastRef.current = true;
 
             // Notify user that a new version is available
-            toast('New Version Available', {
+            toast('Novira just got smarter', {
                 id: 'pwa-update-toast',
-                description: 'Refresh to see the latest updates and features.',
+                description: 'New: vs-last-month delta, Today chip, upcoming charges, amount calculator, Take Photo, description pills & smart place defaults.',
                 duration: Infinity,
                 action: {
                     label: 'Update Now',

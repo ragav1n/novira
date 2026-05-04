@@ -24,6 +24,7 @@ export type Transaction = {
     place_lat?: number;
     place_lng?: number;
     tags?: string[];
+    notes?: string;
     splits?: {
         user_id: string;
         amount: number;
