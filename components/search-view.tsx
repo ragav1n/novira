@@ -122,6 +122,11 @@ export function SearchView() {
         };
     });
     const [selectedBucketId, setSelectedBucketId] = useState<string | null>(null);
+    const [selectedTags, setSelectedTags] = useState<string[]>(() => {
+        const t = searchParams?.get('tag');
+        return t ? [t] : [];
+    });
+    const [knownTags, setKnownTags] = useState<string[]>([]);
     const [sortBy, setSortBy] = useState<SortOption>('date-desc');
     const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
 
@@ -168,7 +173,7 @@ export function SearchView() {
         try {
             let query = supabase
                 .from('transactions')
-                .select('id, description, amount, category, date, payment_method, created_at, user_id, group_id, currency, exchange_rate, base_currency, is_recurring, is_settlement, exclude_from_allowance, bucket_id, place_name, place_address, place_lat, place_lng, profile:profiles(full_name, avatar_url), splits(user_id, amount, is_paid)');
+                .select('id, description, amount, category, date, payment_method, created_at, user_id, group_id, currency, exchange_rate, base_currency, is_recurring, is_settlement, exclude_from_allowance, bucket_id, place_name, place_address, place_lat, place_lng, tags, profile:profiles(full_name, avatar_url), splits(user_id, amount, is_paid)');
 
             // Workspace filter
             if (activeWorkspaceId && activeWorkspaceId !== 'personal') {
@@ -213,6 +218,11 @@ export function SearchView() {
                 query = query.eq('bucket_id', selectedBucketId);
             }
 
+            // Tag filter — match transactions that contain ALL selected tags.
+            if (selectedTags.length > 0) {
+                query = query.contains('tags', selectedTags);
+            }
+
             // Sorting
             const ascending = sortBy === 'date-asc' || sortBy === 'amount-asc';
             const sortColumn = sortBy.startsWith('date') ? 'date' : 'amount';
@@ -243,11 +253,40 @@ export function SearchView() {
         } finally {
             setLoading(false);
         }
-    }, [activeWorkspaceId, debouncedSearchQuery, selectedCategories, selectedPayments, dateRange, priceRange, selectedBucketId, sortBy, maxPossiblePrice]);
+    }, [activeWorkspaceId, debouncedSearchQuery, selectedCategories, selectedPayments, dateRange, priceRange, selectedBucketId, selectedTags, sortBy, maxPossiblePrice]);
 
     useEffect(() => {
         fetchAndFilter();
     }, [fetchAndFilter]);
+
+    // Build the user's tag vocabulary once so the filter sheet has chips to choose from.
+    useEffect(() => {
+        if (!userId) return;
+        let cancelled = false;
+        (async () => {
+            try {
+                const { data } = await supabase
+                    .from('transactions')
+                    .select('tags')
+                    .eq('user_id', userId)
+                    .not('tags', 'is', null)
+                    .order('created_at', { ascending: false })
+                    .limit(300);
+                if (cancelled || !data) return;
+                const counts = new Map<string, number>();
+                for (const row of data as { tags: string[] | null }[]) {
+                    for (const t of row.tags || []) {
+                        if (!t) continue;
+                        counts.set(t, (counts.get(t) || 0) + 1);
+                    }
+                }
+                setKnownTags([...counts.entries()].sort((a, b) => b[1] - a[1]).map(([t]) => t));
+            } catch (error) {
+                console.error('Error fetching tag vocabulary:', error);
+            }
+        })();
+        return () => { cancelled = true; };
+    }, [userId]);
 
     useTransactionInvalidationListener(fetchAndFilter);
 
@@ -286,6 +325,7 @@ export function SearchView() {
         setSelectedPayments([]);
         setDateRange({ from: undefined, to: undefined });
         setSelectedBucketId(null);
+        setSelectedTags([]);
         setSortBy('date-desc');
         setSearchQuery('');
     };
@@ -297,6 +337,7 @@ export function SearchView() {
         if (selectedPayments.length > 0) count++;
         if (dateRange.from || dateRange.to) count++;
         if (selectedBucketId) count++;
+        if (selectedTags.length > 0) count++;
         return count;
     };
 
@@ -482,6 +523,33 @@ export function SearchView() {
                                 </div>
                             )}
 
+                            {/* Tags Filter */}
+                            {knownTags.length > 0 && (
+                                <div className="space-y-3">
+                                    <Label className="text-xs font-bold uppercase text-muted-foreground tracking-wider">Tags</Label>
+                                    <div className="flex flex-wrap gap-1.5">
+                                        {knownTags.slice(0, 30).map((t) => {
+                                            const active = selectedTags.includes(t);
+                                            return (
+                                                <button
+                                                    type="button"
+                                                    key={t}
+                                                    onClick={() => setSelectedTags(prev => active ? prev.filter(x => x !== t) : [...prev, t])}
+                                                    className={cn(
+                                                        "inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold border transition-colors",
+                                                        active
+                                                            ? "bg-primary/20 border-primary/40 text-primary"
+                                                            : "bg-secondary/10 border-white/5 text-muted-foreground hover:border-white/10"
+                                                    )}
+                                                >
+                                                    #{t}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
+
                             {/* Categories (Multi-select) */}
                             <div className="space-y-3">
                                 <Label className="text-xs font-bold uppercase text-muted-foreground tracking-wider">Categories</Label>
@@ -593,6 +661,11 @@ export function SearchView() {
                             Bucket: {buckets.find(b => b.id === selectedBucketId)?.name} <X className="w-3 h-3 cursor-pointer" onClick={() => setSelectedBucketId(null)} />
                         </div>
                     )}
+                    {selectedTags.map(t => (
+                        <div key={t} className="flex items-center gap-1.5 px-3 py-1 bg-primary/15 border border-primary/30 rounded-full text-[11px] text-primary whitespace-nowrap">
+                            #{t} <X className="w-3 h-3 cursor-pointer" onClick={() => setSelectedTags(prev => prev.filter(x => x !== t))} />
+                        </div>
+                    ))}
                 </div>
             )}
 

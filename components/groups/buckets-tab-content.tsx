@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import { type Bucket } from '@/components/providers/buckets-provider';
 import { toast } from '@/utils/haptics';
 import { BucketDialog } from './bucket-dialog';
+import { BucketDetailSheet } from './bucket-detail-sheet';
 
 interface BucketsTabContentProps {
     buckets: Bucket[];
@@ -24,9 +25,11 @@ export function BucketsTabContent({
 }: BucketsTabContentProps) {
     const [isBucketDialogOpen, setIsBucketDialogOpen] = useState(false);
     const [editingBucket, setEditingBucket] = useState<Bucket | null>(null);
+    const [detailBucket, setDetailBucket] = useState<Bucket | null>(null);
 
     const activeBuckets = buckets.filter(b => !b.is_archived);
     const archivedBuckets = buckets.filter(b => b.is_archived);
+    const completedBuckets = archivedBuckets.filter(b => !!b.completed_at);
 
     const handleAddBucket = () => {
         setEditingBucket(null);
@@ -44,6 +47,12 @@ export function BucketsTabContent({
                 isOpen={isBucketDialogOpen}
                 onClose={() => setIsBucketDialogOpen(false)}
                 editingBucket={editingBucket}
+            />
+            <BucketDetailSheet
+                bucket={detailBucket}
+                spent={detailBucket ? (bucketSpending[detailBucket.id] || 0) : 0}
+                open={!!detailBucket}
+                onOpenChange={(open) => !open && setDetailBucket(null)}
             />
 
             <div className="space-y-4">
@@ -68,7 +77,20 @@ export function BucketsTabContent({
                         const remaining = budget - spent;
 
                         return (
-                            <Card key={bucket.id} className="rounded-3xl overflow-hidden hover:bg-card/60 transition-colors border-white/5 bg-card/40">
+                            <Card
+                                key={bucket.id}
+                                onClick={() => setDetailBucket(bucket)}
+                                className="rounded-3xl overflow-hidden hover:bg-card/60 transition-colors border-white/5 bg-card/40 cursor-pointer"
+                                role="button"
+                                tabIndex={0}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter' || e.key === ' ') {
+                                        e.preventDefault();
+                                        setDetailBucket(bucket);
+                                    }
+                                }}
+                                aria-label={`Open details for bucket ${bucket.name}`}
+                            >
                                 <CardContent className="p-4 space-y-4">
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-4 min-w-0">
@@ -84,7 +106,7 @@ export function BucketsTabContent({
                                                 </p>
                                             </div>
                                         </div>
-                                        <div className="flex items-center gap-1">
+                                        <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                                             <button
                                                 onClick={() => handleEditBucket(bucket)}
                                                 className="p-2 rounded-full hover:bg-secondary/30 transition-colors"
@@ -176,47 +198,84 @@ export function BucketsTabContent({
                 <div className="pt-4 space-y-4">
                     <div className="flex items-center gap-2 px-1">
                         <Archive className="w-3 h-3 text-muted-foreground/40" />
-                        <h3 className="text-[11px] font-bold text-muted-foreground/40 uppercase tracking-widest">Archived Buckets</h3>
+                        <h3 className="text-[11px] font-bold text-muted-foreground/40 uppercase tracking-widest">
+                            {completedBuckets.length === archivedBuckets.length
+                                ? 'Completed Buckets'
+                                : completedBuckets.length > 0
+                                    ? `Completed & Archived`
+                                    : 'Archived Buckets'}
+                        </h3>
                     </div>
-                    {archivedBuckets.map((bucket) => (
-                        <Card key={bucket.id} className="rounded-3xl overflow-hidden grayscale-[0.5] opacity-60 hover:opacity-100 transition-all border-white/5 bg-card/20 group">
-                            <CardContent className="p-4 flex items-center justify-between">
-                                <div className="flex items-center gap-4 min-w-0">
-                                    <div className="w-10 h-10 rounded-xl flex items-center justify-center border bg-secondary/10 border-white/5 text-muted-foreground p-2 shrink-0">
-                                        {getBucketIcon(bucket.icon)}
+                    {archivedBuckets.map((bucket) => {
+                        const isCompleted = !!bucket.completed_at;
+                        return (
+                            <Card
+                                key={bucket.id}
+                                onClick={() => setDetailBucket(bucket)}
+                                className={cn(
+                                    "rounded-3xl overflow-hidden hover:opacity-100 transition-all border-white/5 group cursor-pointer",
+                                    isCompleted ? "bg-emerald-500/5 border-emerald-500/15 opacity-90" : "bg-card/20 grayscale-[0.5] opacity-60"
+                                )}
+                                role="button"
+                                tabIndex={0}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter' || e.key === ' ') {
+                                        e.preventDefault();
+                                        setDetailBucket(bucket);
+                                    }
+                                }}
+                            >
+                                <CardContent className="p-4 flex items-center justify-between">
+                                    <div className="flex items-center gap-4 min-w-0">
+                                        <div className={cn(
+                                            "w-10 h-10 rounded-xl flex items-center justify-center border p-2 shrink-0",
+                                            isCompleted ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400" : "bg-secondary/10 border-white/5 text-muted-foreground"
+                                        )}>
+                                            {getBucketIcon(bucket.icon)}
+                                        </div>
+                                        <div className="min-w-0">
+                                            <h4 className={cn(
+                                                "font-bold text-sm truncate",
+                                                isCompleted ? "text-emerald-300" : "text-muted-foreground"
+                                            )}>{bucket.name}</h4>
+                                            <p className={cn(
+                                                "text-[9px] uppercase tracking-wider font-bold",
+                                                isCompleted ? "text-emerald-400/70" : "text-muted-foreground/60"
+                                            )}>
+                                                {isCompleted
+                                                    ? `Completed ${format(new Date(bucket.completed_at!), 'MMM d, yy')}`
+                                                    : 'Archived'}
+                                            </p>
+                                        </div>
                                     </div>
-                                    <div className="min-w-0">
-                                        <h4 className="font-bold text-sm text-muted-foreground truncate">{bucket.name}</h4>
-                                        <p className="text-[9px] text-muted-foreground/60 uppercase tracking-wider font-bold">Archived</p>
+                                    <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                                        <button
+                                            onClick={() => archiveBucket(bucket.id, false)}
+                                            className="p-2 rounded-full hover:bg-primary/20 hover:text-primary transition-colors"
+                                            title="Unarchive Bucket"
+                                        >
+                                            <RotateCcw className="w-3.5 h-3.5" />
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                toast(`Delete ${bucket.name}?`, {
+                                                    description: "Transactions will stay, but the label will be removed.",
+                                                    action: {
+                                                        label: 'Delete',
+                                                        onClick: () => deleteBucket(bucket.id)
+                                                    }
+                                                })
+                                            }}
+                                            className="p-2 rounded-full hover:bg-rose-500/20 hover:text-rose-500 transition-colors"
+                                            title="Delete Bucket"
+                                        >
+                                            <Trash2 className="w-3.5 h-3.5" />
+                                        </button>
                                     </div>
-                                </div>
-                                <div className="flex items-center gap-1">
-                                    <button
-                                        onClick={() => archiveBucket(bucket.id, false)}
-                                        className="p-2 rounded-full hover:bg-primary/20 hover:text-primary transition-colors"
-                                        title="Unarchive Bucket"
-                                    >
-                                        <RotateCcw className="w-3.5 h-3.5" />
-                                    </button>
-                                    <button
-                                        onClick={() => {
-                                            toast(`Delete ${bucket.name}?`, {
-                                                description: "Transactions will stay, but the label will be removed.",
-                                                action: {
-                                                    label: 'Delete',
-                                                    onClick: () => deleteBucket(bucket.id)
-                                                }
-                                            })
-                                        }}
-                                        className="p-2 rounded-full hover:bg-rose-500/20 hover:text-rose-500 transition-colors"
-                                        title="Delete Bucket"
-                                    >
-                                        <Trash2 className="w-3.5 h-3.5" />
-                                    </button>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    ))}
+                                </CardContent>
+                            </Card>
+                        );
+                    })}
                 </div>
             )}
         </div>

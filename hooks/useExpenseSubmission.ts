@@ -29,6 +29,7 @@ interface ExpenseSubmissionParams {
     placeLng: number | null;
     paymentMethod: string;
     notes: string;
+    tags: string[];
     // Split State
     isSplitEnabled: boolean;
     selectedFriendIds: string[];
@@ -133,7 +134,8 @@ function buildRecurringRecord(
     placeName: string | null,
     placeAddress: string | null,
     placeLat: number | null,
-    placeLng: number | null
+    placeLng: number | null,
+    tags: string[]
 ): RecurringRecord {
     const intendedDay = date.getDate();
     const nextDate = new Date(date);
@@ -169,6 +171,7 @@ function buildRecurringRecord(
             friend_ids: selectedFriendIds,
             notes,
             bucket_id: selectedBucketId,
+            ...(tags.length ? { tags } : {}),
             ...(placeName ? { place_name: placeName, place_address: placeAddress, place_lat: placeLat, place_lng: placeLng } : {})
         }
     };
@@ -183,7 +186,7 @@ export function useExpenseSubmission() {
             amount, description, date, selectedCategory, txCurrency,
             selectedGroupId, selectedBucketId, excludeFromAllowance,
             placeName, placeAddress, placeLat, placeLng,
-            paymentMethod, notes, isSplitEnabled, selectedFriendIds,
+            paymentMethod, notes, tags, isSplitEnabled, selectedFriendIds,
             splitMode, customAmounts, isRecurring, frequency
         } = params;
 
@@ -200,6 +203,10 @@ export function useExpenseSubmission() {
 
             const exchangeRate = await TransactionService.getExchangeRate(txCurrency, currency, date!);
             const convertedAmount = parseFloat(amount) * exchangeRate;
+
+            const cleanTags = Array.from(new Set(
+                tags.map(t => t.trim()).filter(t => t.length > 0 && t.length <= 32)
+            )).slice(0, 12);
 
             const transactionRecord: TransactionRecord = {
                 user_id: userId,
@@ -218,6 +225,7 @@ export function useExpenseSubmission() {
                 is_recurring: isRecurring,
                 exclude_from_allowance: excludeFromAllowance,
                 idempotency_key: idempotencyKey,
+                tags: cleanTags,
                 ...(placeName ? { place_name: placeName, place_address: placeAddress, place_lat: placeLat, place_lng: placeLng } : {})
             };
 
@@ -229,7 +237,7 @@ export function useExpenseSubmission() {
             }
 
             const recurringRecordToInsert = isRecurring
-                ? buildRecurringRecord(userId, description, amount, selectedCategory, txCurrency, selectedGroupId, paymentMethod, frequency, date!, excludeFromAllowance, isSplitEnabled, selectedFriendIds, notes, selectedBucketId, placeName, placeAddress, placeLat, placeLng)
+                ? buildRecurringRecord(userId, description, amount, selectedCategory, txCurrency, selectedGroupId, paymentMethod, frequency, date!, excludeFromAllowance, isSplitEnabled, selectedFriendIds, notes, selectedBucketId, placeName, placeAddress, placeLat, placeLng, cleanTags)
                 : null;
 
             const result = await TransactionService.createTransaction({
@@ -283,6 +291,7 @@ export function useExpenseSubmission() {
                             place_address: transactionRecord.place_address ?? undefined,
                             place_lat: transactionRecord.place_lat ?? undefined,
                             place_lng: transactionRecord.place_lng ?? undefined,
+                            tags: transactionRecord.tags,
                             group_id: transactionRecord.group_id,
                             splits: (splitResult.records ?? []).map(s => ({ user_id: s.user_id, amount: s.amount })),
                             profile: userProfile,

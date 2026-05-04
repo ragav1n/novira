@@ -79,11 +79,12 @@ export function SettlementsTabContent({
                                                         ? `Settled ${settled} split${settled !== 1 ? 's' : ''} with ${payment.toName}!`
                                                         : `Marked ${settled} payment${settled !== 1 ? 's' : ''} as received from ${payment.fromName}!`
                                                     );
-                                                } catch (error: any) {
+                                                } catch (error) {
+                                                    const msg = error instanceof Error ? error.message : 'Failed';
                                                     if (settled > 0) {
-                                                        toast.error(`Settled ${settled} of ${payment.splitIds.length} — ${error.message || 'partial failure'}`);
+                                                        toast.error(`Settled ${settled} of ${payment.splitIds.length} — ${msg}`);
                                                     } else {
-                                                        toast.error(error.message || 'Failed to settle');
+                                                        toast.error(msg);
                                                     }
                                                 } finally {
                                                     setSettlingPaymentIndex(null);
@@ -121,8 +122,8 @@ export function SettlementsTabContent({
                                         settled++;
                                     }
                                     toast.success(`Settled all ${settled} debt${settled !== 1 ? 's' : ''}!`);
-                                } catch (error: any) {
-                                    toast.error(error.message || 'Failed to settle all');
+                                } catch (error) {
+                                    toast.error(error instanceof Error ? error.message : 'Failed to settle all');
                                 } finally {
                                     setIsSettlingAll(false);
                                 }
@@ -178,8 +179,8 @@ export function SettlementsTabContent({
                                             try {
                                                 await settleSplit(split.id, split.transaction?.user_id);
                                                 toast.success('Split settled!');
-                                            } catch (error: any) {
-                                                toast.error(error.message || 'Failed to settle split');
+                                            } catch (error) {
+                                                toast.error(error instanceof Error ? error.message : 'Failed to settle split');
                                             }
                                         }}
                                     >

@@ -5,7 +5,7 @@ export const BucketService = {
     async getBuckets(userId?: string, workspaceId?: string | null) {
         let query = supabase
             .from('buckets')
-            .select('id, user_id, name, type, icon, color, budget, currency, is_archived, start_date, end_date, created_at')
+            .select('id, user_id, name, type, icon, color, budget, currency, is_archived, start_date, end_date, created_at, allowed_categories, completed_at, completion_notified, group_id')
             .order('created_at', { ascending: false });
 
         if (workspaceId && workspaceId !== 'personal') {
@@ -24,7 +24,7 @@ export const BucketService = {
     async getBucketSpending(userId?: string, workspaceId?: string | null) {
         let query = supabase
             .from('transactions')
-            .select('id, amount, currency, bucket_id, exchange_rate, base_currency, user_id, group_id, splits(user_id, amount)')
+            .select('id, amount, category, currency, bucket_id, exchange_rate, base_currency, user_id, group_id, splits(user_id, amount)')
             .not('bucket_id', 'is', null);
 
         if (workspaceId && workspaceId !== 'personal') {
@@ -36,6 +36,23 @@ export const BucketService = {
         }
 
         const { data, error } = await query;
+        if (error) throw error;
+        return data;
+    },
+
+    /**
+     * Fetches every transaction belonging to a bucket plus the contributor profiles,
+     * so the detail view can render per-category, per-currency, and per-member breakdowns
+     * without further round-trips.
+     */
+    async getBucketTransactions(bucketId: string) {
+        const { data, error } = await supabase
+            .from('transactions')
+            .select('id, description, amount, category, date, created_at, user_id, currency, exchange_rate, base_currency, bucket_id, group_id, place_name, place_address, place_lat, place_lng, tags, profile:profiles(full_name, avatar_url), splits(user_id, amount, is_paid, profile:profiles(full_name, avatar_url))')
+            .eq('bucket_id', bucketId)
+            .order('date', { ascending: false })
+            .order('created_at', { ascending: false });
+
         if (error) throw error;
         return data;
     },

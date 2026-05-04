@@ -3,13 +3,14 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
-import { Tag, Plane, Home, Gift, Car, Utensils, ShoppingCart, Heart, Gamepad2, Music, Laptop, School } from 'lucide-react';
+import { Tag, Plane, Home, Gift, Car, Utensils, ShoppingCart, Heart, Gamepad2, Music, Laptop, School, Filter } from 'lucide-react';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
 import { DateRange } from 'react-day-picker';
 import { useBucketsList, Bucket } from '@/components/providers/buckets-provider';
 import { useUserPreferences, CURRENCY_DETAILS, type Currency } from '@/components/providers/user-preferences-provider';
 import { toast } from '@/utils/haptics';
 import { cn } from '@/lib/utils';
+import { CATEGORIES as SYSTEM_CATEGORIES, CATEGORY_COLORS, getIconForCategory } from '@/lib/categories';
 
 interface BucketDialogProps {
     isOpen: boolean;
@@ -27,6 +28,7 @@ export function BucketDialog({ isOpen, onClose, editingBucket }: BucketDialogPro
     const [newBucketIcon, setNewBucketIcon] = useState('Tag');
     const [bucketDateRange, setBucketDateRange] = useState<DateRange | undefined>();
     const [newBucketCurrency, setNewBucketCurrency] = useState<Currency | string>(currency || 'USD');
+    const [allowedCategories, setAllowedCategories] = useState<string[]>([]);
 
     useEffect(() => {
         if (isOpen) {
@@ -39,12 +41,14 @@ export function BucketDialog({ isOpen, onClose, editingBucket }: BucketDialogPro
                     to: editingBucket.end_date ? new Date(editingBucket.end_date) : undefined
                 });
                 setNewBucketCurrency(editingBucket.currency || currency || 'USD');
+                setAllowedCategories(editingBucket.allowed_categories || []);
             } else {
                 setNewBucketName('');
                 setNewBucketTarget('');
                 setNewBucketIcon('Tag');
                 setBucketDateRange(undefined);
                 setNewBucketCurrency(currency || 'USD');
+                setAllowedCategories([]);
             }
         }
     }, [isOpen, editingBucket, currency]);
@@ -64,7 +68,8 @@ export function BucketDialog({ isOpen, onClose, editingBucket }: BucketDialogPro
                     icon: newBucketIcon,
                     start_date: bucketDateRange?.from?.toISOString(),
                     end_date: bucketDateRange?.to?.toISOString(),
-                    currency: newBucketCurrency
+                    currency: newBucketCurrency,
+                    allowed_categories: allowedCategories
                 });
                 toast.success('Bucket updated');
             } else {
@@ -75,13 +80,15 @@ export function BucketDialog({ isOpen, onClose, editingBucket }: BucketDialogPro
                     type: 'trip',
                     start_date: bucketDateRange?.from?.toISOString(),
                     end_date: bucketDateRange?.to?.toISOString(),
-                    currency: newBucketCurrency
+                    currency: newBucketCurrency,
+                    allowed_categories: allowedCategories
                 });
                 toast.success('Bucket created');
             }
             onClose();
-        } catch (error: any) {
-            toast.error(error.message || `Failed to ${editingBucket ? 'update' : 'create'} bucket`);
+        } catch (error) {
+            const msg = error instanceof Error ? error.message : `Failed to ${editingBucket ? 'update' : 'create'} bucket`;
+            toast.error(msg);
         } finally {
             setIsProcessing(false);
         }
@@ -204,6 +211,58 @@ export function BucketDialog({ isOpen, onClose, editingBucket }: BucketDialogPro
                                     numberOfMonths={1}
                                     align="center"
                                 />
+                            </div>
+
+                            <div className="space-y-2 text-left w-full">
+                                <div className="flex items-center justify-between pl-1">
+                                    <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-1.5">
+                                        <Filter className="w-3 h-3" aria-hidden="true" />
+                                        Limit to categories
+                                    </p>
+                                    {allowedCategories.length > 0 && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setAllowedCategories([])}
+                                            className="text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+                                        >
+                                            Clear
+                                        </button>
+                                    )}
+                                </div>
+                                <p className="text-[10px] text-muted-foreground/70 pl-1 -mt-1">
+                                    {allowedCategories.length === 0
+                                        ? 'All categories count toward this bucket.'
+                                        : `Only ${allowedCategories.length} ${allowedCategories.length === 1 ? 'category counts' : 'categories count'} toward this bucket.`}
+                                </p>
+                                <div className="flex flex-wrap gap-1.5">
+                                    {SYSTEM_CATEGORIES.map((cat) => {
+                                        const active = allowedCategories.includes(cat.id);
+                                        const color = CATEGORY_COLORS[cat.id] || '#8A2BE2';
+                                        return (
+                                            <button
+                                                type="button"
+                                                key={cat.id}
+                                                onClick={() => setAllowedCategories(prev =>
+                                                    active ? prev.filter(c => c !== cat.id) : [...prev, cat.id]
+                                                )}
+                                                className={cn(
+                                                    "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border transition-colors capitalize",
+                                                    active
+                                                        ? "border-transparent"
+                                                        : "bg-secondary/10 border-white/5 text-muted-foreground hover:border-white/10"
+                                                )}
+                                                style={active ? { backgroundColor: `${color}20`, borderColor: `${color}50`, color } : undefined}
+                                            >
+                                                <span className="w-3 h-3 inline-flex items-center justify-center">
+                                                    {React.cloneElement(getIconForCategory(cat.id) as React.ReactElement<{ style?: React.CSSProperties }>, {
+                                                        style: { color: active ? color : undefined, width: '100%', height: '100%' }
+                                                    })}
+                                                </span>
+                                                {cat.label}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
                             </div>
                         </div>
 

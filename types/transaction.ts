@@ -23,6 +23,7 @@ export type Transaction = {
     place_address?: string;
     place_lat?: number;
     place_lng?: number;
+    tags?: string[];
     splits?: {
         user_id: string;
         amount: number;
@@ -63,6 +64,7 @@ export type TransactionRecord = {
     place_address?: string | null;
     place_lat?: number | null;
     place_lng?: number | null;
+    tags?: string[];
 };
 
 export type SplitRecord = {

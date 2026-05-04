@@ -98,8 +98,9 @@ export function ChangePasswordDialog({ trigger, mode = 'change', onSuccess }: Ch
             setCurrentPassword('');
             setPassword('');
             setConfirmPassword('');
-        } catch (error: any) {
-            toast.error(error.message || 'Failed to update password');
+        } catch (error) {
+            const msg = error instanceof Error ? error.message : 'Failed to update password';
+            toast.error(msg);
             console.error('Password update error:', error);
         } finally {
             setIsLoading(false);

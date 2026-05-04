@@ -40,14 +40,14 @@ export class ErrorBoundary extends Component<Props, State> {
             An unexpected error occurred. We've been notified and are working on a fix.
           </p>
           <div className="flex gap-4">
-            <Button 
+            <Button
               onClick={() => window.location.reload()}
               className="bg-primary hover:bg-primary/90 rounded-xl px-6"
             >
               <RefreshCcw className="w-4 h-4 mr-2" />
               Reload App
             </Button>
-            <Button 
+            <Button
               variant="outline"
               onClick={() => window.location.href = '/'}
               className="border-white/10 hover:bg-white/5 rounded-xl px-6"

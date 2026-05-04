@@ -36,6 +36,11 @@ export function useExpenseForm(userId: string | null | undefined, defaultCurrenc
     const [placeLng, setPlaceLng] = useState<number | null>(null);
     const [suggestedLocations, setSuggestedLocations] = useState<{ name: string, address: string, lat: number, lng: number, type: 'last' | 'frequent' | 'category' }[]>([]);
 
+    // Tag State
+    const [tags, setTags] = useState<string[]>([]);
+    const [knownTags, setKnownTags] = useState<string[]>([]);
+    const [suggestedCategory, setSuggestedCategory] = useState<string | null>(null);
+
     // Smart Location Memory: Suggest locations from previous transactions
     useEffect(() => {
         if (!userId) {
@@ -128,6 +133,85 @@ export function useExpenseForm(userId: string | null | undefined, defaultCurrenc
         return () => clearTimeout(timer);
     }, [description, selectedCategory, userId, placeName]);
 
+    // Load the user's existing tag vocabulary once per session for autocomplete.
+    useEffect(() => {
+        if (!userId) {
+            setKnownTags([]);
+            return;
+        }
+        let cancelled = false;
+        (async () => {
+            try {
+                const { data } = await supabase
+                    .from('transactions')
+                    .select('tags')
+                    .eq('user_id', userId)
+                    .not('tags', 'is', null)
+                    .order('created_at', { ascending: false })
+                    .limit(200);
+                if (cancelled || !data) return;
+                const counts = new Map<string, number>();
+                for (const row of data as { tags: string[] | null }[]) {
+                    for (const t of row.tags || []) {
+                        if (!t) continue;
+                        counts.set(t, (counts.get(t) || 0) + 1);
+                    }
+                }
+                setKnownTags(
+                    [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([t]) => t)
+                );
+            } catch (error) {
+                console.error('Error fetching known tags:', error);
+            }
+        })();
+        return () => { cancelled = true; };
+    }, [userId]);
+
+    // Smart category suggestion: when description matches a past transaction,
+    // surface its category as a tap-to-apply chip. Skips when the user has
+    // already changed the category from the default.
+    useEffect(() => {
+        if (!userId) {
+            setSuggestedCategory(null);
+            return;
+        }
+        const trimmed = description.trim();
+        if (trimmed.length < 3) {
+            setSuggestedCategory(null);
+            return;
+        }
+        let cancelled = false;
+        const timer = setTimeout(async () => {
+            try {
+                const escaped = trimmed.replace(/[%_\\]/g, '\\$&');
+                const { data } = await supabase
+                    .from('transactions')
+                    .select('category')
+                    .eq('user_id', userId)
+                    .ilike('description', `%${escaped}%`)
+                    .order('created_at', { ascending: false })
+                    .limit(8);
+                if (cancelled) return;
+
+                if (!data || data.length === 0) {
+                    setSuggestedCategory(null);
+                    return;
+                }
+                // Pick the most common category among recent matches.
+                const tally = new Map<string, number>();
+                for (const r of data as { category: string }[]) {
+                    if (!r.category) continue;
+                    tally.set(r.category, (tally.get(r.category) || 0) + 1);
+                }
+                const top = [...tally.entries()].sort((a, b) => b[1] - a[1])[0];
+                setSuggestedCategory(top && top[0] !== selectedCategory ? top[0] : null);
+            } catch (error) {
+                console.error('Error fetching category suggestion:', error);
+            }
+        }, 350);
+        return () => { cancelled = true; clearTimeout(timer); };
+    }, [description, userId, selectedCategory]);
+
     const resetForm = () => {
         setAmount('');
         setDescription('');
@@ -149,6 +233,8 @@ export function useExpenseForm(userId: string | null | undefined, defaultCurrenc
         setPlaceAddress(null);
         setPlaceLat(null);
         setPlaceLng(null);
+        setTags([]);
+        setSuggestedCategory(null);
     };
 
     return {
@@ -173,6 +259,9 @@ export function useExpenseForm(userId: string | null | undefined, defaultCurrenc
         placeLat, setPlaceLat,
         placeLng, setPlaceLng,
         suggestedLocations, setSuggestedLocations,
+        tags, setTags,
+        knownTags,
+        suggestedCategory, setSuggestedCategory,
         resetForm
     };
 }

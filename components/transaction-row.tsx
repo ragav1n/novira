@@ -237,6 +237,15 @@ export const TransactionRow = memo(function TransactionRow({
                   Failed
                 </span>
               )}
+              {tx.tags && tx.tags.length > 0 && (
+                <span className="shrink-0 flex items-center gap-1 ml-0.5 truncate" aria-label={`Tags: ${tx.tags.join(', ')}`}>
+                  <span className="text-white/20 text-[10px]">·</span>
+                  <span className="text-[10.5px] text-primary/70 font-medium leading-none truncate">
+                    {tx.tags.slice(0, 2).map(t => `#${t}`).join(' ')}
+                    {tx.tags.length > 2 && <span className="text-white/30"> +{tx.tags.length - 2}</span>}
+                  </span>
+                </span>
+              )}
             </div>
 
             {/* Right: dropdown */}

@@ -178,14 +178,13 @@ export function Component({ isSignUp = false }: { isSignUp?: boolean }) {
           router.push('/');
         }
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error("Auth error:", error);
-
-      // Better error handling for rate limits
-      if (error.status === 429 || error.message?.toLowerCase().includes('rate limit')) {
+      const e = error as { status?: number; message?: string };
+      if (e?.status === 429 || e?.message?.toLowerCase().includes('rate limit')) {
         setError('Too many requests. Please wait a moment before trying again.');
       } else {
-        setError(error.message || 'Authentication failed');
+        setError(e?.message || 'Authentication failed');
       }
 
       // Release lock on error only (on success we navigate away)
@@ -784,9 +783,10 @@ export function Component({ isSignUp = false }: { isSignUp?: boolean }) {
                       });
                       if (error) throw error;
                       // On success the browser is redirecting to Google — leave the lock held.
-                    } catch (error: any) {
+                    } catch (error) {
                       console.error("Google Auth error:", error);
-                      setError(error.message || 'Authentication failed');
+                      const msg = error instanceof Error ? error.message : 'Authentication failed';
+                      setError(msg);
                       setIsLoading(false);
                       isSubmittingRef.current = false;
                     }

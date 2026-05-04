@@ -7,7 +7,10 @@ import { useUserPreferences } from '@/components/providers/user-preferences-prov
 import { useWorkspaceTheme } from '@/hooks/useWorkspaceTheme';
 import { supabase } from '@/lib/supabase';
 import { Card, CardContent } from '@/components/ui/card';
-import { Calendar, RotateCw, Trash2, ArrowLeft } from 'lucide-react';
+import { Calendar, RotateCw, Trash2, ArrowLeft, Tag, X } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { useBucketsList } from '@/components/providers/buckets-provider';
+import { getBucketIcon } from '@/utils/icon-utils';
 import {
     AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
     AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -19,12 +22,20 @@ import { toast } from '@/utils/haptics';
 import { getCategoryLabel, getIconForCategory, CATEGORY_COLORS } from '@/lib/categories';
 import type { RecurringTemplate } from '@/types/transaction';
 
+// Local type that admits the metadata JSONB the server returns. RecurringTemplate
+// in shared types is intentionally narrower; this view needs to read/write the
+// bucket_id stored inside metadata.
+type RecurringTemplateWithMeta = RecurringTemplate & {
+    metadata?: Record<string, unknown> | null;
+};
+
 export function SubscriptionsView() {
     const { userId, formatCurrency, convertAmount, currency, activeWorkspaceId } = useUserPreferences();
     const { theme: themeConfig } = useWorkspaceTheme();
+    const { buckets } = useBucketsList();
 
     const router = useRouter();
-    const [templates, setTemplates] = useState<RecurringTemplate[]>([]);
+    const [templates, setTemplates] = useState<RecurringTemplateWithMeta[]>([]);
     const [loading, setLoading] = useState(true);
     const [cancelTarget, setCancelTarget] = useState<string | null>(null);
 
@@ -72,6 +83,25 @@ export function SubscriptionsView() {
             supabase.removeChannel(templatesChannel);
         };
     }, [userId, activeWorkspaceId, loadTemplates]);
+
+    // Persist a bucket assignment into the template's metadata blob. We fetch the
+    // current metadata from local state so notes/friend_ids/place_* survive the write.
+    const handleAssignBucket = async (template: RecurringTemplateWithMeta, bucketId: string | null) => {
+        const existing = (template.metadata && typeof template.metadata === 'object') ? template.metadata : {};
+        const nextMetadata = { ...existing, bucket_id: bucketId };
+        // Optimistic
+        setTemplates(prev => prev.map(t => t.id === template.id ? { ...t, metadata: nextMetadata } : t));
+        const { error } = await supabase
+            .from('recurring_templates')
+            .update({ metadata: nextMetadata })
+            .eq('id', template.id);
+        if (error) {
+            toast.error('Failed to update bucket');
+            loadTemplates();
+        } else {
+            toast.success(bucketId ? 'Bucket updated' : 'Bucket cleared');
+        }
+    };
 
     const handleToggleActive = async (id: string, currentStatus: boolean) => {
         const newStatus = !currentStatus;
@@ -157,7 +187,12 @@ export function SubscriptionsView() {
                         <p className="text-xs opacity-70 mt-1">Add a recurring expense to see it here.</p>
                     </div>
                 ) : (
-                    templates.filter(t => t.is_active).map((template) => (
+                    templates.filter(t => t.is_active).map((template) => {
+                        const bucketId = (template.metadata && typeof template.metadata === 'object'
+                            ? (template.metadata as Record<string, unknown>).bucket_id
+                            : null) as string | null;
+                        const linkedBucket = bucketId ? buckets.find(b => b.id === bucketId) : null;
+                        return (
                         <Card key={template.id} className="bg-card/40 border-white/5 backdrop-blur-sm overflow-hidden group">
                             <CardContent className="p-4 flex items-center gap-4">
                                 <div className={cn("w-12 h-12 rounded-2xl flex flex-col items-center justify-center shrink-0 border", themeConfig.bg, themeConfig.border)}>
@@ -170,7 +205,7 @@ export function SubscriptionsView() {
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <h4 className="font-bold text-base truncate">{template.description}</h4>
-                                    <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
+                                    <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1 flex-wrap">
                                         <span className="capitalize bg-secondary/50 px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wider">{template.frequency}</span>
                                         <div className="flex items-center gap-1 opacity-70">
                                             <div className="w-3.5 h-3.5 flex items-center justify-center">
@@ -178,6 +213,65 @@ export function SubscriptionsView() {
                                             </div>
                                             <span className="truncate">{getCategoryLabel(template.category)}</span>
                                         </div>
+                                        <Popover>
+                                            <PopoverTrigger asChild>
+                                                <button
+                                                    type="button"
+                                                    className={cn(
+                                                        "inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold border transition-colors",
+                                                        linkedBucket
+                                                            ? "bg-cyan-500/10 border-cyan-500/25 text-cyan-300 hover:bg-cyan-500/15"
+                                                            : "bg-secondary/30 border-white/5 text-muted-foreground/70 hover:text-foreground"
+                                                    )}
+                                                    aria-label={linkedBucket ? `Bucket: ${linkedBucket.name}, change` : 'Assign bucket'}
+                                                >
+                                                    {linkedBucket ? (
+                                                        <>
+                                                            <span className="w-2.5 h-2.5 inline-flex items-center justify-center">
+                                                                {getBucketIcon(linkedBucket.icon)}
+                                                            </span>
+                                                            <span className="truncate max-w-[80px]">{linkedBucket.name}</span>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <Tag className="w-2.5 h-2.5" aria-hidden="true" />
+                                                            <span>Add to bucket</span>
+                                                        </>
+                                                    )}
+                                                </button>
+                                            </PopoverTrigger>
+                                            <PopoverContent align="start" className="w-56 p-1 bg-card/95 backdrop-blur-xl border-white/10">
+                                                <div className="max-h-64 overflow-y-auto">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleAssignBucket(template, null)}
+                                                        className={cn(
+                                                            "w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-xs hover:bg-secondary/30 transition-colors",
+                                                            !bucketId && "bg-secondary/20"
+                                                        )}
+                                                    >
+                                                        <X className="w-3 h-3 text-muted-foreground" aria-hidden="true" />
+                                                        <span>No bucket</span>
+                                                    </button>
+                                                    {buckets.filter(b => !b.is_archived).map(b => (
+                                                        <button
+                                                            type="button"
+                                                            key={b.id}
+                                                            onClick={() => handleAssignBucket(template, b.id)}
+                                                            className={cn(
+                                                                "w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-xs hover:bg-secondary/30 transition-colors",
+                                                                bucketId === b.id && "bg-cyan-500/10 text-cyan-300"
+                                                            )}
+                                                        >
+                                                            <span className="w-3 h-3 inline-flex items-center justify-center text-cyan-400">
+                                                                {getBucketIcon(b.icon)}
+                                                            </span>
+                                                            <span className="truncate">{b.name}</span>
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </PopoverContent>
+                                        </Popover>
                                     </div>
                                 </div>
                                 <div className="flex flex-col items-end gap-2 shrink-0">
@@ -193,7 +287,8 @@ export function SubscriptionsView() {
                                 </div>
                             </CardContent>
                         </Card>
-                    ))
+                        );
+                    })
                 )}
             </div>
             

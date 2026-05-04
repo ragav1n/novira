@@ -207,8 +207,9 @@ export function SettingsView() {
             if (error) throw error;
             setRecurringTemplates(prev => prev.filter(t => t.id !== templateId));
             toast.success('Recurring expense stopped');
-        } catch (error: any) {
-            toast.error('Failed to stop recurring expense: ' + error.message);
+        } catch (error) {
+            const msg = error instanceof Error ? error.message : 'Unknown error';
+            toast.error('Failed to stop recurring expense: ' + msg);
         }
     };
 
@@ -241,8 +242,9 @@ export function SettingsView() {
 
             if (error) throw error;
             toast.success('Profile updated successfully');
-        } catch (error: any) {
-            toast.error('Error updating profile: ' + error.message);
+        } catch (error) {
+            const msg = error instanceof Error ? error.message : 'Unknown error';
+            toast.error('Error updating profile: ' + msg);
         } finally {
             setSaving(false);
         }
@@ -290,9 +292,10 @@ export function SettingsView() {
             setAvatarUrl(publicUrl);
             setAvatarUrlProvider(publicUrl);
             toast.success('Avatar updated successfully');
-        } catch (error: any) {
+        } catch (error) {
+            const msg = error instanceof Error ? error.message : 'Unknown error';
             console.error('Error uploading avatar:', error);
-            toast.error('Error uploading avatar: ' + error.message);
+            toast.error('Error uploading avatar: ' + msg);
         } finally {
             setUploadingAvatar(false);
         }
@@ -358,16 +361,17 @@ export function SettingsView() {
                 toast.success('PDF Exported successfully');
             }
             setExportModalOpen(false);
-        } catch (error: any) {
+        } catch (error) {
+            const e = error as { message?: string; details?: string; hint?: string; code?: string; stack?: string };
             console.error('Export failed details:', {
-                message: error.message,
-                details: error.details,
-                hint: error.hint,
-                code: error.code,
-                stack: error.stack,
+                message: e?.message,
+                details: e?.details,
+                hint: e?.hint,
+                code: e?.code,
+                stack: e?.stack,
                 error
             });
-            toast.error('Failed to export data: ' + (error.message || 'Unknown error'));
+            toast.error('Failed to export data: ' + (e?.message || 'Unknown error'));
         } finally {
             setLoadingExport(false);
         }

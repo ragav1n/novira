@@ -413,8 +413,9 @@ export function ImportView() {
             sessionStorage.setItem('novira_expense_added', '1');
             window.dispatchEvent(new Event('novira:expense-added'));
             router.push('/');
-        } catch (error: any) {
-            toast.error(`Import failed: ${error.message}`);
+        } catch (error) {
+            const msg = error instanceof Error ? error.message : 'Unknown error';
+            toast.error(`Import failed: ${msg}`);
         } finally {
             setIsImporting(false);
         }

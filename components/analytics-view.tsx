@@ -8,7 +8,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { ChartConfig, BasePieChart } from "@/components/charts/base-pie-chart";
 import { TransactionService } from '@/lib/services/transaction-service';
 import { CHART_CONFIG, CATEGORY_COLORS, getIconForCategory, getCategoryLabel } from '@/lib/categories';
-import { format, startOfMonth, endOfMonth, startOfWeek, startOfYear, subMonths, subYears, subDays, parseISO } from 'date-fns';
+import { format, startOfMonth, endOfMonth, startOfWeek, startOfYear, subMonths, subYears, subDays, parseISO, isAfter } from 'date-fns';
 import { useUserPreferences } from '@/components/providers/user-preferences-provider';
 import { useBucketsList, useBucketSpending } from '@/components/providers/buckets-provider';
 import { useWorkspaceTheme } from '@/hooks/useWorkspaceTheme';
@@ -290,6 +290,27 @@ export function AnalyticsView() {
     // Drives the stat row labels ("Top Day" vs "Top Month").
     const monthsBackKind: 'days' | 'months' = (dateRange === '1M' || dateRange === 'LM') ? 'days' : 'months';
 
+    // Active recurring templates feed the forecast overlay; cheap one-shot fetch.
+    type RecurringLite = { id: string; amount: number; currency: string; frequency: 'daily' | 'weekly' | 'monthly' | 'yearly'; next_occurrence: string };
+    const [recurringForecast, setRecurringForecast] = useState<RecurringLite[]>([]);
+    useEffect(() => {
+        if (!userId) return;
+        let cancelled = false;
+        (async () => {
+            try {
+                const { data } = await supabase
+                    .from('recurring_templates')
+                    .select('id, amount, currency, frequency, next_occurrence')
+                    .eq('user_id', userId)
+                    .eq('is_active', true);
+                if (!cancelled && data) setRecurringForecast(data as RecurringLite[]);
+            } catch (error) {
+                console.error('Error fetching recurring templates for forecast:', error);
+            }
+        })();
+        return () => { cancelled = true; };
+    }, [userId]);
+
     // Simple end-of-month projection for the 1M view. Skipped in bucket-focused mode
     // (no monthly-budget analogue) and in the first 2 days of the month (too noisy).
     const pacingChip = useMemo(() => {
@@ -301,6 +322,55 @@ export function AnalyticsView() {
         const projected = (totalSpentInRange / day) * daysInMonth;
         return { projected };
     }, [dateRange, selectedBucketId, totalSpentInRange]);
+
+    // Forecast overlay: only meaningful for the current month (1M, all-buckets) past
+    // day 3. Each future day in the chart gets `forecast_total = run_rate + recurring_spike`,
+    // where the run rate is derived from MTD spend and recurrings come from the templates
+    // we fetched above. Recharts renders this as a dashed line that picks up where the
+    // solid spend lines stop.
+    const forecastChartData = useMemo(() => {
+        if (dateRange !== '1M' || selectedBucketId !== 'all') return categoryTrendData;
+        const today = new Date();
+        const dom = today.getDate();
+        const monthEnd = endOfMonth(today);
+        const dim = monthEnd.getDate();
+        if (dom < 3 || dom >= dim) return categoryTrendData;
+
+        const runRate = totalSpentInRange / dom;
+
+        // Build a map: bucket label ('MMM d') -> projected recurring amount on that day.
+        const recurringMap = new Map<string, number>();
+        for (const t of recurringForecast) {
+            const occ = parseISO(t.next_occurrence);
+            if (isNaN(occ.getTime())) continue;
+            const cursor = new Date(occ);
+            // Bound the projection: don't loop more than 60 iterations even on bad data.
+            for (let i = 0; i < 60 && cursor <= monthEnd; i++) {
+                if (isAfter(cursor, today)) {
+                    const key = format(cursor, 'MMM d');
+                    const amt = convertAmount(Number(t.amount), (t.currency || 'USD').toUpperCase());
+                    recurringMap.set(key, (recurringMap.get(key) || 0) + amt);
+                }
+                if (t.frequency === 'daily') cursor.setDate(cursor.getDate() + 1);
+                else if (t.frequency === 'weekly') cursor.setDate(cursor.getDate() + 7);
+                else if (t.frequency === 'monthly') { cursor.setMonth(cursor.getMonth() + 1); break; }
+                else if (t.frequency === 'yearly') break;
+                else break;
+            }
+        }
+
+        return categoryTrendData.map(b => {
+            const date = b.rawDate as Date;
+            if (!date || date <= today) return b;
+            const spike = recurringMap.get(b.month) || 0;
+            return { ...b, forecast_total: runRate + spike };
+        });
+    }, [categoryTrendData, recurringForecast, dateRange, selectedBucketId, totalSpentInRange, convertAmount]);
+
+    const hasForecast = useMemo(
+        () => dateRange === '1M' && selectedBucketId === 'all' && forecastChartData.some(b => typeof (b as { forecast_total?: number }).forecast_total === 'number'),
+        [forecastChartData, dateRange, selectedBucketId]
+    );
 
     // MoM/period-over-period delta. For 1M we compare MTD-vs-same-MTD (honest mid-month).
     // For other ranges we compare full-period totals since both are complete windows.
@@ -811,6 +881,14 @@ export function AnalyticsView() {
                                         On pace · {formatCurrency(pacingChip.projected)}
                                     </span>
                                 )}
+                                {hasForecast && (
+                                    <span
+                                        className="text-[10px] px-2 py-0.5 rounded-md font-bold border bg-cyan-500/15 border-cyan-500/30 text-cyan-300"
+                                        title="Run-rate plus upcoming recurring charges"
+                                    >
+                                        Forecast on
+                                    </span>
+                                )}
                                 <span className="text-[10px] bg-secondary/30 px-2 py-0.5 rounded-md text-muted-foreground font-bold">
                                     {dateRange === 'ALL' ? 'All Time' : dateRange}
                                 </span>
@@ -836,7 +914,7 @@ export function AnalyticsView() {
                         <div className="h-[140px] w-full">
                             {activeCategories.length > 0 ? (
                                 <ResponsiveContainer width="100%" height="100%">
-                                    <LineChart data={categoryTrendData} margin={{ top: 5, right: 5, bottom: 0, left: 5 }}>
+                                    <LineChart data={forecastChartData} margin={{ top: 5, right: 5, bottom: 0, left: 5 }}>
                                         <XAxis
                                             dataKey="month"
                                             axisLine={false}
@@ -874,6 +952,20 @@ export function AnalyticsView() {
                                                 animationEasing="ease-in-out"
                                             />
                                         ))}
+                                        {hasForecast && (
+                                            <Line
+                                                type="monotone"
+                                                dataKey="forecast_total"
+                                                name="Forecast"
+                                                stroke="#06B6D4"
+                                                strokeWidth={2}
+                                                strokeDasharray="4 3"
+                                                dot={false}
+                                                connectNulls
+                                                animationDuration={1000}
+                                                animationEasing="ease-in-out"
+                                            />
+                                        )}
                                     </LineChart>
                                 </ResponsiveContainer>
                             ) : (

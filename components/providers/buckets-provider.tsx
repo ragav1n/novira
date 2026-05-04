@@ -20,6 +20,9 @@ export interface Bucket {
     end_date?: string;
     currency?: string;
     group_id?: string | null;
+    allowed_categories?: string[];
+    completed_at?: string | null;
+    completion_notified?: boolean;
 }
 
 interface BucketsListContextType {
@@ -48,6 +51,7 @@ interface SpendingTx {
     bucket_id: string | null;
     user_id: string;
     amount: number | string;
+    category?: string | null;
     currency: string | null;
     exchange_rate: number | null;
     base_currency: string | null;
@@ -77,6 +81,9 @@ function computeBucketSpending(
         const bId = tx.bucket_id;
         if (!bId) return;
         const bucketConfig = bucketMap.get(bId);
+        // Honor per-bucket category restriction. Empty list = allow all.
+        const allowed = bucketConfig?.allowed_categories || [];
+        if (allowed.length > 0 && !allowed.includes((tx.category || '').toLowerCase())) return;
         const bucketCurrency = (bucketConfig?.currency || currency).toUpperCase();
         let shareAmount = Number(tx.amount);
         if (tx.splits && tx.splits.length > 0) {

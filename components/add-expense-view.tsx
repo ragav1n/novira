@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronLeft, CreditCard, Utensils, Car, Zap, ShoppingBag, HeartPulse, Clapperboard, Wallet, Banknote, HelpCircle, Calendar as CalendarIcon, Home, School, LayoutGrid, Building2, MapPin, Shirt, ShoppingCart, LocateFixed, ScanSearch } from 'lucide-react';
+import { ChevronLeft, CreditCard, Utensils, Car, Zap, ShoppingBag, HeartPulse, Clapperboard, Wallet, Banknote, HelpCircle, Calendar as CalendarIcon, Home, School, LayoutGrid, Building2, MapPin, Shirt, ShoppingCart, LocateFixed, ScanSearch, Sparkles } from 'lucide-react';
 import UniqueLoading from '@/components/ui/grid-loading';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
@@ -38,10 +38,12 @@ const RecurringExpenseSection = dynamic(
 );
 
 import { CategorySelector, BucketSelector } from './add-expense/selectors';
+import { TagsSection } from './add-expense/tags-section';
 import { useExpenseForm } from '@/hooks/useExpenseForm';
 import { useExpenseSubmission, getExpenseFormErrors, type ExpenseFormErrors } from '@/hooks/useExpenseSubmission';
 import { getDistance } from '@/lib/location';
 import { takePendingSharedFile } from '@/lib/share-target';
+import { toast } from '@/utils/haptics';
 
 import { CATEGORY_COLORS, getIconForCategory, CATEGORIES as SYSTEM_CATEGORIES } from '@/lib/categories';
 
@@ -80,6 +82,10 @@ export function AddExpenseView() {
     const [errors, setErrors] = React.useState<ExpenseFormErrors>({});
 
     const scanFile = React.useCallback(async (file: Blob) => {
+        if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+            toast.error('Receipt scanning needs an internet connection');
+            return;
+        }
         scanAbortRef.current?.abort();
         const controller = new AbortController();
         scanAbortRef.current = controller;
@@ -194,7 +200,8 @@ export function AddExpenseView() {
             selectedGroupId: formState.selectedGroupId, selectedBucketId: formState.selectedBucketId,
             excludeFromAllowance: formState.excludeFromAllowance, placeName: formState.placeName,
             placeAddress: formState.placeAddress, placeLat: formState.placeLat, placeLng: formState.placeLng,
-            paymentMethod: formState.paymentMethod, notes: formState.notes, isSplitEnabled: formState.isSplitEnabled,
+            paymentMethod: formState.paymentMethod, notes: formState.notes, tags: formState.tags,
+            isSplitEnabled: formState.isSplitEnabled,
             selectedFriendIds: formState.selectedFriendIds, splitMode: formState.splitMode,
             customAmounts: formState.customAmounts, isRecurring: formState.isRecurring, frequency: formState.frequency
         });
@@ -360,6 +367,23 @@ export function AddExpenseView() {
                     />
                     {errors.description && (
                         <p id="expense-description-error" className="text-xs text-destructive font-medium">{errors.description}</p>
+                    )}
+                    {formState.suggestedCategory && (
+                        <button
+                            type="button"
+                            onClick={() => {
+                                if (isNative) Haptics.impact({ style: ImpactStyle.Light }).catch(() => { });
+                                formState.setSelectedCategory(formState.suggestedCategory!);
+                                formState.setSuggestedCategory(null);
+                            }}
+                            className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-primary transition-colors pl-1 -mt-0.5"
+                            aria-label={`Use suggested category: ${formState.suggestedCategory}`}
+                        >
+                            <Sparkles className="w-3 h-3 text-primary/70" aria-hidden="true" />
+                            <span>Suggested category</span>
+                            <span className="font-bold text-primary capitalize">{formState.suggestedCategory}</span>
+                            <span className="text-muted-foreground/60">— tap to apply</span>
+                        </button>
                     )}
                 </div>
 
@@ -620,6 +644,13 @@ export function AddExpenseView() {
                     frequency={formState.frequency}
                     setFrequency={formState.setFrequency}
                     date={formState.date}
+                />
+
+                {/* Tags */}
+                <TagsSection
+                    tags={formState.tags}
+                    setTags={formState.setTags}
+                    knownTags={formState.knownTags}
                 />
 
                 {/* Notes */}
