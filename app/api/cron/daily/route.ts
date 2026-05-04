@@ -25,8 +25,10 @@ export async function GET(request: NextRequest) {
     const targets = [
         '/api/cron/bill-reminders',
         '/api/cron/bucket-completion',
+        '/api/cron/bucket-deadline',
         '/api/cron/bucket-thresholds',
         '/api/cron/daily-digest',
+        '/api/cron/spending-pace',
     ];
 
     const results = await Promise.allSettled(

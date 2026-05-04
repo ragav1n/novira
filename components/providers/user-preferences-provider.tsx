@@ -210,6 +210,29 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
                 console.error('Error fetching preferences:', error);
             }
 
+            // Best-effort timezone sync: keep profiles.timezone in step with the
+            // user's current device. Cron jobs use this to phrase notifications
+            // in the user's local frame (e.g., "yesterday" = the user's local
+            // yesterday, not UTC's). Failure is silent — column may not exist
+            // on older schemas, in which case Supabase returns an error we
+            // simply log and ignore.
+            try {
+                const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+                if (tz) {
+                    const { error: tzErr } = await supabase
+                        .from('profiles')
+                        .update({ timezone: tz })
+                        .eq('id', uid);
+                    if (tzErr && process.env.NODE_ENV === 'development') {
+                        console.warn('[preferences] timezone sync failed (column may not exist yet):', tzErr.message);
+                    }
+                }
+            } catch (e) {
+                if (process.env.NODE_ENV === 'development') {
+                    console.warn('[preferences] timezone capture skipped:', e);
+                }
+            }
+
             // Fetch workspace budgets (RLS ensures user only gets their groups)
             const { data: workspaceData, error: workspaceError } = await supabase
                 .from('workspace_budgets')
