@@ -25,6 +25,7 @@ interface TxRow {
     exchange_rate: number | null;
     base_currency: string | null;
     date: string;
+    exclude_from_allowance: boolean | null;
 }
 
 interface PushSubRow {
@@ -93,7 +94,7 @@ export async function GET(request: NextRequest) {
 
     const { data: txs } = await supabase
         .from('transactions')
-        .select('user_id, amount, currency, exchange_rate, base_currency, date')
+        .select('user_id, amount, currency, exchange_rate, base_currency, date, exclude_from_allowance')
         .in('user_id', allUserIds)
         .gte('date', eightDaysAgo.toISOString().slice(0, 10))
         .is('group_id', null)
@@ -116,6 +117,11 @@ export async function GET(request: NextRequest) {
     }
 
     for (const tx of txs || []) {
+        // Match the dashboard's "Spent in <month>" semantics: anything the user
+        // has flagged as excluded from allowance shouldn't show up in the digest
+        // either. Otherwise the notification total disagrees with what they see
+        // on the home screen.
+        if (tx.exclude_from_allowance) continue;
         const profile = profiles.find(p => p.id === tx.user_id);
         if (!profile) continue;
         const baseCcy = (profile.currency || 'USD').toUpperCase();
