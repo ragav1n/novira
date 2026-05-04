@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const webpush = require('web-push') as typeof import('web-push');
-import { createClient } from '@/utils/supabase/server';
+import { createClient as createServiceClient } from '@supabase/supabase-js';
 
 // VAPID keys must be set in environment variables.
 // Generate with: npx web-push generate-vapid-keys
@@ -42,7 +42,18 @@ export async function POST(request: NextRequest) {
 
     try {
         const { userId, payload }: { userId: string; payload: PushPayload } = await request.json();
-        const supabase = await createClient();
+
+        // Use service-role client so RLS doesn't block this cron-style endpoint.
+        // Curl / Vercel-cron calls carry no user session cookies, so the user
+        // client would return zero rows even when subscriptions exist.
+        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+        const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+        if (!supabaseUrl || !serviceKey) {
+            return NextResponse.json({ error: 'Service role key not configured' }, { status: 503 });
+        }
+        const supabase = createServiceClient(supabaseUrl, serviceKey, {
+            auth: { persistSession: false, autoRefreshToken: false }
+        });
 
         const { data: subs } = await supabase
             .from('push_subscriptions')
