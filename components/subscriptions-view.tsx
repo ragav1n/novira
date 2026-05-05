@@ -2,13 +2,17 @@
 
 import { motion } from 'framer-motion';
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo, useDeferredValue } from 'react';
 import { useUserPreferences } from '@/components/providers/user-preferences-provider';
 import { useWorkspaceTheme } from '@/hooks/useWorkspaceTheme';
 import { supabase } from '@/lib/supabase';
 import { Card, CardContent } from '@/components/ui/card';
-import { Calendar, RotateCw, Trash2, ArrowLeft, Tag, X, TrendingUp, TrendingDown } from 'lucide-react';
+import {
+    Calendar, RotateCw, Trash2, ArrowLeft, Tag, X, TrendingUp, TrendingDown,
+    Search, Star, MoreVertical, Pause, Play, Clock, ArrowUpDown, Check,
+} from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Input } from '@/components/ui/input';
 import { useBucketsList } from '@/components/providers/buckets-provider';
 import { getBucketIcon } from '@/utils/icon-utils';
 import {
@@ -16,17 +20,35 @@ import {
     AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { cn } from '@/lib/utils';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, formatDistanceToNowStrict, differenceInCalendarDays } from 'date-fns';
 import { useRouter } from 'next/navigation';
 import { toast } from '@/utils/haptics';
 import { getCategoryLabel, getIconForCategory, CATEGORY_COLORS } from '@/lib/categories';
-import type { RecurringTemplate } from '@/types/transaction';
+import type { RecurringTemplate, SubscriptionMetadata } from '@/types/transaction';
 
-// Local type that admits the metadata JSONB the server returns. RecurringTemplate
-// in shared types is intentionally narrower; this view needs to read/write the
-// bucket_id stored inside metadata.
-type RecurringTemplateWithMeta = RecurringTemplate & {
-    metadata?: Record<string, unknown> | null;
+type Tpl = RecurringTemplate;
+type Frequency = Tpl['frequency'];
+type SortBy = 'next' | 'amount' | 'name' | 'category';
+type BucketState = 'all' | 'with' | 'without';
+
+const INACTIVE_PAGE_SIZE = 5;
+const ALL_FREQUENCIES: Frequency[] = ['daily', 'weekly', 'monthly', 'yearly'];
+
+const freqToMonthly = (amount: number, freq: Frequency) => {
+    if (freq === 'yearly') return amount / 12;
+    if (freq === 'weekly') return amount * 4.33;
+    if (freq === 'daily') return amount * 30;
+    return amount;
+};
+
+const getMeta = (t: Tpl): SubscriptionMetadata =>
+    (t.metadata && typeof t.metadata === 'object' ? t.metadata : {}) as SubscriptionMetadata;
+
+const SORT_LABELS: Record<SortBy, string> = {
+    next: 'Next due',
+    amount: 'Amount (high → low)',
+    name: 'Name (A → Z)',
+    category: 'Category',
 };
 
 export function SubscriptionsView() {
@@ -35,13 +57,30 @@ export function SubscriptionsView() {
     const { buckets } = useBucketsList();
 
     const router = useRouter();
-    const [templates, setTemplates] = useState<RecurringTemplateWithMeta[]>([]);
+    const [templates, setTemplates] = useState<Tpl[]>([]);
     const [loading, setLoading] = useState(true);
     const [cancelTarget, setCancelTarget] = useState<string | null>(null);
 
     type PriceChange = { lastAmount: number; lastDate: string; pctChange: number; templateAmount: number };
-    const [priceChanges, setPriceChanges] = useState<Record<string, PriceChange>>({});
-    const [updateTarget, setUpdateTarget] = useState<{ template: RecurringTemplateWithMeta; change: PriceChange } | null>(null);
+    type LastCharge = { lastAmount: number; lastDate: string; pctChange: number };
+    const [lastCharges, setLastCharges] = useState<Record<string, LastCharge>>({});
+    const [updateTarget, setUpdateTarget] = useState<{ template: Tpl; change: PriceChange } | null>(null);
+
+    const [search, setSearch] = useState('');
+    const deferredSearch = useDeferredValue(search);
+    const [sortBy, setSortBy] = useState<SortBy>('next');
+    const [filterFrequencies, setFilterFrequencies] = useState<Set<Frequency>>(new Set());
+    const [filterCategories, setFilterCategories] = useState<Set<string>>(new Set());
+    const [bucketState, setBucketState] = useState<BucketState>('all');
+    const [showAllInactive, setShowAllInactive] = useState(false);
+
+    const isPaused = useCallback((t: Tpl) => {
+        const m = getMeta(t);
+        if (!m.pause_until) return false;
+        return parseISO(m.pause_until) > new Date();
+    }, []);
+
+    const effectiveActive = useCallback((t: Tpl) => t.is_active && !isPaused(t), [isPaused]);
 
     const loadTemplates = useCallback(async () => {
         if (!userId) return;
@@ -61,8 +100,11 @@ export function SubscriptionsView() {
 
         const { data, error } = await query;
 
-        if (!error && data) {
-            setTemplates(data);
+        if (error) {
+            console.error('Failed to load subscriptions', error);
+            toast.error("Couldn't load subscriptions");
+        } else if (data) {
+            setTemplates(data as Tpl[]);
         }
         setLoading(false);
     }, [userId, activeWorkspaceId]);
@@ -71,18 +113,18 @@ export function SubscriptionsView() {
         loadTemplates();
     }, [loadTemplates]);
 
-    // Detect silent price changes: compare each active template's amount against
-    // the most recent matching transaction. Flag if drift > 5% so the user can
-    // bump the template before the next charge cycle.
+    // Capture the most recent matching transaction per active template. We compute
+    // pctChange for every match (drift badge still gates display ≥5%), and the
+    // "Last charged" line uses lastDate from the same lookup with no extra queries.
     useEffect(() => {
         if (!userId || templates.length === 0) {
-            setPriceChanges({});
+            setLastCharges({});
             return;
         }
         let cancelled = false;
         (async () => {
             const active = templates.filter(t => t.is_active);
-            const results: Record<string, PriceChange> = {};
+            const results: Record<string, LastCharge> = {};
             await Promise.all(active.map(async (t) => {
                 try {
                     const escapedDesc = t.description.replace(/[%_\\]/g, '\\$&');
@@ -107,19 +149,16 @@ export function SubscriptionsView() {
                     if (!lastAmt || !tplAmt) return;
                     if ((last.currency || 'USD').toUpperCase() !== (t.currency || 'USD').toUpperCase()) return;
                     const pct = ((lastAmt - tplAmt) / tplAmt) * 100;
-                    if (Math.abs(pct) >= 5) {
-                        results[t.id] = {
-                            lastAmount: lastAmt,
-                            lastDate: last.date,
-                            pctChange: pct,
-                            templateAmount: tplAmt,
-                        };
-                    }
+                    results[t.id] = {
+                        lastAmount: lastAmt,
+                        lastDate: last.date,
+                        pctChange: pct,
+                    };
                 } catch (error) {
-                    console.error('Error checking price change for template', t.id, error);
+                    console.error('Error checking last charge for template', t.id, error);
                 }
             }));
-            if (!cancelled) setPriceChanges(results);
+            if (!cancelled) setLastCharges(results);
         })();
         return () => { cancelled = true; };
     }, [templates, userId, activeWorkspaceId]);
@@ -128,11 +167,10 @@ export function SubscriptionsView() {
         if (!updateTarget) return;
         const { template, change } = updateTarget;
         setTemplates(prev => prev.map(t => t.id === template.id ? { ...t, amount: change.lastAmount } : t));
-        setPriceChanges(prev => {
-            const next = { ...prev };
-            delete next[template.id];
-            return next;
-        });
+        setLastCharges(prev => ({
+            ...prev,
+            [template.id]: { ...prev[template.id], pctChange: 0 },
+        }));
         const { error } = await supabase
             .from('recurring_templates')
             .update({ amount: change.lastAmount })
@@ -146,7 +184,6 @@ export function SubscriptionsView() {
         setUpdateTarget(null);
     };
 
-    // Real-time subscription for recurring templates
     useEffect(() => {
         if (!userId) return;
 
@@ -164,28 +201,45 @@ export function SubscriptionsView() {
         };
     }, [userId, activeWorkspaceId, loadTemplates]);
 
-    // Persist a bucket assignment into the template's metadata blob. We fetch the
-    // current metadata from local state so notes/friend_ids/place_* survive the write.
-    const handleAssignBucket = async (template: RecurringTemplateWithMeta, bucketId: string | null) => {
-        const existing = (template.metadata && typeof template.metadata === 'object') ? template.metadata : {};
-        const nextMetadata = { ...existing, bucket_id: bucketId };
-        // Optimistic
+    const updateMetadata = useCallback(async (template: Tpl, partial: Partial<SubscriptionMetadata>) => {
+        const existing = getMeta(template);
+        const nextMetadata = { ...existing, ...partial };
         setTemplates(prev => prev.map(t => t.id === template.id ? { ...t, metadata: nextMetadata } : t));
         const { error } = await supabase
             .from('recurring_templates')
             .update({ metadata: nextMetadata })
             .eq('id', template.id);
         if (error) {
-            toast.error('Failed to update bucket');
+            toast.error('Failed to update');
             loadTemplates();
-        } else {
-            toast.success(bucketId ? 'Bucket updated' : 'Bucket cleared');
+            return false;
         }
+        return true;
+    }, [loadTemplates]);
+
+    const handleAssignBucket = async (template: Tpl, bucketId: string | null) => {
+        const ok = await updateMetadata(template, { bucket_id: bucketId });
+        if (ok) toast.success(bucketId ? 'Bucket updated' : 'Bucket cleared');
+    };
+
+    const togglePin = async (template: Tpl) => {
+        const next = !getMeta(template).pinned;
+        const ok = await updateMetadata(template, { pinned: next });
+        if (ok) toast.success(next ? 'Pinned' : 'Unpinned');
+    };
+
+    const setPauseUntil = async (template: Tpl, dateStr: string | null) => {
+        const ok = await updateMetadata(template, { pause_until: dateStr });
+        if (ok) toast.success(dateStr ? `Paused until ${dateStr}` : 'Resumed');
+    };
+
+    const setTrialEndsAt = async (template: Tpl, dateStr: string | null) => {
+        const ok = await updateMetadata(template, { trial_ends_at: dateStr });
+        if (ok) toast.success(dateStr ? `Trial ends ${dateStr}` : 'Trial cleared');
     };
 
     const handleToggleActive = async (id: string, currentStatus: boolean) => {
         const newStatus = !currentStatus;
-        // Optimistic update
         setTemplates(prev => prev.map(t => t.id === id ? { ...t, is_active: newStatus } : t));
 
         const { error } = await supabase
@@ -201,18 +255,92 @@ export function SubscriptionsView() {
         }
     };
 
-
-
-    const totalMonthly = templates
-        .filter(t => t.is_active)
-        .reduce((acc, curr) => {
-            const amountInBase = convertAmount(Number(curr.amount), curr.currency, currency);
-            let monthlyEquivalent = amountInBase;
-            if (curr.frequency === 'yearly') monthlyEquivalent /= 12;
-            if (curr.frequency === 'weekly') monthlyEquivalent *= 4.33;
-            if (curr.frequency === 'daily') monthlyEquivalent *= 30;
-            return acc + monthlyEquivalent;
+    const totalMonthly = useMemo(() => {
+        return templates.filter(effectiveActive).reduce((acc, t) => {
+            const inBase = convertAmount(Number(t.amount), t.currency, currency);
+            return acc + freqToMonthly(inBase, t.frequency);
         }, 0);
+    }, [templates, effectiveActive, convertAmount, currency]);
+
+    const totalYearly = totalMonthly * 12;
+
+    const breakdown = useMemo(() => {
+        const acc: Record<Frequency, { count: number; monthly: number }> = {
+            daily: { count: 0, monthly: 0 },
+            weekly: { count: 0, monthly: 0 },
+            monthly: { count: 0, monthly: 0 },
+            yearly: { count: 0, monthly: 0 },
+        };
+        templates.filter(effectiveActive).forEach(t => {
+            const inBase = convertAmount(Number(t.amount), t.currency, currency);
+            acc[t.frequency].count += 1;
+            acc[t.frequency].monthly += freqToMonthly(inBase, t.frequency);
+        });
+        return acc;
+    }, [templates, effectiveActive, convertAmount, currency]);
+
+    const availableCategories = useMemo(() => {
+        const set = new Set<string>();
+        templates.filter(t => t.is_active).forEach(t => set.add(t.category));
+        return Array.from(set).sort();
+    }, [templates]);
+
+    const visibleTemplates = useMemo(() => {
+        const q = deferredSearch.trim().toLowerCase();
+        let active = templates.filter(t => t.is_active);
+        if (q) active = active.filter(t => t.description.toLowerCase().includes(q));
+        if (filterFrequencies.size > 0) active = active.filter(t => filterFrequencies.has(t.frequency));
+        if (filterCategories.size > 0) active = active.filter(t => filterCategories.has(t.category));
+        if (bucketState !== 'all') {
+            active = active.filter(t => {
+                const has = !!getMeta(t).bucket_id;
+                return bucketState === 'with' ? has : !has;
+            });
+        }
+        return active.sort((a, b) => {
+            const aPin = getMeta(a).pinned ? 1 : 0;
+            const bPin = getMeta(b).pinned ? 1 : 0;
+            if (aPin !== bPin) return bPin - aPin;
+            switch (sortBy) {
+                case 'amount': return Number(b.amount) - Number(a.amount);
+                case 'name': return a.description.localeCompare(b.description);
+                case 'category': return a.category.localeCompare(b.category);
+                default: return parseISO(a.next_occurrence).getTime() - parseISO(b.next_occurrence).getTime();
+            }
+        });
+    }, [templates, deferredSearch, filterFrequencies, filterCategories, bucketState, sortBy]);
+
+    const inactiveTemplates = useMemo(
+        () => templates.filter(t => !t.is_active),
+        [templates]
+    );
+
+    const hasActiveFilters = filterFrequencies.size > 0 || filterCategories.size > 0 || bucketState !== 'all';
+
+    const toggleFrequency = (f: Frequency) => {
+        setFilterFrequencies(prev => {
+            const next = new Set(prev);
+            if (next.has(f)) next.delete(f); else next.add(f);
+            return next;
+        });
+    };
+
+    const toggleCategory = (c: string) => {
+        setFilterCategories(prev => {
+            const next = new Set(prev);
+            if (next.has(c)) next.delete(c); else next.add(c);
+            return next;
+        });
+    };
+
+    const clearFilters = () => {
+        setFilterFrequencies(new Set());
+        setFilterCategories(new Set());
+        setBucketState('all');
+    };
+
+    const totalActiveCount = templates.filter(effectiveActive).length;
+    const pausedCount = templates.filter(t => t.is_active && isPaused(t)).length;
 
     return (
         <>
@@ -236,7 +364,7 @@ export function SubscriptionsView() {
                 </button>
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                     <h1 className="text-lg font-semibold flex items-center gap-2">
-                        <RotateCw className={`w-5 h-5 ${themeConfig.text}`} /> 
+                        <RotateCw className={`w-5 h-5 ${themeConfig.text}`} />
                         Subscriptions
                     </h1>
                 </div>
@@ -247,33 +375,227 @@ export function SubscriptionsView() {
                 <CardContent className="p-6">
                     <p className="text-sm text-muted-foreground font-medium mb-1">Estimated Monthly Cost</p>
                     <h2 className={`text-3xl font-bold ${themeConfig.text}`}>{formatCurrency(totalMonthly)}</h2>
-                    <p className="text-xs text-muted-foreground mt-2">Based on {templates.filter(t => t.is_active).length} active recurring expenses</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                        ≈ {formatCurrency(totalYearly)} / yr
+                        <span className="opacity-60">
+                            {' · '}{totalActiveCount} active
+                            {pausedCount > 0 ? ` · ${pausedCount} paused` : ''}
+                        </span>
+                    </p>
+                    {totalActiveCount > 0 && (
+                        <div className="grid grid-cols-2 gap-2 mt-4">
+                            {ALL_FREQUENCIES.filter(f => breakdown[f].count > 0).map(f => (
+                                <div
+                                    key={f}
+                                    className={cn(
+                                        "rounded-xl border px-3 py-2 bg-card/30",
+                                        themeConfig.border
+                                    )}
+                                >
+                                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
+                                        {f}
+                                    </p>
+                                    <p className="text-sm font-bold mt-0.5">
+                                        {breakdown[f].count} <span className="text-[10px] text-muted-foreground font-normal">·</span>{' '}
+                                        <span className={themeConfig.text}>{formatCurrency(breakdown[f].monthly)}/mo</span>
+                                    </p>
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </CardContent>
             </Card>
 
+            {totalActiveCount > 0 && (
+                <div className="space-y-2">
+                    <div className="flex gap-2">
+                        <div className="relative flex-1">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" aria-hidden="true" />
+                            <Input
+                                id="subs-search"
+                                name="subs-search"
+                                autoComplete="off"
+                                placeholder="Search subscriptions"
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                                className={`pl-9 pr-9 bg-secondary/10 border-white/10 h-10 rounded-xl ${themeConfig.ring}`}
+                            />
+                            {search && (
+                                <button
+                                    type="button"
+                                    onClick={() => setSearch('')}
+                                    aria-label="Clear search"
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                                >
+                                    <X className="w-4 h-4" />
+                                </button>
+                            )}
+                        </div>
+                        <Popover>
+                            <PopoverTrigger asChild>
+                                <button
+                                    type="button"
+                                    className={cn(
+                                        "h-10 px-3 rounded-xl bg-secondary/10 border border-white/10 inline-flex items-center gap-1.5 text-xs font-bold shrink-0",
+                                        themeConfig.text
+                                    )}
+                                    aria-label="Sort subscriptions"
+                                >
+                                    <ArrowUpDown className="w-3.5 h-3.5" aria-hidden="true" />
+                                    <span className="hidden sm:inline">{SORT_LABELS[sortBy]}</span>
+                                </button>
+                            </PopoverTrigger>
+                            <PopoverContent align="end" className="w-56 p-1 bg-card/95 backdrop-blur-xl border-white/10">
+                                {(Object.keys(SORT_LABELS) as SortBy[]).map(opt => (
+                                    <button
+                                        key={opt}
+                                        type="button"
+                                        onClick={() => setSortBy(opt)}
+                                        className={cn(
+                                            "w-full flex items-center justify-between gap-2 px-2 py-1.5 rounded-md text-xs hover:bg-secondary/30 transition-colors",
+                                            sortBy === opt && "bg-secondary/30"
+                                        )}
+                                    >
+                                        <span>{SORT_LABELS[opt]}</span>
+                                        {sortBy === opt && <Check className="w-3.5 h-3.5" aria-hidden="true" />}
+                                    </button>
+                                ))}
+                            </PopoverContent>
+                        </Popover>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-hide">
+                        {ALL_FREQUENCIES.map(f => (
+                            <button
+                                key={f}
+                                type="button"
+                                onClick={() => toggleFrequency(f)}
+                                className={cn(
+                                    "shrink-0 capitalize px-2.5 py-1 rounded-full text-[10px] font-bold border transition-colors",
+                                    filterFrequencies.has(f)
+                                        ? cn(themeConfig.bgMedium, themeConfig.borderMedium, themeConfig.text)
+                                        : "bg-secondary/20 border-white/10 text-muted-foreground hover:text-foreground"
+                                )}
+                            >
+                                {f}
+                            </button>
+                        ))}
+                        <span className="w-px h-4 bg-white/10 shrink-0 mx-1" aria-hidden="true" />
+                        {(['all', 'with', 'without'] as BucketState[]).map(opt => (
+                            <button
+                                key={opt}
+                                type="button"
+                                onClick={() => setBucketState(opt)}
+                                className={cn(
+                                    "shrink-0 px-2.5 py-1 rounded-full text-[10px] font-bold border transition-colors",
+                                    bucketState === opt
+                                        ? "bg-cyan-500/15 border-cyan-500/30 text-cyan-300"
+                                        : "bg-secondary/20 border-white/10 text-muted-foreground hover:text-foreground"
+                                )}
+                            >
+                                {opt === 'all' ? 'Any bucket' : opt === 'with' ? 'With bucket' : 'No bucket'}
+                            </button>
+                        ))}
+                        {availableCategories.length > 1 && (
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                    <button
+                                        type="button"
+                                        className={cn(
+                                            "shrink-0 px-2.5 py-1 rounded-full text-[10px] font-bold border transition-colors inline-flex items-center gap-1",
+                                            filterCategories.size > 0
+                                                ? "bg-violet-500/15 border-violet-500/30 text-violet-300"
+                                                : "bg-secondary/20 border-white/10 text-muted-foreground hover:text-foreground"
+                                        )}
+                                    >
+                                        <Tag className="w-2.5 h-2.5" aria-hidden="true" />
+                                        {filterCategories.size > 0 ? `Categories (${filterCategories.size})` : 'Category'}
+                                    </button>
+                                </PopoverTrigger>
+                                <PopoverContent align="start" className="w-56 p-1 bg-card/95 backdrop-blur-xl border-white/10 max-h-72 overflow-y-auto">
+                                    {availableCategories.map(c => (
+                                        <button
+                                            key={c}
+                                            type="button"
+                                            onClick={() => toggleCategory(c)}
+                                            className={cn(
+                                                "w-full flex items-center justify-between gap-2 px-2 py-1.5 rounded-md text-xs hover:bg-secondary/30 transition-colors",
+                                                filterCategories.has(c) && "bg-violet-500/10 text-violet-300"
+                                            )}
+                                        >
+                                            <span className="flex items-center gap-2 min-w-0">
+                                                <span className="w-3 h-3 inline-flex items-center justify-center shrink-0">
+                                                    {getIconForCategory(c, "w-full h-full", { style: { color: CATEGORY_COLORS[c] || CATEGORY_COLORS.others } })}
+                                                </span>
+                                                <span className="truncate">{getCategoryLabel(c)}</span>
+                                            </span>
+                                            {filterCategories.has(c) && <Check className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />}
+                                        </button>
+                                    ))}
+                                </PopoverContent>
+                            </Popover>
+                        )}
+                        {hasActiveFilters && (
+                            <button
+                                type="button"
+                                onClick={clearFilters}
+                                className="shrink-0 px-2.5 py-1 rounded-full text-[10px] font-bold text-rose-400 hover:text-rose-300 inline-flex items-center gap-1"
+                            >
+                                <X className="w-2.5 h-2.5" aria-hidden="true" /> Clear
+                            </button>
+                        )}
+                    </div>
+                </div>
+            )}
+
             <div className="space-y-3">
                 <h3 className="text-lg font-bold mb-4">Upcoming Renewals</h3>
-                
+
                 {loading ? (
                     <div className="space-y-3">
                         <div className="h-20 w-full rounded-3xl bg-secondary/10 animate-pulse" />
                         <div className="h-20 w-full rounded-3xl bg-secondary/10 animate-pulse" />
                         <div className="h-20 w-full rounded-3xl bg-secondary/10 animate-pulse" />
                     </div>
-                ) : templates.length === 0 ? (
+                ) : templates.filter(t => t.is_active).length === 0 ? (
                     <div className="text-center py-12 text-muted-foreground border border-dashed border-white/10 rounded-3xl">
                         <Calendar className="w-12 h-12 mx-auto mb-3 opacity-20" />
                         <p>No active subscriptions found.</p>
                         <p className="text-xs opacity-70 mt-1">Add a recurring expense to see it here.</p>
                     </div>
+                ) : visibleTemplates.length === 0 ? (
+                    <div className="text-center py-10 text-muted-foreground border border-dashed border-white/10 rounded-3xl">
+                        <p className="text-sm">No subscriptions match your filters.</p>
+                        <button
+                            type="button"
+                            onClick={() => { setSearch(''); clearFilters(); }}
+                            className={cn("text-xs font-bold mt-2", themeConfig.text)}
+                        >
+                            Clear all
+                        </button>
+                    </div>
                 ) : (
-                    templates.filter(t => t.is_active).map((template) => {
-                        const bucketId = (template.metadata && typeof template.metadata === 'object'
-                            ? (template.metadata as Record<string, unknown>).bucket_id
-                            : null) as string | null;
+                    visibleTemplates.map((template) => {
+                        const meta = getMeta(template);
+                        const bucketId = meta.bucket_id ?? null;
                         const linkedBucket = bucketId ? buckets.find(b => b.id === bucketId) : null;
+                        const lastCharge = lastCharges[template.id];
+                        const drift = lastCharge && Math.abs(lastCharge.pctChange) >= 5
+                            ? { ...lastCharge, templateAmount: Number(template.amount) }
+                            : null;
+                        const paused = isPaused(template);
+                        const trialEnds = meta.trial_ends_at ? parseISO(meta.trial_ends_at) : null;
+                        const trialActive = trialEnds && trialEnds > new Date();
+                        const trialEnded = trialEnds && trialEnds <= new Date();
+                        const showConvertedHint = template.currency && template.currency.toUpperCase() !== currency.toUpperCase();
                         return (
-                        <Card key={template.id} className="bg-card/40 border-white/5 backdrop-blur-sm overflow-hidden group">
+                        <Card
+                            key={template.id}
+                            className={cn(
+                                "bg-card/40 border-white/5 backdrop-blur-sm overflow-hidden group transition-opacity",
+                                paused && "opacity-60"
+                            )}
+                        >
                             <CardContent className="p-4 flex items-center gap-4">
                                 <div className={cn("w-12 h-12 rounded-2xl flex flex-col items-center justify-center shrink-0 border", themeConfig.bg, themeConfig.border)}>
                                     <span className={cn("text-[10px] font-bold uppercase leading-tight w-full text-center py-0.5 rounded-t-lg", themeConfig.text, themeConfig.headerBg)}>
@@ -284,7 +606,18 @@ export function SubscriptionsView() {
                                     </span>
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                    <h4 className="font-bold text-base truncate">{template.description}</h4>
+                                    <h4 className="font-bold text-base truncate flex items-center gap-1.5">
+                                        {meta.pinned && (
+                                            <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400 shrink-0" aria-label="Pinned" />
+                                        )}
+                                        <span className="truncate">{template.description}</span>
+                                    </h4>
+                                    {lastCharge && (
+                                        <p className="text-[10px] text-muted-foreground/70 mt-0.5 flex items-center gap-1">
+                                            <Clock className="w-2.5 h-2.5" aria-hidden="true" />
+                                            Last charged {formatDistanceToNowStrict(parseISO(lastCharge.lastDate), { addSuffix: true })}
+                                        </p>
+                                    )}
                                     <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1 flex-wrap">
                                         <span className="capitalize bg-secondary/50 px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wider">{template.frequency}</span>
                                         <div className="flex items-center gap-1 opacity-70">
@@ -352,39 +685,63 @@ export function SubscriptionsView() {
                                                 </div>
                                             </PopoverContent>
                                         </Popover>
+                                        {paused && meta.pause_until && (
+                                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold border bg-amber-500/10 border-amber-500/25 text-amber-300">
+                                                <Pause className="w-2.5 h-2.5" aria-hidden="true" />
+                                                Paused until {format(parseISO(meta.pause_until), 'MMM d')}
+                                            </span>
+                                        )}
+                                        {trialActive && trialEnds && (
+                                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold border bg-rose-500/10 border-rose-500/25 text-rose-300">
+                                                Trial ends in {Math.max(0, differenceInCalendarDays(trialEnds, new Date()))}d
+                                            </span>
+                                        )}
+                                        {trialEnded && (
+                                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold border bg-secondary/30 border-white/5 text-muted-foreground/70">
+                                                Trial ended
+                                            </span>
+                                        )}
                                     </div>
                                 </div>
                                 <div className="flex flex-col items-end gap-2 shrink-0">
-                                    <span className="font-bold text-base">{formatCurrency(template.amount, template.currency)}</span>
-                                    {priceChanges[template.id] && (
+                                    <div className="flex flex-col items-end">
+                                        <span className="font-bold text-base">{formatCurrency(template.amount, template.currency)}</span>
+                                        {showConvertedHint && (
+                                            <span className="text-[10px] text-muted-foreground/70">
+                                                ≈ {formatCurrency(convertAmount(Number(template.amount), template.currency, currency))}
+                                            </span>
+                                        )}
+                                    </div>
+                                    {drift && (
                                         <button
                                             type="button"
-                                            onClick={() => setUpdateTarget({ template, change: priceChanges[template.id] })}
+                                            onClick={() => setUpdateTarget({ template, change: drift })}
                                             className={cn(
                                                 "inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] font-bold transition-colors",
-                                                priceChanges[template.id].pctChange > 0
+                                                drift.pctChange > 0
                                                     ? "bg-rose-500/15 border-rose-500/30 text-rose-300 hover:bg-rose-500/25"
                                                     : "bg-emerald-500/15 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/25"
                                             )}
                                             aria-label="Update template price"
                                         >
-                                            {priceChanges[template.id].pctChange > 0
+                                            {drift.pctChange > 0
                                                 ? <TrendingUp className="w-3 h-3" aria-hidden="true" />
                                                 : <TrendingDown className="w-3 h-3" aria-hidden="true" />}
                                             <span>
-                                                {priceChanges[template.id].pctChange > 0 ? '+' : ''}
-                                                {priceChanges[template.id].pctChange.toFixed(0)}%
+                                                {drift.pctChange > 0 ? '+' : ''}
+                                                {drift.pctChange.toFixed(0)}%
                                             </span>
                                         </button>
                                     )}
-                                    <button
-                                        onClick={() => setCancelTarget(template.id)}
-                                        className="text-rose-400 hover:text-rose-300 opacity-0 group-hover:opacity-100 transition-opacity p-1"
-                                        title="Cancel Subscription"
-                                        aria-label="Cancel subscription"
-                                    >
-                                        <Trash2 className="w-4 h-4" aria-hidden="true" />
-                                    </button>
+                                    <RowActionsMenu
+                                        template={template}
+                                        meta={meta}
+                                        paused={paused}
+                                        onTogglePin={togglePin}
+                                        onSetPause={setPauseUntil}
+                                        onSetTrial={setTrialEndsAt}
+                                        onCancel={(id) => setCancelTarget(id)}
+                                    />
                                 </div>
                             </CardContent>
                         </Card>
@@ -392,11 +749,24 @@ export function SubscriptionsView() {
                     })
                 )}
             </div>
-            
-            {templates.filter(t => !t.is_active).length > 0 && (
+
+            {inactiveTemplates.length > 0 && (
                  <div className="pt-6 border-t border-white/10 space-y-3">
-                     <h3 className="text-sm font-bold text-muted-foreground">Inactive Subscriptions</h3>
-                     {templates.filter(t => !t.is_active).map((template) => (
+                     <div className="flex items-center justify-between">
+                         <h3 className="text-sm font-bold text-muted-foreground">
+                             Inactive Subscriptions ({inactiveTemplates.length})
+                         </h3>
+                         {inactiveTemplates.length > INACTIVE_PAGE_SIZE && (
+                             <button
+                                 type="button"
+                                 onClick={() => setShowAllInactive(s => !s)}
+                                 className={cn("text-[10px] font-bold uppercase tracking-wider", themeConfig.text)}
+                             >
+                                 {showAllInactive ? 'Show less' : `Show all (${inactiveTemplates.length})`}
+                             </button>
+                         )}
+                     </div>
+                     {(showAllInactive ? inactiveTemplates : inactiveTemplates.slice(0, INACTIVE_PAGE_SIZE)).map((template) => (
                          <div key={template.id} className={cn("flex justify-between items-center p-3 rounded-xl bg-secondary/10 opacity-70 border border-white/5 group", themeConfig.bg)}>
                              <div className="flex items-center gap-3">
                                  <RotateCw className={cn("w-4 h-4", themeConfig.text)} />
@@ -404,7 +774,7 @@ export function SubscriptionsView() {
                              </div>
                              <div className="flex items-center gap-3">
                                 <span className="text-xs font-bold text-muted-foreground">{formatCurrency(template.amount, template.currency)} / {template.frequency}</span>
-                                <button 
+                                <button
                                     onClick={() => handleToggleActive(template.id, false)}
                                     className={cn("text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-lg bg-secondary/30 hover:bg-secondary/50 transition-colors", themeConfig.text)}
                                 >
@@ -415,7 +785,7 @@ export function SubscriptionsView() {
                      ))}
                  </div>
             )}
-            
+
             </div>
         </motion.div>
 
@@ -468,5 +838,111 @@ export function SubscriptionsView() {
             </AlertDialogContent>
         </AlertDialog>
         </>
+    );
+}
+
+type RowActionsMenuProps = {
+    template: Tpl;
+    meta: SubscriptionMetadata;
+    paused: boolean;
+    onTogglePin: (t: Tpl) => void;
+    onSetPause: (t: Tpl, dateStr: string | null) => void;
+    onSetTrial: (t: Tpl, dateStr: string | null) => void;
+    onCancel: (id: string) => void;
+};
+
+function RowActionsMenu({ template, meta, paused, onTogglePin, onSetPause, onSetTrial, onCancel }: RowActionsMenuProps) {
+    const [open, setOpen] = useState(false);
+    const todayStr = format(new Date(), 'yyyy-MM-dd');
+
+    return (
+        <Popover open={open} onOpenChange={setOpen}>
+            <PopoverTrigger asChild>
+                <button
+                    type="button"
+                    className="text-muted-foreground hover:text-foreground p-1 transition-colors"
+                    aria-label="Subscription actions"
+                >
+                    <MoreVertical className="w-4 h-4" aria-hidden="true" />
+                </button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-56 p-1 bg-card/95 backdrop-blur-xl border-white/10">
+                <button
+                    type="button"
+                    onClick={() => { onTogglePin(template); setOpen(false); }}
+                    className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-xs hover:bg-secondary/30 transition-colors text-left"
+                >
+                    <Star className={cn("w-3.5 h-3.5", meta.pinned && "fill-amber-400 text-amber-400")} aria-hidden="true" />
+                    <span>{meta.pinned ? 'Unpin' : 'Pin to top'}</span>
+                </button>
+
+                {paused ? (
+                    <button
+                        type="button"
+                        onClick={() => { onSetPause(template, null); setOpen(false); }}
+                        className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-xs hover:bg-secondary/30 transition-colors text-left"
+                    >
+                        <Play className="w-3.5 h-3.5 text-emerald-400" aria-hidden="true" />
+                        <span>Resume now</span>
+                    </button>
+                ) : (
+                    <label className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-xs hover:bg-secondary/30 transition-colors cursor-pointer">
+                        <Pause className="w-3.5 h-3.5 text-amber-400" aria-hidden="true" />
+                        <span className="flex-1">Pause until…</span>
+                        <input
+                            type="date"
+                            min={todayStr}
+                            onChange={(e) => {
+                                if (e.target.value) {
+                                    onSetPause(template, e.target.value);
+                                    setOpen(false);
+                                }
+                            }}
+                            className="bg-transparent text-[10px] w-[88px] text-muted-foreground"
+                            aria-label="Pause until date"
+                        />
+                    </label>
+                )}
+
+                {meta.trial_ends_at ? (
+                    <button
+                        type="button"
+                        onClick={() => { onSetTrial(template, null); setOpen(false); }}
+                        className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-xs hover:bg-secondary/30 transition-colors text-left"
+                    >
+                        <Clock className="w-3.5 h-3.5 text-rose-300" aria-hidden="true" />
+                        <span>Clear trial</span>
+                    </button>
+                ) : (
+                    <label className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-xs hover:bg-secondary/30 transition-colors cursor-pointer">
+                        <Clock className="w-3.5 h-3.5 text-rose-300" aria-hidden="true" />
+                        <span className="flex-1">Trial ends…</span>
+                        <input
+                            type="date"
+                            min={todayStr}
+                            onChange={(e) => {
+                                if (e.target.value) {
+                                    onSetTrial(template, e.target.value);
+                                    setOpen(false);
+                                }
+                            }}
+                            className="bg-transparent text-[10px] w-[88px] text-muted-foreground"
+                            aria-label="Trial ends date"
+                        />
+                    </label>
+                )}
+
+                <div className="my-1 h-px bg-white/10" />
+
+                <button
+                    type="button"
+                    onClick={() => { onCancel(template.id); setOpen(false); }}
+                    className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-xs hover:bg-rose-500/10 text-rose-400 transition-colors text-left"
+                >
+                    <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
+                    <span>Cancel subscription</span>
+                </button>
+            </PopoverContent>
+        </Popover>
     );
 }

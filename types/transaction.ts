@@ -91,6 +91,15 @@ export type RecurringRecord = {
     metadata?: Record<string, unknown>;
 };
 
+export interface SubscriptionMetadata {
+    bucket_id?: string | null;
+    pinned?: boolean;
+    pause_until?: string | null;
+    trial_ends_at?: string | null;
+    notes?: string;
+    [key: string]: unknown;
+}
+
 export type RecurringTemplate = {
     id: string;
     description: string;
@@ -105,6 +114,7 @@ export type RecurringTemplate = {
     user_id?: string;
     group_id?: string | null;
     payment_method?: string | null;
+    metadata?: SubscriptionMetadata | null;
 };
 
 export type AuditLog = {
