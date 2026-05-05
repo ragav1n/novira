@@ -177,8 +177,8 @@ export async function GET(request: NextRequest) {
                     : `${c.bucket.name} at ${c.threshold}%`;
             const body =
                 c.threshold === 100
-                    ? `You've used ${c.pct.toFixed(0)}% of this bucket's budget.`
-                    : `Heads up — ${c.pct.toFixed(0)}% of the bucket's budget spent.`;
+                    ? `You've used ${c.pct.toFixed(0)}% of your budget.`
+                    : `${c.pct.toFixed(0)}% of your budget is spent.`;
 
             const payload = JSON.stringify({
                 title,

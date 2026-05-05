@@ -41,11 +41,14 @@ const CURRENCY_SYMBOLS: Record<string, string> = {
     USD: '$', EUR: '€', INR: '₹', GBP: '£', SGD: 'S$', JPY: '¥', AUD: 'A$', CAD: 'C$', AED: 'AED'
 };
 
-function formatBillBody(t: RecurringTemplateRow, daysUntil: number) {
+function formatBillNotification(t: RecurringTemplateRow, daysUntil: number) {
     const symbol = CURRENCY_SYMBOLS[t.currency?.toUpperCase()] || t.currency || '';
     const amount = `${symbol}${Number(t.amount).toLocaleString()}`;
     const when = daysUntil === 0 ? 'today' : daysUntil === 1 ? 'tomorrow' : `in ${daysUntil} days`;
-    return `${t.description} — ${amount} due ${when}`;
+    return {
+        title: `${t.description} due ${when}`,
+        body: amount,
+    };
 }
 
 export async function GET(request: NextRequest) {
@@ -176,9 +179,10 @@ export async function GET(request: NextRequest) {
 
         const occ = new Date(t.next_occurrence + 'T00:00:00Z');
         const daysUntil = Math.round((occ.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+        const { title, body } = formatBillNotification(t, daysUntil);
         const payload = JSON.stringify({
-            title: 'Upcoming bill',
-            body: formatBillBody(t, daysUntil),
+            title,
+            body,
             url: '/subscriptions',
             icon: '/Novira.png'
         });

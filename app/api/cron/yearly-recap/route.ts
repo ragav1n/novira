@@ -75,8 +75,8 @@ export async function GET(request: NextRequest) {
     const baseUrl = workerBaseUrl(request);
     const workerUrl = `${baseUrl}/api/cron/_recap-worker`;
     const pushPayload = {
-        title: `Your ${year} year in money is here`,
-        body: 'See how the whole year stacked up — open Novira.',
+        title: `Your ${year} in money`,
+        body: 'See how the whole year stacked up.',
         url: '/analytics',
         icon: '/Novira.png'
     };

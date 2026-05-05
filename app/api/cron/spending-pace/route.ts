@@ -147,8 +147,8 @@ export async function GET(request: NextRequest) {
             const overshootPct = Math.round(((projected - budget) / budget) * 100);
 
             const payload = JSON.stringify({
-                title: 'You\'re pacing over budget',
-                body: `At ${fmt(total, baseCcy)} mid-month, you\'re on track to overshoot by ${fmt(overshoot, baseCcy)} (+${overshootPct}%). Time to ease off.`,
+                title: 'Pacing over budget',
+                body: `${fmt(total, baseCcy)} mid-month — projected to overshoot by ${fmt(overshoot, baseCcy)} (+${overshootPct}%).`,
                 url: '/dashboard',
                 icon: '/Novira.png'
             });

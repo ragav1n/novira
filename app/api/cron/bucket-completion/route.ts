@@ -122,8 +122,8 @@ export async function GET(request: NextRequest) {
             if (!userSubs?.length) continue;
 
             const payload = JSON.stringify({
-                title: 'Bucket completed',
-                body: `${b.name} has wrapped up — tap to see your final summary.`,
+                title: `${b.name} wrapped up`,
+                body: 'Tap to see your final summary.',
                 url: '/groups',
                 icon: '/Novira.png'
             });

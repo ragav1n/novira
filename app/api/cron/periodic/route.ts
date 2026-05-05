@@ -44,6 +44,10 @@ export async function GET(request: NextRequest) {
 
     if (day === 1) {
         await trigger('/api/cron/monthly-recap');
+        await trigger('/api/cron/monthly-allowance-reset');
+    }
+    if (day === 15) {
+        await trigger('/api/cron/midmonth-comparison');
     }
     if (month === 1 && day === 2) {
         await trigger('/api/cron/yearly-recap');

@@ -107,8 +107,8 @@ export async function GET(request: NextRequest) {
             const isOneDay = b.end_date === ymd(inOne);
             const title = isOneDay ? `${b.name} ends tomorrow` : `${b.name} ends in 3 days`;
             const body = isOneDay
-                ? 'Final day to log expenses and review your mission.'
-                : 'Heads up — wrap up your spending and review before it closes.';
+                ? 'Last day to log expenses and review.'
+                : 'Wrap up spending and review before it closes.';
 
             const payload = JSON.stringify({
                 title,

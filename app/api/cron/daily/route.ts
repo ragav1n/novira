@@ -29,6 +29,14 @@ export async function GET(request: NextRequest) {
         '/api/cron/bucket-thresholds',
         '/api/cron/daily-digest',
         '/api/cron/spending-pace',
+        '/api/cron/subscription-price-change',
+        '/api/cron/goal-thresholds',
+        '/api/cron/goal-deadline',
+        '/api/cron/cash-flow-shortfall',
+        '/api/cron/transaction-anomaly',
+        '/api/cron/re-engagement',
+        '/api/cron/group-activity',
+        '/api/cron/no-spend-streak',
     ];
 
     const results = await Promise.allSettled(
