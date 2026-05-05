@@ -23,6 +23,7 @@ interface TransactionRowProps {
   icon: React.ReactNode;
   color?: string;
   bucketChip: React.ReactNode | null;
+  descriptionNode?: React.ReactNode;
   onHistory: () => void;
   onEdit: () => void;
   onDelete: () => void;
@@ -51,6 +52,7 @@ export const TransactionRow = memo(function TransactionRow({
   icon,
   color = '#8A2BE2',
   bucketChip,
+  descriptionNode,
   onHistory,
   onEdit,
   onDelete,
@@ -187,7 +189,7 @@ export const TransactionRow = memo(function TransactionRow({
           {/* Row 1: description + amount */}
           <div className="flex items-baseline gap-2">
             <p className="flex-1 min-w-0 truncate text-[13.5px] font-semibold text-white/90 leading-none">
-              {tx.description}
+              {descriptionNode ?? tx.description}
             </p>
             <div className="shrink-0 text-right leading-none">
               <span className={cn(

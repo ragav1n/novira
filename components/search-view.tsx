@@ -1,12 +1,13 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
     ChevronLeft, Search, SlidersHorizontal, Tag, Plane, Home, Gift,
     Car, Utensils, ShoppingCart, Heart, Gamepad2, School, Laptop, Music,
-    X, Check, Calendar as CalendarIcon, Filter, Shirt, CheckSquare, Square, Trash2
+    X, Check, Calendar as CalendarIcon, Filter, Shirt, CheckSquare, Square, Trash2,
+    Bookmark, BookmarkPlus, RefreshCcw, Ban
 } from "lucide-react";
-import { CATEGORY_COLORS, getIconForCategory, CATEGORIES as SYSTEM_CATEGORIES } from '@/lib/categories';
+import { CATEGORY_COLORS, getIconForCategory, getCategoryLabel, CATEGORIES as SYSTEM_CATEGORIES } from '@/lib/categories';
 import { TransactionRow } from '@/components/transaction-row';
 import { Transaction } from '@/types/transaction';
 import { enqueueMutation } from '@/lib/sync-manager';
@@ -16,11 +17,12 @@ import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
 import { toast, ImpactStyle } from '@/utils/haptics';
-import { format } from 'date-fns';
+import { format, parseISO, startOfDay, endOfDay, subDays, startOfMonth, isSameDay } from 'date-fns';
 import { useUserPreferences } from '@/components/providers/user-preferences-provider';
 import { useBucketsList } from '@/components/providers/buckets-provider';
 import { useWorkspaceTheme } from '@/hooks/useWorkspaceTheme';
 import { useTransactionInvalidationListener } from '@/hooks/useTransactionInvalidationListener';
+import { loadPresets, savePreset, deletePreset, type SearchPreset, type SearchFilterSnapshot } from '@/lib/search-presets';
 import {
     Sheet,
     SheetContent,
@@ -56,6 +58,9 @@ type DateRange = {
 
 type SortOption = 'date-desc' | 'date-asc' | 'amount-desc' | 'amount-asc';
 
+type QuickRangeId = 'today' | '7d' | '30d' | 'month';
+type NumericOp = '>' | '<' | '>=' | '<=' | '=';
+
 // Custom hook for debouncing
 function useDebounce<T>(value: T, delay: number): T {
     const [debouncedValue, setDebouncedValue] = useState<T>(value);
@@ -66,6 +71,48 @@ function useDebounce<T>(value: T, delay: number): T {
         return () => clearTimeout(handler);
     }, [value, delay]);
     return debouncedValue;
+}
+
+function parseNumericQuery(q: string): { op: NumericOp; value: number } | null {
+    const m = /^(>=|<=|>|<|=)\s*(\d+(?:\.\d+)?)$/.exec(q.trim());
+    if (!m) return null;
+    const value = Number(m[2]);
+    if (!Number.isFinite(value)) return null;
+    return { op: m[1] as NumericOp, value };
+}
+
+function highlightMatch(text: string | null | undefined, query: string): React.ReactNode {
+    if (!text) return text;
+    const trimmed = query.trim();
+    if (!trimmed) return text;
+    const escaped = trimmed.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const splitter = new RegExp(`(${escaped})`, 'gi');
+    const matcher = new RegExp(`^${escaped}$`, 'i');
+    const parts = text.split(splitter);
+    return parts.map((part, i) =>
+        matcher.test(part)
+            ? <mark key={i} className="bg-primary/25 text-primary rounded px-0.5">{part}</mark>
+            : <React.Fragment key={i}>{part}</React.Fragment>
+    );
+}
+
+function rangeMatches(from: Date | undefined, to: Date | undefined, target: { from: Date; to: Date }): boolean {
+    if (!from || !to) return false;
+    return isSameDay(from, target.from) && isSameDay(to, target.to);
+}
+
+function getQuickRange(id: QuickRangeId): { from: Date; to: Date } {
+    const now = new Date();
+    switch (id) {
+        case 'today':
+            return { from: startOfDay(now), to: endOfDay(now) };
+        case '7d':
+            return { from: startOfDay(subDays(now, 6)), to: endOfDay(now) };
+        case '30d':
+            return { from: startOfDay(subDays(now, 29)), to: endOfDay(now) };
+        case 'month':
+            return { from: startOfMonth(now), to: endOfDay(now) };
+    }
 }
 
 const SearchSkeleton = () => (
@@ -105,14 +152,18 @@ export function SearchView() {
     const debouncedSearchQuery = useDebounce(searchQuery, 300);
 
     // Advanced Filter State
-    const [priceRange, setPriceRange] = useState<[number, number]>([0, 1000]);
+    const [priceRange, setPriceRange] = useState<[number, number]>(() => {
+        const min = Number(searchParams?.get('min'));
+        const max = Number(searchParams?.get('max'));
+        return [Number.isFinite(min) && min > 0 ? min : 0, Number.isFinite(max) && max > 0 ? max : 1000];
+    });
     const [selectedCategories, setSelectedCategories] = useState<string[]>(() => {
         const c = searchParams?.get('category');
-        return c ? [c] : [];
+        return c ? c.split(',').filter(Boolean) : [];
     });
     const [selectedPayments, setSelectedPayments] = useState<string[]>(() => {
         const p = searchParams?.get('payment');
-        return p ? [p] : [];
+        return p ? p.split(',').filter(Boolean) : [];
     });
     const [dateRange, setDateRange] = useState<DateRange>(() => {
         const from = searchParams?.get('from');
@@ -122,14 +173,25 @@ export function SearchView() {
             to: to ? new Date(to + 'T00:00:00') : undefined,
         };
     });
-    const [selectedBucketId, setSelectedBucketId] = useState<string | null>(null);
+    const [selectedBucketId, setSelectedBucketId] = useState<string | null>(() => searchParams?.get('bucket') || null);
     const [selectedTags, setSelectedTags] = useState<string[]>(() => {
         const t = searchParams?.get('tag');
-        return t ? [t] : [];
+        return t ? t.split(',').filter(Boolean) : [];
     });
     const [knownTags, setKnownTags] = useState<string[]>([]);
-    const [sortBy, setSortBy] = useState<SortOption>('date-desc');
+    const [sortBy, setSortBy] = useState<SortOption>(() => {
+        const s = searchParams?.get('sort');
+        if (s === 'date-asc' || s === 'amount-desc' || s === 'amount-asc' || s === 'date-desc') return s;
+        return 'date-desc';
+    });
+    const [showRecurringOnly, setShowRecurringOnly] = useState<boolean>(() => searchParams?.get('recurring') === '1');
+    const [showExcludedOnly, setShowExcludedOnly] = useState<boolean>(() => searchParams?.get('excluded') === '1');
     const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
+
+    // Presets
+    const [presets, setPresets] = useState<SearchPreset[]>([]);
+    const [presetNameDraft, setPresetNameDraft] = useState('');
+    const [showPresetInput, setShowPresetInput] = useState(false);
 
     // Bulk-edit mode state
     const [bulkMode, setBulkMode] = useState(false);
@@ -178,8 +240,13 @@ export function SearchView() {
         }
     }, [selectedIds, exitBulkMode]);
 
-    // Dynamic Max Price calculation
-    const [maxPossiblePrice, setMaxPossiblePrice] = useState(1000);
+    // Dynamic Max Price calculation. Seed with the URL's `max` if it's higher
+    // than the default ceiling so a shared link with a custom range doesn't get
+    // clobbered by the auto-recalc the first time data lands.
+    const [maxPossiblePrice, setMaxPossiblePrice] = useState(() => {
+        const m = Number(searchParams?.get('max'));
+        return Math.max(1000, Number.isFinite(m) ? m : 0);
+    });
 
     const getBucketIcon = (iconName?: string) => {
         const icons: Record<string, React.ElementType> = {
@@ -230,11 +297,20 @@ export function SearchView() {
                 query = query.is('group_id', null);
             }
 
-            // Text search across description, place name, place address, and notes.
-            // Wrap in double quotes so commas/periods in the user's query don't
-            // break PostgREST's `or` filter parser; escape ilike wildcards so a
-            // literal `%` or `_` in the query doesn't act as a pattern char.
-            if (debouncedSearchQuery) {
+            // Numeric shortcut: a leading operator (>, <, >=, <=, =) + number is
+            // applied as an amount filter instead of a text search.
+            const numeric = parseNumericQuery(debouncedSearchQuery);
+            if (numeric) {
+                if (numeric.op === '>') query = query.gt('amount', numeric.value);
+                else if (numeric.op === '<') query = query.lt('amount', numeric.value);
+                else if (numeric.op === '>=') query = query.gte('amount', numeric.value);
+                else if (numeric.op === '<=') query = query.lte('amount', numeric.value);
+                else query = query.eq('amount', numeric.value);
+            } else if (debouncedSearchQuery) {
+                // Text search across description, place name, place address, and notes.
+                // Wrap in double quotes so commas/periods in the user's query don't
+                // break PostgREST's `or` filter parser; escape ilike wildcards so a
+                // literal `%` or `_` in the query doesn't act as a pattern char.
                 const escaped = debouncedSearchQuery
                     .replace(/[%_\\]/g, '\\$&')
                     .replace(/"/g, '');
@@ -279,6 +355,14 @@ export function SearchView() {
                 query = query.contains('tags', selectedTags);
             }
 
+            // Recurring / excluded toggles
+            if (showRecurringOnly) {
+                query = query.eq('is_recurring', true);
+            }
+            if (showExcludedOnly) {
+                query = query.eq('exclude_from_allowance', true);
+            }
+
             // Sorting
             const ascending = sortBy === 'date-asc' || sortBy === 'amount-asc';
             const sortColumn = sortBy.startsWith('date') ? 'date' : 'amount';
@@ -309,7 +393,7 @@ export function SearchView() {
         } finally {
             setLoading(false);
         }
-    }, [activeWorkspaceId, debouncedSearchQuery, selectedCategories, selectedPayments, dateRange, priceRange, selectedBucketId, selectedTags, sortBy, maxPossiblePrice]);
+    }, [activeWorkspaceId, debouncedSearchQuery, selectedCategories, selectedPayments, dateRange, priceRange, selectedBucketId, selectedTags, sortBy, maxPossiblePrice, showRecurringOnly, showExcludedOnly]);
 
     useEffect(() => {
         fetchAndFilter();
@@ -375,6 +459,43 @@ export function SearchView() {
         };
     }, [userId, activeWorkspaceId]);
 
+    // Load user-saved presets
+    useEffect(() => {
+        if (!userId) return;
+        setPresets(loadPresets(userId));
+    }, [userId]);
+
+    // Persist filter state to URL so refresh / back-nav / shared links work.
+    // Debounced via the searchParams.toString comparison + replace which is cheap.
+    const urlWriteRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    useEffect(() => {
+        const params = new URLSearchParams();
+        if (debouncedSearchQuery) params.set('q', debouncedSearchQuery);
+        if (selectedCategories.length > 0) params.set('category', selectedCategories.join(','));
+        if (selectedPayments.length > 0) params.set('payment', selectedPayments.join(','));
+        if (selectedTags.length > 0) params.set('tag', selectedTags.join(','));
+        if (dateRange.from) params.set('from', format(dateRange.from, 'yyyy-MM-dd'));
+        if (dateRange.to) params.set('to', format(dateRange.to, 'yyyy-MM-dd'));
+        if (priceRange[0] > 0) params.set('min', String(priceRange[0]));
+        if (priceRange[1] < maxPossiblePrice) params.set('max', String(priceRange[1]));
+        if (selectedBucketId) params.set('bucket', selectedBucketId);
+        if (sortBy !== 'date-desc') params.set('sort', sortBy);
+        if (showRecurringOnly) params.set('recurring', '1');
+        if (showExcludedOnly) params.set('excluded', '1');
+
+        const next = params.toString();
+        if (urlWriteRef.current) clearTimeout(urlWriteRef.current);
+        urlWriteRef.current = setTimeout(() => {
+            const current = window.location.search.replace(/^\?/, '');
+            if (current === next) return;
+            const url = next ? `${window.location.pathname}?${next}` : window.location.pathname;
+            router.replace(url, { scroll: false });
+        }, 150);
+        return () => {
+            if (urlWriteRef.current) clearTimeout(urlWriteRef.current);
+        };
+    }, [debouncedSearchQuery, selectedCategories, selectedPayments, selectedTags, dateRange, priceRange, maxPossiblePrice, selectedBucketId, sortBy, showRecurringOnly, showExcludedOnly, router]);
+
     const resetFilters = () => {
         setPriceRange([0, maxPossiblePrice]);
         setSelectedCategories([]);
@@ -384,6 +505,8 @@ export function SearchView() {
         setSelectedTags([]);
         setSortBy('date-desc');
         setSearchQuery('');
+        setShowRecurringOnly(false);
+        setShowExcludedOnly(false);
     };
 
     const getActiveFilterCount = () => {
@@ -394,12 +517,105 @@ export function SearchView() {
         if (dateRange.from || dateRange.to) count++;
         if (selectedBucketId) count++;
         if (selectedTags.length > 0) count++;
+        if (showRecurringOnly) count++;
+        if (showExcludedOnly) count++;
         return count;
     };
 
-    // Unified icon getter with color support is now handled in return
+    const buildSnapshot = useCallback((): SearchFilterSnapshot => ({
+        q: searchQuery || undefined,
+        categories: selectedCategories.length ? selectedCategories : undefined,
+        payments: selectedPayments.length ? selectedPayments : undefined,
+        from: dateRange.from ? format(dateRange.from, 'yyyy-MM-dd') : undefined,
+        to: dateRange.to ? format(dateRange.to, 'yyyy-MM-dd') : undefined,
+        min: priceRange[0] > 0 ? priceRange[0] : undefined,
+        max: priceRange[1] < maxPossiblePrice ? priceRange[1] : undefined,
+        bucket: selectedBucketId || undefined,
+        tags: selectedTags.length ? selectedTags : undefined,
+        sort: sortBy !== 'date-desc' ? sortBy : undefined,
+        recurring: showRecurringOnly || undefined,
+        excluded: showExcludedOnly || undefined,
+    }), [searchQuery, selectedCategories, selectedPayments, dateRange, priceRange, maxPossiblePrice, selectedBucketId, selectedTags, sortBy, showRecurringOnly, showExcludedOnly]);
 
-    const totalFilteredAmount = filteredTransactions.reduce((sum, tx) => sum + convertAmount(Number(tx.amount), tx.currency || 'USD'), 0);
+    const applySnapshot = useCallback((snap: SearchFilterSnapshot) => {
+        setSearchQuery(snap.q || '');
+        setSelectedCategories(snap.categories || []);
+        setSelectedPayments(snap.payments || []);
+        setSelectedTags(snap.tags || []);
+        setDateRange({
+            from: snap.from ? new Date(snap.from + 'T00:00:00') : undefined,
+            to: snap.to ? new Date(snap.to + 'T00:00:00') : undefined,
+        });
+        setPriceRange([snap.min ?? 0, snap.max ?? maxPossiblePrice]);
+        setSelectedBucketId(snap.bucket ?? null);
+        setSortBy((snap.sort as SortOption) || 'date-desc');
+        setShowRecurringOnly(!!snap.recurring);
+        setShowExcludedOnly(!!snap.excluded);
+    }, [maxPossiblePrice]);
+
+    const handleSavePreset = useCallback(() => {
+        if (!userId) return;
+        const name = presetNameDraft.trim();
+        if (!name) return;
+        const created = savePreset(userId, name, buildSnapshot());
+        setPresets(loadPresets(userId));
+        setPresetNameDraft('');
+        setShowPresetInput(false);
+        toast.success(`Saved preset "${created.name}"`);
+    }, [userId, presetNameDraft, buildSnapshot]);
+
+    const handleDeletePreset = useCallback((id: string) => {
+        if (!userId) return;
+        deletePreset(userId, id);
+        setPresets(loadPresets(userId));
+    }, [userId]);
+
+    // Toggle a quick date range. Tapping the active chip clears it.
+    const toggleQuickRange = useCallback((id: QuickRangeId) => {
+        const target = getQuickRange(id);
+        if (rangeMatches(dateRange.from, dateRange.to, target)) {
+            setDateRange({ from: undefined, to: undefined });
+        } else {
+            setDateRange({ from: target.from, to: target.to });
+        }
+    }, [dateRange.from, dateRange.to]);
+
+    const activeQuickRange = useMemo<QuickRangeId | null>(() => {
+        if (!dateRange.from || !dateRange.to) return null;
+        const ids: QuickRangeId[] = ['today', '7d', '30d', 'month'];
+        for (const id of ids) {
+            if (rangeMatches(dateRange.from, dateRange.to, getQuickRange(id))) return id;
+        }
+        return null;
+    }, [dateRange.from, dateRange.to]);
+
+    const numericQueryActive = useMemo(() => parseNumericQuery(debouncedSearchQuery), [debouncedSearchQuery]);
+
+    // Stats derived from the current filtered set
+    const filterStats = useMemo(() => {
+        if (filteredTransactions.length === 0) return null;
+        let total = 0;
+        const byCategory = new Map<string, number>();
+        for (const tx of filteredTransactions) {
+            const amt = convertAmount(Number(tx.amount), tx.currency || 'USD');
+            total += amt;
+            const cat = (tx.category || 'uncategorized').toLowerCase();
+            byCategory.set(cat, (byCategory.get(cat) || 0) + amt);
+        }
+        let topCategory: string | null = null;
+        let topAmount = -Infinity;
+        for (const [cat, amt] of byCategory) {
+            if (amt > topAmount) { topAmount = amt; topCategory = cat; }
+        }
+        return {
+            total,
+            count: filteredTransactions.length,
+            avg: total / filteredTransactions.length,
+            topCategory,
+        };
+    }, [filteredTransactions, convertAmount]);
+
+    // Unified icon getter with color support is now handled in return
 
     return (
         <motion.div 
@@ -703,6 +919,144 @@ export function SearchView() {
                 </Sheet>
             </div>
 
+            {/* Quick filter chips */}
+            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide shrink-0 -mt-2">
+                {([
+                    { id: 'today' as const, label: 'Today' },
+                    { id: '7d' as const, label: '7d' },
+                    { id: '30d' as const, label: '30d' },
+                    { id: 'month' as const, label: 'This month' },
+                ]).map(({ id, label }) => {
+                    const active = activeQuickRange === id;
+                    return (
+                        <button
+                            key={id}
+                            type="button"
+                            onClick={() => toggleQuickRange(id)}
+                            className={cn(
+                                'shrink-0 px-3 py-1.5 rounded-full text-[11px] font-semibold border transition-colors',
+                                active
+                                    ? `${themeConfig.bgMedium} ${themeConfig.borderMedium} ${themeConfig.text}`
+                                    : 'bg-secondary/10 border-white/10 text-muted-foreground hover:border-white/20'
+                            )}
+                        >
+                            {label}
+                        </button>
+                    );
+                })}
+                <button
+                    type="button"
+                    onClick={() => setShowRecurringOnly(v => !v)}
+                    className={cn(
+                        'shrink-0 inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-[11px] font-semibold border transition-colors',
+                        showRecurringOnly
+                            ? 'bg-cyan-500/15 border-cyan-500/40 text-cyan-300'
+                            : 'bg-secondary/10 border-white/10 text-muted-foreground hover:border-white/20'
+                    )}
+                >
+                    <RefreshCcw className="w-3 h-3" />
+                    Recurring
+                </button>
+                <button
+                    type="button"
+                    onClick={() => setShowExcludedOnly(v => !v)}
+                    className={cn(
+                        'shrink-0 inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-[11px] font-semibold border transition-colors',
+                        showExcludedOnly
+                            ? 'bg-rose-500/15 border-rose-500/40 text-rose-300'
+                            : 'bg-secondary/10 border-white/10 text-muted-foreground hover:border-white/20'
+                    )}
+                >
+                    <Ban className="w-3 h-3" />
+                    Excluded
+                </button>
+            </div>
+
+            {/* Numeric query hint */}
+            {numericQueryActive && (
+                <div className={`flex items-center justify-between gap-2 px-3 py-1.5 rounded-xl text-[11px] shrink-0 ${themeConfig.bgMedium} ${themeConfig.borderMedium} border`}>
+                    <span className={`${themeConfig.text} font-semibold`}>
+                        Filtering by amount {numericQueryActive.op} {formatCurrency(numericQueryActive.value)}
+                    </span>
+                    <button
+                        type="button"
+                        onClick={() => setSearchQuery('')}
+                        className="text-muted-foreground hover:text-foreground"
+                        aria-label="Clear amount filter"
+                    >
+                        <X className="w-3.5 h-3.5" />
+                    </button>
+                </div>
+            )}
+
+            {/* Saved presets row */}
+            {presets.length > 0 && (
+                <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide shrink-0">
+                    {presets.map((p) => (
+                        <div key={p.id} className="shrink-0 inline-flex items-center gap-1 pl-3 pr-1.5 py-1 rounded-full text-[11px] font-semibold bg-secondary/15 border border-white/10 text-foreground/80">
+                            <button type="button" onClick={() => applySnapshot(p.filters)} className="inline-flex items-center gap-1.5">
+                                <Bookmark className="w-3 h-3" />
+                                {p.name}
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => handleDeletePreset(p.id)}
+                                className="ml-1 p-0.5 rounded-full hover:bg-white/10 text-muted-foreground"
+                                aria-label={`Delete preset ${p.name}`}
+                            >
+                                <X className="w-3 h-3" />
+                            </button>
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            {/* Save preset control (only when there are filters to save) */}
+            {getActiveFilterCount() > 0 && (
+                <div className="flex items-center gap-2 shrink-0">
+                    {showPresetInput ? (
+                        <>
+                            <Input
+                                autoFocus
+                                placeholder="Preset name"
+                                value={presetNameDraft}
+                                onChange={(e) => setPresetNameDraft(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') handleSavePreset();
+                                    if (e.key === 'Escape') { setShowPresetInput(false); setPresetNameDraft(''); }
+                                }}
+                                className="h-8 text-xs bg-secondary/10 border-white/10 rounded-lg flex-1"
+                            />
+                            <Button
+                                size="sm"
+                                onClick={handleSavePreset}
+                                disabled={!presetNameDraft.trim()}
+                                className={`h-8 text-[11px] rounded-lg ${themeConfig.bgSolid} ${themeConfig.textWhite}`}
+                            >
+                                Save
+                            </Button>
+                            <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => { setShowPresetInput(false); setPresetNameDraft(''); }}
+                                className="h-8 text-[11px] rounded-lg"
+                            >
+                                Cancel
+                            </Button>
+                        </>
+                    ) : (
+                        <button
+                            type="button"
+                            onClick={() => setShowPresetInput(true)}
+                            className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+                        >
+                            <BookmarkPlus className="w-3.5 h-3.5" />
+                            Save filter as preset
+                        </button>
+                    )}
+                </div>
+            )}
+
             {/* Active Filters Summary Chips */}
             {getActiveFilterCount() > 0 && (
                 <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide shrink-0">
@@ -739,14 +1093,57 @@ export function SearchView() {
                             #{t} <X className="w-3 h-3 cursor-pointer" onClick={() => setSelectedTags(prev => prev.filter(x => x !== t))} />
                         </div>
                     ))}
+                    {showRecurringOnly && (
+                        <div className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] whitespace-nowrap bg-cyan-500/15 border border-cyan-500/40 text-cyan-300">
+                            Recurring <X className="w-3 h-3 cursor-pointer" onClick={() => setShowRecurringOnly(false)} />
+                        </div>
+                    )}
+                    {showExcludedOnly && (
+                        <div className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] whitespace-nowrap bg-rose-500/15 border border-rose-500/40 text-rose-300">
+                            Excluded <X className="w-3 h-3 cursor-pointer" onClick={() => setShowExcludedOnly(false)} />
+                        </div>
+                    )}
                 </div>
             )}
 
-            {/* Total Summary Mini-Card (Visible when filtered) */}
-            {getActiveFilterCount() > 0 && (
-                <div className={`bg-gradient-to-r to-secondary/20 p-3 rounded-2xl flex justify-between items-center shrink-0 border ${themeConfig.gradient} ${themeConfig.borderLight}`}>
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Total Filtered</span>
-                    <span className={`text-lg font-bold ${themeConfig.text}`}>{formatCurrency(totalFilteredAmount)}</span>
+            {/* Filter Stats Card (Visible when filtered) */}
+            {getActiveFilterCount() > 0 && filterStats && (
+                <div className={`bg-gradient-to-r to-secondary/20 p-3 rounded-2xl shrink-0 border ${themeConfig.gradient} ${themeConfig.borderLight}`}>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        <div className="flex flex-col">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Total</span>
+                            <span className={`text-base font-bold ${themeConfig.text} tabular-nums`}>{formatCurrency(filterStats.total)}</span>
+                        </div>
+                        <div className="flex flex-col">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Count</span>
+                            <span className={`text-base font-bold ${themeConfig.text} tabular-nums`}>{filterStats.count}</span>
+                        </div>
+                        <div className="flex flex-col">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Avg</span>
+                            <span className={`text-base font-bold ${themeConfig.text} tabular-nums`}>{formatCurrency(filterStats.avg)}</span>
+                        </div>
+                        <div className="flex flex-col min-w-0">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Top Category</span>
+                            {filterStats.topCategory ? (
+                                <span
+                                    className="inline-flex items-center gap-1.5 mt-0.5 px-1.5 py-0.5 rounded-md text-[11px] font-bold capitalize self-start max-w-full truncate"
+                                    style={{
+                                        backgroundColor: `${CATEGORY_COLORS[filterStats.topCategory] || '#8A2BE2'}20`,
+                                        color: CATEGORY_COLORS[filterStats.topCategory] || '#8A2BE2',
+                                    }}
+                                >
+                                    <span className="w-3 h-3 shrink-0">
+                                        {React.cloneElement(getIconForCategory(filterStats.topCategory, 'w-3 h-3') as React.ReactElement<{ style?: React.CSSProperties }>, {
+                                            style: { color: CATEGORY_COLORS[filterStats.topCategory] || '#8A2BE2' },
+                                        })}
+                                    </span>
+                                    <span className="truncate">{getCategoryLabel(filterStats.topCategory)}</span>
+                                </span>
+                            ) : (
+                                <span className="text-base font-bold text-muted-foreground">—</span>
+                            )}
+                        </div>
+                    </div>
                 </div>
             )}
 
@@ -762,50 +1159,76 @@ export function SearchView() {
                     ) : (
                         <AnimatePresence mode="popLayout">
                             {filteredTransactions.length > 0 ? (
-                                filteredTransactions.map((tx) => {
-                                    const myShare = calculateUserShare(tx, userId);
-                                    const showConverted = !!(tx.currency && tx.currency.toUpperCase() !== currency.toUpperCase());
-                                    const color = CATEGORY_COLORS[tx.category?.toLowerCase()] || CATEGORY_COLORS.uncategorized;
-                                    const isSelected = selectedIds.has(tx.id);
-                                    const row = (
-                                        <TransactionRow
-                                            key={tx.id}
-                                            tx={tx}
-                                            userId={userId}
-                                            myShare={myShare}
-                                            formattedAmount={formatCurrency(Math.abs(myShare), tx.currency)}
-                                            formattedConverted={showConverted ? formatCurrency(convertAmount(Math.abs(myShare), tx.currency || 'USD', currency), currency) : undefined}
-                                            showConverted={showConverted}
-                                            canEdit={false}
-                                            icon={getIconForCategory(tx.category, 'w-4 h-4')}
-                                            color={color}
-                                            bucketChip={getBucketChip(tx)}
-                                            onHistory={() => toast('History is available from the dashboard')}
-                                            onEdit={() => {}}
-                                            onDelete={() => {}}
-                                        />
-                                    );
-                                    if (!bulkMode) return row;
-                                    return (
-                                        <div
-                                            key={tx.id}
-                                            onClick={() => toggleSelection(tx.id)}
-                                            className={cn(
-                                                "relative flex items-center gap-2 cursor-pointer rounded-xl transition-colors",
-                                                isSelected && `${themeConfig.bgMedium}`
-                                            )}
-                                        >
-                                            <div className="pl-2 shrink-0">
-                                                {isSelected
-                                                    ? <CheckSquare className={cn("w-5 h-5", themeConfig.text)} />
-                                                    : <Square className="w-5 h-5 text-muted-foreground" />}
-                                            </div>
-                                            <div className="flex-1 min-w-0 pointer-events-none">
-                                                {row}
-                                            </div>
-                                        </div>
-                                    );
-                                })
+                                (() => {
+                                    const groupByDate = sortBy.startsWith('date');
+                                    const nodes: React.ReactNode[] = [];
+                                    let lastDateKey: string | null = null;
+                                    const queryActive = !!debouncedSearchQuery && !numericQueryActive;
+                                    for (const tx of filteredTransactions) {
+                                        const dateKey = (tx.date || '').slice(0, 10);
+                                        if (groupByDate && dateKey && dateKey !== lastDateKey) {
+                                            lastDateKey = dateKey;
+                                            nodes.push(
+                                                <div
+                                                    key={`hdr-${dateKey}`}
+                                                    className="sticky top-0 z-10 bg-background/85 backdrop-blur px-2 pt-2 pb-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground"
+                                                >
+                                                    {format(parseISO(dateKey), 'EEE, MMM d')}
+                                                </div>
+                                            );
+                                        }
+                                        const myShare = calculateUserShare(tx, userId);
+                                        const showConverted = !!(tx.currency && tx.currency.toUpperCase() !== currency.toUpperCase());
+                                        const color = CATEGORY_COLORS[tx.category?.toLowerCase()] || CATEGORY_COLORS.uncategorized;
+                                        const isSelected = selectedIds.has(tx.id);
+                                        const descriptionNode = queryActive
+                                            ? highlightMatch(tx.description, debouncedSearchQuery)
+                                            : undefined;
+                                        const row = (
+                                            <TransactionRow
+                                                key={tx.id}
+                                                tx={tx}
+                                                userId={userId}
+                                                myShare={myShare}
+                                                formattedAmount={formatCurrency(Math.abs(myShare), tx.currency)}
+                                                formattedConverted={showConverted ? formatCurrency(convertAmount(Math.abs(myShare), tx.currency || 'USD', currency), currency) : undefined}
+                                                showConverted={showConverted}
+                                                canEdit={false}
+                                                icon={getIconForCategory(tx.category, 'w-4 h-4')}
+                                                color={color}
+                                                bucketChip={getBucketChip(tx)}
+                                                descriptionNode={descriptionNode}
+                                                onHistory={() => toast('History is available from the dashboard')}
+                                                onEdit={() => {}}
+                                                onDelete={() => {}}
+                                            />
+                                        );
+                                        if (!bulkMode) {
+                                            nodes.push(row);
+                                        } else {
+                                            nodes.push(
+                                                <div
+                                                    key={tx.id}
+                                                    onClick={() => toggleSelection(tx.id)}
+                                                    className={cn(
+                                                        "relative flex items-center gap-2 cursor-pointer rounded-xl transition-colors",
+                                                        isSelected && `${themeConfig.bgMedium}`
+                                                    )}
+                                                >
+                                                    <div className="pl-2 shrink-0">
+                                                        {isSelected
+                                                            ? <CheckSquare className={cn("w-5 h-5", themeConfig.text)} />
+                                                            : <Square className="w-5 h-5 text-muted-foreground" />}
+                                                    </div>
+                                                    <div className="flex-1 min-w-0 pointer-events-none">
+                                                        {row}
+                                                    </div>
+                                                </div>
+                                            );
+                                        }
+                                    }
+                                    return nodes;
+                                })()
                         ) : (
                             <motion.div
                                 initial={{ opacity: 0 }}
@@ -831,19 +1254,36 @@ export function SearchView() {
 
             {/* Bulk action bar */}
             <AnimatePresence>
-                {bulkMode && selectedIds.size > 0 && (
+                {bulkMode && (
                     <motion.div
                         initial={{ y: 60, opacity: 0 }}
                         animate={{ y: 0, opacity: 1 }}
                         exit={{ y: 60, opacity: 0 }}
                         transition={{ type: 'spring', stiffness: 280, damping: 28 }}
-                        className="fixed bottom-20 lg:bottom-6 left-1/2 -translate-x-1/2 z-[80] flex items-center gap-2 px-3 py-2 rounded-2xl bg-card/95 backdrop-blur-xl border border-white/10 shadow-2xl"
+                        className="fixed bottom-20 lg:bottom-6 left-1/2 -translate-x-1/2 z-[80] flex items-center gap-2 px-3 py-2 rounded-2xl bg-card/95 backdrop-blur-xl border border-white/10 shadow-2xl max-w-[calc(100vw-1rem)] flex-wrap justify-center"
                     >
                         <span className="text-xs font-semibold px-2">{selectedIds.size} selected</span>
                         <Button
                             size="sm"
                             variant="outline"
+                            onClick={() => {
+                                if (selectedIds.size === filteredTransactions.length && filteredTransactions.length > 0) {
+                                    setSelectedIds(new Set());
+                                } else {
+                                    setSelectedIds(new Set(filteredTransactions.map(t => t.id)));
+                                }
+                            }}
+                            disabled={filteredTransactions.length === 0}
+                            className="h-8 rounded-lg bg-secondary/20 border-white/10 text-xs"
+                        >
+                            <CheckSquare className="w-3.5 h-3.5 mr-1.5" />
+                            {selectedIds.size === filteredTransactions.length && filteredTransactions.length > 0 ? 'Clear' : 'Select all'}
+                        </Button>
+                        <Button
+                            size="sm"
+                            variant="outline"
                             onClick={() => setIsRecategorizeOpen(true)}
+                            disabled={selectedIds.size === 0}
                             className="h-8 rounded-lg bg-secondary/20 border-white/10 text-xs"
                         >
                             <Tag className="w-3.5 h-3.5 mr-1.5" /> Recategorize
@@ -851,7 +1291,8 @@ export function SearchView() {
                         <Button
                             size="sm"
                             onClick={bulkDelete}
-                            className="h-8 rounded-lg bg-rose-500/20 border border-rose-500/30 text-rose-300 hover:bg-rose-500/30 text-xs"
+                            disabled={selectedIds.size === 0}
+                            className="h-8 rounded-lg bg-rose-500/20 border border-rose-500/30 text-rose-300 hover:bg-rose-500/30 text-xs disabled:opacity-50"
                         >
                             <Trash2 className="w-3.5 h-3.5 mr-1.5" /> Delete
                         </Button>
