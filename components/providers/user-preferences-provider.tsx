@@ -50,6 +50,23 @@ interface UserPreferencesContextType {
     setBillReminderLeadDays: (days: number | null) => Promise<void>;
     digestFrequency: 'off' | 'daily' | 'weekly';
     setDigestFrequency: (freq: 'off' | 'daily' | 'weekly') => Promise<void>;
+    bucketDeadlineAlerts: boolean;
+    setBucketDeadlineAlerts: (enabled: boolean) => Promise<void>;
+    spendingPaceAlerts: boolean;
+    setSpendingPaceAlerts: (enabled: boolean) => Promise<void>;
+    quietHoursStart: number | null;
+    quietHoursEnd: number | null;
+    setQuietHours: (start: number | null, end: number | null) => Promise<void>;
+    firstDayOfWeek: 0 | 1;
+    setFirstDayOfWeek: (day: 0 | 1) => Promise<void>;
+    dateFormat: 'MDY' | 'DMY' | 'YMD';
+    setDateFormat: (fmt: 'MDY' | 'DMY' | 'YMD') => Promise<void>;
+    defaultCategory: string | null;
+    setDefaultCategory: (cat: string | null) => Promise<void>;
+    defaultPaymentMethod: string | null;
+    setDefaultPaymentMethod: (pm: string | null) => Promise<void>;
+    defaultBucketId: string | null;
+    setDefaultBucketId: (id: string | null) => Promise<void>;
     monthlyBudget: number;
     setMonthlyBudget: (budget: number) => Promise<void>;
     avatarUrl: string | null;
@@ -120,6 +137,15 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
     const [budgetAlertsEnabled, setBudgetAlertsEnabledState] = useState(false);
     const [billReminderLeadDays, setBillReminderLeadDaysState] = useState<number | null>(null);
     const [digestFrequency, setDigestFrequencyState] = useState<'off' | 'daily' | 'weekly'>('off');
+    const [bucketDeadlineAlerts, setBucketDeadlineAlertsState] = useState(true);
+    const [spendingPaceAlerts, setSpendingPaceAlertsState] = useState(true);
+    const [quietHoursStart, setQuietHoursStartState] = useState<number | null>(null);
+    const [quietHoursEnd, setQuietHoursEndState] = useState<number | null>(null);
+    const [firstDayOfWeek, setFirstDayOfWeekState] = useState<0 | 1>(0);
+    const [dateFormat, setDateFormatState] = useState<'MDY' | 'DMY' | 'YMD'>('MDY');
+    const [defaultCategory, setDefaultCategoryState] = useState<string | null>(null);
+    const [defaultPaymentMethod, setDefaultPaymentMethodState] = useState<string | null>(null);
+    const [defaultBucketId, setDefaultBucketIdState] = useState<string | null>(null);
     const [monthlyBudget, setMonthlyBudgetState] = useState(DEFAULT_BUDGETS.INR);
     const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
     const [fullName, setFullName] = useState<string>('User');
@@ -166,6 +192,15 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
                     if (parsed.monthly_budget != null) setMonthlyBudgetState(parsed.monthly_budget);
                     if (parsed.avatar_url) setAvatarUrl(parsed.avatar_url);
                     if (parsed.budgets) setBudgets(parsed.budgets);
+                    if (parsed.bucket_deadline_alerts != null) setBucketDeadlineAlertsState(parsed.bucket_deadline_alerts);
+                    if (parsed.spending_pace_alerts != null) setSpendingPaceAlertsState(parsed.spending_pace_alerts);
+                    if (parsed.quiet_hours_start !== undefined) setQuietHoursStartState(parsed.quiet_hours_start);
+                    if (parsed.quiet_hours_end !== undefined) setQuietHoursEndState(parsed.quiet_hours_end);
+                    if (parsed.first_day_of_week === 0 || parsed.first_day_of_week === 1) setFirstDayOfWeekState(parsed.first_day_of_week);
+                    if (parsed.date_format === 'MDY' || parsed.date_format === 'DMY' || parsed.date_format === 'YMD') setDateFormatState(parsed.date_format);
+                    if (parsed.default_category !== undefined) setDefaultCategoryState(parsed.default_category);
+                    if (parsed.default_payment_method !== undefined) setDefaultPaymentMethodState(parsed.default_payment_method);
+                    if (parsed.default_bucket_id !== undefined) setDefaultBucketIdState(parsed.default_bucket_id);
                     // Migration: if active_workspace_id was previously stored in the
                     // consolidated blob, surface it so the new dedicated key takes over.
                     if (parsed.active_workspace_id && !localStorage.getItem(workspaceKey)) {
@@ -178,24 +213,72 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
             const storedWorkspace = localStorage.getItem(workspaceKey);
             if (storedWorkspace) setActiveWorkspaceId(storedWorkspace);
 
-            const { data, error } = await supabase
+            // Try the wide select first (includes new columns). If columns don't
+            // exist yet on this deployment, fall back to the legacy column set
+            // so the rest of the preferences still hydrate.
+            const FULL_COLUMNS = 'currency, budget_alerts, bill_reminder_lead_days, digest_frequency, monthly_budget, budgets, avatar_url, full_name, bucket_deadline_alerts, spending_pace_alerts, quiet_hours_start, quiet_hours_end, first_day_of_week, date_format, default_category, default_payment_method, default_bucket_id';
+            const LEGACY_COLUMNS = 'currency, budget_alerts, bill_reminder_lead_days, digest_frequency, monthly_budget, budgets, avatar_url, full_name';
+
+            type ProfileRow = {
+                currency?: Currency | null;
+                budget_alerts?: boolean | null;
+                bill_reminder_lead_days?: number | null;
+                digest_frequency?: 'off' | 'daily' | 'weekly' | null;
+                monthly_budget?: number | null;
+                budgets?: Record<string, number> | null;
+                avatar_url?: string | null;
+                full_name?: string | null;
+                bucket_deadline_alerts?: boolean | null;
+                spending_pace_alerts?: boolean | null;
+                quiet_hours_start?: number | null;
+                quiet_hours_end?: number | null;
+                first_day_of_week?: 0 | 1 | null;
+                date_format?: 'MDY' | 'DMY' | 'YMD' | null;
+                default_category?: string | null;
+                default_payment_method?: string | null;
+                default_bucket_id?: string | null;
+            };
+
+            let data: ProfileRow | null = null;
+            let error: { code?: string; message?: string } | null = null;
+            const wide = await supabase
                 .from('profiles')
-                .select('currency, budget_alerts, bill_reminder_lead_days, digest_frequency, monthly_budget, budgets, avatar_url, full_name')
+                .select(FULL_COLUMNS)
                 .eq('id', uid)
                 .single();
+            if (wide.error && wide.error.code !== 'PGRST116') {
+                const legacy = await supabase
+                    .from('profiles')
+                    .select(LEGACY_COLUMNS)
+                    .eq('id', uid)
+                    .single();
+                data = (legacy.data as ProfileRow | null) ?? null;
+                error = legacy.error;
+            } else {
+                data = (wide.data as ProfileRow | null) ?? null;
+                error = wide.error;
+            }
 
             if (data) {
                 if (data.currency) setCurrencyState(data.currency as Currency);
-                if (data.budget_alerts !== null) setBudgetAlertsEnabledState(data.budget_alerts);
-                if ((data as { bill_reminder_lead_days?: number | null }).bill_reminder_lead_days !== undefined) {
-                    setBillReminderLeadDaysState((data as { bill_reminder_lead_days?: number | null }).bill_reminder_lead_days ?? null);
+                if (data.budget_alerts !== null && data.budget_alerts !== undefined) setBudgetAlertsEnabledState(data.budget_alerts);
+                if (data.bill_reminder_lead_days !== undefined) {
+                    setBillReminderLeadDaysState(data.bill_reminder_lead_days ?? null);
                 }
-                const digestVal = (data as { digest_frequency?: 'off' | 'daily' | 'weekly' | null }).digest_frequency;
-                if (digestVal) setDigestFrequencyState(digestVal);
+                if (data.digest_frequency) setDigestFrequencyState(data.digest_frequency);
                 if (data.monthly_budget != null) setMonthlyBudgetState(data.monthly_budget);
                 if (data.avatar_url) setAvatarUrl(data.avatar_url);
-                if (data.budgets) setBudgets(data.budgets as Record<string, number>);
+                if (data.budgets) setBudgets(data.budgets);
                 if (data.full_name) setFullName(data.full_name);
+                if (data.bucket_deadline_alerts != null) setBucketDeadlineAlertsState(data.bucket_deadline_alerts);
+                if (data.spending_pace_alerts != null) setSpendingPaceAlertsState(data.spending_pace_alerts);
+                if (data.quiet_hours_start !== undefined) setQuietHoursStartState(data.quiet_hours_start);
+                if (data.quiet_hours_end !== undefined) setQuietHoursEndState(data.quiet_hours_end);
+                if (data.first_day_of_week === 0 || data.first_day_of_week === 1) setFirstDayOfWeekState(data.first_day_of_week);
+                if (data.date_format === 'MDY' || data.date_format === 'DMY' || data.date_format === 'YMD') setDateFormatState(data.date_format);
+                if (data.default_category !== undefined) setDefaultCategoryState(data.default_category);
+                if (data.default_payment_method !== undefined) setDefaultPaymentMethodState(data.default_payment_method);
+                if (data.default_bucket_id !== undefined) setDefaultBucketIdState(data.default_bucket_id);
 
                 // Update cache with fresh data (merge to preserve fields like active_workspace_id)
                 try {
@@ -594,6 +677,93 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
         }
     }, [userId, refreshPreferences]);
 
+    const persistProfileField = useCallback(async <K extends string>(
+        column: K,
+        value: unknown,
+        cacheKey: K,
+        errorLabel: string,
+    ) => {
+        if (!userId) return true;
+        const profileCacheKey = `novira_profile_${userId}`;
+        try {
+            const cached = localStorage.getItem(profileCacheKey);
+            const parsed = cached ? JSON.parse(cached) : {};
+            localStorage.setItem(profileCacheKey, JSON.stringify({ ...parsed, [cacheKey]: value }));
+        } catch { /* ignore */ }
+
+        try {
+            const { error } = await supabase
+                .from('profiles')
+                .update({ [column]: value })
+                .eq('id', userId);
+            if (error) throw error;
+            return true;
+        } catch (error) {
+            console.error(`Error updating ${errorLabel}:`, error);
+            toast.error(`Failed to update ${errorLabel}`);
+            refreshPreferences();
+            return false;
+        }
+    }, [userId, refreshPreferences]);
+
+    const setBucketDeadlineAlerts = useCallback(async (enabled: boolean) => {
+        setBucketDeadlineAlertsState(enabled);
+        await persistProfileField('bucket_deadline_alerts', enabled, 'bucket_deadline_alerts', 'bucket deadline alerts');
+    }, [persistProfileField]);
+
+    const setSpendingPaceAlerts = useCallback(async (enabled: boolean) => {
+        setSpendingPaceAlertsState(enabled);
+        await persistProfileField('spending_pace_alerts', enabled, 'spending_pace_alerts', 'spending pace alerts');
+    }, [persistProfileField]);
+
+    const setQuietHours = useCallback(async (start: number | null, end: number | null) => {
+        setQuietHoursStartState(start);
+        setQuietHoursEndState(end);
+        if (!userId) return;
+        const profileCacheKey = `novira_profile_${userId}`;
+        try {
+            const cached = localStorage.getItem(profileCacheKey);
+            const parsed = cached ? JSON.parse(cached) : {};
+            localStorage.setItem(profileCacheKey, JSON.stringify({ ...parsed, quiet_hours_start: start, quiet_hours_end: end }));
+        } catch { /* ignore */ }
+        try {
+            const { error } = await supabase
+                .from('profiles')
+                .update({ quiet_hours_start: start, quiet_hours_end: end })
+                .eq('id', userId);
+            if (error) throw error;
+        } catch (error) {
+            console.error('Error updating quiet hours:', error);
+            toast.error('Failed to update quiet hours');
+            refreshPreferences();
+        }
+    }, [userId, refreshPreferences]);
+
+    const setFirstDayOfWeek = useCallback(async (day: 0 | 1) => {
+        setFirstDayOfWeekState(day);
+        await persistProfileField('first_day_of_week', day, 'first_day_of_week', 'first day of week');
+    }, [persistProfileField]);
+
+    const setDateFormat = useCallback(async (fmt: 'MDY' | 'DMY' | 'YMD') => {
+        setDateFormatState(fmt);
+        await persistProfileField('date_format', fmt, 'date_format', 'date format');
+    }, [persistProfileField]);
+
+    const setDefaultCategory = useCallback(async (cat: string | null) => {
+        setDefaultCategoryState(cat);
+        await persistProfileField('default_category', cat, 'default_category', 'default category');
+    }, [persistProfileField]);
+
+    const setDefaultPaymentMethod = useCallback(async (pm: string | null) => {
+        setDefaultPaymentMethodState(pm);
+        await persistProfileField('default_payment_method', pm, 'default_payment_method', 'default payment method');
+    }, [persistProfileField]);
+
+    const setDefaultBucketId = useCallback(async (id: string | null) => {
+        setDefaultBucketIdState(id);
+        await persistProfileField('default_bucket_id', id, 'default_bucket_id', 'default bucket');
+    }, [persistProfileField]);
+
     const setBudgetAlertsEnabled = useCallback(async (enabled: boolean) => {
         setBudgetAlertsEnabledState(enabled);
 
@@ -703,6 +873,23 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
         setBillReminderLeadDays,
         digestFrequency,
         setDigestFrequency,
+        bucketDeadlineAlerts,
+        setBucketDeadlineAlerts,
+        spendingPaceAlerts,
+        setSpendingPaceAlerts,
+        quietHoursStart,
+        quietHoursEnd,
+        setQuietHours,
+        firstDayOfWeek,
+        setFirstDayOfWeek,
+        dateFormat,
+        setDateFormat,
+        defaultCategory,
+        setDefaultCategory,
+        defaultPaymentMethod,
+        setDefaultPaymentMethod,
+        defaultBucketId,
+        setDefaultBucketId,
         monthlyBudget,
         setMonthlyBudget,
         avatarUrl,
@@ -739,6 +926,23 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
         setBillReminderLeadDays,
         digestFrequency,
         setDigestFrequency,
+        bucketDeadlineAlerts,
+        setBucketDeadlineAlerts,
+        spendingPaceAlerts,
+        setSpendingPaceAlerts,
+        quietHoursStart,
+        quietHoursEnd,
+        setQuietHours,
+        firstDayOfWeek,
+        setFirstDayOfWeek,
+        dateFormat,
+        setDateFormat,
+        defaultCategory,
+        setDefaultCategory,
+        defaultPaymentMethod,
+        setDefaultPaymentMethod,
+        defaultBucketId,
+        setDefaultBucketId,
         monthlyBudget,
         setMonthlyBudget,
         avatarUrl,
@@ -753,7 +957,8 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
         privacyMode,
         setPrivacyMode,
         isPrivacyHidden,
-        togglePrivacyHidden
+        togglePrivacyHidden,
+        setActiveWorkspaceIdWithCache
     ]);
 
     return (

@@ -1,6 +1,6 @@
 'use client';
 
-import { Lock, Shield, ChevronRight } from 'lucide-react';
+import { Lock, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ChangePasswordDialog } from '@/components/change-password-dialog';
 
@@ -13,12 +13,7 @@ interface Props {
 
 export function SecuritySection({ userEmail, hasPassword, hasGoogleIdentity, onPasswordChangeSuccess }: Props) {
     return (
-        <div className="space-y-3 pt-2">
-            <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
-                <Shield className="w-4 h-4" />
-                <span>Security & Privacy</span>
-            </div>
-
+        <div className="space-y-3">
             <div className="bg-secondary/5 rounded-xl border border-white/5 divide-y divide-white/5 min-h-[144px]">
                 <div className="flex items-center justify-between p-3">
                     <div className="flex items-center gap-3">

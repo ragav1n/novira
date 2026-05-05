@@ -1,6 +1,7 @@
 import 'server-only';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient as createServiceClient } from '@supabase/supabase-js';
+import { isInQuietHours } from '@/lib/push-quiet-hours';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const webpush = require('web-push') as typeof import('web-push');
 
@@ -24,6 +25,10 @@ interface ProfileRow {
     id: string;
     currency: string | null;
     monthly_budget: number | null;
+    spending_pace_alerts?: boolean | null;
+    quiet_hours_start?: number | null;
+    quiet_hours_end?: number | null;
+    timezone?: string | null;
 }
 
 interface TxRow {
@@ -75,11 +80,26 @@ export async function GET(request: NextRequest) {
         auth: { persistSession: false, autoRefreshToken: false }
     });
 
-    const { data: profiles } = await supabase
-        .from('profiles')
-        .select('id, currency, monthly_budget')
-        .gt('monthly_budget', 0)
-        .returns<ProfileRow[]>();
+    // Wide select first for the new prefs columns; fall back if columns aren't
+    // deployed yet so the cron keeps working.
+    let profiles: ProfileRow[] | null = null;
+    {
+        const wide = await supabase
+            .from('profiles')
+            .select('id, currency, monthly_budget, spending_pace_alerts, quiet_hours_start, quiet_hours_end, timezone')
+            .gt('monthly_budget', 0)
+            .returns<ProfileRow[]>();
+        if (wide.error) {
+            const legacy = await supabase
+                .from('profiles')
+                .select('id, currency, monthly_budget')
+                .gt('monthly_budget', 0)
+                .returns<ProfileRow[]>();
+            profiles = legacy.data ?? null;
+        } else {
+            profiles = wide.data ?? null;
+        }
+    }
 
     if (!profiles?.length) return NextResponse.json({ recipients: 0 });
 
@@ -133,6 +153,9 @@ export async function GET(request: NextRequest) {
         const expiredEndpoints: string[] = [];
 
         for (const profile of profiles) {
+            if (profile.spending_pace_alerts === false) continue;
+            if (isInQuietHours(profile.timezone, profile.quiet_hours_start, profile.quiet_hours_end)) continue;
+
             const total = totalsByUser.get(profile.id) || 0;
             const budget = Number(profile.monthly_budget) || 0;
             if (budget <= 0 || total <= 0) continue;

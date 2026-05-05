@@ -1,6 +1,7 @@
 import 'server-only';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient as createServiceClient } from '@supabase/supabase-js';
+import { isInQuietHours } from '@/lib/push-quiet-hours';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const webpush = require('web-push') as typeof import('web-push');
 
@@ -83,6 +84,8 @@ export async function GET(request: NextRequest) {
     }
 
     let pushSent = 0;
+    let skippedQuiet = 0;
+    let skippedDisabled = 0;
     if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
         const userIds = Array.from(new Set(candidates.map(b => b.user_id)));
         const { data: subs } = await supabase
@@ -98,11 +101,41 @@ export async function GET(request: NextRequest) {
             subsByUser.set(s.user_id, arr);
         }
 
+        // Per-user gating: opt-out flag + quiet hours. Best-effort: if columns
+        // don't exist (older deployments), the select fails and we fall back
+        // to sending unconditionally rather than blocking everyone.
+        type ProfilePrefs = {
+            bucket_deadline_alerts?: boolean | null;
+            quiet_hours_start?: number | null;
+            quiet_hours_end?: number | null;
+            timezone?: string | null;
+        };
+        const prefsByUser = new Map<string, ProfilePrefs>();
+        const { data: profiles, error: profilesErr } = await supabase
+            .from('profiles')
+            .select('id, bucket_deadline_alerts, quiet_hours_start, quiet_hours_end, timezone')
+            .in('id', userIds);
+        if (!profilesErr && profiles) {
+            for (const p of profiles as Array<ProfilePrefs & { id: string }>) {
+                prefsByUser.set(p.id, p);
+            }
+        }
+
         const expiredEndpoints: string[] = [];
 
         for (const b of candidates) {
             const userSubs = subsByUser.get(b.user_id);
             if (!userSubs?.length) continue;
+
+            const prefs = prefsByUser.get(b.user_id);
+            if (prefs && prefs.bucket_deadline_alerts === false) {
+                skippedDisabled++;
+                continue;
+            }
+            if (prefs && isInQuietHours(prefs.timezone, prefs.quiet_hours_start, prefs.quiet_hours_end)) {
+                skippedQuiet++;
+                continue;
+            }
 
             const isOneDay = b.end_date === ymd(inOne);
             const title = isOneDay ? `${b.name} ends tomorrow` : `${b.name} ends in 3 days`;
@@ -140,5 +173,5 @@ export async function GET(request: NextRequest) {
         }
     }
 
-    return NextResponse.json({ warned: candidates.length, pushSent });
+    return NextResponse.json({ warned: candidates.length, pushSent, skippedQuiet, skippedDisabled });
 }

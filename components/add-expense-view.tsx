@@ -66,7 +66,7 @@ const PAYMENT_METHOD_COLORS: Record<string, string> = {
 export function AddExpenseView() {
     const router = useRouter();
     const isNative = useIsNative();
-    const { currency, userId, CURRENCY_SYMBOLS, activeWorkspaceId, fullName, avatarUrl } = useUserPreferences();
+    const { currency, userId, CURRENCY_SYMBOLS, activeWorkspaceId, fullName, avatarUrl, defaultCategory, defaultPaymentMethod, defaultBucketId } = useUserPreferences();
     const { groups, friends } = useGroups();
     const { buckets } = useBucketsList();
     const [currentPos, setCurrentPos] = React.useState<{ lat: number, lng: number } | null>(null);
@@ -75,7 +75,11 @@ export function AddExpenseView() {
     const isSharedWorkspace = activeGroup?.type === 'couple' || activeGroup?.type === 'home';
     const defaultSplitEnabled = activeWorkspaceId ? !isSharedWorkspace : false;
 
-    const formState = useExpenseForm(userId, currency, activeWorkspaceId, defaultSplitEnabled);
+    const formState = useExpenseForm(userId, currency, activeWorkspaceId, defaultSplitEnabled, {
+        category: defaultCategory,
+        paymentMethod: defaultPaymentMethod as 'Cash' | 'Debit Card' | 'Credit Card' | 'UPI' | 'Bank Transfer' | null,
+        bucketId: defaultBucketId,
+    });
     const searchParams = useSearchParams();
 
     // Calendar deep-link: ?recurring=1&date=YYYY-MM-DD pre-fills the form for

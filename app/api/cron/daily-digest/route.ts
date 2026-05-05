@@ -1,6 +1,7 @@
 import 'server-only';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient as createServiceClient } from '@supabase/supabase-js';
+import { isInQuietHours } from '@/lib/push-quiet-hours';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const webpush = require('web-push') as typeof import('web-push');
 
@@ -16,6 +17,9 @@ interface ProfileRow {
     id: string;
     currency: string | null;
     digest_frequency: 'daily' | 'weekly';
+    quiet_hours_start?: number | null;
+    quiet_hours_end?: number | null;
+    timezone?: string | null;
 }
 
 interface TxRow {
@@ -72,15 +76,27 @@ export async function GET(request: NextRequest) {
     // Daily digest fires every day, weekly only on Monday.
     const eligibleFrequencies: Array<'daily' | 'weekly'> = isMonday ? ['daily', 'weekly'] : ['daily'];
 
-    const { data: profiles, error: profilesErr } = await supabase
-        .from('profiles')
-        .select('id, currency, digest_frequency')
-        .in('digest_frequency', eligibleFrequencies)
-        .returns<ProfileRow[]>();
-
-    if (profilesErr) {
-        console.error('[daily-digest] profile fetch failed', profilesErr);
-        return NextResponse.json({ error: profilesErr.message }, { status: 500 });
+    let profiles: ProfileRow[] | null = null;
+    {
+        const wide = await supabase
+            .from('profiles')
+            .select('id, currency, digest_frequency, quiet_hours_start, quiet_hours_end, timezone')
+            .in('digest_frequency', eligibleFrequencies)
+            .returns<ProfileRow[]>();
+        if (wide.error) {
+            const legacy = await supabase
+                .from('profiles')
+                .select('id, currency, digest_frequency')
+                .in('digest_frequency', eligibleFrequencies)
+                .returns<ProfileRow[]>();
+            if (legacy.error) {
+                console.error('[daily-digest] profile fetch failed', legacy.error);
+                return NextResponse.json({ error: legacy.error.message }, { status: 500 });
+            }
+            profiles = legacy.data ?? null;
+        } else {
+            profiles = wide.data ?? null;
+        }
     }
     if (!profiles?.length) {
         return NextResponse.json({ recipients: 0, pushSent: 0 });
@@ -164,6 +180,7 @@ export async function GET(request: NextRequest) {
         const expiredEndpoints: string[] = [];
 
         for (const profile of profiles) {
+            if (isInQuietHours(profile.timezone, profile.quiet_hours_start, profile.quiet_hours_end)) continue;
             const userSubs = subsByUser.get(profile.id);
             if (!userSubs?.length) continue;
             const totals = totalsByUser.get(profile.id);

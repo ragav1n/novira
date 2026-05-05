@@ -12,11 +12,7 @@ interface Props {
 
 export function DataManagementSection({ loading, onImport, onExportCSV, onExportPDF }: Props) {
     return (
-        <div className="space-y-3 pt-2">
-            <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
-                <Download className="w-4 h-4" />
-                <span>Data Management</span>
-            </div>
+        <div className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
                 <Button
                     variant="outline"

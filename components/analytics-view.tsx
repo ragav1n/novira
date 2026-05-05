@@ -59,7 +59,7 @@ export function AnalyticsView() {
     const [customStart, setCustomStart] = useState<string>('');
     const [customEnd, setCustomEnd] = useState<string>('');
     const [activeTags, setActiveTags] = useState<string[]>([]);
-    const { formatCurrency, currency, convertAmount, userId, activeWorkspaceId, ratesLastUpdated } = useUserPreferences();
+    const { formatCurrency, currency, convertAmount, userId, activeWorkspaceId, ratesLastUpdated, firstDayOfWeek } = useUserPreferences();
     const { activeWorkspace, theme: themeConfig } = useWorkspaceTheme('cyan');
 
     const { buckets } = useBucketsList();
@@ -397,7 +397,7 @@ export function AnalyticsView() {
                     <div className="px-1 space-y-2">
                         <div className="flex flex-wrap gap-1.5">
                             {[
-                                { label: 'This Week', from: () => format(startOfWeek(new Date(), { weekStartsOn: 1 }), 'yyyy-MM-dd'), to: () => format(new Date(), 'yyyy-MM-dd') },
+                                { label: 'This Week', from: () => format(startOfWeek(new Date(), { weekStartsOn: firstDayOfWeek }), 'yyyy-MM-dd'), to: () => format(new Date(), 'yyyy-MM-dd') },
                                 { label: 'Last 7 Days', from: () => format(subDays(new Date(), 6), 'yyyy-MM-dd'), to: () => format(new Date(), 'yyyy-MM-dd') },
                                 { label: 'YTD', from: () => format(startOfYear(new Date()), 'yyyy-MM-dd'), to: () => format(new Date(), 'yyyy-MM-dd') },
                             ].map(p => (

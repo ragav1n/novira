@@ -1,6 +1,7 @@
 import 'server-only';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient as createServiceClient } from '@supabase/supabase-js';
+import { isInQuietHours } from '@/lib/push-quiet-hours';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const webpush = require('web-push') as typeof import('web-push');
 
@@ -28,6 +29,9 @@ interface RecurringTemplateRow {
 interface ProfileRow {
     id: string;
     bill_reminder_lead_days: number | null;
+    quiet_hours_start?: number | null;
+    quiet_hours_end?: number | null;
+    timezone?: string | null;
 }
 
 interface PushSubRow {
@@ -78,29 +82,44 @@ export async function GET(request: NextRequest) {
         auth: { persistSession: false, autoRefreshToken: false }
     });
 
-    // 1. Profiles with reminders enabled (lead_days set, > 0)
-    const { data: profiles, error: profileErr } = await supabase
-        .from('profiles')
-        .select('id, bill_reminder_lead_days')
-        .not('bill_reminder_lead_days', 'is', null)
-        .gt('bill_reminder_lead_days', 0)
-        .returns<ProfileRow[]>();
-
-    if (profileErr) {
-        console.error('[bill-reminders] profile fetch failed', profileErr);
-        return NextResponse.json({ error: profileErr.message }, { status: 500 });
+    // 1. Profiles with reminders enabled (lead_days set, > 0). Wide select for
+    //    quiet-hours columns; fall back if not deployed.
+    let profiles: ProfileRow[] | null = null;
+    {
+        const wide = await supabase
+            .from('profiles')
+            .select('id, bill_reminder_lead_days, quiet_hours_start, quiet_hours_end, timezone')
+            .not('bill_reminder_lead_days', 'is', null)
+            .gt('bill_reminder_lead_days', 0)
+            .returns<ProfileRow[]>();
+        if (wide.error) {
+            const legacy = await supabase
+                .from('profiles')
+                .select('id, bill_reminder_lead_days')
+                .not('bill_reminder_lead_days', 'is', null)
+                .gt('bill_reminder_lead_days', 0)
+                .returns<ProfileRow[]>();
+            if (legacy.error) {
+                console.error('[bill-reminders] profile fetch failed', legacy.error);
+                return NextResponse.json({ error: legacy.error.message }, { status: 500 });
+            }
+            profiles = legacy.data ?? null;
+        } else {
+            profiles = wide.data ?? null;
+        }
     }
     if (!profiles?.length) return NextResponse.json({ sent: 0, scanned: 0 });
 
-    // Map user_id -> lead_days
+    // Map user_id -> lead_days. Drop users currently in quiet hours.
     const leadByUser = new Map<string, number>();
     let maxLead = 0;
     for (const p of profiles) {
-        if (p.bill_reminder_lead_days != null) {
-            leadByUser.set(p.id, p.bill_reminder_lead_days);
-            if (p.bill_reminder_lead_days > maxLead) maxLead = p.bill_reminder_lead_days;
-        }
+        if (p.bill_reminder_lead_days == null) continue;
+        if (isInQuietHours(p.timezone, p.quiet_hours_start, p.quiet_hours_end)) continue;
+        leadByUser.set(p.id, p.bill_reminder_lead_days);
+        if (p.bill_reminder_lead_days > maxLead) maxLead = p.bill_reminder_lead_days;
     }
+    if (!leadByUser.size) return NextResponse.json({ sent: 0, scanned: 0, skippedQuiet: profiles.length });
 
     // 2. Active recurring templates whose next_occurrence falls within [today, today+maxLead]
     const today = new Date();

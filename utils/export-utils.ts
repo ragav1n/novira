@@ -1,6 +1,6 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { format, differenceInDays, parseISO } from 'date-fns';
+import { format, differenceInDays, parseISO, subDays } from 'date-fns';
 import { DateRange } from 'react-day-picker';
 
 interface ExportTransaction {
@@ -20,6 +20,265 @@ interface ExportTransaction {
     exclude_from_allowance?: boolean;
     place_name?: string | null;
     notes?: string | null;
+    tags?: string[] | null;
+    created_at?: string | null;
+}
+
+/**
+ * Shared analytics computed once, consumed by both CSV and PDF generators.
+ * Centralizing this prevents the two outputs from drifting in their numbers,
+ * which used to happen when each function re-derived totals separately.
+ */
+interface ReportStats {
+    totalExpenses: number;
+    totalIncome: number;
+    recurringTotal: number;
+    expenseTxCount: number;
+    incomeTxCount: number;
+    daysCovered: number;
+    avgPerTx: number;
+    avgPerDay: number;
+    avgTxPerDay: number;
+    savingsRate: number | null;
+    recurringPct: number;
+    netCashFlow: number;
+    categoryTotals: Record<string, number>;
+    incomeCategoryTotals: Record<string, number>;
+    methodTotals: Record<string, number>;
+    monthlyTotals: Record<string, number>;
+    weeklyTotals: { weekStart: string; total: number }[];
+    dowTotals: number[];
+    dailyTotals: Record<string, number>; // key: yyyy-MM-dd
+    locationTotals: Record<string, { count: number; total: number }>;
+    bucketTotals: Record<string, { name: string; spent: number; budget: number }>;
+    tagTotals: Record<string, { count: number; total: number }>;
+    currencyTotals: Record<string, { count: number; nativeTotal: number; convertedTotal: number }>;
+    distribution: { min: number; p25: number; median: number; p75: number; max: number; stddev: number };
+    biggestSingleDay: { date: string; total: number } | null;
+    biggestSingleTx: ExportTransaction | null;
+    longestSpendStreak: number;
+    longestNoSpendStreak: number;
+    firstTxDate: string | null;
+    lastTxDate: string | null;
+    forecast: { projected: number; vsBudget: null | { budget: number; deltaPct: number } } | null;
+    topMerchantsByVisits: { name: string; count: number; total: number }[];
+    topCategory: [string, number] | null;
+    busiestDay: [string, number] | null;
+}
+
+const quantile = (sorted: number[], p: number): number => {
+    if (!sorted.length) return 0;
+    const idx = Math.max(0, Math.min(sorted.length - 1, Math.floor(sorted.length * p)));
+    return sorted[idx];
+};
+
+function computeStats(
+    transactions: ExportTransaction[],
+    currency: string,
+    convertAmount: (amount: number, fromCurrency: string) => number,
+    buckets: any[],
+    reportRange?: DateRange,
+    monthlyBudget?: number,
+): ReportStats {
+    const bucketMap = Object.fromEntries(buckets.map(b => [b.id, b]));
+
+    let totalExpenses = 0, totalIncome = 0, recurringTotal = 0;
+    let incomeTxCount = 0;
+    const categoryTotals: Record<string, number> = {};
+    const incomeCategoryTotals: Record<string, number> = {};
+    const methodTotals: Record<string, number> = {};
+    const monthlyTotals: Record<string, number> = {};
+    const weekKeyTotals: Record<string, number> = {};
+    const dowTotals: number[] = [0, 0, 0, 0, 0, 0, 0];
+    const dailyTotals: Record<string, number> = {};
+    const locationTotals: Record<string, { count: number; total: number }> = {};
+    const bucketTotals: Record<string, { name: string; spent: number; budget: number }> = {};
+    const tagTotals: Record<string, { count: number; total: number }> = {};
+    const currencyTotals: Record<string, { count: number; nativeTotal: number; convertedTotal: number }> = {};
+    const expenseAmounts: number[] = [];
+    let biggestSingleTx: ExportTransaction | null = null;
+    let biggestSingleTxAmt = 0;
+
+    transactions.forEach(tx => {
+        const rawAmount = resolveAmount(tx, currency, convertAmount);
+        const isIncome = rawAmount < 0 || tx.category === 'income';
+        const amount = Math.abs(rawAmount);
+        const dateKey = tx.date.slice(0, 10);
+
+        // Currency split — group by source currency before conversion.
+        const srcCurr = (tx.currency || currency).toUpperCase();
+        if (!currencyTotals[srcCurr]) currencyTotals[srcCurr] = { count: 0, nativeTotal: 0, convertedTotal: 0 };
+        currencyTotals[srcCurr].count += 1;
+        currencyTotals[srcCurr].nativeTotal += Math.abs(Number(tx.amount));
+        currencyTotals[srcCurr].convertedTotal += amount;
+
+        if (isIncome) {
+            totalIncome += amount;
+            incomeTxCount += 1;
+            incomeCategoryTotals[tx.category] = (incomeCategoryTotals[tx.category] || 0) + amount;
+            return;
+        }
+        totalExpenses += amount;
+        if (tx.is_recurring) recurringTotal += amount;
+        expenseAmounts.push(amount);
+
+        if (amount > biggestSingleTxAmt) {
+            biggestSingleTxAmt = amount;
+            biggestSingleTx = tx;
+        }
+
+        categoryTotals[tx.category] = (categoryTotals[tx.category] || 0) + amount;
+        methodTotals[tx.payment_method || 'Other'] = (methodTotals[tx.payment_method || 'Other'] || 0) + amount;
+        const dt = parseISO(dateKey);
+        monthlyTotals[format(dt, 'MMM yyyy')] = (monthlyTotals[format(dt, 'MMM yyyy')] || 0) + amount;
+        // ISO week key (year-week) — Monday-anchored regardless of user pref so weekly grouping is stable.
+        const weekStart = new Date(dt);
+        const day = weekStart.getDay();
+        const diff = (day === 0 ? -6 : 1) - day;
+        weekStart.setDate(weekStart.getDate() + diff);
+        const weekKey = format(weekStart, 'yyyy-MM-dd');
+        weekKeyTotals[weekKey] = (weekKeyTotals[weekKey] || 0) + amount;
+        dowTotals[dt.getDay()] += amount;
+        dailyTotals[dateKey] = (dailyTotals[dateKey] || 0) + amount;
+
+        if (tx.place_name) {
+            if (!locationTotals[tx.place_name]) locationTotals[tx.place_name] = { count: 0, total: 0 };
+            locationTotals[tx.place_name].count += 1;
+            locationTotals[tx.place_name].total += amount;
+        }
+
+        if (Array.isArray(tx.tags)) {
+            for (const t of tx.tags) {
+                if (!t) continue;
+                if (!tagTotals[t]) tagTotals[t] = { count: 0, total: 0 };
+                tagTotals[t].count += 1;
+                tagTotals[t].total += amount;
+            }
+        }
+
+        if (tx.bucket_id) {
+            const bucket = bucketMap[tx.bucket_id];
+            if (bucket) {
+                if (!bucketTotals[tx.bucket_id]) {
+                    const bucketCurr = (bucket.currency || currency).toUpperCase();
+                    let effectiveBudget = convertAmount(Number(bucket.budget || 0), bucketCurr);
+                    if (bucket.start_date && bucket.end_date && reportRange?.from && reportRange?.to) {
+                        const bStart = new Date(bucket.start_date), bEnd = new Date(bucket.end_date);
+                        const overlapStart = new Date(Math.max(bStart.getTime(), reportRange.from.getTime()));
+                        const overlapEnd = new Date(Math.min(bEnd.getTime(), reportRange.to.getTime()));
+                        if (overlapEnd > overlapStart) {
+                            const bucketDays = Math.max(1, differenceInDays(bEnd, bStart) + 1);
+                            const overlapDays = Math.max(1, differenceInDays(overlapEnd, overlapStart) + 1);
+                            effectiveBudget = effectiveBudget * (overlapDays / bucketDays);
+                        }
+                    }
+                    bucketTotals[tx.bucket_id] = { name: bucket.name, spent: 0, budget: effectiveBudget };
+                }
+                bucketTotals[tx.bucket_id].spent += amount;
+            }
+        }
+    });
+
+    const expenseTxCount = expenseAmounts.length;
+    const datesWithSpend = Object.keys(dailyTotals).sort();
+    const firstTxDate = datesWithSpend[0] ?? null;
+    const lastTxDate = datesWithSpend[datesWithSpend.length - 1] ?? null;
+    const daysCovered = reportRange?.from && reportRange?.to
+        ? Math.max(1, differenceInDays(reportRange.to, reportRange.from) + 1)
+        : firstTxDate && lastTxDate
+            ? Math.max(1, differenceInDays(parseISO(lastTxDate), parseISO(firstTxDate)) + 1)
+            : 1;
+    const avgPerTx = expenseTxCount > 0 ? totalExpenses / expenseTxCount : 0;
+    const avgPerDay = totalExpenses / daysCovered;
+    const avgTxPerDay = expenseTxCount / daysCovered;
+    const savingsRate = totalIncome > 0 ? ((totalIncome - totalExpenses) / totalIncome) * 100 : null;
+    const recurringPct = totalExpenses > 0 ? (recurringTotal / totalExpenses) * 100 : 0;
+    const netCashFlow = totalIncome - totalExpenses;
+    const sortedAmts = [...expenseAmounts].sort((a, b) => a - b);
+    const mean = expenseTxCount > 0 ? totalExpenses / expenseTxCount : 0;
+    const variance = expenseTxCount > 1
+        ? expenseAmounts.reduce((s, a) => s + (a - mean) ** 2, 0) / (expenseTxCount - 1)
+        : 0;
+    const distribution = {
+        min: sortedAmts[0] ?? 0,
+        p25: quantile(sortedAmts, 0.25),
+        median: quantile(sortedAmts, 0.5),
+        p75: quantile(sortedAmts, 0.75),
+        max: sortedAmts[sortedAmts.length - 1] ?? 0,
+        stddev: Math.sqrt(variance),
+    };
+
+    // Streaks: walk every day from firstTx to lastTx.
+    let longestSpendStreak = 0, longestNoSpendStreak = 0;
+    if (firstTxDate && lastTxDate) {
+        let curSpend = 0, curDry = 0;
+        const start = parseISO(firstTxDate), end = parseISO(lastTxDate);
+        for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+            const k = format(d, 'yyyy-MM-dd');
+            if (dailyTotals[k] && dailyTotals[k] > 0) {
+                curSpend += 1;
+                if (curSpend > longestSpendStreak) longestSpendStreak = curSpend;
+                curDry = 0;
+            } else {
+                curDry += 1;
+                if (curDry > longestNoSpendStreak) longestNoSpendStreak = curDry;
+                curSpend = 0;
+            }
+        }
+    }
+
+    const biggestSingleDayEntry = Object.entries(dailyTotals).sort((a, b) => b[1] - a[1])[0];
+    const biggestSingleDay = biggestSingleDayEntry
+        ? { date: biggestSingleDayEntry[0], total: biggestSingleDayEntry[1] }
+        : null;
+
+    const weeklyTotals = Object.entries(weekKeyTotals)
+        .sort((a, b) => a[0].localeCompare(b[0]))
+        .map(([weekStart, total]) => ({ weekStart, total }));
+
+    // Forecast — only meaningful for an in-progress month report. If the
+    // report range ends on/after today and we're partway through, project
+    // month-end based on average daily spend.
+    let forecast: ReportStats['forecast'] = null;
+    const now = new Date();
+    if (reportRange?.from && reportRange?.to && reportRange.from <= now && reportRange.to >= now && expenseTxCount > 0) {
+        const elapsed = Math.max(1, differenceInDays(now, reportRange.from) + 1);
+        const totalRangeDays = Math.max(elapsed, differenceInDays(reportRange.to, reportRange.from) + 1);
+        const projected = (totalExpenses / elapsed) * totalRangeDays;
+        forecast = {
+            projected,
+            vsBudget: monthlyBudget && monthlyBudget > 0
+                ? { budget: monthlyBudget, deltaPct: ((projected - monthlyBudget) / monthlyBudget) * 100 }
+                : null,
+        };
+    }
+
+    const topMerchantsByVisits = Object.entries(locationTotals)
+        .sort((a, b) => b[1].count - a[1].count)
+        .slice(0, 10)
+        .map(([name, d]) => ({ name, count: d.count, total: d.total }));
+
+    const topCategory = Object.entries(categoryTotals).sort((a, b) => b[1] - a[1])[0] ?? null;
+    const busiestDay = Object.entries(dailyTotals).sort((a, b) => b[1] - a[1])[0] ?? null;
+
+    return {
+        totalExpenses, totalIncome, recurringTotal,
+        expenseTxCount, incomeTxCount,
+        daysCovered, avgPerTx, avgPerDay, avgTxPerDay,
+        savingsRate, recurringPct, netCashFlow,
+        categoryTotals, incomeCategoryTotals, methodTotals,
+        monthlyTotals, weeklyTotals, dowTotals, dailyTotals,
+        locationTotals, bucketTotals, tagTotals, currencyTotals,
+        distribution,
+        biggestSingleDay,
+        biggestSingleTx,
+        longestSpendStreak, longestNoSpendStreak,
+        firstTxDate, lastTxDate,
+        forecast,
+        topMerchantsByVisits,
+        topCategory: topCategory as [string, number] | null,
+        busiestDay: busiestDay as [string, number] | null,
+    };
 }
 
 /**
@@ -167,7 +426,7 @@ export const generateCSV = (
     buckets: any[] = [],
     groups: any[] = [],
     reportRange?: DateRange,
-    ownerInfo?: { email?: string; workspaceName?: string }
+    ownerInfo?: { email?: string; workspaceName?: string; monthlyBudget?: number }
 ) => {
     // RFC 4180-compliant quoting — always quote strings
     const q = (val: string | number | null | undefined): string => {
@@ -185,57 +444,21 @@ export const generateCSV = (
     transactions = transactions.filter(tx => tx.date && tx.amount != null && !isNaN(Number(tx.amount)));
     const sorted = [...transactions].sort((a, b) => parseISO(a.date.slice(0, 10)).getTime() - parseISO(b.date.slice(0, 10)).getTime());
 
-    // ── Calculations (mirrors PDF logic) ──────────────────────────────────────
-    let totalExpenses = 0, totalIncome = 0, recurringTotal = 0;
-    const categoryTotals: Record<string, number> = {};
-    const methodTotals: Record<string, number> = {};
-    const monthlyTotals: Record<string, number> = {};
-    const dowTotals: number[] = [0, 0, 0, 0, 0, 0, 0];
-    const locationTotals: Record<string, { count: number; total: number }> = {};
-    const bucketTotals: Record<string, { spent: number; budget: number; name: string }> = {};
+    const stats = computeStats(transactions, currency, convertAmount, buckets, reportRange, ownerInfo?.monthlyBudget);
+    const {
+        totalExpenses, totalIncome, recurringTotal,
+        expenseTxCount, incomeTxCount,
+        daysCovered, avgPerTx, avgPerDay, avgTxPerDay,
+        savingsRate, recurringPct, netCashFlow,
+        categoryTotals, incomeCategoryTotals, methodTotals,
+        monthlyTotals, weeklyTotals, dowTotals, locationTotals,
+        bucketTotals, tagTotals, currencyTotals,
+        distribution, biggestSingleDay, biggestSingleTx,
+        longestSpendStreak, longestNoSpendStreak,
+        firstTxDate, lastTxDate, forecast,
+        topCategory,
+    } = stats;
 
-    transactions.forEach(tx => {
-        const amt = resolveAmount(tx, currency, convertAmount);
-        const isIncome = amt < 0 || tx.category === 'income';
-        const abs = Math.abs(amt);
-        if (isIncome) { totalIncome += abs; return; }
-        totalExpenses += abs;
-        if (tx.is_recurring) recurringTotal += abs;
-        categoryTotals[tx.category] = (categoryTotals[tx.category] || 0) + abs;
-        methodTotals[tx.payment_method || 'Other'] = (methodTotals[tx.payment_method || 'Other'] || 0) + abs;
-        const mKey = format(parseISO(tx.date.slice(0, 10)), 'MMM yyyy');
-        monthlyTotals[mKey] = (monthlyTotals[mKey] || 0) + abs;
-        dowTotals[parseISO(tx.date.slice(0, 10)).getDay()] += abs;
-        if (tx.place_name) {
-            if (!locationTotals[tx.place_name]) locationTotals[tx.place_name] = { count: 0, total: 0 };
-            locationTotals[tx.place_name].count++;
-            locationTotals[tx.place_name].total += abs;
-        }
-        if (tx.bucket_id) {
-            const bucket = bucketMap[tx.bucket_id];
-            if (bucket) {
-                if (!bucketTotals[tx.bucket_id]) {
-                    const bucketCurr = (bucket.currency || currency).toUpperCase();
-                    const budgetInBase = convertAmount(Number(bucket.budget || 0), bucketCurr);
-                    bucketTotals[tx.bucket_id] = { spent: 0, budget: budgetInBase, name: bucket.name };
-                }
-                bucketTotals[tx.bucket_id].spent += abs;
-            }
-        }
-    });
-
-    const expenseTxCount = transactions.filter(tx => {
-        const a = resolveAmount(tx, currency, convertAmount);
-        return a >= 0 && tx.category !== 'income';
-    }).length;
-    const daysCovered = reportRange?.from && reportRange?.to
-        ? Math.max(1, differenceInDays(reportRange.to, reportRange.from) + 1)
-        : Object.keys(monthlyTotals).length > 0 ? 30 : 1;
-    const avgPerTx = expenseTxCount > 0 ? totalExpenses / expenseTxCount : 0;
-    const avgPerDay = totalExpenses / daysCovered;
-    const savingsRate = totalIncome > 0 ? ((totalIncome - totalExpenses) / totalIncome) * 100 : null;
-    const recurringPct = totalExpenses > 0 ? (recurringTotal / totalExpenses) * 100 : 0;
-    const topCategory = Object.entries(categoryTotals).sort((a, b) => b[1] - a[1])[0];
     const dowLabels = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
     const lines: string[] = [];
@@ -250,6 +473,9 @@ export const generateCSV = (
             : `From ${format(reportRange.from, 'MMM d, yyyy')}`;
         lines.push(row('Period', period));
     }
+    if (firstTxDate && lastTxDate) {
+        lines.push(row('Data Range', `${firstTxDate} – ${lastTxDate}`));
+    }
     lines.push(row('Generated', format(new Date(), 'PPP p')));
     lines.push(row('All amounts in', currency));
     lines.push(blank());
@@ -259,15 +485,57 @@ export const generateCSV = (
     lines.push(row('Metric', 'Value'));
     lines.push(row('Total Expenses', totalExpenses.toFixed(2)));
     lines.push(row('Total Income', totalIncome.toFixed(2)));
-    lines.push(row('Net Cash Flow', (totalIncome - totalExpenses).toFixed(2)));
+    lines.push(row('Net Cash Flow', netCashFlow.toFixed(2)));
     lines.push(row('Expense Transactions', expenseTxCount));
+    lines.push(row('Income Transactions', incomeTxCount));
     lines.push(row('Avg Per Transaction', avgPerTx.toFixed(2)));
     lines.push(row('Avg Daily Spend', avgPerDay.toFixed(2)));
+    lines.push(row('Avg Transactions Per Day', avgTxPerDay.toFixed(2)));
     lines.push(row('Days Covered', daysCovered));
     lines.push(row('Savings Rate', savingsRate !== null ? `${savingsRate.toFixed(1)}%` : 'N/A'));
     lines.push(row('Recurring Spend', `${recurringPct.toFixed(1)}% of total`));
+    lines.push(row('Recurring Total', recurringTotal.toFixed(2)));
     if (topCategory) lines.push(row('Top Category', `${topCategory[0]} (${((topCategory[1] / totalExpenses) * 100).toFixed(1)}%)`));
     lines.push(blank());
+
+    // ── Section 2b: Spending Distribution ─────────────────────────────────────
+    if (expenseTxCount > 0) {
+        lines.push(heading('SPENDING DISTRIBUTION (per expense)'));
+        lines.push(row('Statistic', `Amount (${currency})`));
+        lines.push(row('Smallest', distribution.min.toFixed(2)));
+        lines.push(row('25th Percentile', distribution.p25.toFixed(2)));
+        lines.push(row('Median', distribution.median.toFixed(2)));
+        lines.push(row('75th Percentile', distribution.p75.toFixed(2)));
+        lines.push(row('Largest', distribution.max.toFixed(2)));
+        lines.push(row('Std. Deviation', distribution.stddev.toFixed(2)));
+        lines.push(blank());
+    }
+
+    // ── Section 2c: Streaks & Highlights ──────────────────────────────────────
+    lines.push(heading('STREAKS & HIGHLIGHTS'));
+    lines.push(row('Metric', 'Value'));
+    lines.push(row('Longest Spending Streak', `${longestSpendStreak} day${longestSpendStreak === 1 ? '' : 's'}`));
+    lines.push(row('Longest No-Spend Streak', `${longestNoSpendStreak} day${longestNoSpendStreak === 1 ? '' : 's'}`));
+    if (biggestSingleDay) {
+        lines.push(row('Biggest Spending Day', `${biggestSingleDay.date} (${biggestSingleDay.total.toFixed(2)} ${currency})`));
+    }
+    if (biggestSingleTx) {
+        lines.push(row('Largest Single Transaction', `${biggestSingleTx.description} — ${Math.abs(resolveAmount(biggestSingleTx, currency, convertAmount)).toFixed(2)} ${currency} on ${biggestSingleTx.date.slice(0, 10)}`));
+    }
+    lines.push(blank());
+
+    // ── Section 2d: Forecast (if applicable) ──────────────────────────────────
+    if (forecast) {
+        lines.push(heading('FORECAST (PERIOD-END PROJECTION)'));
+        lines.push(row('Metric', 'Value'));
+        lines.push(row('Projected Total', forecast.projected.toFixed(2)));
+        if (forecast.vsBudget) {
+            const sign = forecast.vsBudget.deltaPct >= 0 ? '+' : '';
+            lines.push(row('Monthly Budget', forecast.vsBudget.budget.toFixed(2)));
+            lines.push(row('Projected vs Budget', `${sign}${forecast.vsBudget.deltaPct.toFixed(1)}%`));
+        }
+        lines.push(blank());
+    }
 
     // ── Section 3: Category Breakdown ─────────────────────────────────────────
     lines.push(heading('CATEGORY BREAKDOWN'));
@@ -280,6 +548,19 @@ export const generateCSV = (
         });
     lines.push(blank());
 
+    // ── Section 3b: Income by Category ────────────────────────────────────────
+    if (Object.keys(incomeCategoryTotals).length > 0) {
+        lines.push(heading('INCOME BY CATEGORY'));
+        lines.push(row('Category', `Amount (${currency})`, '% of Income'));
+        Object.entries(incomeCategoryTotals)
+            .sort((a, b) => b[1] - a[1])
+            .forEach(([cat, amt]) => {
+                const pct = totalIncome > 0 ? ((amt / totalIncome) * 100).toFixed(1) : '0.0';
+                lines.push(row(cat.charAt(0).toUpperCase() + cat.slice(1), amt.toFixed(2), `${pct}%`));
+            });
+        lines.push(blank());
+    }
+
     // ── Section 4: Payment Method Breakdown ───────────────────────────────────
     lines.push(heading('PAYMENT METHOD BREAKDOWN'));
     lines.push(row('Method', `Amount (${currency})`, '% of Total'));
@@ -291,11 +572,31 @@ export const generateCSV = (
         });
     lines.push(blank());
 
+    // ── Section 4b: Currency Mix (only if multi-currency) ─────────────────────
+    if (Object.keys(currencyTotals).length > 1) {
+        lines.push(heading('CURRENCY MIX'));
+        lines.push(row('Currency', 'Transactions', 'Native Total', `Converted (${currency})`));
+        Object.entries(currencyTotals)
+            .sort((a, b) => b[1].convertedTotal - a[1].convertedTotal)
+            .forEach(([curr, d]) => {
+                lines.push(row(curr, d.count, d.nativeTotal.toFixed(2), d.convertedTotal.toFixed(2)));
+            });
+        lines.push(blank());
+    }
+
     // ── Section 5: Spending by Day of Week ────────────────────────────────────
     lines.push(heading('SPENDING BY DAY OF WEEK'));
     lines.push(row('Day', `Total Spent (${currency})`));
     dowLabels.forEach((day, i) => lines.push(row(day, dowTotals[i].toFixed(2))));
     lines.push(blank());
+
+    // ── Section 5b: Weekly Recap ──────────────────────────────────────────────
+    if (weeklyTotals.length > 1) {
+        lines.push(heading('WEEKLY RECAP (week of)'));
+        lines.push(row('Week Starting', `Total Spent (${currency})`));
+        weeklyTotals.forEach(({ weekStart, total }) => lines.push(row(weekStart, total.toFixed(2))));
+        lines.push(blank());
+    }
 
     // ── Section 6: Monthly Recap ──────────────────────────────────────────────
     if (Object.keys(monthlyTotals).length > 1) {
@@ -320,6 +621,19 @@ export const generateCSV = (
         lines.push(blank());
     }
 
+    // ── Section 7b: Tags Breakdown ────────────────────────────────────────────
+    if (Object.keys(tagTotals).length > 0) {
+        lines.push(heading('TAGS BREAKDOWN'));
+        lines.push(row('Tag', 'Transactions', `Total Spent (${currency})`, '% of Total'));
+        Object.entries(tagTotals)
+            .sort((a, b) => b[1].total - a[1].total)
+            .forEach(([tag, d]) => {
+                const pct = totalExpenses > 0 ? ((d.total / totalExpenses) * 100).toFixed(1) : '0.0';
+                lines.push(row(tag, d.count, d.total.toFixed(2), `${pct}%`));
+            });
+        lines.push(blank());
+    }
+
     // ── Section 8: Top Locations ──────────────────────────────────────────────
     const topLocations = Object.entries(locationTotals).sort((a, b) => b[1].count - a[1].count).slice(0, 10);
     if (topLocations.length > 0) {
@@ -334,11 +648,11 @@ export const generateCSV = (
     // ── Section 9: Transaction Details ────────────────────────────────────────
     lines.push(heading('TRANSACTION DETAILS'));
     lines.push(row(
-        'Date', 'Time', 'Description', 'Category', 'Type',
+        'Date', 'Description', 'Category', 'Type',
         'Bucket', 'Group', 'Payment Method',
         `Amount (Original)`, 'Original Currency',
         `Converted Amount (${currency})`,
-        'Location', 'Notes', 'Recurring', 'Excluded from Allowance'
+        'Location', 'Tags', 'Notes', 'Recurring', 'Excluded from Allowance'
     ));
     sorted.forEach(tx => {
         const converted = resolveAmount(tx, currency, convertAmount);
@@ -348,7 +662,6 @@ export const generateCSV = (
         const dateObj = parseISO(tx.date.slice(0, 10));
         lines.push(row(
             format(dateObj, 'yyyy-MM-dd'),
-            format(dateObj, 'HH:mm'),
             tx.description,
             tx.is_settlement ? 'Settlement' : tx.category.charAt(0).toUpperCase() + tx.category.slice(1),
             tx.is_settlement ? 'Settlement' : isIncome ? 'Income' : 'Expense',
@@ -359,6 +672,7 @@ export const generateCSV = (
             tx.currency || currency,
             Math.abs(converted).toFixed(2),
             tx.place_name || '',
+            Array.isArray(tx.tags) && tx.tags.length ? tx.tags.join('; ') : '',
             tx.notes || '',
             tx.is_recurring ? 'Yes' : 'No',
             tx.exclude_from_allowance ? 'Yes' : 'No',
@@ -397,18 +711,20 @@ export const generatePDF = async (
     buckets: any[] = [],
     groups: any[] = [],
     reportRange?: DateRange,
-    ownerInfo?: { email?: string; avatarUrl?: string | null; workspaceName?: string }
+    ownerInfo?: { email?: string; avatarUrl?: string | null; workspaceName?: string; monthlyBudget?: number }
 ) => {
     const doc = new jsPDF({ putOnlyUsedFonts: true, compress: true });
     const pageWidth = doc.internal.pageSize.width;
+    const pageHeight = doc.internal.pageSize.height;
 
     const bucketMap = Object.fromEntries(buckets.map(b => [b.id, b]));
-    const groupMap = Object.fromEntries(groups.map(g => [g.id, g]));
 
     // Drop rows that would produce NaN/undefined in the report
     transactions = transactions.filter(tx => tx.date && tx.amount != null && !isNaN(Number(tx.amount)));
 
-    const sortedTx = [...transactions].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    const sortedTx = [...transactions].sort(
+        (a, b) => parseISO(a.date.slice(0, 10)).getTime() - parseISO(b.date.slice(0, 10)).getTime()
+    );
 
     const formatForPDF = (amount: number, cur?: string) =>
         formatCurrency(amount, cur)
@@ -418,75 +734,21 @@ export const generatePDF = async (
             .replace('Mex$', ' MXN ').replace('C$', ' CAD ').replace('A$', ' AUD ')
             .replace('RM', ' MYR ').replace('R$', ' BRL ').replace('Rp', ' IDR ');
 
-    // ── Calculations ──────────────────────────────────────────────────────────
-    let totalExpenses = 0, totalIncome = 0, recurringTotal = 0;
-    const categoryTotals: Record<string, number> = {};
-    const methodTotals: Record<string, number> = {};
-    const bucketTotals: Record<string, { spent: number, budget: number }> = {};
-    const dailyTotals: Record<string, number> = {};
-    const monthlyTotals: Record<string, number> = {};
-    const dowTotals: number[] = [0, 0, 0, 0, 0, 0, 0]; // Sun=0..Sat=6
-    const locationTotals: Record<string, { count: number, total: number }> = {};
-
-    transactions.forEach(tx => {
-        const rawAmount = resolveAmount(tx, currency, convertAmount);
-        const isIncome = rawAmount < 0 || tx.category === 'income';
-        const amount = Math.abs(rawAmount);
-        const bucket = tx.bucket_id ? bucketMap[tx.bucket_id] : null;
-
-        if (isIncome) { totalIncome += amount; return; }
-
-        totalExpenses += amount;
-        if (tx.is_recurring) recurringTotal += amount;
-
-        categoryTotals[tx.category] = (categoryTotals[tx.category] || 0) + amount;
-        methodTotals[tx.payment_method || 'Other'] = (methodTotals[tx.payment_method || 'Other'] || 0) + amount;
-
-        const dateKey = format(parseISO(tx.date.slice(0, 10)), 'MMM d');
-        dailyTotals[dateKey] = (dailyTotals[dateKey] || 0) + amount;
-
-        const monthKey = format(parseISO(tx.date.slice(0, 10)), 'MMM yyyy');
-        monthlyTotals[monthKey] = (monthlyTotals[monthKey] || 0) + amount;
-
-        const dow = parseISO(tx.date.slice(0, 10)).getDay();
-        dowTotals[dow] += amount;
-
-        if (tx.place_name) {
-            if (!locationTotals[tx.place_name]) locationTotals[tx.place_name] = { count: 0, total: 0 };
-            locationTotals[tx.place_name].count++;
-            locationTotals[tx.place_name].total += amount;
-        }
-
-        if (bucket) {
-            const bucketCurr = (bucket.currency || currency).toUpperCase();
-            let effectiveBudget = convertAmount(Number(bucket.budget || 0), bucketCurr);
-            if (bucket.start_date && bucket.end_date && reportRange?.from && reportRange?.to) {
-                const bStart = new Date(bucket.start_date), bEnd = new Date(bucket.end_date);
-                const overlapStart = new Date(Math.max(bStart.getTime(), reportRange.from.getTime()));
-                const overlapEnd = new Date(Math.min(bEnd.getTime(), reportRange.to.getTime()));
-                if (overlapEnd > overlapStart) {
-                    const bucketDays = Math.max(1, differenceInDays(bEnd, bStart) + 1);
-                    const overlapDays = Math.max(1, differenceInDays(overlapEnd, overlapStart) + 1);
-                    effectiveBudget = effectiveBudget * (overlapDays / bucketDays);
-                }
-            }
-            if (!bucketTotals[bucket.name]) bucketTotals[bucket.name] = { spent: 0, budget: effectiveBudget };
-            bucketTotals[bucket.name].spent += amount;
-        }
-    });
-
-    const expenseTxCount = transactions.filter(tx => {
-        const a = resolveAmount(tx, currency, convertAmount);
-        return a >= 0 && tx.category !== 'income';
-    }).length;
-
-    const netCashFlow = totalIncome - totalExpenses;
-    const daysCovered = reportRange?.from && reportRange?.to
-        ? Math.max(1, differenceInDays(reportRange.to, reportRange.from) + 1)
-        : Object.keys(dailyTotals).length || 1;
-    const avgPerTransaction = expenseTxCount > 0 ? totalExpenses / expenseTxCount : 0;
-    const avgPerDay = totalExpenses / daysCovered;
-    const savingsRate = totalIncome > 0 ? ((totalIncome - totalExpenses) / totalIncome) * 100 : null;
+    const stats = computeStats(transactions, currency, convertAmount, buckets, reportRange, ownerInfo?.monthlyBudget);
+    const {
+        totalExpenses, totalIncome, recurringTotal,
+        expenseTxCount, incomeTxCount,
+        daysCovered, avgPerTx: avgPerTransaction, avgPerDay, avgTxPerDay,
+        savingsRate, recurringPct, netCashFlow,
+        categoryTotals, incomeCategoryTotals, methodTotals,
+        monthlyTotals, weeklyTotals, dowTotals, dailyTotals,
+        bucketTotals, tagTotals, currencyTotals,
+        distribution, biggestSingleDay, biggestSingleTx,
+        longestSpendStreak, longestNoSpendStreak,
+        firstTxDate, lastTxDate, forecast,
+        topMerchantsByVisits,
+        topCategory, busiestDay,
+    } = stats;
 
     const topExpenses = [...transactions]
         .filter(tx => resolveAmount(tx, currency, convertAmount) > 0 && tx.category !== 'income')
@@ -494,13 +756,7 @@ export const generatePDF = async (
         .sort((a, b) => b.converted - a.converted)
         .slice(0, 5);
 
-    const topLocations = Object.entries(locationTotals)
-        .sort((a, b) => b[1].count - a[1].count)
-        .slice(0, 5);
-
-    const topCategory = Object.entries(categoryTotals).sort((a, b) => b[1] - a[1])[0];
-    const busiestDay = Object.entries(dailyTotals).sort((a, b) => b[1] - a[1])[0];
-    const recurringPct = totalExpenses > 0 ? (recurringTotal / totalExpenses) * 100 : 0;
+    const topLocations = topMerchantsByVisits.slice(0, 5).map(m => [m.name, { count: m.count, total: m.total }] as [string, { count: number; total: number }]);
 
     // ── PAGE 1 ────────────────────────────────────────────────────────────────
     doc.setFillColor(138, 43, 226);
@@ -600,7 +856,14 @@ export const generatePDF = async (
     doc.text('Top 5 Expenses', 110, 176);
     doc.setFont('helvetica', 'normal');
 
-    const barData = Object.entries(dailyTotals).map(([label, value]) => ({ label, value })).slice(-7);
+    // Last 7 calendar days (anchored to report end or today), including zero days.
+    const trendEnd = reportRange?.to ?? new Date();
+    const barData: { label: string, value: number }[] = [];
+    for (let i = 6; i >= 0; i--) {
+        const d = subDays(trendEnd, i);
+        const key = format(d, 'yyyy-MM-dd');
+        barData.push({ label: format(d, 'EEEEE'), value: dailyTotals[key] || 0 });
+    }
     drawBarChart(doc, barData, 14, 182, 85, 38, [138, 43, 226]);
 
     topExpenses.forEach((tx, i) => {
@@ -676,16 +939,17 @@ export const generatePDF = async (
     doc.setFont('helvetica', 'normal');
 
     let bucketY = 57;
-    const bucketEntries = Object.entries(bucketTotals);
+    const bucketEntries = Object.values(bucketTotals);
     if (bucketEntries.length === 0) {
         doc.setFontSize(9); doc.setTextColor(150, 150, 150);
         doc.text('No buckets in this report.', 110, bucketY);
         bucketY += 10;
     } else {
-        bucketEntries.forEach(([name, data]) => {
+        bucketEntries.forEach((data) => {
             if (bucketY > 88) return;
             const hasBudget = data.budget > 0;
             const pct = hasBudget ? (data.spent / data.budget) * 100 : 0;
+            const name = data.name;
 
             // Name + % used
             doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(50, 50, 50);
@@ -762,13 +1026,162 @@ export const generatePDF = async (
         tableStartY = (doc as any).lastAutoTable.finalY + 10;
     }
 
-    // ── Transaction Details ───────────────────────────────────────────────────
+    // ── PAGE 3: Distribution, Streaks, Tags, Currency Mix ─────────────────────
+    const hasExtras = expenseTxCount > 0 || Object.keys(tagTotals).length > 0
+        || Object.keys(currencyTotals).length > 1
+        || Object.keys(incomeCategoryTotals).length > 0
+        || forecast !== null;
+
+    if (hasExtras) {
+        doc.addPage();
+        let y = 18;
+        doc.setFontSize(13); doc.setFont('helvetica', 'bold'); doc.setTextColor(50, 50, 50);
+        doc.text('Spending Distribution & Highlights', 14, y);
+        doc.setFont('helvetica', 'normal');
+        y += 6;
+
+        if (expenseTxCount > 0) {
+            const cellW = 42, cellH = 16, gap = 3;
+            // Row 1: distribution
+            drawInsightBox(doc, 14,                     y, cellW, cellH, 'Smallest', formatForPDF(distribution.min, currency), [78, 205, 196]);
+            drawInsightBox(doc, 14 + (cellW + gap) * 1, y, cellW, cellH, 'Median',   formatForPDF(distribution.median, currency), [138, 43, 226]);
+            drawInsightBox(doc, 14 + (cellW + gap) * 2, y, cellW, cellH, '75th %ile', formatForPDF(distribution.p75, currency), [255, 159, 28]);
+            drawInsightBox(doc, 14 + (cellW + gap) * 3, y, cellW, cellH, 'Largest',  formatForPDF(distribution.max, currency), [255, 107, 107]);
+            y += cellH + 4;
+
+            // Row 2: streaks + biggest day
+            drawInsightBox(doc, 14,                     y, cellW, cellH, 'Spend Streak', `${longestSpendStreak}d`, [16, 185, 129]);
+            drawInsightBox(doc, 14 + (cellW + gap) * 1, y, cellW, cellH, 'No-Spend Streak', `${longestNoSpendStreak}d`, [99, 102, 241]);
+            const biggestDayLabel = biggestSingleDay
+                ? `${format(parseISO(biggestSingleDay.date), 'MMM d')} ${formatForPDF(biggestSingleDay.total, currency)}`
+                : '—';
+            drawInsightBox(doc, 14 + (cellW + gap) * 2, y, cellW, cellH, 'Biggest Day', biggestDayLabel, [255, 20, 147]);
+            drawInsightBox(doc, 14 + (cellW + gap) * 3, y, cellW, cellH, 'Avg Tx/Day', avgTxPerDay.toFixed(2), [78, 205, 196]);
+            y += cellH + 8;
+        }
+
+        // Forecast box
+        if (forecast) {
+            doc.setFontSize(11); doc.setFont('helvetica', 'bold'); doc.setTextColor(50, 50, 50);
+            doc.text('Period-End Forecast', 14, y);
+            doc.setFont('helvetica', 'normal');
+            y += 5;
+            doc.setFontSize(8); doc.setTextColor(80, 80, 80);
+            doc.text(`Projected total: ${formatForPDF(forecast.projected, currency)} (extrapolated from current daily run-rate)`, 14, y);
+            y += 4;
+            if (forecast.vsBudget) {
+                const sign = forecast.vsBudget.deltaPct >= 0 ? '+' : '';
+                const overBudget = forecast.vsBudget.deltaPct > 0;
+                doc.setTextColor(overBudget ? 255 : 16, overBudget ? 107 : 185, overBudget ? 107 : 129);
+                doc.text(
+                    `Budget ${formatForPDF(forecast.vsBudget.budget, currency)} · projected ${sign}${forecast.vsBudget.deltaPct.toFixed(1)}% ${overBudget ? 'over' : 'under'}`,
+                    14, y,
+                );
+            }
+            y += 8;
+        }
+
+        // Currency Mix (only if multi-currency)
+        if (Object.keys(currencyTotals).length > 1) {
+            doc.setFontSize(11); doc.setFont('helvetica', 'bold'); doc.setTextColor(50, 50, 50);
+            doc.text('Currency Mix', 14, y);
+            doc.setFont('helvetica', 'normal');
+            y += 4;
+            const currencyRows = Object.entries(currencyTotals)
+                .sort((a, b) => b[1].convertedTotal - a[1].convertedTotal)
+                .map(([curr, d]) => [
+                    curr,
+                    String(d.count),
+                    `${d.nativeTotal.toFixed(2)} ${curr}`,
+                    formatForPDF(d.convertedTotal, currency),
+                ]);
+            autoTable(doc as any, {
+                head: [['Currency', 'Tx', 'Native Total', `Converted (${currency})`]],
+                body: currencyRows,
+                startY: y,
+                theme: 'striped',
+                headStyles: { fillColor: [138, 43, 226], textColor: [255, 255, 255] },
+                styles: { fontSize: 8 },
+                columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' }, 3: { halign: 'right' } },
+                tableWidth: 'auto',
+                margin: { left: 14, right: pageWidth / 2 + 5 },
+            });
+            y = (doc as any).lastAutoTable.finalY + 8;
+        }
+
+        // Income by category
+        if (Object.keys(incomeCategoryTotals).length > 0) {
+            doc.setFontSize(11); doc.setFont('helvetica', 'bold'); doc.setTextColor(50, 50, 50);
+            doc.text('Income by Category', 14, y);
+            doc.setFont('helvetica', 'normal');
+            y += 4;
+            const incomeRows = Object.entries(incomeCategoryTotals)
+                .sort((a, b) => b[1] - a[1])
+                .map(([cat, amt]) => {
+                    const pct = totalIncome > 0 ? ((amt / totalIncome) * 100).toFixed(1) : '0.0';
+                    return [
+                        cat.charAt(0).toUpperCase() + cat.slice(1),
+                        formatForPDF(amt, currency),
+                        `${pct}%`,
+                    ];
+                });
+            autoTable(doc as any, {
+                head: [['Category', 'Amount', '% of Income']],
+                body: incomeRows,
+                startY: y,
+                theme: 'striped',
+                headStyles: { fillColor: [16, 185, 129], textColor: [255, 255, 255] },
+                styles: { fontSize: 8 },
+                columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' } },
+                tableWidth: 'auto',
+                margin: { left: 14, right: pageWidth / 2 + 5 },
+            });
+            y = (doc as any).lastAutoTable.finalY + 8;
+        }
+
+        // Tags Breakdown — full-width below preceding sections so it can't
+        // collide with the distribution insight row at the top.
+        if (Object.keys(tagTotals).length > 0) {
+            // If Y has crept too low, page-break before rendering.
+            if (y > pageHeight - 40) {
+                doc.addPage();
+                y = 18;
+            }
+            doc.setFontSize(11); doc.setFont('helvetica', 'bold'); doc.setTextColor(50, 50, 50);
+            doc.text('Top Tags', 14, y);
+            doc.setFont('helvetica', 'normal');
+            y += 4;
+            const tagRows = Object.entries(tagTotals)
+                .sort((a, b) => b[1].total - a[1].total)
+                .slice(0, 12)
+                .map(([tag, d]) => {
+                    const pct = totalExpenses > 0 ? ((d.total / totalExpenses) * 100).toFixed(1) : '0.0';
+                    return [tag, String(d.count), formatForPDF(d.total, currency), `${pct}%`];
+                });
+            autoTable(doc as any, {
+                head: [['Tag', 'Tx', 'Total', '%']],
+                body: tagRows,
+                startY: y,
+                theme: 'striped',
+                headStyles: { fillColor: [138, 43, 226], textColor: [255, 255, 255] },
+                styles: { fontSize: 8 },
+                columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' }, 3: { halign: 'right' } },
+                tableWidth: 100,
+                margin: { left: 14 },
+            });
+        }
+    }
+
+    // ── Transaction Details (always on a fresh page so it can paginate cleanly) ──
+    doc.addPage();
     doc.setFontSize(13); doc.setFont('helvetica', 'bold'); doc.setTextColor(50, 50, 50);
-    doc.text('Transaction Details', 14, tableStartY);
+    doc.text('Transaction Details', 14, 18);
     doc.setFont('helvetica', 'normal');
 
     const hasNotes = transactions.some(tx => tx.notes);
+    const hasTags = transactions.some(tx => Array.isArray(tx.tags) && tx.tags.length > 0);
     const tableColumns = ['Date', 'Description', 'Category', 'Bucket', 'Payment', 'Amount'];
+    if (hasTags) tableColumns.push('Tags');
     if (hasNotes) tableColumns.push('Notes');
 
     const tableRows = sortedTx.map(tx => {
@@ -786,6 +1199,10 @@ export const generatePDF = async (
             tx.payment_method || '-',
             displayAmount,
         ];
+        if (hasTags) {
+            const t = Array.isArray(tx.tags) && tx.tags.length ? tx.tags.join(', ') : '';
+            row.push(t.length > 18 ? t.substring(0, 16) + '..' : t);
+        }
         if (hasNotes) row.push(tx.notes ? (tx.notes.length > 20 ? tx.notes.substring(0, 18) + '..' : tx.notes) : '');
         return row;
     });
@@ -793,7 +1210,7 @@ export const generatePDF = async (
     autoTable(doc as any, {
         head: [tableColumns],
         body: tableRows,
-        startY: tableStartY + 5,
+        startY: 24,
         theme: 'striped',
         headStyles: { fillColor: [138, 43, 226], textColor: [255, 255, 255] },
         styles: { fontSize: 7.5, cellPadding: 2 },

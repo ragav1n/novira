@@ -1,7 +1,8 @@
 'use client';
 
 import React, { memo, useState, useEffect, useRef } from 'react';
-import { format, parseISO } from 'date-fns';
+import { parseISO } from 'date-fns';
+import { useFormattedDate } from '@/utils/format-date';
 import { History, MoreVertical, Users, RefreshCcw, Ban, MapPin, Pencil, Trash2, Globe, ArrowLeftRight, Cloud, AlertTriangle, StickyNote } from 'lucide-react';
 import type { Transaction } from '@/types/transaction';
 import {
@@ -59,6 +60,7 @@ export const TransactionRow = memo(function TransactionRow({
 }: TransactionRowProps) {
   const hasSplits = tx.splits && tx.splits.length > 0;
   const isSettlement = tx.is_settlement;
+  const formatDate = useFormattedDate();
 
   const x = useMotionValue(0);
   const [swiped, setSwiped] = useState(false);
@@ -220,7 +222,7 @@ export const TransactionRow = memo(function TransactionRow({
               <span className="shrink-0 text-[11px] text-white/35 font-medium leading-none">{paidByLabel}</span>
               <span className="shrink-0 text-white/20 text-[10px]">·</span>
               <span className="shrink-0 text-[11px] text-white/35 font-medium tabular-nums leading-none">
-                {format(parseISO(tx.date.slice(0, 10)), 'MMM d')}
+                {formatDate(parseISO(tx.date.slice(0, 10)), 'short')}
               </span>
               {/* Location indicator */}
               {tx.place_name && (

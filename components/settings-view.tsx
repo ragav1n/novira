@@ -1,13 +1,14 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { ChevronLeft, User, Shield, ChevronRight, LogOut, Trash2, Wrench } from 'lucide-react';
+import { ChevronLeft, User, Shield, ChevronRight, LogOut, Trash2, Wrench, RefreshCcw, Download, SlidersHorizontal, Bell, Globe, Zap } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { useUserPreferences } from '@/components/providers/user-preferences-provider';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { supabase } from '@/lib/supabase';
 import { toast } from '@/utils/haptics';
 import { version as APP_VERSION } from '@/package.json';
@@ -28,6 +29,9 @@ import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { RecurringExpensesSection } from '@/components/settings/recurring-expenses-section';
 import { DataManagementSection } from '@/components/settings/data-management-section';
 import { PreferencesSection } from '@/components/settings/preferences-section';
+import { NotificationsSection } from '@/components/settings/notifications-section';
+import { LocaleSection } from '@/components/settings/locale-section';
+import { QuickAddDefaultsSection } from '@/components/settings/quick-add-defaults-section';
 import { SecuritySection } from '@/components/settings/security-section';
 import { FailedSyncSection } from '@/components/settings/failed-sync-section';
 
@@ -61,11 +65,27 @@ export function SettingsView() {
         user,
         activeWorkspaceId,
         setAvatarUrl: setAvatarUrlProvider,
-        CURRENCY_DETAILS,
         privacyMode,
         setPrivacyMode,
         digestFrequency,
         setDigestFrequency,
+        bucketDeadlineAlerts,
+        setBucketDeadlineAlerts,
+        spendingPaceAlerts,
+        setSpendingPaceAlerts,
+        quietHoursStart,
+        quietHoursEnd,
+        setQuietHours,
+        firstDayOfWeek,
+        setFirstDayOfWeek,
+        dateFormat,
+        setDateFormat,
+        defaultCategory,
+        setDefaultCategory,
+        defaultPaymentMethod,
+        setDefaultPaymentMethod,
+        defaultBucketId,
+        setDefaultBucketId,
     } = useUserPreferences();
 
     const { buckets } = useBucketsList();
@@ -81,6 +101,15 @@ export function SettingsView() {
     const [loadingTemplates, setLoadingTemplates] = useState(true);
 
     const { failedItems, pending } = useSyncQueueState();
+
+    // Honor a URL hash like `#notifications` so deep links can open a specific
+    // section. Computed once on mount; users can still collapse/expand after.
+    const [defaultOpenSections] = useState<string[]>(() => {
+        if (typeof window === 'undefined') return [];
+        const hash = window.location.hash.replace('#', '').trim();
+        const valid = ['recurring', 'data', 'notifications', 'locale', 'quick-add', 'general', 'security'];
+        return hash && valid.includes(hash) ? [hash] : [];
+    });
 
     useEffect(() => {
         setLocalBudget(monthlyBudget.toString());
@@ -309,7 +338,7 @@ export function SettingsView() {
 
             let query = supabase
                 .from('transactions')
-                .select('id, description, amount, category, date, payment_method, created_at, currency, bucket_id, group_id, notes, is_recurring, is_settlement, place_name, exclude_from_allowance, exchange_rate, base_currency, converted_amount')
+                .select('id, description, amount, category, date, payment_method, created_at, currency, bucket_id, group_id, notes, is_recurring, is_settlement, place_name, exclude_from_allowance, exchange_rate, base_currency, converted_amount, tags')
                 .order('date', { ascending: false });
 
             if (dateRange?.from) {
@@ -345,6 +374,7 @@ export function SettingsView() {
                 generateCSV(transactions, currency, convertAmount, formatCurrency, buckets, groups, dateRange || undefined, {
                     email: user?.email,
                     workspaceName,
+                    monthlyBudget,
                 });
                 toast.success('CSV Exported successfully');
             } else {
@@ -352,6 +382,7 @@ export function SettingsView() {
                     email: user?.email,
                     avatarUrl,
                     workspaceName,
+                    monthlyBudget,
                 });
 
                 toast.success('PDF Exported successfully');
@@ -479,41 +510,151 @@ export function SettingsView() {
                     </div>
                 </div>
 
-                <RecurringExpensesSection
-                    templates={recurringTemplates}
-                    loading={loadingTemplates}
-                    formatCurrency={formatCurrency}
-                    onDelete={deleteRecurringTemplate}
-                />
+                <Accordion
+                    type="multiple"
+                    defaultValue={defaultOpenSections}
+                    className="rounded-xl border border-white/5 bg-secondary/5 divide-y divide-white/5"
+                >
+                    <AccordionItem value="recurring" className="border-b-0 px-3">
+                        <AccordionTrigger className="text-sm font-semibold text-muted-foreground hover:no-underline">
+                            <div className="flex items-center gap-2">
+                                <RefreshCcw className="w-4 h-4" />
+                                <span>Recurring Expenses</span>
+                            </div>
+                        </AccordionTrigger>
+                        <AccordionContent>
+                            <RecurringExpensesSection
+                                templates={recurringTemplates}
+                                loading={loadingTemplates}
+                                formatCurrency={formatCurrency}
+                                onDelete={deleteRecurringTemplate}
+                            />
+                        </AccordionContent>
+                    </AccordionItem>
 
-                <DataManagementSection
-                    loading={loadingExport}
-                    onImport={() => router.push('/import')}
-                    onExportCSV={() => handleExportClick('csv')}
-                    onExportPDF={() => handleExportClick('pdf')}
-                />
+                    <AccordionItem value="data" className="border-b-0 px-3">
+                        <AccordionTrigger className="text-sm font-semibold text-muted-foreground hover:no-underline">
+                            <div className="flex items-center gap-2">
+                                <Download className="w-4 h-4" />
+                                <span>Data Management</span>
+                            </div>
+                        </AccordionTrigger>
+                        <AccordionContent>
+                            <DataManagementSection
+                                loading={loadingExport}
+                                onImport={() => router.push('/import')}
+                                onExportCSV={() => handleExportClick('csv')}
+                                onExportPDF={() => handleExportClick('pdf')}
+                            />
+                        </AccordionContent>
+                    </AccordionItem>
 
-                <PreferencesSection
-                    currency={currency}
-                    setCurrency={setCurrency}
-                    budgetAlertsEnabled={budgetAlertsEnabled}
-                    onToggleBudgetAlerts={(checked) => {
-                        setBudgetAlertsEnabled(checked);
-                        if (checked) {
-                            setShowAlert(true);
-                            setTimeout(() => setShowAlert(false), 5000);
-                        } else {
-                            setShowAlert(false);
-                        }
-                    }}
-                    billReminderLeadDays={billReminderLeadDays}
-                    setBillReminderLeadDays={setBillReminderLeadDays}
-                    push={push}
-                    privacyMode={privacyMode}
-                    setPrivacyMode={setPrivacyMode}
-                    digestFrequency={digestFrequency}
-                    setDigestFrequency={setDigestFrequency}
-                />
+                    <AccordionItem value="notifications" className="border-b-0 px-3">
+                        <AccordionTrigger className="text-sm font-semibold text-muted-foreground hover:no-underline">
+                            <div className="flex items-center gap-2">
+                                <Bell className="w-4 h-4" />
+                                <span>Notifications</span>
+                            </div>
+                        </AccordionTrigger>
+                        <AccordionContent>
+                            <NotificationsSection
+                                push={push}
+                                digestFrequency={digestFrequency}
+                                setDigestFrequency={setDigestFrequency}
+                                billReminderLeadDays={billReminderLeadDays}
+                                setBillReminderLeadDays={setBillReminderLeadDays}
+                                bucketDeadlineAlerts={bucketDeadlineAlerts}
+                                setBucketDeadlineAlerts={setBucketDeadlineAlerts}
+                                spendingPaceAlerts={spendingPaceAlerts}
+                                setSpendingPaceAlerts={setSpendingPaceAlerts}
+                                quietHoursStart={quietHoursStart}
+                                quietHoursEnd={quietHoursEnd}
+                                setQuietHours={setQuietHours}
+                            />
+                        </AccordionContent>
+                    </AccordionItem>
+
+                    <AccordionItem value="locale" className="border-b-0 px-3">
+                        <AccordionTrigger className="text-sm font-semibold text-muted-foreground hover:no-underline">
+                            <div className="flex items-center gap-2">
+                                <Globe className="w-4 h-4" />
+                                <span>Currency &amp; Locale</span>
+                            </div>
+                        </AccordionTrigger>
+                        <AccordionContent>
+                            <LocaleSection
+                                currency={currency}
+                                setCurrency={setCurrency}
+                                firstDayOfWeek={firstDayOfWeek}
+                                setFirstDayOfWeek={setFirstDayOfWeek}
+                                dateFormat={dateFormat}
+                                setDateFormat={setDateFormat}
+                            />
+                        </AccordionContent>
+                    </AccordionItem>
+
+                    <AccordionItem value="quick-add" className="border-b-0 px-3">
+                        <AccordionTrigger className="text-sm font-semibold text-muted-foreground hover:no-underline">
+                            <div className="flex items-center gap-2">
+                                <Zap className="w-4 h-4" />
+                                <span>Quick-Add Defaults</span>
+                            </div>
+                        </AccordionTrigger>
+                        <AccordionContent>
+                            <QuickAddDefaultsSection
+                                defaultCategory={defaultCategory}
+                                setDefaultCategory={setDefaultCategory}
+                                defaultPaymentMethod={defaultPaymentMethod}
+                                setDefaultPaymentMethod={setDefaultPaymentMethod}
+                                defaultBucketId={defaultBucketId}
+                                setDefaultBucketId={setDefaultBucketId}
+                                buckets={buckets}
+                            />
+                        </AccordionContent>
+                    </AccordionItem>
+
+                    <AccordionItem value="general" className="border-b-0 px-3">
+                        <AccordionTrigger className="text-sm font-semibold text-muted-foreground hover:no-underline">
+                            <div className="flex items-center gap-2">
+                                <SlidersHorizontal className="w-4 h-4" />
+                                <span>General</span>
+                            </div>
+                        </AccordionTrigger>
+                        <AccordionContent>
+                            <PreferencesSection
+                                budgetAlertsEnabled={budgetAlertsEnabled}
+                                onToggleBudgetAlerts={(checked) => {
+                                    setBudgetAlertsEnabled(checked);
+                                    if (checked) {
+                                        setShowAlert(true);
+                                        setTimeout(() => setShowAlert(false), 5000);
+                                    } else {
+                                        setShowAlert(false);
+                                    }
+                                }}
+                                privacyMode={privacyMode}
+                                setPrivacyMode={setPrivacyMode}
+                            />
+                        </AccordionContent>
+                    </AccordionItem>
+
+                    <AccordionItem value="security" className="border-b-0 px-3">
+                        <AccordionTrigger className="text-sm font-semibold text-muted-foreground hover:no-underline">
+                            <div className="flex items-center gap-2">
+                                <Shield className="w-4 h-4" />
+                                <span>Security &amp; Privacy</span>
+                            </div>
+                        </AccordionTrigger>
+                        <AccordionContent>
+                            <SecuritySection
+                                userEmail={userEmail}
+                                hasPassword={hasPassword}
+                                hasGoogleIdentity={hasGoogleIdentity}
+                                onPasswordChangeSuccess={getProfile}
+                            />
+                        </AccordionContent>
+                    </AccordionItem>
+                </Accordion>
 
                 <AnimatePresence>
                     {showAlert && (
@@ -535,14 +676,6 @@ export function SettingsView() {
                         </div>
                     )}
                 </AnimatePresence>
-
-
-                <SecuritySection
-                    userEmail={userEmail}
-                    hasPassword={hasPassword}
-                    hasGoogleIdentity={hasGoogleIdentity}
-                    onPasswordChangeSuccess={getProfile}
-                />
 
                 <FailedSyncSection failedItems={failedItems} />
 
@@ -572,7 +705,7 @@ export function SettingsView() {
                         </button>
                     </div>
                     <p className="text-[11px] text-muted-foreground px-1">
-                        Clears cached data and resets the service worker. Use if the app behaves unexpectedly.
+                        Clears cached data, the offline queue, and signs you out on this device. Your account stays intact.
                     </p>
                 </div>
 

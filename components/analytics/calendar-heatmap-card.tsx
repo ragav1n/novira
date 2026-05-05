@@ -6,6 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Calendar } from 'lucide-react';
 import { format, parseISO, eachDayOfInterval, startOfWeek, endOfWeek } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { useUserPreferences } from '@/components/providers/user-preferences-provider';
 
 interface Props {
     dailyTotals: Record<string, number>;
@@ -14,10 +15,13 @@ interface Props {
     formatCurrency: (amount: number) => string;
 }
 
-const DAY_LABELS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+const DAY_LABELS_MON = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+const DAY_LABELS_SUN = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
 export function CalendarHeatmapCard({ dailyTotals, rangeStart, rangeEnd, formatCurrency }: Props) {
     const router = useRouter();
+    const { firstDayOfWeek } = useUserPreferences();
+    const dayLabels = firstDayOfWeek === 1 ? DAY_LABELS_MON : DAY_LABELS_SUN;
 
     const { days, quantiles, weeks, totalDays, totalSpend, peakDay } = useMemo(() => {
         if (!rangeStart || !rangeEnd || rangeEnd < rangeStart) {
@@ -38,9 +42,9 @@ export function CalendarHeatmapCard({ dailyTotals, rangeStart, rangeEnd, formatC
         };
         const quantiles = [q(0.25), q(0.5), q(0.75), q(1)];
 
-        // Calendar grid is week-major (one column per week, padded to start on Monday).
-        const gridStart = startOfWeek(rangeStart, { weekStartsOn: 1 });
-        const gridEnd = endOfWeek(rangeEnd, { weekStartsOn: 1 });
+        // Calendar grid is week-major (one column per week, padded to user's first day of week).
+        const gridStart = startOfWeek(rangeStart, { weekStartsOn: firstDayOfWeek });
+        const gridEnd = endOfWeek(rangeEnd, { weekStartsOn: firstDayOfWeek });
         const gridDays = eachDayOfInterval({ start: gridStart, end: gridEnd });
         const totalSpend = enriched.reduce((s, d) => s + d.amount, 0);
         const peak = enriched.reduce<{ date: string; amount: number } | null>((best, d) => {
@@ -61,7 +65,7 @@ export function CalendarHeatmapCard({ dailyTotals, rangeStart, rangeEnd, formatC
             totalSpend,
             peakDay: peak,
         };
-    }, [dailyTotals, rangeStart, rangeEnd]);
+    }, [dailyTotals, rangeStart, rangeEnd, firstDayOfWeek]);
 
     if (!rangeStart || !rangeEnd || days.length === 0) return null;
 
@@ -99,7 +103,7 @@ export function CalendarHeatmapCard({ dailyTotals, rangeStart, rangeEnd, formatC
 
                 <div className="flex gap-1.5">
                     <div className="flex flex-col gap-1 pt-[1px] shrink-0">
-                        {DAY_LABELS.map((d, i) => (
+                        {dayLabels.map((d, i) => (
                             <div key={i} className="h-3 text-[8px] font-bold text-muted-foreground/50 leading-3 w-2.5 text-right">
                                 {i % 2 === 1 ? d : ''}
                             </div>

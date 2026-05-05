@@ -36,7 +36,19 @@ function readDraft(key: string): Partial<DraftShape> | null {
     }
 }
 
-export function useExpenseForm(userId: string | null | undefined, defaultCurrency: string, activeWorkspaceId: string | null = null, defaultSplitEnabled: boolean = !!activeWorkspaceId) {
+type QuickAddDefaults = {
+    category?: string | null;
+    paymentMethod?: 'Cash' | 'Debit Card' | 'Credit Card' | 'UPI' | 'Bank Transfer' | null;
+    bucketId?: string | null;
+};
+
+export function useExpenseForm(
+    userId: string | null | undefined,
+    defaultCurrency: string,
+    activeWorkspaceId: string | null = null,
+    defaultSplitEnabled: boolean = !!activeWorkspaceId,
+    quickAddDefaults: QuickAddDefaults = {},
+) {
     const draftKey = `${DRAFT_KEY_PREFIX}_${userId ?? 'anon'}_${activeWorkspaceId ?? 'personal'}`;
     // Lazy-init: only read sessionStorage once on mount, not on every render.
     const initialDraftRef = useRef<Partial<DraftShape> | null>(null);
@@ -46,7 +58,9 @@ export function useExpenseForm(userId: string | null | undefined, defaultCurrenc
     const initialDraft = initialDraftRef.current;
     const hadDraftCurrencyRef = useRef(!!initialDraft.txCurrency);
 
-    const [selectedCategory, setSelectedCategory] = useState(initialDraft.selectedCategory ?? 'food');
+    const [selectedCategory, setSelectedCategory] = useState(
+        initialDraft.selectedCategory ?? quickAddDefaults.category ?? 'food'
+    );
     const [amount, setAmount] = useState(initialDraft.amount ?? '');
     const [description, setDescription] = useState(initialDraft.description ?? '');
     const [notes, setNotes] = useState(initialDraft.notes ?? '');
@@ -54,10 +68,12 @@ export function useExpenseForm(userId: string | null | undefined, defaultCurrenc
         initialDraft.date ? new Date(initialDraft.date) : new Date()
     );
     const [paymentMethod, setPaymentMethod] = useState<'Cash' | 'Debit Card' | 'Credit Card' | 'UPI' | 'Bank Transfer'>(
-        initialDraft.paymentMethod ?? 'Cash'
+        initialDraft.paymentMethod ?? quickAddDefaults.paymentMethod ?? 'Cash'
     );
     const [txCurrency, setTxCurrency] = useState(initialDraft.txCurrency ?? defaultCurrency);
-    const [selectedBucketId, setSelectedBucketId] = useState<string | null>(initialDraft.selectedBucketId ?? null);
+    const [selectedBucketId, setSelectedBucketId] = useState<string | null>(
+        initialDraft.selectedBucketId ?? quickAddDefaults.bucketId ?? null
+    );
 
     useEffect(() => {
         // Only force-reset to the user's preferred currency if the draft on mount
@@ -404,11 +420,11 @@ export function useExpenseForm(userId: string | null | undefined, defaultCurrenc
         setAmount('');
         setDescription('');
         setNotes('');
-        setSelectedCategory('food');
+        setSelectedCategory(quickAddDefaults.category ?? 'food');
         setDate(new Date());
-        setPaymentMethod('Cash');
+        setPaymentMethod(quickAddDefaults.paymentMethod ?? 'Cash');
         setTxCurrency(defaultCurrency);
-        setSelectedBucketId(null);
+        setSelectedBucketId(quickAddDefaults.bucketId ?? null);
         setIsSplitEnabled(defaultSplitEnabled);
         setSelectedGroupId(activeWorkspaceId);
         setSelectedFriendIds([]);

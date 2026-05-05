@@ -27,11 +27,7 @@ export function RecurringExpensesSection({ templates, loading, formatCurrency, o
     const [templateToDelete, setTemplateToDelete] = React.useState<RecurringTemplate | null>(null);
 
     return (
-        <div className="space-y-3 pt-2">
-            <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
-                <RefreshCcw className="w-4 h-4" />
-                <span>Recurring Expenses</span>
-            </div>
+        <div className="space-y-3">
             <div className="bg-secondary/5 rounded-xl border border-white/5 divide-y divide-white/5 min-h-[48px]">
                 {loading ? (
                     <>
