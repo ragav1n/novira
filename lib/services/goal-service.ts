@@ -82,5 +82,49 @@ export const GoalService = {
         }
 
         toast.success('Deposit added successfully!');
-    }
+    },
+
+    async getDepositsForGoals(userId: string, goalIds: string[], sinceDays = 90): Promise<SavingsDeposit[]> {
+        if (!goalIds.length) return [];
+        const since = new Date(Date.now() - sinceDays * 24 * 60 * 60 * 1000).toISOString();
+        const { data, error } = await supabase
+            .from('savings_deposits')
+            .select('*')
+            .eq('user_id', userId)
+            .in('goal_id', goalIds)
+            .gte('created_at', since)
+            .order('created_at', { ascending: false });
+        if (error) {
+            console.error('Error fetching deposits:', error);
+            return [];
+        }
+        return (data ?? []) as SavingsDeposit[];
+    },
+
+    async getAllDepositsForGoal(userId: string, goalId: string): Promise<SavingsDeposit[]> {
+        const { data, error } = await supabase
+            .from('savings_deposits')
+            .select('*')
+            .eq('user_id', userId)
+            .eq('goal_id', goalId)
+            .order('created_at', { ascending: false });
+        if (error) {
+            console.error('Error fetching deposits:', error);
+            return [];
+        }
+        return (data ?? []) as SavingsDeposit[];
+    },
+
+    async removeDeposit(userId: string, depositId: string) {
+        const { data, error } = await supabase.rpc('remove_savings_deposit_atomic', {
+            p_deposit_id: depositId,
+            p_user_id: userId,
+        });
+        if (error || (data && (data as { success?: boolean }).success === false)) {
+            const msg = (data as { error?: string })?.error;
+            toast.error(msg || 'Failed to remove deposit');
+            throw error ?? new Error(msg || 'Failed to remove deposit');
+        }
+        toast.success('Deposit removed');
+    },
 };
