@@ -49,6 +49,11 @@ const nextConfig = {
       'date-fns',
     ],
   },
+  async redirects() {
+    return [
+      { source: '/calendar', destination: '/cashflow', permanent: true },
+    ]
+  },
   async headers() {
     return [
       {

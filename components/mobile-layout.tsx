@@ -24,7 +24,7 @@ const DESKTOP_NAV = [
     { title: 'Analytics',icon: BarChart2, route: '/analytics' },
     { title: 'Groups',   icon: Users,    route: '/groups' },
     { title: 'Subs',     icon: Calendar, route: '/subscriptions' },
-    { title: 'Cash Flow',icon: CalendarDays, route: '/calendar' },
+    { title: 'Cash Flow',icon: CalendarDays, route: '/cashflow' },
     { title: 'Goals',    icon: Target,   route: '/goals' },
     { title: 'Search',   icon: Search,   route: '/search' },
     { title: 'Settings', icon: Settings, route: '/settings' },
@@ -342,7 +342,7 @@ export function MobileLayout({ children, defaultIsDesktop = false }: { children:
         { title: "Settings", icon: Settings },
     ];
 
-    const routes = ['/', '/add', '/analytics', '/groups', '/subscriptions', '/calendar', '/goals', '/search', null, '/settings'];
+    const routes = ['/', '/add', '/analytics', '/groups', '/subscriptions', '/cashflow', '/goals', '/search', null, '/settings'];
 
     const pathname = usePathname();
     const isPublicPage = ['/privacy', '/terms'].includes(pathname);
@@ -360,7 +360,7 @@ export function MobileLayout({ children, defaultIsDesktop = false }: { children:
 
     useEffect(() => {
         if (!isAuthenticated) return;
-        const navRoutes = ['/add', '/analytics', '/groups', '/subscriptions', '/calendar', '/goals', '/search', '/settings'];
+        const navRoutes = ['/add', '/analytics', '/groups', '/subscriptions', '/cashflow', '/goals', '/search', '/settings'];
         navRoutes.forEach(route => router.prefetch(route));
 
         import('@/components/analytics-view').catch(() => {});

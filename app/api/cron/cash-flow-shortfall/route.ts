@@ -130,7 +130,7 @@ export async function GET(request: NextRequest) {
         const sent = await sendToUser(supabase, subsByUser, h.profile.id, {
             title: 'Tight week ahead',
             body: `Projected short by ${fmtMoney(h.gap, ccy)} after ${billCount} upcoming bill${billCount === 1 ? '' : 's'}.`,
-            url: '/calendar',
+            url: '/cashflow',
         }, expired);
         pushSent += sent;
         if (sent > 0) {

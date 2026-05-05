@@ -18,20 +18,22 @@ import {
     startOfWeek,
     subMonths,
 } from 'date-fns';
-import { ArrowLeft, ChevronLeft, ChevronRight, Plus, RotateCw, Target, Tag, CalendarDays } from 'lucide-react';
+import { ArrowLeft, ChevronLeft, ChevronRight, Plus, RotateCw, Target, Tag, CalendarDays, Bell, TrendingDown, Check, Trash2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useUserPreferences } from '@/components/providers/user-preferences-provider';
 import { useBucketsList } from '@/components/providers/buckets-provider';
 import { useWorkspaceTheme } from '@/hooks/useWorkspaceTheme';
 import { cn } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { getCategoryLabel, CATEGORY_COLORS } from '@/lib/categories';
+import { ScheduleSheet } from '@/components/calendar/schedule-sheet';
+import { toast } from '@/utils/haptics';
 
-type EventKind = 'recurring' | 'goal' | 'bucket-end';
+type EventKind = 'recurring' | 'goal' | 'bucket-end' | 'one-off';
 
 interface CalendarEvent {
     id: string;
+    sourceId: string;
     date: Date;
     kind: EventKind;
     label: string;
@@ -39,6 +41,7 @@ interface CalendarEvent {
     amount?: number;
     currency?: string;
     color?: string;
+    isCompleted?: boolean;
 }
 
 interface RecurringRow {
@@ -59,6 +62,16 @@ interface GoalRow {
     current_amount: number;
     currency: string;
     deadline: string | null;
+}
+
+interface OneOffRow {
+    id: string;
+    date: string;
+    label: string;
+    amount: number | null;
+    currency: string | null;
+    notes: string | null;
+    is_completed: boolean;
 }
 
 function expandRecurring(row: RecurringRow, fromStr: string, untilStr: string): Date[] {
@@ -107,8 +120,10 @@ export function CalendarView() {
     const [viewMonth, setViewMonth] = useState(() => startOfMonth(new Date()));
     const [recurring, setRecurring] = useState<RecurringRow[]>([]);
     const [goals, setGoals] = useState<GoalRow[]>([]);
+    const [oneOffs, setOneOffs] = useState<OneOffRow[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedDate, setSelectedDate] = useState<Date>(() => startOfDay(new Date()));
+    const [scheduleOpen, setScheduleOpen] = useState(false);
 
     const load = useCallback(async () => {
         if (!userId) return;
@@ -131,19 +146,42 @@ export function CalendarView() {
                 .eq('user_id', userId)
                 .not('deadline', 'is', null);
 
-            const [{ data: recurringData }, { data: goalsData }] = await Promise.all([
+            // Bound the one-off window so the table stays cheap to query as it grows.
+            const oneOffStart = format(subMonths(viewMonth, 1), 'yyyy-MM-dd');
+            const oneOffEnd = format(addMonths(viewMonth, 2), 'yyyy-MM-dd');
+            let oneOffQuery = supabase
+                .from('scheduled_events')
+                .select('id, date, label, amount, currency, notes, is_completed')
+                .eq('user_id', userId)
+                .gte('date', oneOffStart)
+                .lte('date', oneOffEnd);
+            if (activeWorkspaceId && activeWorkspaceId !== 'personal') {
+                oneOffQuery = oneOffQuery.eq('group_id', activeWorkspaceId);
+            } else if (activeWorkspaceId === 'personal') {
+                oneOffQuery = oneOffQuery.is('group_id', null);
+            }
+
+            const [{ data: recurringData }, { data: goalsData }, { data: oneOffData, error: oneOffError }] = await Promise.all([
                 recurringQuery.returns<RecurringRow[]>(),
                 goalsQuery.returns<GoalRow[]>(),
+                oneOffQuery.returns<OneOffRow[]>(),
             ]);
+
+            if (oneOffError && oneOffError.code !== '42P01') {
+                // 42P01 = "relation does not exist" — surfaces if the migration hasn't been
+                // applied yet. Fail soft so the rest of the page still renders.
+                console.error('Error loading scheduled_events:', oneOffError);
+            }
 
             setRecurring(recurringData || []);
             setGoals(goalsData || []);
+            setOneOffs(oneOffData || []);
         } catch (error) {
             console.error('Error loading calendar data:', error);
         } finally {
             setLoading(false);
         }
-    }, [userId, activeWorkspaceId]);
+    }, [userId, activeWorkspaceId, viewMonth]);
 
     useEffect(() => { load(); }, [load]);
 
@@ -161,6 +199,7 @@ export function CalendarView() {
             for (const d of dates) {
                 out.push({
                     id: `r-${r.id}-${format(d, 'yyyyMMdd')}`,
+                    sourceId: r.id,
                     date: d,
                     kind: 'recurring',
                     label: r.description,
@@ -179,6 +218,7 @@ export function CalendarView() {
             const remaining = Math.max(Number(g.target_amount) - Number(g.current_amount), 0);
             out.push({
                 id: `g-${g.id}`,
+                sourceId: g.id,
                 date: d,
                 kind: 'goal',
                 label: g.name,
@@ -195,16 +235,36 @@ export function CalendarView() {
             if (d < horizonStart || d > horizonEnd) continue;
             out.push({
                 id: `b-${b.id}`,
+                sourceId: b.id,
                 date: d,
                 kind: 'bucket-end',
                 label: b.name,
                 detail: 'Bucket ends',
+                amount: b.budget != null ? -Math.abs(Number(b.budget)) : undefined,
+                currency: b.currency,
                 color: '#06B6D4',
             });
         }
 
+        for (const o of oneOffs) {
+            const d = parseISO(o.date);
+            if (d < horizonStart || d > horizonEnd) continue;
+            out.push({
+                id: `o-${o.id}`,
+                sourceId: o.id,
+                date: d,
+                kind: 'one-off',
+                label: o.label,
+                detail: o.is_completed ? 'Completed' : (o.notes || (o.amount != null ? 'One-off bill' : 'Reminder')),
+                amount: o.amount != null ? -Math.abs(Number(o.amount)) : undefined,
+                currency: o.currency || currency,
+                color: '#F59E0B',
+                isCompleted: o.is_completed,
+            });
+        }
+
         return out;
-    }, [recurring, goals, buckets, viewMonth]);
+    }, [recurring, goals, buckets, oneOffs, viewMonth, currency]);
 
     const eventsByDay = useMemo(() => {
         const map = new Map<string, CalendarEvent[]>();
@@ -221,6 +281,12 @@ export function CalendarView() {
         const map = new Map<string, number>();
         for (const e of events) {
             if (e.amount == null) continue;
+            // Bucket-ends are deadline markers, not actual cash debits — the real
+            // spending inside the bucket already shows up as transactions. Skip them
+            // so the projected total stays meaningful.
+            if (e.kind === 'bucket-end') continue;
+            // Completed one-offs no longer represent future obligations.
+            if (e.kind === 'one-off' && e.isCompleted) continue;
             const key = format(e.date, 'yyyy-MM-dd');
             const inBase = convertAmount(e.amount, e.currency || currency, currency);
             map.set(key, (map.get(key) || 0) + inBase);
@@ -243,8 +309,71 @@ export function CalendarView() {
         return sum;
     }, [dailyDelta, viewMonth]);
 
+    const maxAbsDeltaInMonth = useMemo(() => {
+        let max = 0;
+        for (const [key, val] of dailyDelta.entries()) {
+            if (!isSameMonth(parseISO(key), viewMonth)) continue;
+            if (Math.abs(val) > max) max = Math.abs(val);
+        }
+        return max;
+    }, [dailyDelta, viewMonth]);
+
+    // Walks the visible month day-by-day, accumulating outflows, and tracks the
+    // single day where the running total dips lowest. That's the date the user
+    // needs the most cash on hand.
+    const tightestDay = useMemo(() => {
+        const monthDays = eachDayOfInterval({
+            start: startOfMonth(viewMonth),
+            end: endOfMonth(viewMonth),
+        });
+        let cumulative = 0;
+        let worstDay: Date | null = null;
+        let worstAmount = 0;
+        for (const d of monthDays) {
+            const key = format(d, 'yyyy-MM-dd');
+            cumulative += dailyDelta.get(key) || 0;
+            if (cumulative < worstAmount) {
+                worstAmount = cumulative;
+                worstDay = d;
+            }
+        }
+        return worstAmount < 0 && worstDay
+            ? { date: worstDay, cumulative: worstAmount }
+            : null;
+    }, [dailyDelta, viewMonth]);
+
     const selectedKey = format(selectedDate, 'yyyy-MM-dd');
     const selectedEvents = eventsByDay.get(selectedKey) || [];
+
+    const handleToggleOneOff = useCallback(async (id: string, completed: boolean) => {
+        const prev = oneOffs;
+        setOneOffs(prev.map(o => o.id === id ? { ...o, is_completed: completed } : o));
+        try {
+            const { error } = await supabase
+                .from('scheduled_events')
+                .update({ is_completed: completed })
+                .eq('id', id);
+            if (error) throw error;
+        } catch (err) {
+            console.error('Error toggling one-off:', err);
+            setOneOffs(prev);
+            toast.error('Could not update');
+        }
+    }, [oneOffs]);
+
+    const handleDeleteOneOff = useCallback(async (id: string) => {
+        const prev = oneOffs;
+        setOneOffs(prev.filter(o => o.id !== id));
+        try {
+            const { error } = await supabase.from('scheduled_events').delete().eq('id', id);
+            if (error) throw error;
+            toast.success('Removed');
+        } catch (err) {
+            console.error('Error deleting one-off:', err);
+            setOneOffs(prev);
+            toast.error('Could not delete');
+        }
+    }, [oneOffs]);
 
     return (
         <motion.div
@@ -280,7 +409,21 @@ export function CalendarView() {
                         <h2 className={cn('text-3xl font-bold mt-1', monthlyTotal < 0 ? 'text-rose-400' : themeConfig.text)}>
                             {monthlyTotal >= 0 ? '+' : ''}{formatCurrency(monthlyTotal)}
                         </h2>
-                        <p className="text-xs text-muted-foreground mt-1">From recurring expenses, goal deadlines and bucket end-dates.</p>
+                        <p className="text-xs text-muted-foreground mt-1">From recurring expenses, goal deadlines and one-off bills.</p>
+                        {tightestDay && (
+                            <button
+                                type="button"
+                                onClick={() => setSelectedDate(tightestDay.date)}
+                                className="mt-3 pt-3 border-t border-white/5 w-full flex items-center gap-2 text-[11px] text-left rounded-md hover:bg-white/5 -mx-1 px-1 py-1 transition-colors"
+                            >
+                                <TrendingDown className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+                                <span className="text-muted-foreground">Tightest day:</span>
+                                <span className="font-bold">{format(tightestDay.date, 'MMM d')}</span>
+                                <span className="text-rose-400 font-bold ml-auto">
+                                    {formatCurrency(tightestDay.cumulative)}
+                                </span>
+                            </button>
+                        )}
                     </CardContent>
                 </Card>
 
@@ -313,18 +456,28 @@ export function CalendarView() {
                             const delta = dailyDelta.get(key) || 0;
                             const isSelected = isSameDay(day, selectedDate);
                             const isToday = isSameDay(day, new Date());
+                            // Saturate the cell by relative outflow magnitude so big-spend
+                            // days pop. Selected cell wins (theme highlight overrides tint).
+                            const intensity = (!isSelected && delta < 0 && inMonth && maxAbsDeltaInMonth > 0)
+                                ? Math.abs(delta) / maxAbsDeltaInMonth
+                                : 0;
+                            const heatmapStyle = intensity > 0
+                                ? { background: `rgba(244, 63, 94, ${0.06 + intensity * 0.22})` }
+                                : undefined;
 
                             return (
                                 <button
                                     key={key}
                                     type="button"
                                     onClick={() => setSelectedDate(day)}
+                                    style={heatmapStyle}
                                     className={cn(
                                         'aspect-square rounded-xl flex flex-col items-center justify-center text-xs gap-0.5 border transition-colors relative p-1',
                                         inMonth ? 'text-foreground' : 'text-muted-foreground/40',
                                         isSelected
                                             ? `${themeConfig.bgMedium} ${themeConfig.borderMedium} ${themeConfig.text}`
-                                            : 'bg-secondary/5 border-white/5 hover:bg-secondary/15',
+                                            : intensity === 0 && 'bg-secondary/5 hover:bg-secondary/15',
+                                        !isSelected && 'border-white/5',
                                         isToday && !isSelected && 'border-primary/40'
                                     )}
                                 >
@@ -334,7 +487,7 @@ export function CalendarView() {
                                             {dayEvents.slice(0, 3).map((e, i) => (
                                                 <span
                                                     key={i}
-                                                    className="w-1 h-1 rounded-full"
+                                                    className={cn('w-1 h-1 rounded-full', e.isCompleted && 'opacity-30')}
                                                     style={{ background: e.color || '#888' }}
                                                 />
                                             ))}
@@ -361,56 +514,16 @@ export function CalendarView() {
                                     {selectedEvents.length} item{selectedEvents.length === 1 ? '' : 's'}
                                 </span>
                             )}
-                            <Popover>
-                                <PopoverTrigger asChild>
-                                    <button
-                                        type="button"
-                                        className={cn(
-                                            'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold border transition-colors',
-                                            themeConfig.bgMedium, themeConfig.borderMedium, themeConfig.text, themeConfig.hoverBg
-                                        )}
-                                    >
-                                        <Plus className="w-3 h-3" /> Schedule
-                                    </button>
-                                </PopoverTrigger>
-                                <PopoverContent
-                                    align="end"
-                                    sideOffset={6}
-                                    className={cn(
-                                        'w-56 p-1.5 bg-card/95 backdrop-blur-xl border-white/10 shadow-xl',
-                                        // Tighter slide + faster duration overrides the default
-                                        // popover's drawn-out slide-from-top-2 animation.
-                                        'duration-150 ease-out',
-                                        'data-[side=bottom]:slide-in-from-top-1 data-[side=top]:slide-in-from-bottom-1',
-                                        'data-[side=left]:slide-in-from-right-1 data-[side=right]:slide-in-from-left-1'
-                                    )}
-                                >
-                                    <button
-                                        type="button"
-                                        onClick={() => router.push(`/add?recurring=1&date=${format(selectedDate, 'yyyy-MM-dd')}`)}
-                                        className="group w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs text-left transition-all duration-150 hover:bg-primary/15 hover:translate-x-0.5"
-                                    >
-                                        <RotateCw className={cn('w-3.5 h-3.5 transition-transform duration-150 group-hover:scale-110 group-hover:rotate-45', themeConfig.text)} />
-                                        <span className="flex-1 group-hover:text-foreground transition-colors">Recurring expense</span>
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => router.push(`/groups?bucket=new&end=${format(selectedDate, 'yyyy-MM-dd')}`)}
-                                        className="group w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs text-left transition-all duration-150 hover:bg-cyan-500/15 hover:translate-x-0.5"
-                                    >
-                                        <Tag className="w-3.5 h-3.5 text-cyan-300 transition-transform duration-150 group-hover:scale-110" />
-                                        <span className="flex-1 group-hover:text-foreground transition-colors">Bucket ending here</span>
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => router.push(`/goals?goal=new&deadline=${format(selectedDate, 'yyyy-MM-dd')}`)}
-                                        className="group w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs text-left transition-all duration-150 hover:bg-emerald-500/15 hover:translate-x-0.5"
-                                    >
-                                        <Target className="w-3.5 h-3.5 text-emerald-300 transition-transform duration-150 group-hover:scale-110" />
-                                        <span className="flex-1 group-hover:text-foreground transition-colors">Goal deadline</span>
-                                    </button>
-                                </PopoverContent>
-                            </Popover>
+                            <button
+                                type="button"
+                                onClick={() => setScheduleOpen(true)}
+                                className={cn(
+                                    'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold border transition-colors',
+                                    themeConfig.bgMedium, themeConfig.borderMedium, themeConfig.text, themeConfig.hoverBg
+                                )}
+                            >
+                                <Plus className="w-3 h-3" /> Schedule
+                            </button>
                         </div>
                     </div>
                     {loading ? (
@@ -424,14 +537,21 @@ export function CalendarView() {
                         </div>
                     ) : (
                         selectedEvents.map(e => {
-                            const Icon = e.kind === 'recurring' ? RotateCw : e.kind === 'goal' ? Target : Tag;
+                            const Icon = e.kind === 'recurring' ? RotateCw
+                                : e.kind === 'goal' ? Target
+                                : e.kind === 'one-off' ? Bell
+                                : Tag;
+                            const isOneOff = e.kind === 'one-off';
                             return (
                                 <div
                                     key={e.id}
-                                    className="flex items-center gap-3 p-3 rounded-2xl bg-card/40 border border-white/5 backdrop-blur-sm"
+                                    className={cn(
+                                        'flex items-center gap-3 p-3 rounded-2xl bg-card/40 border border-white/5 backdrop-blur-sm',
+                                        e.isCompleted && 'opacity-50'
+                                    )}
                                 >
                                     <div
-                                        className="w-9 h-9 rounded-full flex items-center justify-center border"
+                                        className="w-9 h-9 rounded-full flex items-center justify-center border shrink-0"
                                         style={{
                                             background: `${e.color || '#8A2BE2'}20`,
                                             borderColor: `${e.color || '#8A2BE2'}40`,
@@ -440,7 +560,7 @@ export function CalendarView() {
                                         <Icon className="w-4 h-4" style={{ color: e.color || '#8A2BE2' }} />
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                        <p className="text-sm font-semibold truncate">{e.label}</p>
+                                        <p className={cn('text-sm font-semibold truncate', e.isCompleted && 'line-through')}>{e.label}</p>
                                         {e.detail && (
                                             <p className="text-[11px] text-muted-foreground truncate">{e.detail}</p>
                                         )}
@@ -450,12 +570,44 @@ export function CalendarView() {
                                             {formatCurrency(e.amount, e.currency)}
                                         </span>
                                     )}
+                                    {isOneOff && (
+                                        <div className="flex items-center gap-1 shrink-0">
+                                            <button
+                                                type="button"
+                                                onClick={() => handleToggleOneOff(e.sourceId, !e.isCompleted)}
+                                                aria-label={e.isCompleted ? 'Mark as not completed' : 'Mark as completed'}
+                                                className={cn(
+                                                    'w-7 h-7 rounded-full flex items-center justify-center border transition-colors',
+                                                    e.isCompleted
+                                                        ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-400'
+                                                        : 'bg-secondary/20 border-white/10 text-muted-foreground hover:bg-secondary/40'
+                                                )}
+                                            >
+                                                <Check className="w-3.5 h-3.5" />
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => handleDeleteOneOff(e.sourceId)}
+                                                aria-label="Delete one-off"
+                                                className="w-7 h-7 rounded-full flex items-center justify-center border bg-secondary/20 border-white/10 text-muted-foreground hover:bg-rose-500/20 hover:text-rose-400 transition-colors"
+                                            >
+                                                <Trash2 className="w-3.5 h-3.5" />
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
                             );
                         })
                     )}
                 </div>
             </div>
+
+            <ScheduleSheet
+                open={scheduleOpen}
+                onOpenChange={setScheduleOpen}
+                selectedDate={selectedDate}
+                onCreated={load}
+            />
         </motion.div>
     );
 }
