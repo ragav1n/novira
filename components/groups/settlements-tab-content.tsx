@@ -4,19 +4,22 @@ import { Button } from '@/components/ui/button';
 import { Sparkles, ArrowRight, Zap, ArrowUpRight, ArrowDownLeft, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from '@/utils/haptics';
+import type { Split } from '@/components/providers/groups-provider';
+import type { SimplifiedPayment } from '@/utils/simplify-debts';
 
 interface SettlementsTabContentProps {
-    simplifiedDebts: any[];
-    pendingSplits: any[];
+    simplifiedDebts: SimplifiedPayment[];
+    pendingSplits: Split[];
     userId: string | null;
     currency: string;
     formatCurrency: (amount: number, currencyCode?: string) => string;
     convertAmount: (amount: number, fromCurrency: string, toCurrency?: string) => number;
     settleSplit: (splitId: string, creditorId?: string) => Promise<boolean | void>;
+    settleSplitsBatch: (splitIds: string[], creditorId?: string) => Promise<{ settled: number; total: number }>;
 }
 
 export function SettlementsTabContent({
-    simplifiedDebts, pendingSplits, userId, currency, formatCurrency, convertAmount, settleSplit
+    simplifiedDebts, pendingSplits, userId, currency, formatCurrency, convertAmount, settleSplit, settleSplitsBatch
 }: SettlementsTabContentProps) {
     const [settlingPaymentIndex, setSettlingPaymentIndex] = useState<number | null>(null);
     const [isSettlingAll, setIsSettlingAll] = useState(false);
@@ -69,23 +72,19 @@ export function SettlementsTabContent({
                                             className="h-7 text-[11px] rounded-full bg-amber-500/20 text-amber-500 border border-amber-500/30 hover:bg-amber-500/30 gap-1"
                                             onClick={async () => {
                                                 setSettlingPaymentIndex(index);
-                                                let settled = 0;
                                                 try {
-                                                    for (const splitId of payment.splitIds) {
-                                                        await settleSplit(splitId, isMyPayment ? payment.to : payment.from);
-                                                        settled++;
-                                                    }
-                                                    toast.success(isMyPayment
-                                                        ? `Settled ${settled} split${settled !== 1 ? 's' : ''} with ${payment.toName}!`
-                                                        : `Marked ${settled} payment${settled !== 1 ? 's' : ''} as received from ${payment.fromName}!`
-                                                    );
-                                                } catch (error) {
-                                                    const msg = error instanceof Error ? error.message : 'Failed';
-                                                    if (settled > 0) {
-                                                        toast.error(`Settled ${settled} of ${payment.splitIds.length} — ${msg}`);
+                                                    const counterparty = isMyPayment ? payment.to : payment.from;
+                                                    const { settled, total } = await settleSplitsBatch(payment.splitIds, counterparty);
+                                                    if (settled === total) {
+                                                        toast.success(isMyPayment
+                                                            ? `Settled ${settled} split${settled !== 1 ? 's' : ''} with ${payment.toName}!`
+                                                            : `Marked ${settled} payment${settled !== 1 ? 's' : ''} as received from ${payment.fromName}!`
+                                                        );
                                                     } else {
-                                                        toast.error(msg);
+                                                        toast.error(`Settled ${settled} of ${total} — please retry`);
                                                     }
+                                                } catch (error) {
+                                                    toast.error(error instanceof Error ? error.message : 'Failed');
                                                 } finally {
                                                     setSettlingPaymentIndex(null);
                                                 }
@@ -115,13 +114,14 @@ export function SettlementsTabContent({
                             className="h-8 text-xs rounded-full bg-primary/15 text-primary border border-primary/20 hover:bg-primary/25 gap-1.5"
                             onClick={async () => {
                                 setIsSettlingAll(true);
-                                let settled = 0;
                                 try {
-                                    for (const split of debtorSplits) {
-                                        await settleSplit(split.id, split.transaction?.user_id);
-                                        settled++;
+                                    const ids = debtorSplits.map(s => s.id);
+                                    const { settled, total } = await settleSplitsBatch(ids);
+                                    if (settled === total) {
+                                        toast.success(`Settled all ${settled} debt${settled !== 1 ? 's' : ''}!`);
+                                    } else {
+                                        toast.error(`Settled ${settled} of ${total} — please retry`);
                                     }
-                                    toast.success(`Settled all ${settled} debt${settled !== 1 ? 's' : ''}!`);
                                 } catch (error) {
                                     toast.error(error instanceof Error ? error.message : 'Failed to settle all');
                                 } finally {

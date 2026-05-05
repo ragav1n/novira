@@ -31,7 +31,7 @@ export interface Friend {
     request_id?: string; // The ID of the friendship record, useful for accepting/declining
 }
 
-interface Split {
+export interface Split {
     id: string;
     transaction_id: string;
     user_id: string;
@@ -45,6 +45,7 @@ interface Split {
         currency?: string;
         exchange_rate?: number;
         base_currency?: string;
+        group_id?: string | null;
         profile?: { full_name?: string; avatar_url?: string | null } | null;
     };
 }
@@ -52,6 +53,15 @@ interface Split {
 interface Balances {
     totalOwed: number; // You owe
     totalOwedToMe: number; // You are owed
+}
+
+export type GroupType = 'home' | 'trip' | 'couple' | 'other';
+
+export interface UpdateGroupPatch {
+    name?: string;
+    type?: GroupType;
+    start_date?: string | null;
+    end_date?: string | null;
 }
 
 interface GroupsContextType {
@@ -62,15 +72,19 @@ interface GroupsContextType {
     pendingSplits: Split[];
     loading: boolean;
     refreshData: () => Promise<void>;
-    createGroup: (name: string, type?: 'home' | 'trip' | 'couple' | 'other', startDate?: Date, endDate?: Date) => Promise<string | null>;
+    createGroup: (name: string, type?: GroupType, startDate?: Date, endDate?: Date) => Promise<string | null>;
     addFriendByEmail: (email: string) => Promise<boolean>;
     addFriendById: (friendId: string) => Promise<boolean>;
     addMemberToGroup: (groupId: string, userId: string) => Promise<boolean>;
     settleSplit: (splitId: string, creditorId?: string) => Promise<boolean>;
+    settleSplitsBatch: (splitIds: string[], creditorId?: string) => Promise<{ settled: number; total: number }>;
     acceptFriendRequest: (requestId: string) => Promise<void>;
     declineFriendRequest: (requestId: string) => Promise<void>;
     leaveGroup: (groupId: string) => Promise<void>;
     removeFriend: (friendshipId: string) => Promise<void>;
+    updateGroup: (groupId: string, patch: UpdateGroupPatch) => Promise<void>;
+    deleteGroup: (groupId: string) => Promise<void>;
+    removeGroupMember: (groupId: string, memberId: string) => Promise<void>;
     simplifiedDebts: SimplifiedPayment[];
 }
 
@@ -142,7 +156,7 @@ export function GroupsProvider({ children }: { children: React.ReactNode }) {
                     .select(`
                         *,
                         profile:profiles(full_name, avatar_url),
-                        transaction:transactions(description, date, user_id, currency, exchange_rate, base_currency, profile:profiles(full_name, avatar_url))
+                        transaction:transactions(description, date, user_id, currency, exchange_rate, base_currency, group_id, profile:profiles(full_name, avatar_url))
                     `)
                     .eq('user_id', userId)
                     .eq('is_paid', false),
@@ -152,7 +166,7 @@ export function GroupsProvider({ children }: { children: React.ReactNode }) {
                     .select(`
                         *,
                         profile:profiles(full_name, avatar_url),
-                        transaction:transactions!inner(description, date, user_id, currency, exchange_rate, base_currency, profile:profiles(full_name, avatar_url))
+                        transaction:transactions!inner(description, date, user_id, currency, exchange_rate, base_currency, group_id, profile:profiles(full_name, avatar_url))
                     `)
                     .eq('transaction.user_id', userId)
                     .eq('is_paid', false)
@@ -521,6 +535,36 @@ export function GroupsProvider({ children }: { children: React.ReactNode }) {
         return true;
     }, [refreshData]);
 
+    const updateGroup = useCallback(async (groupId: string, patch: UpdateGroupPatch) => {
+        if (!userId) throw new Error('Not authenticated');
+        const { error } = await supabase
+            .from('groups')
+            .update(patch)
+            .eq('id', groupId);
+        if (error) throw error;
+        refreshData();
+    }, [userId, refreshData]);
+
+    const deleteGroup = useCallback(async (groupId: string) => {
+        if (!userId) throw new Error('Not authenticated');
+        const { error } = await supabase.rpc('delete_group', { group_id: groupId });
+        if (error) throw error;
+        // Optimistic local removal so the card disappears even before realtime fires
+        setGroups(prev => prev.filter(g => g.id !== groupId));
+        refreshData();
+    }, [userId, refreshData]);
+
+    const removeGroupMember = useCallback(async (groupId: string, memberId: string) => {
+        if (!userId) throw new Error('Not authenticated');
+        const { error } = await supabase
+            .from('group_members')
+            .delete()
+            .eq('group_id', groupId)
+            .eq('user_id', memberId);
+        if (error) throw error;
+        refreshData();
+    }, [userId, refreshData]);
+
     const settleSplit = useCallback(async (splitId: string, creditorId?: string) => {
         if (!userId) throw new Error('Not authenticated');
 
@@ -552,6 +596,55 @@ export function GroupsProvider({ children }: { children: React.ReactNode }) {
         return true;
     }, [userId, refreshData]);
 
+    const settleSplitsBatch = useCallback(async (splitIds: string[], creditorId?: string) => {
+        if (!userId) throw new Error('Not authenticated');
+        if (splitIds.length === 0) return { settled: 0, total: 0 };
+
+        // Try the atomic RPC first; fall back to per-split loop if it doesn't exist yet.
+        const { error: rpcError } = await supabase.rpc('settle_splits_batch', { split_ids: splitIds });
+
+        const fnMissing = rpcError && (rpcError.code === '42883' || /function .* does not exist/i.test(rpcError.message));
+
+        if (rpcError && !fnMissing) {
+            throw rpcError;
+        }
+
+        let settled = splitIds.length;
+
+        if (fnMissing) {
+            // Fallback: settle one at a time. Reports how many succeeded before any failure.
+            settled = 0;
+            for (const id of splitIds) {
+                const { error } = await supabase.rpc('settle_split', { split_id: id });
+                if (error) {
+                    if (settled === 0) throw error;
+                    break;
+                }
+                settled++;
+            }
+        }
+
+        // Optimistically remove all settled splits
+        setPendingSplits(prev => prev.filter(s => !splitIds.includes(s.id)));
+        refreshData();
+
+        sessionStorage.setItem('novira_expense_added', '1');
+        window.dispatchEvent(new Event('novira:expense-added'));
+
+        if (creditorId) {
+            const notifyChannel = supabase.channel(`settlement-notify-${creditorId}`);
+            notifyChannel.subscribe((status) => {
+                if (status === 'SUBSCRIBED') {
+                    notifyChannel
+                        .send({ type: 'broadcast', event: 'settled', payload: { splitIds } })
+                        .finally(() => supabase.removeChannel(notifyChannel));
+                }
+            });
+        }
+
+        return { settled, total: splitIds.length };
+    }, [userId, refreshData]);
+
     const computedSimplifiedDebts = useMemo(() => {
         if (!userId || pendingSplits.length === 0) return [];
         return simplifyDebts(pendingSplits, userId, convertAmount, userCurrency);
@@ -573,13 +666,15 @@ export function GroupsProvider({ children }: { children: React.ReactNode }) {
 
     const contextValue = useMemo(() => ({
         groups, friends, friendRequests, balances: computedBalances, pendingSplits, loading,
-        refreshData, createGroup, addFriendByEmail, addFriendById, addMemberToGroup, settleSplit,
+        refreshData, createGroup, addFriendByEmail, addFriendById, addMemberToGroup, settleSplit, settleSplitsBatch,
         acceptFriendRequest, declineFriendRequest, leaveGroup, removeFriend,
+        updateGroup, deleteGroup, removeGroupMember,
         simplifiedDebts: computedSimplifiedDebts
     }), [
         groups, friends, friendRequests, computedBalances, pendingSplits, loading,
-        refreshData, createGroup, addFriendByEmail, addFriendById, addMemberToGroup, settleSplit,
+        refreshData, createGroup, addFriendByEmail, addFriendById, addMemberToGroup, settleSplit, settleSplitsBatch,
         acceptFriendRequest, declineFriendRequest, leaveGroup, removeFriend,
+        updateGroup, deleteGroup, removeGroupMember,
         computedSimplifiedDebts
     ]);
 

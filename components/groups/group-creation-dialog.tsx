@@ -9,9 +9,21 @@ import { useGroups } from '@/components/providers/groups-provider';
 import { toast } from '@/utils/haptics';
 import { cn } from '@/lib/utils';
 
-export function GroupCreationDialog() {
+interface GroupCreationDialogProps {
+    /** When provided, the dialog is fully controlled and the default trigger button is hidden. */
+    open?: boolean;
+    onOpenChange?: (open: boolean) => void;
+}
+
+export function GroupCreationDialog({ open, onOpenChange }: GroupCreationDialogProps = {}) {
     const { createGroup } = useGroups();
-    const [isOpen, setIsOpen] = useState(false);
+    const isControlled = open !== undefined;
+    const [internalOpen, setInternalOpen] = useState(false);
+    const isOpen = isControlled ? open! : internalOpen;
+    const setIsOpen = (next: boolean) => {
+        if (isControlled) onOpenChange?.(next);
+        else setInternalOpen(next);
+    };
     const [creationStep, setCreationStep] = useState<'type' | 'details'>('type');
     const [selectedType, setSelectedType] = useState<'home' | 'trip' | 'couple' | 'other' | null>(null);
     const [newGroupName, setNewGroupName] = useState('');
@@ -52,11 +64,13 @@ export function GroupCreationDialog() {
                 }
             }}
         >
-            <DialogTrigger asChild>
-                <button className="p-2 rounded-full bg-primary/20 hover:bg-primary/30 text-primary transition-colors border border-primary/20">
-                    <Plus className="w-5 h-5" />
-                </button>
-            </DialogTrigger>
+            {!isControlled && (
+                <DialogTrigger asChild>
+                    <button className="p-2 rounded-full bg-primary/20 hover:bg-primary/30 text-primary transition-colors border border-primary/20">
+                        <Plus className="w-5 h-5" />
+                    </button>
+                </DialogTrigger>
+            )}
             <DialogContent className="max-w-[400px] w-[95vw] rounded-3xl border-white/10 bg-card/90 backdrop-blur-xl p-0 overflow-hidden shadow-2xl">
                 <div className="p-6 space-y-4 w-full max-w-full overflow-hidden flex flex-col box-border">
                     <DialogHeader className="text-left px-0 w-full">

@@ -30,6 +30,7 @@ interface SplitInput {
         user_id: string; // creditor (transaction owner)
         currency?: string;
         payer_name?: string;
+        group_id?: string | null;
     };
 }
 
@@ -157,4 +158,41 @@ export function simplifyDebts(
     }
 
     return payments;
+}
+
+/**
+ * Simplified debts filtered to a single group. Useful for "who owes whom in *this* trip."
+ * Splits without a matching `transaction.group_id` are dropped.
+ */
+export function simplifyDebtsForGroup(
+    pendingSplits: SplitInput[],
+    currentUserId: string,
+    convertAmount: (amount: number, fromCurrency: string, toCurrency?: string) => number,
+    userCurrency: string,
+    groupId: string
+): SimplifiedPayment[] {
+    const filtered = pendingSplits.filter(s => s.transaction?.group_id === groupId);
+    return simplifyDebts(filtered, currentUserId, convertAmount, userCurrency);
+}
+
+/**
+ * Simplified debts filtered to splits between the current user and a single counterparty.
+ * Useful for "settle up with Alice" across all groups & personal splits.
+ */
+export function simplifyDebtsForFriend(
+    pendingSplits: SplitInput[],
+    currentUserId: string,
+    convertAmount: (amount: number, fromCurrency: string, toCurrency?: string) => number,
+    userCurrency: string,
+    friendId: string
+): SimplifiedPayment[] {
+    const filtered = pendingSplits.filter(s => {
+        const debtor = s.user_id;
+        const creditor = s.transaction?.user_id;
+        if (!creditor) return false;
+        const involvesMe = debtor === currentUserId || creditor === currentUserId;
+        const involvesFriend = debtor === friendId || creditor === friendId;
+        return involvesMe && involvesFriend;
+    });
+    return simplifyDebts(filtered, currentUserId, convertAmount, userCurrency);
 }

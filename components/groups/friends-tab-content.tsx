@@ -1,23 +1,43 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { X, UserPlus, UserMinus } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { toast } from '@/utils/haptics';
-import type { Friend } from '@/components/providers/groups-provider';
+import type { Friend, Split } from '@/components/providers/groups-provider';
+import { simplifyDebtsForFriend } from '@/utils/simplify-debts';
 
 interface FriendsTabContentProps {
     friendRequests: Friend[];
     friends: Friend[];
+    currentUserId: string | null;
+    pendingSplits: Split[];
+    currency: string;
+    formatCurrency: (amount: number, currencyCode?: string) => string;
+    convertAmount: (amount: number, fromCurrency: string, toCurrency?: string) => number;
     acceptFriendRequest: (requestId: string) => Promise<void>;
     declineFriendRequest: (requestId: string) => Promise<void>;
     removeFriend: (requestId: string) => Promise<void>;
 }
 
 export function FriendsTabContent({
-    friendRequests, friends, acceptFriendRequest, declineFriendRequest, removeFriend
+    friendRequests, friends, currentUserId, pendingSplits, currency, formatCurrency, convertAmount,
+    acceptFriendRequest, declineFriendRequest, removeFriend
 }: FriendsTabContentProps) {
+    const friendBalances = useMemo(() => {
+        if (!currentUserId) return new Map<string, { owe: number; owed: number }>();
+        const out = new Map<string, { owe: number; owed: number }>();
+        for (const f of friends) {
+            const debts = simplifyDebtsForFriend(pendingSplits, currentUserId, convertAmount, currency, f.id);
+            const owe = debts.filter(p => p.from === currentUserId).reduce((a, p) => a + p.amount, 0);
+            const owed = debts.filter(p => p.to === currentUserId).reduce((a, p) => a + p.amount, 0);
+            out.set(f.id, { owe, owed });
+        }
+        return out;
+    }, [friends, pendingSplits, currentUserId, convertAmount, currency]);
+
     return (
         <div className="mt-6 space-y-4">
             {/* Friend Requests Section */}
@@ -80,7 +100,10 @@ export function FriendsTabContent({
 
             {/* Friends List */}
             {friends.length > 0 ? (
-                friends.map((friend) => (
+                friends.map((friend) => {
+                    const bal = friendBalances.get(friend.id);
+                    const hasBalance = bal && (bal.owe > 0.01 || bal.owed > 0.01);
+                    return (
                     <div key={friend.id} className="flex items-center justify-between p-3 rounded-2xl bg-card/20 border border-white/5 overflow-hidden">
                         <div className="flex items-center gap-3 min-w-0">
                             <Avatar className="w-10 h-10 border border-white/10 shrink-0">
@@ -93,10 +116,25 @@ export function FriendsTabContent({
                             </div>
                         </div>
                         <div className="flex items-center gap-2">
-                            {/* Status Badge */}
-                            <Badge variant="outline" className="text-[8px] uppercase tracking-wider bg-primary/5 text-primary border-primary/20">
-                                Active
-                            </Badge>
+                            {hasBalance ? (
+                                <Badge
+                                    variant="outline"
+                                    className={cn(
+                                        'text-[10px] font-bold rounded-full px-2 py-0.5',
+                                        bal!.owe > 0.01
+                                            ? 'bg-rose-500/10 border-rose-500/20 text-rose-500'
+                                            : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500'
+                                    )}
+                                >
+                                    {bal!.owe > 0.01
+                                        ? `You owe ${formatCurrency(bal!.owe)}`
+                                        : `Owed ${formatCurrency(bal!.owed)}`}
+                                </Badge>
+                            ) : (
+                                <Badge variant="outline" className="text-[8px] uppercase tracking-wider bg-primary/5 text-primary border-primary/20">
+                                    Active
+                                </Badge>
+                            )}
                             <button
                                 className="p-2 rounded-full hover:bg-rose-500/20 hover:text-rose-500 transition-colors text-muted-foreground"
                                 title="Remove Friend"
@@ -124,7 +162,8 @@ export function FriendsTabContent({
                             </button>
                         </div>
                     </div>
-                ))
+                    );
+                })
             ) : (
                 <Card className="bg-card/40 border-primary/20 overflow-hidden relative mx-4">
                     <div className="absolute top-0 right-0 p-8 opacity-5">

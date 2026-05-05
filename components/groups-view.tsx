@@ -2,9 +2,9 @@
 
 import { motion } from 'framer-motion';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ChevronLeft, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
+import { ChevronLeft, ArrowUpRight, ArrowDownLeft, Plus, UserPlus } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useGroups } from './providers/groups-provider';
@@ -20,19 +20,26 @@ import { BucketsTabContent } from './groups/buckets-tab-content';
 import { GroupsTabContent } from './groups/groups-tab-content';
 import { FriendsTabContent } from './groups/friends-tab-content';
 import { SettlementsTabContent } from './groups/settlements-tab-content';
+import { GroupsSkeleton } from './groups/groups-skeleton';
 
 export function GroupsView() {
     const router = useRouter();
     const {
-        groups, friends, friendRequests, balances, pendingSplits, simplifiedDebts,
-        addMemberToGroup, settleSplit, acceptFriendRequest, declineFriendRequest, leaveGroup, removeFriend
+        groups, friends, friendRequests, balances, pendingSplits, simplifiedDebts, loading,
+        addMemberToGroup, settleSplit, settleSplitsBatch, acceptFriendRequest, declineFriendRequest, leaveGroup, removeFriend
     } = useGroups();
     const { formatCurrency, userId, currency, convertAmount } = useUserPreferences();
 
     const { buckets, archiveBucket, deleteBucket, bucketSpending } = useBuckets();
 
+    const [createGroupOpen, setCreateGroupOpen] = useState(false);
+    const [addFriendOpen, setAddFriendOpen] = useState(false);
+
+    const showSkeleton = loading && groups.length === 0 && friends.length === 0;
+    const isFirstTime = !loading && groups.length === 0 && friends.length === 0 && friendRequests.length === 0;
+
     return (
-        <motion.div 
+        <motion.div
             initial={{ opacity: 0, scale: 0.98 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.98 }}
@@ -53,11 +60,54 @@ export function GroupsView() {
                     <h2 className="text-lg font-semibold truncate px-12">Groups & Friends</h2>
                 </div>
                 <div className="flex gap-2 shrink-0 z-10">
-                    <AddFriendDialog userId={userId} />
-                    <GroupCreationDialog />
+                    <AddFriendDialog userId={userId} open={addFriendOpen} onOpenChange={setAddFriendOpen} />
+                    <button
+                        onClick={() => setAddFriendOpen(true)}
+                        aria-label="Add friend"
+                        className="p-2 rounded-full bg-primary/20 hover:bg-primary/30 text-primary transition-colors border border-primary/20"
+                    >
+                        <UserPlus className="w-5 h-5" />
+                    </button>
+                    <GroupCreationDialog open={createGroupOpen} onOpenChange={setCreateGroupOpen} />
+                    <button
+                        onClick={() => setCreateGroupOpen(true)}
+                        aria-label="Create group"
+                        className="p-2 rounded-full bg-primary/20 hover:bg-primary/30 text-primary transition-colors border border-primary/20"
+                    >
+                        <Plus className="w-5 h-5" />
+                    </button>
                 </div>
             </div>
 
+            {showSkeleton ? (
+                <GroupsSkeleton />
+            ) : isFirstTime ? (
+                <Card className="bg-card/40 border-primary/20 rounded-3xl overflow-hidden">
+                    <CardContent className="p-6 text-center space-y-4">
+                        <h3 className="font-bold text-lg">Welcome to Groups</h3>
+                        <p className="text-xs text-muted-foreground">
+                            Add a friend or create a group to start splitting expenses.
+                        </p>
+                        <div className="grid grid-cols-2 gap-3 pt-2">
+                            <button
+                                onClick={() => setAddFriendOpen(true)}
+                                className="flex flex-col items-center gap-2 p-4 rounded-2xl bg-primary/10 border border-primary/20 hover:bg-primary/15 transition-colors"
+                            >
+                                <UserPlus className="w-6 h-6 text-primary" />
+                                <span className="text-xs font-bold">Add Friend</span>
+                            </button>
+                            <button
+                                onClick={() => setCreateGroupOpen(true)}
+                                className="flex flex-col items-center gap-2 p-4 rounded-2xl bg-primary/10 border border-primary/20 hover:bg-primary/15 transition-colors"
+                            >
+                                <Plus className="w-6 h-6 text-primary" />
+                                <span className="text-xs font-bold">Create Group</span>
+                            </button>
+                        </div>
+                    </CardContent>
+                </Card>
+            ) : (
+                <>
             {/* Balance Overview */}
             <div className="grid grid-cols-2 gap-4">
                 <Card className="bg-emerald-500/10 border-emerald-500/20 rounded-3xl">
@@ -103,9 +153,14 @@ export function GroupsView() {
                     <GroupsTabContent
                         groups={groups}
                         friends={friends}
+                        currentUserId={userId}
+                        pendingSplits={pendingSplits}
+                        currency={currency}
+                        formatCurrency={formatCurrency}
+                        convertAmount={convertAmount}
                         addMemberToGroup={addMemberToGroup}
                         leaveGroup={leaveGroup}
-                        onStartGroup={() => document.querySelector<HTMLButtonElement>('.lucide-plus')?.parentElement?.click()}
+                        onStartGroup={() => setCreateGroupOpen(true)}
                     />
                 </TabsContent>
 
@@ -113,6 +168,11 @@ export function GroupsView() {
                     <FriendsTabContent
                         friendRequests={friendRequests}
                         friends={friends}
+                        currentUserId={userId}
+                        pendingSplits={pendingSplits}
+                        currency={currency}
+                        formatCurrency={formatCurrency}
+                        convertAmount={convertAmount}
                         acceptFriendRequest={acceptFriendRequest}
                         declineFriendRequest={declineFriendRequest}
                         removeFriend={removeFriend}
@@ -128,9 +188,12 @@ export function GroupsView() {
                         formatCurrency={formatCurrency}
                         convertAmount={convertAmount}
                         settleSplit={settleSplit}
+                        settleSplitsBatch={settleSplitsBatch}
                     />
                 </TabsContent>
             </Tabs>
+                </>
+            )}
             </div>
         </motion.div>
     );

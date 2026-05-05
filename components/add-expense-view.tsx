@@ -85,12 +85,17 @@ export function AddExpenseView() {
         if (appliedDeepLinkRef.current || !searchParams) return;
         const wantsRecurring = searchParams.get('recurring') === '1';
         const dateParam = searchParams.get('date');
-        if (!wantsRecurring && !dateParam) return;
+        const groupIdParam = searchParams.get('groupId');
+        if (!wantsRecurring && !dateParam && !groupIdParam) return;
         appliedDeepLinkRef.current = true;
         if (wantsRecurring) formState.setIsRecurring(true);
         if (dateParam) {
             const parsed = parseISO(dateParam);
             if (!isNaN(parsed.getTime())) formState.setDate(parsed);
+        }
+        if (groupIdParam) {
+            formState.setIsSplitEnabled(true);
+            formState.setSelectedGroupId(groupIdParam);
         }
     }, [searchParams, formState]);
     const { handleSubmit, loading } = useExpenseSubmission();

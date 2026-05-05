@@ -1,18 +1,24 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { format } from 'date-fns';
-import { Plus, Users, UserPlus, LogOut, FileText, Home, Plane, Heart } from 'lucide-react';
+import { format, parseISO } from 'date-fns';
+import { Plus, Users, Settings2, LogOut, FileText, Home, Plane, Heart } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from '@/utils/haptics';
+import type { Group, Friend, Split } from '@/components/providers/groups-provider';
+import { simplifyDebtsForGroup } from '@/utils/simplify-debts';
+import { GroupSettingsDialog } from './group-settings-dialog';
+import { GroupDetailSheet } from './group-detail-sheet';
 
 interface GroupsTabContentProps {
-    groups: any[];
-    friends: any[];
+    groups: Group[];
+    friends: Friend[];
+    currentUserId: string | null;
+    pendingSplits: Split[];
+    currency: string;
+    formatCurrency: (amount: number, currencyCode?: string) => string;
+    convertAmount: (amount: number, fromCurrency: string, toCurrency?: string) => number;
     addMemberToGroup: (groupId: string, friendId: string) => Promise<boolean | void>;
     leaveGroup: (groupId: string) => Promise<boolean | void>;
     onStartGroup: () => void;
@@ -28,10 +34,27 @@ const getTypeIcon = (type?: string) => {
 };
 
 export function GroupsTabContent({
-    groups, friends, addMemberToGroup, leaveGroup, onStartGroup
+    groups, friends, currentUserId, pendingSplits, currency, formatCurrency, convertAmount,
+    leaveGroup, onStartGroup
 }: GroupsTabContentProps) {
-    const [isManageMembersOpen, setIsManageMembersOpen] = useState(false);
-    const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
+    const [settingsGroupId, setSettingsGroupId] = useState<string | null>(null);
+    const [detailGroupId, setDetailGroupId] = useState<string | null>(null);
+    const settingsGroup = settingsGroupId ? groups.find(g => g.id === settingsGroupId) ?? null : null;
+    const detailGroup = detailGroupId ? groups.find(g => g.id === detailGroupId) ?? null : null;
+
+    const groupBalances = useMemo(() => {
+        if (!currentUserId) return new Map<string, { owe: number; owed: number }>();
+        const out = new Map<string, { owe: number; owed: number }>();
+        for (const group of groups) {
+            const debts = simplifyDebtsForGroup(pendingSplits, currentUserId, convertAmount, currency, group.id);
+            const owe = debts.filter(p => p.from === currentUserId).reduce((a, p) => a + p.amount, 0);
+            const owed = debts.filter(p => p.to === currentUserId).reduce((a, p) => a + p.amount, 0);
+            out.set(group.id, { owe, owed });
+        }
+        return out;
+    }, [groups, pendingSplits, currentUserId, convertAmount, currency]);
+
+    const parseDateOnly = (iso: string) => parseISO(iso.slice(0, 10));
 
     const sortedGroups = [...groups].sort((a, b) => {
         if (a.type === 'home' && b.type !== 'home') return -1;
@@ -39,15 +62,15 @@ export function GroupsTabContent({
         const aIsTrip = a.type === 'trip';
         const bIsTrip = b.type === 'trip';
         const now = new Date();
-        const aIsPastTrip = aIsTrip && a.end_date && new Date(a.end_date) < now;
-        const bIsPastTrip = bIsTrip && b.end_date && new Date(b.end_date) < now;
+        const aIsPastTrip = aIsTrip && a.end_date && parseDateOnly(a.end_date) < now;
+        const bIsPastTrip = bIsTrip && b.end_date && parseDateOnly(b.end_date) < now;
 
         if (aIsPastTrip && !bIsPastTrip) return 1;
         if (!aIsPastTrip && bIsPastTrip) return -1;
 
         if (aIsTrip && bIsTrip && !aIsPastTrip && !bIsPastTrip) {
             if (a.start_date && b.start_date) {
-                return new Date(a.start_date).getTime() - new Date(b.start_date).getTime();
+                return parseDateOnly(a.start_date).getTime() - parseDateOnly(b.start_date).getTime();
             }
         }
         return 0;
@@ -56,16 +79,39 @@ export function GroupsTabContent({
     const activeGroups = sortedGroups.filter(g => {
         if (g.type !== 'trip') return true;
         if (!g.end_date) return true;
-        return new Date(g.end_date) >= new Date();
+        return parseDateOnly(g.end_date) >= new Date();
     });
 
     const pastTrips = sortedGroups.filter(g => {
         if (g.type !== 'trip') return false;
-        return g.end_date && new Date(g.end_date) < new Date();
+        return g.end_date && parseDateOnly(g.end_date) < new Date();
     });
 
     return (
         <div className="mt-6 space-y-4">
+            {settingsGroup && (
+                <GroupSettingsDialog
+                    group={settingsGroup}
+                    friends={friends}
+                    currentUserId={currentUserId}
+                    pendingSplits={pendingSplits}
+                    open={!!settingsGroupId}
+                    onOpenChange={(open) => { if (!open) setSettingsGroupId(null); }}
+                />
+            )}
+            {detailGroup && (
+                <GroupDetailSheet
+                    group={detailGroup}
+                    currentUserId={currentUserId}
+                    pendingSplits={pendingSplits}
+                    currency={currency}
+                    formatCurrency={formatCurrency}
+                    convertAmount={convertAmount}
+                    open={!!detailGroupId}
+                    onOpenChange={(open) => { if (!open) setDetailGroupId(null); }}
+                />
+            )}
+
             {activeGroups.length > 0 ? (
                 activeGroups.map((group) => {
                     const Icon = getTypeIcon(group.type);
@@ -73,11 +119,25 @@ export function GroupsTabContent({
                     const isTrip = group.type === 'trip';
                     const isCouple = group.type === 'couple';
 
+                    const balance = groupBalances.get(group.id);
+
                     return (
-                        <Card key={group.id} className={cn(
-                            "rounded-3xl overflow-hidden hover:bg-card/60 transition-colors border-white/5",
-                            isHome ? "bg-emerald-500/5 border-emerald-500/10" : "bg-card/40"
-                        )}>
+                        <Card
+                            key={group.id}
+                            onClick={() => setDetailGroupId(group.id)}
+                            role="button"
+                            tabIndex={0}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                    e.preventDefault();
+                                    setDetailGroupId(group.id);
+                                }
+                            }}
+                            className={cn(
+                                "rounded-3xl overflow-hidden hover:bg-card/60 transition-colors border-white/5 cursor-pointer",
+                                isHome ? "bg-emerald-500/5 border-emerald-500/10" : "bg-card/40"
+                            )}
+                        >
                             <CardContent className="p-4">
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-4 min-w-0">
@@ -102,81 +162,28 @@ export function GroupsTabContent({
                                                     <>
                                                         <span className="w-1 h-1 rounded-full bg-white/20" />
                                                         <span className="text-sky-500/80 font-medium">
-                                                            {format(new Date(group.start_date), 'MMM d')}
-                                                            {group.end_date && ` - ${format(new Date(group.end_date), 'MMM d')}`}
+                                                            {format(parseDateOnly(group.start_date), 'MMM d')}
+                                                            {group.end_date && ` - ${format(parseDateOnly(group.end_date), 'MMM d')}`}
                                                         </span>
                                                     </>
                                                 )}
                                             </p>
                                         </div>
                                     </div>
-                                    <div className="flex items-center gap-2">
-                                        <Dialog open={isManageMembersOpen && selectedGroupId === group.id} onOpenChange={(open) => {
-                                            setIsManageMembersOpen(open);
-                                            if (open) setSelectedGroupId(group.id);
-                                        }}>
-                                            <DialogTrigger asChild>
-                                                <button className="p-2 rounded-full hover:bg-secondary/30 transition-colors" title="Manage Members">
-                                                    <UserPlus className="w-4 h-4 text-primary" />
-                                                </button>
-                                            </DialogTrigger>
-                                            <DialogContent className="max-w-[400px] w-[95vw] rounded-3xl border-white/10 bg-card/90 backdrop-blur-xl p-0 overflow-hidden shadow-2xl">
-                                                <div className="p-6 space-y-4 w-full max-w-full overflow-hidden flex flex-col box-border">
-                                                    <DialogHeader className="text-left px-0 w-full">
-                                                        <DialogTitle>Manage Members</DialogTitle>
-                                                        <DialogDescription className="truncate">Add friends to {group.name}</DialogDescription>
-                                                    </DialogHeader>
-                                                    <div className="space-y-4 py-4">
-                                                        <div className="text-xs font-bold text-muted-foreground uppercase tracking-wider px-1">Your Friends</div>
-                                                        <ScrollArea className="h-48 rounded-2xl border border-white/5 p-2">
-                                                            <div className="space-y-2">
-                                                                {friends.filter((f: any) => !group.members.some((m: any) => m.user_id === f.id)).map((friend: any) => (
-                                                                    <div key={friend.id} className="flex items-center justify-between p-2 rounded-xl bg-secondary/10">
-                                                                        <div className="flex items-center gap-2">
-                                                                            <Avatar className="w-6 h-6">
-                                                                                <AvatarImage src={friend.avatar_url || ''} />
-                                                                                <AvatarFallback className="text-[8px]">{friend.full_name?.substring(0, 1)}</AvatarFallback>
-                                                                            </Avatar>
-                                                                            <span className="text-xs font-medium">{friend.full_name || friend.email}</span>
-                                                                        </div>
-                                                                        <Button
-                                                                            size="sm"
-                                                                            variant="ghost"
-                                                                            className="h-7 text-[11px] text-primary hover:text-primary hover:bg-primary/10"
-                                                                            onClick={async () => {
-                                                                                try {
-                                                                                    await addMemberToGroup(group.id, friend.id);
-                                                                                    toast.success('Member added to group!');
-                                                                                } catch (error: any) {
-                                                                                    toast.error(error.message || 'Failed to add member');
-                                                                                }
-                                                                            }}
-                                                                        >
-                                                                            Add
-                                                                        </Button>
-                                                                    </div>
-                                                                ))}
-                                                                {friends.filter((f: any) => !group.members.some((m: any) => m.user_id === f.id)).length === 0 && (
-                                                                    <p className="text-[11px] text-center text-muted-foreground p-4">No more friends to add.</p>
-                                                                )}
-                                                            </div>
-                                                        </ScrollArea>
-                                                        <div className="text-xs font-bold text-muted-foreground uppercase tracking-wider px-1 mt-4">Current Members</div>
-                                                        <div className="flex flex-wrap gap-2">
-                                                            {group.members.map((m: any) => (
-                                                                <Badge key={m.user_id} variant="secondary" className="rounded-full px-2 py-0.5 text-[11px]">
-                                                                    {m.full_name || 'You'}
-                                                                </Badge>
-                                                            ))}
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </DialogContent>
-                                        </Dialog>
+                                    <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                                        <button
+                                            className="p-2 rounded-full hover:bg-secondary/30 transition-colors"
+                                            title="Group settings"
+                                            aria-label={`Settings for ${group.name}`}
+                                            onClick={(e) => { e.stopPropagation(); setSettingsGroupId(group.id); }}
+                                        >
+                                            <Settings2 className="w-4 h-4 text-primary" />
+                                        </button>
                                         <button
                                             className="p-2 rounded-full hover:bg-rose-500/20 hover:text-rose-500 transition-colors"
                                             title="Leave Group"
-                                            onClick={() => {
+                                            onClick={(e) => {
+                                                e.stopPropagation();
                                                 toast(`Leave ${group.name}?`, {
                                                     action: {
                                                         label: 'Leave',
@@ -184,8 +191,9 @@ export function GroupsTabContent({
                                                             try {
                                                                 await leaveGroup(group.id);
                                                                 toast.success('Left group successfully');
-                                                            } catch (error: any) {
-                                                                toast.error(error.message || 'Failed to leave group');
+                                                            } catch (error: unknown) {
+                                                                const msg = error instanceof Error ? error.message : 'Failed to leave group';
+                                                                toast.error(msg);
                                                             }
                                                         }
                                                     },
@@ -197,19 +205,40 @@ export function GroupsTabContent({
                                     </div>
                                 </div>
 
-                                {/* Display a few member avatars */}
-                                <div className="flex items-center mt-4 -space-x-2">
-                                    {group.members.slice(0, 4).map((m: any, idx: number) => (
-                                        <Avatar key={m.user_id || idx} className="w-6 h-6 border-2 border-background">
-                                            <AvatarImage src={m.avatar_url || ''} />
-                                            <AvatarFallback className="text-[8px]">{m.full_name?.substring(0, 1) || '?'}</AvatarFallback>
-                                        </Avatar>
-                                    ))}
-                                    {group.members.length > 4 && (
-                                        <div className="w-6 h-6 rounded-full bg-secondary flex items-center justify-center text-[8px] font-bold border-2 border-background">
-                                            +{group.members.length - 4}
-                                        </div>
-                                    )}
+                                {/* Display a few member avatars + per-group balance pill */}
+                                <div className="flex items-center justify-between mt-4">
+                                    <div className="flex items-center -space-x-2">
+                                        {group.members.slice(0, 4).map((m, idx) => (
+                                            <Avatar key={m.user_id || idx} className="w-6 h-6 border-2 border-background">
+                                                <AvatarImage src={m.avatar_url || ''} />
+                                                <AvatarFallback className="text-[8px]">{m.full_name?.substring(0, 1) || '?'}</AvatarFallback>
+                                            </Avatar>
+                                        ))}
+                                        {group.members.length > 4 && (
+                                            <div className="w-6 h-6 rounded-full bg-secondary flex items-center justify-center text-[8px] font-bold border-2 border-background">
+                                                +{group.members.length - 4}
+                                            </div>
+                                        )}
+                                    </div>
+                                    {balance && (balance.owe > 0.01 || balance.owed > 0.01) ? (
+                                        <Badge
+                                            variant="outline"
+                                            className={cn(
+                                                'text-[10px] font-bold rounded-full px-2 py-0.5',
+                                                balance.owe > 0.01
+                                                    ? 'bg-rose-500/10 border-rose-500/20 text-rose-500'
+                                                    : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500'
+                                            )}
+                                        >
+                                            {balance.owe > 0.01
+                                                ? `You owe ${formatCurrency(balance.owe)}`
+                                                : `You're owed ${formatCurrency(balance.owed)}`}
+                                        </Badge>
+                                    ) : balance ? (
+                                        <Badge variant="outline" className="text-[10px] font-bold rounded-full px-2 py-0.5 bg-secondary/20 border-white/5 text-muted-foreground">
+                                            Settled up
+                                        </Badge>
+                                    ) : null}
                                 </div>
                             </CardContent>
                         </Card>
@@ -244,7 +273,19 @@ export function GroupsTabContent({
                         {pastTrips.map((group) => {
                             const Icon = getTypeIcon(group.type);
                             return (
-                                <Card key={group.id} className="bg-card/20 border-white/5 rounded-3xl overflow-hidden hover:bg-card/40 transition-colors">
+                                <Card
+                                    key={group.id}
+                                    onClick={() => setSettingsGroupId(group.id)}
+                                    role="button"
+                                    tabIndex={0}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter' || e.key === ' ') {
+                                            e.preventDefault();
+                                            setSettingsGroupId(group.id);
+                                        }
+                                    }}
+                                    className="bg-card/20 border-white/5 rounded-3xl overflow-hidden hover:bg-card/40 transition-colors cursor-pointer"
+                                >
                                     <CardContent className="p-4">
                                         <div className="flex items-center gap-4">
                                             <div className="w-10 h-10 rounded-2xl bg-secondary/20 flex items-center justify-center grayscale">
@@ -253,7 +294,7 @@ export function GroupsTabContent({
                                             <div>
                                                 <h4 className="font-bold text-sm text-muted-foreground line-through decoration-white/20">{group.name}</h4>
                                                 <p className="text-[11px] text-muted-foreground">
-                                                    {group.end_date && `Ended ${format(new Date(group.end_date), 'MMM yyyy')}`}
+                                                    {group.end_date && `Ended ${format(parseDateOnly(group.end_date), 'MMM yyyy')}`}
                                                 </p>
                                             </div>
                                         </div>
