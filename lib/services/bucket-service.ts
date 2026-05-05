@@ -1,6 +1,15 @@
 import { supabase } from '@/lib/supabase';
 import { Bucket } from '@/components/providers/buckets-provider';
 
+export interface BucketSpendingRow {
+    bucket_id: string;
+    category: string;
+    currency: string;
+    base_currency: string;
+    exchange_rate: number;
+    share_amount: number;
+}
+
 export const BucketService = {
     async getBuckets(userId?: string, workspaceId?: string | null) {
         let query = supabase
@@ -22,23 +31,13 @@ export const BucketService = {
     },
 
     async getBucketSpending(userId?: string, workspaceId?: string | null) {
-        let query = supabase
-            .from('transactions')
-            .select('id, amount, category, currency, bucket_id, exchange_rate, base_currency, user_id, group_id, splits(user_id, amount)')
-            .not('bucket_id', 'is', null)
-            .limit(5000);
-
-        if (workspaceId && workspaceId !== 'personal') {
-            query = query.eq('group_id', workspaceId);
-        } else if (workspaceId === 'personal' && userId) {
-            query = query.eq('user_id', userId).is('group_id', null);
-        } else if (userId) {
-            query = query.eq('user_id', userId);
-        }
-
-        const { data, error } = await query;
+        if (!userId) return [];
+        const { data, error } = await supabase.rpc('compute_user_bucket_spending', {
+            p_user_id: userId,
+            p_workspace_id: workspaceId ?? null,
+        });
         if (error) throw error;
-        return data;
+        return data as BucketSpendingRow[];
     },
 
     /**

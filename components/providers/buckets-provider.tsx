@@ -4,7 +4,7 @@ import React, { createContext, useContext, useEffect, useState, useCallback, use
 import { supabase } from '@/lib/supabase';
 import { useUserPreferences } from './user-preferences-provider';
 import { toast } from '@/utils/haptics';
-import { BucketService } from '@/lib/services/bucket-service';
+import { BucketService, type BucketSpendingRow } from '@/lib/services/bucket-service';
 
 export interface Bucket {
     id: string;
@@ -42,26 +42,9 @@ interface BucketSpendingContextType {
 const BucketsListContext = createContext<BucketsListContextType | undefined>(undefined);
 const BucketSpendingContext = createContext<BucketSpendingContextType | undefined>(undefined);
 
-interface BucketSplit {
-    user_id: string;
-    amount: number | string;
-}
-
-interface SpendingTx {
-    bucket_id: string | null;
-    user_id: string;
-    amount: number | string;
-    category?: string | null;
-    currency: string | null;
-    exchange_rate: number | null;
-    base_currency: string | null;
-    splits?: BucketSplit[];
-}
-
 function computeBucketSpending(
-    spendingData: SpendingTx[],
+    rows: BucketSpendingRow[],
     buckets: Bucket[],
-    userId: string,
     currency: string,
     convertAmount: (amount: number, from: string, to?: string) => number
 ): Record<string, number> {
@@ -77,37 +60,23 @@ function computeBucketSpending(
         return rate;
     };
     const spending: Record<string, number> = {};
-    spendingData.forEach(tx => {
-        const bId = tx.bucket_id;
-        if (!bId) return;
-        const bucketConfig = bucketMap.get(bId);
-        // Honor per-bucket category restriction. Empty list = allow all.
+    rows.forEach(row => {
+        const bucketConfig = bucketMap.get(row.bucket_id);
         const allowed = bucketConfig?.allowed_categories || [];
-        if (allowed.length > 0 && !allowed.includes((tx.category || '').toLowerCase())) return;
+        if (allowed.length > 0 && !allowed.includes(row.category)) return;
+        const share = Number(row.share_amount);
+        if (!share || share <= 0) return;
         const bucketCurrency = (bucketConfig?.currency || currency).toUpperCase();
-        let shareAmount = Number(tx.amount);
-        if (tx.splits && tx.splits.length > 0) {
-            if (tx.user_id === userId) {
-                const othersOwe = tx.splits.reduce((sum: number, s: BucketSplit) => sum + Number(s.amount || 0), 0);
-                shareAmount = Number(tx.amount) - othersOwe;
-            } else {
-                const mySplit = tx.splits.find((s: BucketSplit) => s.user_id === userId);
-                shareAmount = mySplit ? Number(mySplit.amount || 0) : 0;
-            }
-        } else if (tx.user_id !== userId) {
-            shareAmount = 0;
-        }
-        if (shareAmount <= 0) return;
-        const txCurrency = (tx.currency || 'USD').toUpperCase();
+        const txCurrency = (row.currency || 'USD').toUpperCase();
         let amountInBucketCurrency: number;
         if (txCurrency === bucketCurrency) {
-            amountInBucketCurrency = shareAmount;
-        } else if (tx.exchange_rate && (tx.base_currency || '').toUpperCase() === bucketCurrency) {
-            amountInBucketCurrency = shareAmount * Number(tx.exchange_rate);
+            amountInBucketCurrency = share;
+        } else if (row.exchange_rate && row.base_currency === bucketCurrency) {
+            amountInBucketCurrency = share * Number(row.exchange_rate);
         } else {
-            amountInBucketCurrency = shareAmount * getRate(txCurrency, bucketCurrency);
+            amountInBucketCurrency = share * getRate(txCurrency, bucketCurrency);
         }
-        spending[bId] = (spending[bId] || 0) + amountInBucketCurrency;
+        spending[row.bucket_id] = (spending[row.bucket_id] || 0) + amountInBucketCurrency;
     });
     return spending;
 }
@@ -129,7 +98,7 @@ export function BucketsProvider({ children }: { children: React.ReactNode }) {
             setBuckets(fetchedBuckets);
 
             if (spendingData) {
-                setBucketSpending(computeBucketSpending(spendingData, fetchedBuckets, userId, currency, convertAmount));
+                setBucketSpending(computeBucketSpending(spendingData, fetchedBuckets, currency, convertAmount));
             }
         } catch (error) {
             console.error('Error fetching buckets:', error);
@@ -146,7 +115,7 @@ export function BucketsProvider({ children }: { children: React.ReactNode }) {
         try {
             const spendingData = await BucketService.getBucketSpending(userId, activeWorkspaceId);
             if (spendingData) {
-                setBucketSpending(computeBucketSpending(spendingData, bucketsRef.current, userId, currency, convertAmount));
+                setBucketSpending(computeBucketSpending(spendingData, bucketsRef.current, currency, convertAmount));
             }
         } catch (error) {
             console.error('Error refreshing bucket spending:', error);

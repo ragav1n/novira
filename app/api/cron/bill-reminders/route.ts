@@ -2,6 +2,7 @@ import 'server-only';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient as createServiceClient } from '@supabase/supabase-js';
 import { isInQuietHours } from '@/lib/push-quiet-hours';
+import { processInBatches } from '@/lib/server/push';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const webpush = require('web-push') as typeof import('web-push');
 
@@ -192,9 +193,9 @@ export async function GET(request: NextRequest) {
     const expiredEndpoints: string[] = [];
     const successfulNotifications: { user_id: string; template_id: string; next_occurrence: string }[] = [];
 
-    for (const t of toNotify) {
+    await processInBatches(toNotify, 25, async (t) => {
         const userSubs = subsByUser.get(t.user_id);
-        if (!userSubs?.length) continue;
+        if (!userSubs?.length) return;
 
         const occ = new Date(t.next_occurrence + 'T00:00:00Z');
         const daysUntil = Math.round((occ.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
@@ -232,7 +233,7 @@ export async function GET(request: NextRequest) {
                 next_occurrence: t.next_occurrence
             });
         }
-    }
+    });
 
     if (expiredEndpoints.length) {
         await supabase.from('push_subscriptions').delete().in('endpoint', expiredEndpoints);

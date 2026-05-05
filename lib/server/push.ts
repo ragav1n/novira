@@ -109,3 +109,16 @@ export async function cleanupExpired(supabase: SupabaseClient, endpoints: string
     if (!endpoints.length) return;
     await supabase.from('push_subscriptions').delete().in('endpoint', endpoints);
 }
+
+// Process items with bounded concurrency. Replaces the serial per-user loops that
+// blow past Vercel function timeouts at >1k users.
+export async function processInBatches<T>(
+    items: T[],
+    concurrency: number,
+    handler: (item: T) => Promise<void>
+): Promise<void> {
+    for (let i = 0; i < items.length; i += concurrency) {
+        const slice = items.slice(i, i + concurrency);
+        await Promise.allSettled(slice.map(handler));
+    }
+}

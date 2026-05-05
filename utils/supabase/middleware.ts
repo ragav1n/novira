@@ -1,6 +1,32 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
+// Per-instance cache of validated access tokens. Cuts getUser() round-trips for
+// hot navigation paths (a user clicking around triggers many middleware passes
+// inside the auth cookie's lifetime). RLS remains the real security boundary;
+// a short TTL bounds how long a revoked token could slip through.
+const TOKEN_CACHE_TTL_MS = 30_000;
+const tokenCache = new Map<string, number>();
+
+function isTokenCached(token: string): boolean {
+    const expiry = tokenCache.get(token);
+    if (!expiry) return false;
+    if (expiry < Date.now()) {
+        tokenCache.delete(token);
+        return false;
+    }
+    return true;
+}
+
+function rememberToken(token: string) {
+    if (tokenCache.size > 1000) {
+        // bound memory; oldest entries are discarded by Map insertion order
+        const oldest = tokenCache.keys().next().value;
+        if (oldest) tokenCache.delete(oldest);
+    }
+    tokenCache.set(token, Date.now() + TOKEN_CACHE_TTL_MS);
+}
+
 export async function updateSession(request: NextRequest) {
     let supabaseResponse = NextResponse.next({
         request,
@@ -48,18 +74,33 @@ export async function updateSession(request: NextRequest) {
         return supabaseResponse;
     }
 
-    // 2. Validate user via getUser() which verifies the JWT against Supabase's auth server
+    // 2. Skip getUser() if we've validated this exact access token recently.
+    // Supabase auth cookies are split (auth-token.0, auth-token.1) so use both
+    // values as the cache key — any rotation invalidates the cache automatically.
+    const tokenKey = request.cookies
+        .getAll()
+        .filter(c => c.name.startsWith('sb-') && c.name.includes('-auth-token'))
+        .map(c => `${c.name}=${c.value}`)
+        .sort()
+        .join('|');
+
+    if (tokenKey && isTokenCached(tokenKey)) {
+        return supabaseResponse;
+    }
+
+    // 3. Validate user via getUser() which verifies the JWT against Supabase's auth server
     // getSession() only reads from cookies and is NOT guaranteed to be authentic
     const {
         data: { user },
     } = await supabase.auth.getUser()
 
     if (!user) {
-        // no user, potentially respond by redirecting the user to the login page
         const url = request.nextUrl.clone()
         url.pathname = '/signin'
         return NextResponse.redirect(url)
     }
+
+    if (tokenKey) rememberToken(tokenKey);
 
     return supabaseResponse
 }

@@ -45,29 +45,33 @@ export const TransactionList = React.memo(function TransactionList({
         const myShare = calculateUserShare(tx, userId);
         const showConverted = tx.currency && tx.currency.toUpperCase() !== currency.toUpperCase();
         return (
-          <TransactionRow
+          <div
             key={tx.id}
-            tx={tx}
-            userId={userId}
-            myShare={myShare}
-            formattedAmount={formatCurrency(Math.abs(myShare), tx.currency)}
-            formattedConverted={
-              showConverted
-                ? formatCurrency(convertAmount(Math.abs(myShare), tx.currency || 'USD', currency), currency)
-                : undefined
-            }
-            showConverted={!!showConverted}
-            canEdit={canEditTransaction(tx)}
-            icon={getIconForCategory(tx.category, 'w-4 h-4')}
-            color={CATEGORY_COLORS[tx.category.toLowerCase()] || CATEGORY_COLORS.uncategorized}
-            bucketChip={getBucketChip(tx)}
-            onHistory={() => loadAuditLogs(tx)}
-            onEdit={() => {
-              setEditingTransaction(tx);
-              setIsEditOpen(true);
-            }}
-            onDelete={() => handleDeleteTransaction(tx)}
-          />
+            style={{ contentVisibility: 'auto', containIntrinsicSize: '0 64px' }}
+          >
+            <TransactionRow
+              tx={tx}
+              userId={userId}
+              myShare={myShare}
+              formattedAmount={formatCurrency(Math.abs(myShare), tx.currency)}
+              formattedConverted={
+                showConverted
+                  ? formatCurrency(convertAmount(Math.abs(myShare), tx.currency || 'USD', currency), currency)
+                  : undefined
+              }
+              showConverted={!!showConverted}
+              canEdit={canEditTransaction(tx)}
+              icon={getIconForCategory(tx.category, 'w-4 h-4')}
+              color={CATEGORY_COLORS[tx.category.toLowerCase()] || CATEGORY_COLORS.uncategorized}
+              bucketChip={getBucketChip(tx)}
+              onHistory={() => loadAuditLogs(tx)}
+              onEdit={() => {
+                setEditingTransaction(tx);
+                setIsEditOpen(true);
+              }}
+              onDelete={() => handleDeleteTransaction(tx)}
+            />
+          </div>
         );
       })}
       {hasMore && onLoadMore && (

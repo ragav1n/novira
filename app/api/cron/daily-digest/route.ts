@@ -2,6 +2,7 @@ import 'server-only';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient as createServiceClient } from '@supabase/supabase-js';
 import { isInQuietHours } from '@/lib/push-quiet-hours';
+import { processInBatches } from '@/lib/server/push';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const webpush = require('web-push') as typeof import('web-push');
 
@@ -178,33 +179,29 @@ export async function GET(request: NextRequest) {
         }
 
         const expiredEndpoints: string[] = [];
+        let pushSentLocal = 0;
 
-        for (const profile of profiles) {
-            if (isInQuietHours(profile.timezone, profile.quiet_hours_start, profile.quiet_hours_end)) continue;
+        await processInBatches(profiles, 25, async (profile) => {
+            if (isInQuietHours(profile.timezone, profile.quiet_hours_start, profile.quiet_hours_end)) return;
             const userSubs = subsByUser.get(profile.id);
-            if (!userSubs?.length) continue;
+            if (!userSubs?.length) return;
             const totals = totalsByUser.get(profile.id);
-            if (!totals) continue;
+            if (!totals) return;
 
             const baseCcy = (profile.currency || 'USD').toUpperCase();
             let title: string;
             let body: string;
             if (profile.digest_frequency === 'daily') {
-                if (totals.yesterdayCount === 0) continue; // skip silent days
+                if (totals.yesterdayCount === 0) return;
                 title = 'Yesterday\'s spending';
                 body = `${fmt(totals.yesterday, baseCcy)} across ${totals.yesterdayCount} transaction${totals.yesterdayCount === 1 ? '' : 's'}.`;
             } else {
-                if (totals.weekCount === 0) continue;
+                if (totals.weekCount === 0) return;
                 title = 'Your weekly recap';
                 body = `${fmt(totals.week, baseCcy)} across ${totals.weekCount} transaction${totals.weekCount === 1 ? '' : 's'} this week.`;
             }
 
-            const payload = JSON.stringify({
-                title,
-                body,
-                url: '/dashboard',
-                icon: '/Novira.png',
-            });
+            const payload = JSON.stringify({ title, body, url: '/dashboard', icon: '/Novira.png' });
 
             const results = await Promise.allSettled(
                 userSubs.map(s =>
@@ -220,10 +217,12 @@ export async function GET(request: NextRequest) {
                     const status = (r.reason as { statusCode?: number } | undefined)?.statusCode;
                     if (status === 404 || status === 410) expiredEndpoints.push(userSubs[i].endpoint);
                 } else {
-                    pushSent++;
+                    pushSentLocal++;
                 }
             });
-        }
+        });
+
+        pushSent += pushSentLocal;
 
         if (expiredEndpoints.length) {
             await supabase.from('push_subscriptions').delete().in('endpoint', expiredEndpoints);
