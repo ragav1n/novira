@@ -32,6 +32,17 @@ import { TopMerchantsCard } from '@/components/analytics/top-merchants-card';
 import { LargestTransactionsCard } from '@/components/analytics/largest-transactions-card';
 import { CategoryBreakdownCard } from '@/components/analytics/category-breakdown-card';
 import { PaymentBreakdownCard } from '@/components/analytics/payment-breakdown-card';
+import { RecurringSplitCard } from '@/components/analytics/recurring-split-card';
+import { TagsFilterCard } from '@/components/analytics/tags-filter-card';
+import { CalendarHeatmapCard } from '@/components/analytics/calendar-heatmap-card';
+import { LocationInsightsCard } from '@/components/analytics/location-insights-card';
+import { InsightsChatCard } from '@/components/analytics/insights-chat-card';
+import { LazyMount } from '@/components/analytics/lazy-mount';
+
+function BucketIcon({ icon, className }: { icon?: string; className?: string }) {
+    const el = getIconForCategory(icon || 'Tag') as React.ReactElement<{ className?: string }>;
+    return React.cloneElement(el, { className });
+}
 
 export function AnalyticsView() {
     const router = useRouter();
@@ -40,21 +51,25 @@ export function AnalyticsView() {
     const [transactions, setTransactions] = useState<Transaction[]>([]);
     const [priorTransactions, setPriorTransactions] = useState<Transaction[]>([]);
     const [priorStart, setPriorStart] = useState<Date | null>(null);
+    const [rangeStart, setRangeStart] = useState<Date | null>(null);
+    const [rangeEnd, setRangeEnd] = useState<Date | null>(null);
+    const [allViewTruncated, setAllViewTruncated] = useState(false);
     const [dateRange, setDateRange] = useState<DateRange>('1M');
     const [selectedBucketId, setSelectedBucketId] = useState<string | 'all'>('all');
     const [customStart, setCustomStart] = useState<string>('');
     const [customEnd, setCustomEnd] = useState<string>('');
+    const [activeTags, setActiveTags] = useState<string[]>([]);
     const { formatCurrency, currency, convertAmount, userId, activeWorkspaceId, ratesLastUpdated } = useUserPreferences();
     const { activeWorkspace, theme: themeConfig } = useWorkspaceTheme('cyan');
 
-    // getIconForCategory is now imported from lib/categories.ts
-    const getBucketIcon = (iconName?: string) => {
-        const iconElement = getIconForCategory(iconName || 'Tag');
-        return React.cloneElement(iconElement as React.ReactElement<{ className?: string }>, { className: "w-full h-full" });
-    };
-
     const { buckets } = useBucketsList();
     const { bucketSpending } = useBucketSpending();
+
+    const toggleTag = useCallback((tag: string) => {
+        setActiveTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]);
+        toast.haptic(ImpactStyle.Light);
+    }, []);
+    const clearTags = useCallback(() => setActiveTags([]), []);
 
     const fetchData = useCallback(async () => {
         setLoading(true);
@@ -127,7 +142,42 @@ export function AnalyticsView() {
                     : Promise.resolve([] as Transaction[]),
             ]);
 
-            if (current) setTransactions(current);
+            // ALL-view safety: at high transaction counts charts and aggregations get
+            // expensive. Cap the view at the latest 5000 and surface a footnote.
+            const ALL_VIEW_LIMIT = 5000;
+            let nextCurrent = current || [];
+            let truncated = false;
+            if (dateRange === 'ALL' && nextCurrent.length > ALL_VIEW_LIMIT) {
+                nextCurrent = [...nextCurrent]
+                    .sort((a, b) => (a.date < b.date ? 1 : -1))
+                    .slice(0, ALL_VIEW_LIMIT);
+                truncated = true;
+            }
+            setAllViewTruncated(truncated);
+            setTransactions(nextCurrent);
+
+            // For the heatmap and other range-aware widgets, surface the resolved window.
+            if (dateRange === 'ALL') {
+                if (nextCurrent.length > 0) {
+                    const minDate = nextCurrent.reduce((m, t) => t.date < m ? t.date : m, nextCurrent[0].date).slice(0, 10);
+                    const maxDate = nextCurrent.reduce((m, t) => t.date > m ? t.date : m, nextCurrent[0].date).slice(0, 10);
+                    setRangeStart(parseISO(minDate));
+                    setRangeEnd(parseISO(maxDate));
+                } else {
+                    setRangeStart(null);
+                    setRangeEnd(null);
+                }
+            } else {
+                setRangeStart(startDate);
+                // endDate is exclusive in the fetch (custom range adds +1 day); for display roll back one.
+                if (endDate) {
+                    const eDisp = new Date(endDate);
+                    eDisp.setDate(eDisp.getDate() - 1);
+                    setRangeEnd(eDisp);
+                } else {
+                    setRangeEnd(now);
+                }
+            }
             setPriorTransactions(prior || []);
             setPriorStart(priorStart);
         } catch (err) {
@@ -196,6 +246,17 @@ export function AnalyticsView() {
         priorMTDTotal,
         newMerchantsCount,
         usedConversion,
+        recurringTotal,
+        discretionaryTotal,
+        recurringTopCategories,
+        discretionaryTopCategories,
+        recurringTopItems,
+        discretionaryTopItems,
+        tagBreakdown,
+        categoryAnomalies,
+        dailyTotals,
+        locationClusters,
+        geoTxCount,
     } = useAnalyticsData({
         transactions,
         priorTransactions,
@@ -204,6 +265,7 @@ export function AnalyticsView() {
         currency,
         userId,
         convertAmount,
+        activeTags,
     });
 
     const categorizedBreakdown = categoryBreakdown as Array<{
@@ -294,7 +356,7 @@ export function AnalyticsView() {
                                     <SelectItem key={b.id} value={b.id}>
                                         <div className="flex items-center gap-2 w-full">
                                             <div className="w-4 h-4 flex items-center justify-center">
-                                                {getBucketIcon(b.icon)}
+                                                <BucketIcon icon={b.icon} className="w-full h-full" />
                                             </div>
                                             <span className="flex-1 truncate">{b.name}</span>
                                             {Number(b.budget) > 0 && (
@@ -405,7 +467,7 @@ export function AnalyticsView() {
                         <CardContent className="p-4 flex items-center justify-between">
                             <div className="flex items-center gap-3">
                                 <div className={`w-10 h-10 rounded-2xl flex items-center justify-center border ${themeConfig.bgMedium} ${themeConfig.text} ${themeConfig.borderMedium}`}>
-                                    {getBucketIcon(focusedBucket.icon)}
+                                    <BucketIcon icon={focusedBucket.icon} className="w-full h-full" />
                                 </div>
                                 <div>
                                     <h4 className={`text-sm font-bold ${themeConfig.text}`}>{focusedBucket.name}</h4>
@@ -439,6 +501,24 @@ export function AnalyticsView() {
                     </Card>
                 ) : (
                 <>
+                <RecurringSplitCard
+                    recurringTotal={recurringTotal}
+                    discretionaryTotal={discretionaryTotal}
+                    recurringTopCategories={recurringTopCategories}
+                    discretionaryTopCategories={discretionaryTopCategories}
+                    recurringTopItems={recurringTopItems}
+                    discretionaryTopItems={discretionaryTopItems}
+                    formatCurrency={formatCurrency}
+                />
+
+                <TagsFilterCard
+                    tagBreakdown={tagBreakdown}
+                    activeTags={activeTags}
+                    onToggle={toggleTag}
+                    onClear={clearTags}
+                    formatCurrency={formatCurrency}
+                />
+
                 <SpendingTrendCard
                     userId={userId}
                     dateRange={dateRange}
@@ -455,45 +535,93 @@ export function AnalyticsView() {
                     convertAmount={convertAmount}
                 />
 
-                <WeekdayChartCard
-                    weekdayTotals={weekdayTotals}
-                    totalSpentInRange={totalSpentInRange}
-                    formatCurrency={formatCurrency}
-                />
+                {dateRange !== '1M' && dateRange !== 'LM' && (
+                    <LazyMount placeholderHeight={220}>
+                        <CalendarHeatmapCard
+                            dailyTotals={dailyTotals}
+                            rangeStart={rangeStart}
+                            rangeEnd={rangeEnd}
+                            formatCurrency={formatCurrency}
+                        />
+                    </LazyMount>
+                )}
 
-                <TopMerchantsCard
-                    topMerchants={topMerchants}
-                    newMerchantsCount={newMerchantsCount}
-                    formatCurrency={formatCurrency}
-                />
+                <LazyMount placeholderHeight={220}>
+                    <WeekdayChartCard
+                        weekdayTotals={weekdayTotals}
+                        totalSpentInRange={totalSpentInRange}
+                        formatCurrency={formatCurrency}
+                    />
+                </LazyMount>
 
-                <LargestTransactionsCard
-                    top3Largest={top3Largest}
-                    formatCurrency={formatCurrency}
-                />
+                <LazyMount placeholderHeight={200}>
+                    <TopMerchantsCard
+                        topMerchants={topMerchants}
+                        newMerchantsCount={newMerchantsCount}
+                        formatCurrency={formatCurrency}
+                    />
+                </LazyMount>
 
-                <CategoryBreakdownCard
-                    title={
-                        selectedBucketId !== 'all' && buckets.find(b => b.id === selectedBucketId)
-                            ? `Categories within ${buckets.find(b => b.id === selectedBucketId)!.name}`
-                            : 'Spending by Category'
-                    }
-                    categoryBreakdown={categoryBreakdown}
-                    categorizedBreakdown={categorizedBreakdown}
-                    formatCurrency={formatCurrency}
-                    analyticsDateRange={analyticsDateRange}
-                />
+                {locationClusters.length > 0 && (
+                    <LazyMount placeholderHeight={260}>
+                        <LocationInsightsCard
+                            locationClusters={locationClusters}
+                            geoTxCount={geoTxCount}
+                            formatCurrency={formatCurrency}
+                        />
+                    </LazyMount>
+                )}
 
-                <PaymentBreakdownCard
-                    paymentBreakdown={paymentBreakdown}
-                    categorizedPayment={categorizedPayment}
-                    formatCurrency={formatCurrency}
-                />
+                <LazyMount placeholderHeight={180}>
+                    <LargestTransactionsCard
+                        top3Largest={top3Largest}
+                        formatCurrency={formatCurrency}
+                    />
+                </LazyMount>
+
+                <LazyMount placeholderHeight={260}>
+                    <CategoryBreakdownCard
+                        title={
+                            selectedBucketId !== 'all' && buckets.find(b => b.id === selectedBucketId)
+                                ? `Categories within ${buckets.find(b => b.id === selectedBucketId)!.name}`
+                                : 'Spending by Category'
+                        }
+                        categoryBreakdown={categoryBreakdown}
+                        categorizedBreakdown={categorizedBreakdown}
+                        formatCurrency={formatCurrency}
+                        analyticsDateRange={analyticsDateRange}
+                        anomalies={categoryAnomalies}
+                    />
+                </LazyMount>
+
+                <LazyMount placeholderHeight={260}>
+                    <PaymentBreakdownCard
+                        paymentBreakdown={paymentBreakdown}
+                        categorizedPayment={categorizedPayment}
+                        formatCurrency={formatCurrency}
+                    />
+                </LazyMount>
+
+                <LazyMount placeholderHeight={120}>
+                    <InsightsChatCard
+                        dateRange={dateRange}
+                        customStart={customStart}
+                        customEnd={customEnd}
+                        bucketId={selectedBucketId}
+                        baseCurrency={currency}
+                    />
+                </LazyMount>
 
                 {/* Currency conversion staleness footnote */}
                 {usedConversion && ratesLastUpdated && (Date.now() - ratesLastUpdated) > 24 * 60 * 60 * 1000 && (
                     <p className="text-[10px] text-muted-foreground/60 text-center px-2">
                         Some amounts converted using exchange rates last refreshed {format(new Date(ratesLastUpdated), 'd MMM, h:mm a')}.
+                    </p>
+                )}
+
+                {allViewTruncated && (
+                    <p className="text-[10px] text-muted-foreground/60 text-center px-2">
+                        Showing your most recent 5,000 transactions. Pick a narrower range for more detail.
                     </p>
                 )}
                 </>

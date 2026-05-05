@@ -79,17 +79,17 @@ export function SpendingTrendCard({
     }, [userId]);
 
     const pacingChip = useMemo(() => {
-        if (dateRange !== '1M' || selectedBucketId !== 'all' || totalSpentInRange <= 0) return null;
+        if (dateRange !== '1M' || totalSpentInRange <= 0) return null;
         const today = new Date();
         const day = today.getDate();
         if (day < 3) return null;
         const daysInMonth = endOfMonth(today).getDate();
         const projected = (totalSpentInRange / day) * daysInMonth;
         return { projected };
-    }, [dateRange, selectedBucketId, totalSpentInRange]);
+    }, [dateRange, totalSpentInRange]);
 
     const forecastChartData = useMemo(() => {
-        if (dateRange !== '1M' || selectedBucketId !== 'all') return categoryTrendData;
+        if (dateRange !== '1M') return categoryTrendData;
         const today = new Date();
         const dom = today.getDate();
         const monthEnd = endOfMonth(today);
@@ -98,22 +98,27 @@ export function SpendingTrendCard({
 
         const runRate = totalSpentInRange / dom;
 
+        // Recurring spikes only apply to whole-portfolio forecasting; for a bucket-scoped
+        // view we'd need to filter recurring_templates by metadata.bucket_id, which the
+        // current select doesn't pull. Run-rate alone is the safe answer here.
         const recurringMap = new Map<string, number>();
-        for (const t of recurringForecast) {
-            const occ = parseISO(t.next_occurrence);
-            if (isNaN(occ.getTime())) continue;
-            const cursor = new Date(occ);
-            for (let i = 0; i < 60 && cursor <= monthEnd; i++) {
-                if (isAfter(cursor, today)) {
-                    const key = format(cursor, 'MMM d');
-                    const amt = convertAmount(Number(t.amount), (t.currency || 'USD').toUpperCase());
-                    recurringMap.set(key, (recurringMap.get(key) || 0) + amt);
+        if (selectedBucketId === 'all') {
+            for (const t of recurringForecast) {
+                const occ = parseISO(t.next_occurrence);
+                if (isNaN(occ.getTime())) continue;
+                const cursor = new Date(occ);
+                for (let i = 0; i < 60 && cursor <= monthEnd; i++) {
+                    if (isAfter(cursor, today)) {
+                        const key = format(cursor, 'MMM d');
+                        const amt = convertAmount(Number(t.amount), (t.currency || 'USD').toUpperCase());
+                        recurringMap.set(key, (recurringMap.get(key) || 0) + amt);
+                    }
+                    if (t.frequency === 'daily') cursor.setDate(cursor.getDate() + 1);
+                    else if (t.frequency === 'weekly') cursor.setDate(cursor.getDate() + 7);
+                    else if (t.frequency === 'monthly') { cursor.setMonth(cursor.getMonth() + 1); break; }
+                    else if (t.frequency === 'yearly') break;
+                    else break;
                 }
-                if (t.frequency === 'daily') cursor.setDate(cursor.getDate() + 1);
-                else if (t.frequency === 'weekly') cursor.setDate(cursor.getDate() + 7);
-                else if (t.frequency === 'monthly') { cursor.setMonth(cursor.getMonth() + 1); break; }
-                else if (t.frequency === 'yearly') break;
-                else break;
             }
         }
 
@@ -126,8 +131,8 @@ export function SpendingTrendCard({
     }, [categoryTrendData, recurringForecast, dateRange, selectedBucketId, totalSpentInRange, convertAmount]);
 
     const hasForecast = useMemo(
-        () => dateRange === '1M' && selectedBucketId === 'all' && forecastChartData.some(b => typeof (b as { forecast_total?: number }).forecast_total === 'number'),
-        [forecastChartData, dateRange, selectedBucketId]
+        () => dateRange === '1M' && forecastChartData.some(b => typeof (b as { forecast_total?: number }).forecast_total === 'number'),
+        [forecastChartData, dateRange]
     );
 
     const momDelta = useMemo(() => {
