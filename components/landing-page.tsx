@@ -27,7 +27,7 @@ const SECTIONS = [
 
 const FEATURES = [
   { icon: BarChart3, title: 'Rich analytics', desc: 'Beautiful charts that reveal spending patterns at a glance — by category, place, time, or person.' },
-  { icon: Globe, title: 'Any currency', desc: 'Track rupees, euros, pesos — 150+ currencies with live exchange rates and per-transaction conversion.' },
+  { icon: Globe, title: 'Any currency', desc: 'Track rupees, euros, pesos — 20 supported currencies with live exchange rates and per-transaction conversion.' },
   { icon: MessageSquare, title: 'Recurring detection', desc: 'Novira spots subscriptions and recurring bills automatically, so your monthly picture is always accurate.' },
   { icon: Calendar, title: 'Smart budgets', desc: 'Set monthly allowances per bucket. Get nudged before you overspend — not after your card declines.' },
   { icon: Zap, title: 'Bank imports', desc: 'Drop an HDFC or SBI statement and Novira parses it in seconds — smart duplicate detection included.' },
@@ -600,6 +600,7 @@ export function LandingPage() {
                 onClick={e => { e.preventDefault(); document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' }); }}
                 className="hover:text-white transition-colors whitespace-nowrap cursor-pointer">{label}</a>
             ))}
+            <Link href="/guide" className="hover:text-white transition-colors whitespace-nowrap">Guide</Link>
           </nav>
           <div className="hidden md:flex items-center gap-2.5">
             <ShinyButton href="/signin" size="sm">Sign In</ShinyButton>
@@ -659,6 +660,19 @@ export function LandingPage() {
                   {label}
                 </motion.a>
               ))}
+              <motion.div
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.04 + 6 * 0.05, ease: [0.22, 1, 0.36, 1] }}
+              >
+                <Link
+                  href="/guide"
+                  onClick={() => setMenuOpen(false)}
+                  className="text-[30px] font-bold py-2.5 text-white/60 hover:text-white transition-colors cursor-pointer block"
+                >
+                  Guide
+                </Link>
+              </motion.div>
             </nav>
 
             {/* CTAs */}
@@ -680,7 +694,7 @@ export function LandingPage() {
             <span>© 2026 Novira</span>
           </div>
           <div className="flex gap-5">
-            {[['Privacy','/privacy'],['Terms','/terms'],['Support','mailto:ragava22005@gmail.com']].map(([l, h]) => (
+            {[['Guide','/guide'],['Privacy','/privacy'],['Terms','/terms'],['Support','mailto:ragava22005@gmail.com']].map(([l, h]) => (
               <Link key={l} href={h} className="hover:text-white/80 transition-colors">{l}</Link>
             ))}
           </div>
@@ -713,10 +727,18 @@ export function LandingPage() {
                   Track spending, split with friends, and understand your money — in one quietly brilliant app that works anywhere, even offline.
                 </motion.p>
 
-                <motion.div initial="hidden" animate="visible" variants={fadeUp(0.4)} className="flex items-center gap-2.5">
+                <motion.div initial="hidden" animate="visible" variants={fadeUp(0.4)} className="flex flex-wrap items-center gap-2.5">
                   <AdvancedButton href="/signup" size="large">
                     Get started free <ArrowRight className="w-3.5 h-3.5" />
                   </AdvancedButton>
+                  <Link
+                    href="/guide"
+                    className="group inline-flex items-center gap-1.5 px-4 py-3 text-[14px] font-medium transition-colors"
+                    style={{ color: 'rgba(255,255,255,0.78)' }}
+                  >
+                    Read the guide
+                    <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" />
+                  </Link>
                 </motion.div>
 
                 <motion.div initial="hidden" animate="visible" variants={fadeUp(0.5)} className="flex items-center gap-[22px] mt-7 flex-wrap"
@@ -730,7 +752,7 @@ export function LandingPage() {
                 </motion.div>
 
                 <motion.div initial="hidden" animate="visible" variants={fadeUp(0.5)} className="flex gap-7 mt-9 pt-7" style={{ borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-                  {[['150+','Currencies'],['< 2s','Scan time']].map(([n,l]) => (
+                  {[['20','Currencies'],['< 2s','Scan time']].map(([n,l]) => (
                     <div key={l}>
                       <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-0.02em', color: '#fff' }}>
                         {n.replace(/[+s★]/g,'')}<span style={{ color: '#C084FC' }}>{n.match(/[+s★]/)?.[0]}</span>

@@ -3,13 +3,14 @@
 import { motion, AnimatePresence } from 'framer-motion';
 
 import React, { useCallback, useEffect, useMemo, useState, useDeferredValue } from 'react';
+import Link from 'next/link';
 import { useUserPreferences, CURRENCY_SYMBOLS, type Currency } from '@/components/providers/user-preferences-provider';
 import { useWorkspaceTheme } from '@/hooks/useWorkspaceTheme';
 import { supabase } from '@/lib/supabase';
 import { Card, CardContent } from '@/components/ui/card';
 import {
     Target, Plus, ArrowLeft, Calendar, PiggyBank, Search, X, ArrowUpDown, Check,
-    ChevronDown,
+    ChevronDown, BookOpen,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format, parseISO } from 'date-fns';
@@ -569,6 +570,15 @@ export function GoalsView() {
                                 <Plus className="w-4 h-4 mr-2" />
                                 Create your first goal
                             </Button>
+                            <div className="mt-4">
+                                <Link
+                                    href="/guide#goals"
+                                    className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground transition-colors hover:text-primary"
+                                >
+                                    <BookOpen className="h-3 w-3" />
+                                    New here? Read about Goals in the guide
+                                </Link>
+                            </div>
                         </div>
                     ) : activeGoals.length === 0 && achievedGoals.length === 0 ? (
                         <div className="text-center py-12 text-sm text-muted-foreground">

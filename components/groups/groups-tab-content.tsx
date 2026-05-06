@@ -3,7 +3,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { format, parseISO } from 'date-fns';
-import { Plus, Users, Settings2, LogOut, FileText, Home, Plane, Heart } from 'lucide-react';
+import Link from 'next/link';
+import { Plus, Users, Settings2, LogOut, FileText, Home, Plane, Heart, BookOpen } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from '@/utils/haptics';
 import type { Group, Friend, Split } from '@/components/providers/groups-provider';
@@ -260,6 +261,13 @@ export function GroupsTabContent({
                                 <Plus className="w-4 h-4" />
                                 Start a Group
                             </button>
+                            <Link
+                                href="/guide#groups"
+                                className="mt-3 inline-flex items-center gap-1.5 text-[11px] text-muted-foreground transition-colors hover:text-primary"
+                            >
+                                <BookOpen className="h-3 w-3" />
+                                New here? Read about Groups &amp; friends
+                            </Link>
                         </CardContent>
                     </Card>
                 )

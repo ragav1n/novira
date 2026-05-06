@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Compass, Users, Tag, PieChart, Plus, Wallet, X, CheckCircle2, MapPin, RefreshCcw, Search, Home, Target, CalendarClock } from 'lucide-react';
+import Link from 'next/link';
+import { Compass, Users, Tag, PieChart, Plus, Wallet, X, CheckCircle2, MapPin, RefreshCcw, Search, Home, Target, CalendarClock, BookOpen, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 type HowToUseDialogProps = {
@@ -27,7 +28,7 @@ export function HowToUseDialog({ isOpen, onClose }: HowToUseDialogProps) {
                 "Take Photo or Scan Receipt — auto-fill amount, merchant, date",
                 "Inline calculator in amount and split fields",
                 "Description autocomplete pills with full prefill",
-                "Real-time FX across 160+ currencies"
+                "Real-time FX across 20 supported currencies"
             ]
         },
         {
@@ -225,13 +226,22 @@ export function HowToUseDialog({ isOpen, onClose }: HowToUseDialogProps) {
                             </div>
 
                             {/* Fixed Footer Action */}
-                            <div className="px-5 py-4 sm:px-8 sm:py-5 border-t border-white/5 bg-black/98 backdrop-blur-xl shrink-0 z-10">
+                            <div className="px-5 py-4 sm:px-8 sm:py-5 border-t border-white/5 bg-black/98 backdrop-blur-xl shrink-0 z-10 space-y-2.5">
                                 <Button
                                     onClick={onClose}
                                     className="w-full bg-white text-black hover:bg-white/90 font-black h-12 rounded-2xl shadow-[0_0_30px_-5px_rgba(255,255,255,0.3)] transition-all duration-300 hover:scale-[1.01] active:scale-[0.99] text-sm uppercase tracking-widest"
                                 >
                                     Got it! Let's Go
                                 </Button>
+                                <Link
+                                    href="/guide"
+                                    onClick={onClose}
+                                    className="flex w-full items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.02] px-4 py-2.5 text-[12px] font-medium text-white/80 transition-colors hover:bg-white/[0.06] hover:text-white"
+                                >
+                                    <BookOpen className="w-3.5 h-3.5" />
+                                    Read the full user guide
+                                    <ArrowRight className="w-3 h-3" />
+                                </Link>
                             </div>
 
                         </div>

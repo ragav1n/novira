@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { ChevronLeft, User, Shield, ChevronRight, LogOut, Trash2, Wrench, RefreshCcw, Download, SlidersHorizontal, Bell, Globe, Zap, LayoutDashboard } from 'lucide-react';
+import { ChevronLeft, User, Shield, ChevronRight, LogOut, Trash2, Wrench, RefreshCcw, Download, SlidersHorizontal, Bell, Globe, Zap, LayoutDashboard, BookOpen } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -762,6 +762,25 @@ export function SettingsView() {
                         <LogOut className="w-4 h-4" />
                         <span className="font-medium text-sm">Log Out</span>
                     </button>
+                </div>
+
+                {/* Help & Guide */}
+                <div className="space-y-3 pt-2">
+                    <div className="bg-secondary/5 rounded-xl border border-white/5 overflow-hidden">
+                        <button
+                            onClick={() => router.push('/guide')}
+                            className="w-full flex items-center justify-between p-3 hover:bg-white/5 transition-colors text-left outline-none group"
+                        >
+                            <div className="flex items-center gap-3">
+                                <BookOpen className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                                <span className="text-sm font-medium text-muted-foreground group-hover:text-foreground transition-colors">User Guide</span>
+                            </div>
+                            <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:translate-x-0.5 transition-all" />
+                        </button>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground px-1">
+                        A complete walkthrough of every feature, with live animated demos.
+                    </p>
                 </div>
 
                 {/* Troubleshooting */}

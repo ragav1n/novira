@@ -347,7 +347,7 @@ export function MobileLayout({ children, defaultIsDesktop = false }: { children:
     const routes = ['/', '/add', '/analytics', '/groups', '/subscriptions', '/cashflow', '/goals', '/search', null, '/settings'];
 
     const pathname = usePathname();
-    const isPublicPage = ['/privacy', '/terms'].includes(pathname);
+    const isPublicPage = ['/privacy', '/terms', '/guide'].includes(pathname);
     const isAuthPage = ['/signin', '/signup', '/forgot-password', '/update-password'].includes(pathname);
     const { isAuthenticated, isLoading, isNavigating, setIsNavigating, activeWorkspaceId } = useUserPreferences();
     const { groups } = useGroups();

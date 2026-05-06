@@ -3,13 +3,14 @@
 import { motion } from 'framer-motion';
 
 import React, { useEffect, useState, useCallback, useMemo, useDeferredValue } from 'react';
+import Link from 'next/link';
 import { useUserPreferences } from '@/components/providers/user-preferences-provider';
 import { useWorkspaceTheme } from '@/hooks/useWorkspaceTheme';
 import { supabase } from '@/lib/supabase';
 import { Card, CardContent } from '@/components/ui/card';
 import {
     Calendar, RotateCw, Trash2, ArrowLeft, Tag, X, TrendingUp, TrendingDown,
-    Search, Star, MoreVertical, Pause, Play, Clock, ArrowUpDown, Check,
+    Search, Star, MoreVertical, Pause, Play, Clock, ArrowUpDown, Check, BookOpen,
 } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Input } from '@/components/ui/input';
@@ -572,6 +573,13 @@ export function SubscriptionsView() {
                         <Calendar className="w-12 h-12 mx-auto mb-3 opacity-20" />
                         <p>No active subscriptions found.</p>
                         <p className="text-xs opacity-70 mt-1">Add a recurring expense to see it here.</p>
+                        <Link
+                            href="/guide#recurring"
+                            className="mt-4 inline-flex items-center gap-1.5 text-[11px] text-muted-foreground transition-colors hover:text-primary"
+                        >
+                            <BookOpen className="h-3 w-3" />
+                            New here? Read about Recurring &amp; subscriptions
+                        </Link>
                     </div>
                 ) : visibleTemplates.length === 0 ? (
                     <div className="text-center py-10 text-muted-foreground border border-dashed border-white/10 rounded-3xl">

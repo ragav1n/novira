@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
+import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Plus, Archive, Settings2, Trash2, RotateCcw, Tag } from 'lucide-react';
+import { Plus, Archive, Settings2, Trash2, RotateCcw, Tag, BookOpen } from 'lucide-react';
 import { getBucketIcon } from '@/utils/icon-utils';
 import { format, differenceInDays } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -190,6 +191,13 @@ export function BucketsTabContent({
                             <Plus className="w-4 h-4" />
                             Create First Bucket
                         </Button>
+                        <Link
+                            href="/guide#buckets"
+                            className="mx-auto inline-flex items-center gap-1.5 text-[11px] text-muted-foreground transition-colors hover:text-primary"
+                        >
+                            <BookOpen className="h-3 w-3" />
+                            New here? Read about Buckets in the guide
+                        </Link>
                     </div>
                 )}
             </div>
