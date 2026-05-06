@@ -121,14 +121,14 @@ function Inner({ play }: { play: boolean }) {
                     {phase === 3 ? 'Synced' : 'Waiting to sync'}
                   </div>
                 </div>
-                <div className="font-mono text-sm text-foreground/85">−₹245</div>
+                <div className="font-mono text-sm text-foreground">−₹245</div>
               </motion.div>
             </motion.div>
           )}
         </AnimatePresence>
         </div>
 
-        <p className="mt-4 text-[11px] leading-relaxed text-muted-foreground">
+        <p className="mt-4 text-[11px] leading-relaxed text-foreground/75">
           Add transactions on the train, in airplane mode, in a basement. They land on your device and sync the moment your connection comes back.
         </p>
       </div>

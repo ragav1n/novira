@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-motion';
 import { Mail, ArrowRight, ArrowLeft } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
-import { SmokeBackground } from '@/components/ui/spooky-smoke-animation';
 import { cn } from "@/lib/utils";
 import { authRateLimiter } from '@/utils/auth-rate-limiter';
 
@@ -99,16 +98,14 @@ export default function ForgotPassword() {
     };
 
     return (
-        <div className="w-full min-h-[100dvh] relative overflow-hidden flex items-center justify-center" style={{ background: '#0c081e' }}>
-            <div className="fixed inset-0 z-0 pointer-events-none">
-              <SmokeBackground smokeColor="#8A2BE2" />
-            </div>
-            <div className="fixed inset-0 z-[1] pointer-events-none" style={{ background: 'radial-gradient(60% 50% at 50% 20%, rgba(12,8,30,0) 0%, rgba(10,0,24,0.55) 100%), linear-gradient(180deg, rgba(10,0,24,0.35), rgba(10,0,24,0.8))', mixBlendMode: 'multiply' }} />
+        <div className="w-full min-h-[100dvh] relative flex items-center justify-center bg-transparent">
 
+            {/* Opacity intentionally omitted — template cross-fades pages,
+                and double-fading caused a visible blink. */}
             <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.8 }}
+                initial={{ y: 20 }}
+                animate={{ y: 0 }}
+                transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
                 className="w-full max-w-sm relative z-10"
                 style={{ perspective: 1500 }}
             >

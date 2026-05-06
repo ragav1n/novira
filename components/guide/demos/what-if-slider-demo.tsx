@@ -34,7 +34,7 @@ export function WhatIfSliderDemo() {
         </div>
         <div className="min-w-0 flex-1">
           <div className="text-sm font-semibold text-foreground">Cut Dining by</div>
-          <div className="text-[11px] text-muted-foreground">Currently ₹{BASE_DINING.toLocaleString('en-IN')}/mo</div>
+          <div className="text-[11px] text-foreground/75">Currently ₹{BASE_DINING.toLocaleString('en-IN')}/mo</div>
         </div>
         <motion.div
           key={pct}
@@ -60,7 +60,7 @@ export function WhatIfSliderDemo() {
 
       <div className="mt-5 grid grid-cols-2 gap-2.5 text-[12px]">
         <div className="rounded-xl border border-white/10 bg-white/[0.02] px-3 py-2.5">
-          <div className="text-[10px] uppercase tracking-widest text-muted-foreground/70">Monthly</div>
+          <div className="text-[10px] uppercase tracking-widest text-foreground/65">Monthly</div>
           <motion.div
             key={monthlySavings}
             initial={{ opacity: 0, y: -3 }}
@@ -72,7 +72,7 @@ export function WhatIfSliderDemo() {
           </motion.div>
         </div>
         <div className="rounded-xl border border-white/10 bg-white/[0.02] px-3 py-2.5">
-          <div className="text-[10px] uppercase tracking-widest text-muted-foreground/70">In 12 months</div>
+          <div className="text-[10px] uppercase tracking-widest text-foreground/65">In 12 months</div>
           <motion.div
             key={yearly}
             initial={{ opacity: 0, y: -3 }}
@@ -87,20 +87,20 @@ export function WhatIfSliderDemo() {
 
       <div className="mt-3 flex items-center gap-2.5 rounded-xl border border-emerald-400/20 bg-emerald-500/[0.04] px-3 py-2.5">
         <Target className="h-4 w-4 shrink-0 text-emerald-300" />
-        <div className="min-w-0 flex-1 text-[12px] text-foreground/85">
+        <div className="min-w-0 flex-1 text-[12px] text-foreground">
           <div className="font-medium">Emergency fund</div>
           {Number.isFinite(monthsToGoal) ? (
-            <div className="text-muted-foreground">
+            <div className="text-foreground/75">
               You’d reach it{' '}
               <span className="text-emerald-300">in {monthsToGoal} {monthsToGoal === 1 ? 'month' : 'months'}</span>
             </div>
           ) : (
-            <div className="text-muted-foreground">Move the slider to see impact</div>
+            <div className="text-foreground/75">Move the slider to see impact</div>
           )}
         </div>
       </div>
 
-      <p className="mt-3 text-center text-[11px] text-muted-foreground/80">
+      <p className="mt-3 text-center text-[11px] text-foreground/80">
         Live numbers — drag the slider above. The real simulator inside Novira works the same way.
       </p>
     </div>

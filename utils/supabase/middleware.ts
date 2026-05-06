@@ -65,6 +65,7 @@ export async function updateSession(request: NextRequest) {
         path.startsWith('/update-password') ||
         path.startsWith('/privacy') ||
         path.startsWith('/terms') ||
+        path.startsWith('/guide') ||
         path.startsWith('/auth') ||
         path.startsWith('/confirm-delete') ||
         path.startsWith('/_next') ||

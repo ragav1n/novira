@@ -30,7 +30,7 @@ export function GuideHero() {
               in one place.
             </span>
           </h1>
-          <p className="mt-4 max-w-xl text-base leading-relaxed text-muted-foreground sm:text-lg">
+          <p className="mt-4 max-w-xl text-base leading-relaxed text-foreground/85 sm:text-lg">
             A friendly, complete walkthrough — from your first transaction to splitting a trip, detecting subscriptions, and exporting your bills to your calendar. Skim with the table of contents or read top-to-bottom.
           </p>
 
@@ -58,7 +58,7 @@ export function GuideHero() {
             transition={{ duration: 0.5, delay: 0.1, ease: [0.22, 1, 0.36, 1] }}
             className="mt-7 flex flex-wrap items-center gap-2"
           >
-            <div className="mr-1 flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground/70">
+            <div className="mr-1 flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wider text-foreground/65">
               <SearchIcon className="h-3 w-3" />
               Jump to
             </div>
@@ -118,7 +118,7 @@ function SectionsPreviewCard() {
               <Sparkles className="h-3.5 w-3.5" />
             </div>
             <div>
-              <div className="text-[10px] uppercase tracking-widest text-muted-foreground/70">In this guide</div>
+              <div className="text-[10px] uppercase tracking-widest text-foreground/65">In this guide</div>
               <div className="text-[12px] font-semibold text-foreground">
                 {total} sections · {groupCount} groups
               </div>
@@ -148,7 +148,7 @@ function SectionsPreviewCard() {
                   {FirstIcon && <FirstIcon className="h-3 w-3" />}
                   <span className="truncate">{group}</span>
                 </div>
-                <div className="mt-1.5 text-[11px] leading-snug text-muted-foreground">
+                <div className="mt-1.5 text-[11px] leading-snug text-foreground/75">
                   {items.length} {items.length === 1 ? 'section' : 'sections'}
                 </div>
               </motion.div>

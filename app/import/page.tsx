@@ -2,6 +2,7 @@
 
 import dynamic from 'next/dynamic';
 import { DataBoundary } from '@/components/boundaries/data-boundary';
+import { PageTransition } from '@/components/page-transition';
 
 const ImportSkeleton = () => (
   <div className="flex flex-col min-h-screen p-5 space-y-6 max-w-md mx-auto">
@@ -25,10 +26,12 @@ const ImportView = dynamic(
 
 export default function ImportPage() {
     return (
-        <main className="min-h-screen pb-20">
-            <DataBoundary>
-                <ImportView />
-            </DataBoundary>
-        </main>
+        <PageTransition>
+            <main className="min-h-screen pb-20">
+                <DataBoundary>
+                    <ImportView />
+                </DataBoundary>
+            </main>
+        </PageTransition>
     );
 }

@@ -96,13 +96,13 @@ export function SearchPlaygroundDemo() {
       </div>
 
       <div className="flex items-center gap-2 rounded-2xl border border-white/10 bg-background/60 px-3 py-2.5 focus-within:border-primary/40 focus-within:bg-background/80">
-        <SearchIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
+        <SearchIcon className="h-4 w-4 shrink-0 text-foreground/75" />
         <input
           aria-label="Search query"
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Try: uber #travel >500"
-          className="min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground/60"
+          className="min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-foreground/55"
           spellCheck={false}
           autoCapitalize="off"
           autoCorrect="off"
@@ -112,7 +112,7 @@ export function SearchPlaygroundDemo() {
             type="button"
             aria-label="Clear"
             onClick={() => setQ('')}
-            className="rounded-full p-1 text-muted-foreground hover:bg-white/5 hover:text-foreground"
+            className="rounded-full p-1 text-foreground/75 hover:bg-white/5 hover:text-foreground"
           >
             <X className="h-3.5 w-3.5" />
           </button>
@@ -136,7 +136,7 @@ export function SearchPlaygroundDemo() {
       {/* What we understood */}
       {tokens.length > 0 && (
         <div className="mt-3 flex flex-wrap items-center gap-1.5 text-[11px]">
-          <span className="text-muted-foreground/70">Looking for:</span>
+          <span className="text-foreground/65">Looking for:</span>
           {tokens.map((t, i) => {
             const tone =
               t.kind === 'text'
@@ -167,10 +167,10 @@ export function SearchPlaygroundDemo() {
       {/* Results */}
       <div className="mt-4 rounded-xl border border-white/10 bg-background/40">
         <div className="flex items-center justify-between border-b border-white/5 px-3 py-2 text-[11px]">
-          <span className="text-muted-foreground/70">
+          <span className="text-foreground/65">
             {results.length} {results.length === 1 ? 'result' : 'results'} of {TXNS.length}
           </span>
-          {tokens.length === 0 && <span className="text-muted-foreground/50">Showing all — start typing</span>}
+          {tokens.length === 0 && <span className="text-foreground/50">Showing all — start typing</span>}
         </div>
         <ul className="h-[260px] overflow-y-auto divide-y divide-white/5">
           <AnimatePresence initial={false}>
@@ -187,7 +187,7 @@ export function SearchPlaygroundDemo() {
               >
                 <div className="min-w-0">
                   <div className="truncate text-foreground/95">{tx.desc}</div>
-                  <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[10px] text-muted-foreground">
+                  <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[10px] text-foreground/75">
                     <span>{tx.category}</span>
                     <span>·</span>
                     <span>{tx.date}</span>
@@ -198,19 +198,19 @@ export function SearchPlaygroundDemo() {
                     ))}
                   </div>
                 </div>
-                <div className="font-mono text-foreground/85">−₹{tx.amount.toLocaleString('en-IN')}</div>
+                <div className="font-mono text-foreground">−₹{tx.amount.toLocaleString('en-IN')}</div>
               </motion.li>
             ))}
           </AnimatePresence>
           {results.length === 0 && (
-            <li className="px-3 py-6 text-center text-[12px] text-muted-foreground">
+            <li className="px-3 py-6 text-center text-[12px] text-foreground/75">
               No matches. Try one of the chips above.
             </li>
           )}
         </ul>
       </div>
 
-      <p className="mt-3 text-center text-[11px] text-muted-foreground/80">
+      <p className="mt-3 text-center text-[11px] text-foreground/80">
         This works exactly like the real Search inside the app. Mix words, amounts (<code className="rounded bg-white/5 px-1">{'>'}500</code>), and tags (<code className="rounded bg-white/5 px-1">#travel</code>) — every part has to match.
       </p>
     </div>

@@ -2,6 +2,7 @@
 
 import dynamic from 'next/dynamic';
 import { DataBoundary } from '@/components/boundaries/data-boundary';
+import { PageTransition } from '@/components/page-transition';
 
 const AnalyticsSkeleton = () => (
   <div className="flex flex-col min-h-screen p-5 space-y-6 max-w-md mx-auto">
@@ -22,8 +23,10 @@ const AnalyticsView = dynamic(
 
 export default function AnalyticsPage() {
     return (
-        <DataBoundary onReset={() => window.location.reload()}>
-            <AnalyticsView />
-        </DataBoundary>
+        <PageTransition>
+            <DataBoundary onReset={() => window.location.reload()}>
+                <AnalyticsView />
+            </DataBoundary>
+        </PageTransition>
     );
 }

@@ -6,7 +6,6 @@ import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-motion';
 import { Lock, Eye, EyeClosed, ArrowRight } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
-import { FallingPattern } from '@/components/ui/falling-pattern';
 import { cn } from "@/lib/utils";
 import { toast } from '@/utils/haptics';
 import { validatePassword } from '@/utils/password-validation';
@@ -95,13 +94,14 @@ export default function UpdatePassword() {
 
 
     return (
-        <div className="w-full min-h-[100dvh] bg-background relative overflow-hidden flex items-center justify-center">
-            <FallingPattern color="#6237A0" className="absolute inset-0 z-0" />
+        <div className="w-full min-h-[100dvh] relative flex items-center justify-center bg-transparent">
 
+            {/* Opacity intentionally omitted — template cross-fades pages,
+                and double-fading caused a visible blink. */}
             <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.8 }}
+                initial={{ y: 20 }}
+                animate={{ y: 0 }}
+                transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
                 className="w-full max-w-sm relative z-10"
                 style={{ perspective: 1500 }}
             >

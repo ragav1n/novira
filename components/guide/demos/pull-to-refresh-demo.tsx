@@ -25,29 +25,42 @@ function Inner({ play }: { play: boolean }) {
 
     async function loop() {
       while (mounted) {
-        // Reset (instant)
-        await Promise.all([
-          animateContent(contentRef.current, { y: 0 }, { duration: 0 }),
-          animateIcon(iconRef.current, { opacity: 0, rotate: 0, scale: 0.6 }, { duration: 0 }),
-        ]);
-        await new Promise((r) => setTimeout(r, 800));
+        // Bail if either ref unmounted between iterations — passing null to
+        // framer-motion's animate() makes its internal WeakMap throw.
+        if (!contentRef.current || !iconRef.current) break;
+        try {
+          // Reset (instant)
+          await Promise.all([
+            animateContent(contentRef.current, { y: 0 }, { duration: 0.001 }),
+            animateIcon(iconRef.current, { opacity: 0, rotate: 0, scale: 0.6 }, { duration: 0.001 }),
+          ]);
+          if (!mounted || !contentRef.current || !iconRef.current) break;
+          await new Promise((r) => setTimeout(r, 800));
 
-        // Pull down — same easing on both so they move as one
-        await Promise.all([
-          animateContent(contentRef.current, { y: 80 }, { duration: 0.6, ease: EASE_OUT_SOFT }),
-          animateIcon(iconRef.current, { opacity: 1, scale: 1, rotate: 270 }, { duration: 0.6, ease: EASE_OUT_SOFT }),
-        ]);
+          if (!mounted || !contentRef.current || !iconRef.current) break;
+          // Pull down — same easing on both so they move as one
+          await Promise.all([
+            animateContent(contentRef.current, { y: 80 }, { duration: 0.6, ease: EASE_OUT_SOFT }),
+            animateIcon(iconRef.current, { opacity: 1, scale: 1, rotate: 270 }, { duration: 0.6, ease: EASE_OUT_SOFT }),
+          ]);
 
-        // Spin (refreshing) — slightly faster, fewer rotations so the loop stays brisk
-        await animateIcon(iconRef.current, { rotate: 270 + 720 }, { duration: 1.0, ease: 'linear' });
+          if (!mounted || !iconRef.current) break;
+          // Spin (refreshing)
+          await animateIcon(iconRef.current, { rotate: 270 + 720 }, { duration: 1.0, ease: 'linear' });
 
-        // Snap back — soft spring on the content, gentle fade on the icon
-        await Promise.all([
-          animateContent(contentRef.current, { y: 0 }, SLIDE),
-          animateIcon(iconRef.current, { opacity: 0, scale: 0.6 }, { duration: 0.32, ease: EASE_OUT_SOFT }),
-        ]);
+          if (!mounted || !contentRef.current || !iconRef.current) break;
+          // Snap back — soft spring on the content, gentle fade on the icon
+          await Promise.all([
+            animateContent(contentRef.current, { y: 0 }, SLIDE),
+            animateIcon(iconRef.current, { opacity: 0, scale: 0.6 }, { duration: 0.32, ease: EASE_OUT_SOFT }),
+          ]);
 
-        await new Promise((r) => setTimeout(r, 1800));
+          if (!mounted) break;
+          await new Promise((r) => setTimeout(r, 1800));
+        } catch {
+          // Animation interrupted by unmount — exit cleanly.
+          break;
+        }
       }
     }
     loop();
@@ -83,19 +96,19 @@ function Inner({ play }: { play: boolean }) {
             </div>
           </div>
           <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-            <div className="text-[10px] uppercase tracking-widest text-muted-foreground/70">Available this month</div>
+            <div className="text-[10px] uppercase tracking-widest text-foreground/65">Available this month</div>
             <div className="mt-1 text-2xl font-semibold text-foreground">₹42,180</div>
             <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
               <div className="h-full w-[63%] bg-gradient-to-r from-primary to-fuchsia-400" />
             </div>
           </div>
           <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-            <div className="text-[10px] uppercase tracking-widest text-muted-foreground/70">Recent</div>
+            <div className="text-[10px] uppercase tracking-widest text-foreground/65">Recent</div>
             <div className="mt-2 space-y-2">
               {['Zara', 'Uber', 'Blue Tokai'].map((n, i) => (
                 <div key={n} className="flex items-center justify-between text-[12px]">
-                  <span className="text-foreground/85">{n}</span>
-                  <span className="text-muted-foreground">−₹{[2340, 156, 380][i]}</span>
+                  <span className="text-foreground">{n}</span>
+                  <span className="text-foreground/75">−₹{[2340, 156, 380][i]}</span>
                 </div>
               ))}
             </div>

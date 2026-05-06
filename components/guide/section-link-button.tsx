@@ -31,7 +31,7 @@ export function SectionLinkButton({ sectionId, title }: { sectionId: string; tit
       onClick={onClick}
       aria-label={copied ? `Link to ${title} copied` : `Copy link to ${title}`}
       className={cn(
-        'inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.02] text-muted-foreground transition-all hover:border-primary/40 hover:bg-primary/10 hover:text-primary',
+        'inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.02] text-foreground/75 transition-all hover:border-primary/40 hover:bg-primary/10 hover:text-primary',
         copied && 'border-emerald-400/40 bg-emerald-500/10 text-emerald-300'
       )}
     >

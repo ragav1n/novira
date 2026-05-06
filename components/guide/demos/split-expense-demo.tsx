@@ -50,10 +50,10 @@ function Inner({ play }: { play: boolean }) {
           </div>
           <div className="min-w-0 flex-1">
             <div className="text-sm font-semibold text-foreground">Pizza Friday</div>
-            <div className="text-[11px] text-muted-foreground">Food · Tonight</div>
+            <div className="text-[11px] text-foreground/75">Food · Tonight</div>
           </div>
           <div className="text-right">
-            <div className="text-[11px] uppercase tracking-widest text-muted-foreground/70">Total</div>
+            <div className="text-[11px] uppercase tracking-widest text-foreground/65">Total</div>
             <div className="font-mono text-sm font-semibold text-foreground">₹90.00</div>
           </div>
         </div>
@@ -94,7 +94,7 @@ function Inner({ play }: { play: boolean }) {
           })}
         </div>
 
-        <div className="mt-5 flex h-4 items-center justify-center gap-1.5 text-[11px] text-muted-foreground">
+        <div className="mt-5 flex h-4 items-center justify-center gap-1.5 text-[11px] text-foreground/75">
           <Users className="h-3 w-3" />
           <AnimatePresence mode="wait" initial={false}>
             <motion.span

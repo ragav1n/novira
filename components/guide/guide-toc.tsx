@@ -49,13 +49,13 @@ export function GuideTocDesktop() {
 
   return (
     <nav className="sticky top-24 max-h-[calc(100vh-7rem)] w-[260px] shrink-0 overflow-y-auto pr-2" aria-label="Table of contents">
-      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground/70">
+      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-foreground/65">
         On this page
       </div>
       <div className="mt-3 space-y-5">
         {GUIDE_GROUPS.map((group) => (
           <div key={group}>
-            <div className="mb-1.5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground/50">
+            <div className="mb-1.5 text-[11px] font-medium uppercase tracking-wider text-foreground/55">
               {group}
             </div>
             <ul className="space-y-0.5">
@@ -70,10 +70,10 @@ export function GuideTocDesktop() {
                         'group flex items-center gap-2 rounded-lg px-2 py-1.5 text-[13px] transition-colors',
                         isActive
                           ? 'bg-primary/10 text-primary'
-                          : 'text-muted-foreground hover:bg-white/5 hover:text-foreground'
+                          : 'text-foreground/75 hover:bg-white/5 hover:text-foreground'
                       )}
                     >
-                      <Icon className={cn('h-3.5 w-3.5 shrink-0', isActive ? 'text-primary' : 'text-muted-foreground/70 group-hover:text-foreground')} />
+                      <Icon className={cn('h-3.5 w-3.5 shrink-0', isActive ? 'text-primary' : 'text-foreground/70 group-hover:text-foreground')} />
                       <span className="truncate">{s.title}</span>
                     </a>
                   </li>

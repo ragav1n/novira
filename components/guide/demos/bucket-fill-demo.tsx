@@ -57,10 +57,10 @@ function Inner({ play }: { play: boolean }) {
           </div>
           <div className="min-w-0 flex-1">
             <div className="text-sm font-semibold text-foreground">Tokyo trip</div>
-            <div className="text-[11px] text-muted-foreground">Bucket · Apr 12 → 21</div>
+            <div className="text-[11px] text-foreground/75">Bucket · Apr 12 → 21</div>
           </div>
           <div className="text-right">
-            <div className="text-[11px] uppercase tracking-widest text-muted-foreground/70">Spent</div>
+            <div className="text-[11px] uppercase tracking-widest text-foreground/65">Spent</div>
             <motion.div
               key={spent}
               initial={{ opacity: 0, y: -4 }}
@@ -81,7 +81,7 @@ function Inner({ play }: { play: boolean }) {
             style={{ width: '100%', willChange: 'transform' }}
           />
         </div>
-        <div className="mt-1 flex items-center justify-between text-[11px] text-muted-foreground">
+        <div className="mt-1 flex items-center justify-between text-[11px] text-foreground/75">
           <span>{pct.toFixed(0)}% of ₹{TOTAL.toLocaleString('en-IN')}</span>
           <span>{Math.max(0, TOTAL - spent).toLocaleString('en-IN')} left</span>
         </div>
@@ -100,8 +100,8 @@ function Inner({ play }: { play: boolean }) {
                 style={{ willChange: 'transform, opacity' }}
                 className="flex items-center justify-between rounded-xl border border-white/5 bg-white/[0.02] px-3 py-2 text-[12px] transform-gpu"
               >
-                <span className="text-foreground/85">{t.name}</span>
-                <span className="font-mono text-muted-foreground">−₹{t.amount.toLocaleString('en-IN')}</span>
+                <span className="text-foreground">{t.name}</span>
+                <span className="font-mono text-foreground/75">−₹{t.amount.toLocaleString('en-IN')}</span>
               </motion.div>
             ))}
           </AnimatePresence>

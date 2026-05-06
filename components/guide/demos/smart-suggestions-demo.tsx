@@ -58,9 +58,9 @@ function Inner({ play }: { play: boolean }) {
   return (
     <div className="mx-auto max-w-md">
       <div className="rounded-2xl border border-white/10 bg-zinc-950/60 p-5">
-        <div className="text-[10px] uppercase tracking-widest text-muted-foreground/70">Description</div>
+        <div className="text-[10px] uppercase tracking-widest text-foreground/65">Description</div>
         <div className="mt-2 flex items-baseline">
-          <span className="font-medium text-foreground">{text || <span className="text-muted-foreground/50">Where did you spend?</span>}</span>
+          <span className="font-medium text-foreground">{text || <span className="text-foreground/50">Where did you spend?</span>}</span>
           <motion.span
             aria-hidden
             animate={{ opacity: [1, 0.15, 1] }}
@@ -80,7 +80,7 @@ function Inner({ play }: { play: boolean }) {
                 transition={FADE}
                 className="flex flex-wrap gap-1.5 transform-gpu"
               >
-                <div className="mb-0.5 w-full text-[10px] uppercase tracking-widest text-muted-foreground/70">
+                <div className="mb-0.5 w-full text-[10px] uppercase tracking-widest text-foreground/65">
                   Smart suggestions
                 </div>
                 {suggestions.map((s, i) => {
@@ -103,7 +103,7 @@ function Inner({ play }: { play: boolean }) {
             )}
           </AnimatePresence>
         </div>
-        <p className="mt-3 text-[11px] leading-relaxed text-muted-foreground">
+        <p className="mt-3 text-[11px] leading-relaxed text-foreground/75">
           When you type a description Novira recognizes, it offers fills from your past expenses — one tap pulls in the category, payment method, location, and bucket all at once.
         </p>
       </div>

@@ -106,7 +106,10 @@ export function GuideLayout() {
 
   return (
     <MotionConfig transition={SOFT} reducedMotion="user">
-    <div className="relative mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 sm:py-10">
+    {/* z-10 lifts the entire guide above MarketingBackground's multiply-blended
+        overlay (z-0/1/2) so text and demos render at full contrast instead of
+        getting darkened through it. */}
+    <div className="relative z-10 mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 sm:py-10">
       <ReadingProgress />
 
       {/* Top bar with back-to-app link */}
@@ -157,7 +160,7 @@ export function GuideLayout() {
 
           <footer className="mt-16 rounded-3xl border border-white/10 bg-gradient-to-br from-primary/[0.06] via-fuchsia-500/[0.03] to-transparent p-8 text-center">
             <h3 className="text-xl font-semibold text-foreground">That’s the whole tour.</h3>
-            <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">
+            <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-foreground/80">
               Novira keeps shipping. Open the app whenever you’re ready — the <strong>?</strong> icon in the dashboard header is your quick way back here.
             </p>
             <div className="mt-5 flex justify-center gap-3">

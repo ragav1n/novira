@@ -2,6 +2,7 @@
 
 import dynamic from 'next/dynamic';
 import { DataBoundary } from '@/components/boundaries/data-boundary';
+import { PageTransition } from '@/components/page-transition';
 
 const AddExpenseView = dynamic(
     () => import('@/components/add-expense-view').then(mod => mod.AddExpenseView),
@@ -10,8 +11,10 @@ const AddExpenseView = dynamic(
 
 export default function AddExpensePage() {
     return (
-        <DataBoundary>
-            <AddExpenseView />
-        </DataBoundary>
+        <PageTransition>
+            <DataBoundary>
+                <AddExpenseView />
+            </DataBoundary>
+        </PageTransition>
     );
 }

@@ -2,6 +2,7 @@
 
 import dynamic from 'next/dynamic';
 import { UIBoundary } from '@/components/boundaries/ui-boundary';
+import { PageTransition } from '@/components/page-transition';
 
 const SubscriptionsSkeleton = () => (
   <div className="flex flex-col min-h-screen p-5 space-y-6 max-w-md mx-auto">
@@ -24,8 +25,10 @@ const SubscriptionsView = dynamic(
 
 export default function SubscriptionsPage() {
     return (
-        <UIBoundary>
-            <SubscriptionsView />
-        </UIBoundary>
+        <PageTransition>
+            <UIBoundary>
+                <SubscriptionsView />
+            </UIBoundary>
+        </PageTransition>
     );
 }

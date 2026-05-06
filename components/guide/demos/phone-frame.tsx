@@ -23,7 +23,7 @@ export function PhoneFrame({
         </div>
       </div>
       {label && (
-        <div className="mt-2.5 text-center text-[11px] text-muted-foreground/80">{label}</div>
+        <div className="mt-2.5 text-center text-[11px] text-foreground/80">{label}</div>
       )}
     </div>
   );

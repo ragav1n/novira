@@ -17,6 +17,7 @@ import { PWAUpdater } from '@/components/pwa-updater';
 import { toast, ImpactStyle } from '@/utils/haptics';
 import { RefreshCcw } from 'lucide-react';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
+import { MarketingBackground } from '@/components/ui/marketing-background';
 
 // ─── Desktop Top Nav ──────────────────────────────────────────────────────────
 
@@ -421,6 +422,13 @@ export function MobileLayout({ children, defaultIsDesktop = false }: { children:
     const showNav = !isAuthPage && !isPublicPage && isAuthenticated;
     const showDesktop = isDesktop && !isNative && showNav;
 
+    // Marketing background visible on the public marketing pages, the auth
+    // pages, and the landing page (`/` while signed-out). Mounted
+    // unconditionally below so the WebGL smoke canvas only initialises once
+    // and never re-mounts mid-navigation; we just toggle opacity, which makes
+    // inter-page transitions a smooth crossfade instead of a flash.
+    const showMarketingBg = isPublicPage || isAuthPage || (pathname === '/' && !isAuthenticated);
+
     // Pull-to-refresh is mobile-only (touch). Only enable on the dashboard route
     // — other routes have their own scroll containers / refresh affordances.
     const ptrEnabled = showNav && !showDesktop && pathname === '/';
@@ -446,7 +454,10 @@ export function MobileLayout({ children, defaultIsDesktop = false }: { children:
             isCoupleWorkspace && "theme-couple",
             isHomeWorkspace && "theme-home"
         )}>
-            {/* Global Background Glows */}
+            {/* Global Background Glows. On public marketing pages the
+                MarketingBackground (smoke + overlay + grain) paints over these
+                so they're effectively hidden, but we keep them in the DOM
+                unconditionally to avoid a hydration mismatch. */}
             <div className="fixed inset-0 pointer-events-none overflow-hidden z-0 transition-colors duration-500 gpu">
                 <div className={cn(
                     "absolute top-[20%] -right-[10%] w-[50%] h-[50%] rounded-full opacity-10 gpu transition-colors duration-500 glow-optimized",
@@ -466,6 +477,21 @@ export function MobileLayout({ children, defaultIsDesktop = false }: { children:
                         ? "bg-gradient-to-br from-amber-950/10 via-transparent to-transparent"
                         : "bg-gradient-to-br from-primary/10 via-transparent to-transparent"
             )} />
+
+            {/* Persistent marketing background. Always mounted so the smoke
+                canvas stays alive across navigation; opacity-faded in/out per
+                route so transitions don't flash a solid colour. The smoke's
+                RAF loop is paused when invisible to avoid wasting GPU cycles
+                on pages that hide it (dashboard, etc.). */}
+            <div
+                aria-hidden
+                className={cn(
+                    'pointer-events-none transition-opacity duration-500 ease-out',
+                    showMarketingBg ? 'opacity-100' : 'opacity-0'
+                )}
+            >
+                <MarketingBackground paused={!showMarketingBg} />
+            </div>
 
             {/* Desktop Top Nav */}
             {showDesktop && (
@@ -502,12 +528,22 @@ export function MobileLayout({ children, defaultIsDesktop = false }: { children:
 
             {/* Main Content */}
             <main ref={mainRef} id="main-content" tabIndex={-1} className={cn(
-                "flex-1 w-full overflow-y-auto no-scrollbar relative flex flex-col",
+                // z-10 lifts every page's content above the fixed background
+                // layers (workspace glow z-0, marketing smoke z-0, overlay z-1,
+                // grain z-2) so the multiply-blended overlay never darkens
+                // page content.
+                "relative z-10 flex-1 w-full overflow-y-auto no-scrollbar flex flex-col",
                 showDesktop ? "pt-20" : (showNav ? "pb-24" : "pb-0"),
                 ptrEnabled && "overscroll-y-contain"
             )}>
                 <UIBoundary>
-                    <AnimatePresence mode="wait" initial={false}>
+                    {/* No `mode="wait"` — that mode introduced a frame gap
+                        between the outgoing page's exit and the incoming
+                        page's enter, which read as a "blink" against the
+                        persistent marketing background. Default sync mode
+                        overlaps exit + enter so the two opacities cross-fade
+                        smoothly with no momentary blank. */}
+                    <AnimatePresence initial={false}>
                         {children}
                     </AnimatePresence>
                 </UIBoundary>

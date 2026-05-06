@@ -50,10 +50,10 @@ export function Glossary() {
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <div className="hidden text-[12px] text-muted-foreground sm:block">
+          <div className="hidden text-[12px] text-foreground/65 sm:block">
             {TERMS.length} terms · click to {open ? 'hide' : 'expand'}
           </div>
-          <ChevronDown className={cn('h-4 w-4 text-muted-foreground transition-transform', open && 'rotate-180')} />
+          <ChevronDown className={cn('h-4 w-4 text-foreground/65 transition-transform', open && 'rotate-180')} />
         </div>
       </button>
 
@@ -79,7 +79,7 @@ export function Glossary() {
                       <Icon className="h-3.5 w-3.5 shrink-0 text-primary/85" />
                       <span className="text-[13px] font-semibold text-foreground">{t.word}</span>
                     </div>
-                    <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">
+                    <p className="mt-1.5 text-[13px] leading-relaxed text-foreground/85">
                       {t.short}
                     </p>
                   </>

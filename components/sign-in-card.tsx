@@ -7,7 +7,6 @@ import { Mail, Lock, Eye, EyeClosed, ArrowRight } from 'lucide-react';
 
 import { useRouter, useSearchParams } from 'next/navigation';
 import { cn } from "@/lib/utils"
-import { SmokeBackground } from './ui/spooky-smoke-animation';
 import { supabase } from '@/lib/supabase';
 import { authRateLimiter } from '@/utils/auth-rate-limiter';
 import { validatePassword } from '@/utils/password-validation';
@@ -200,15 +199,16 @@ export function Component({ isSignUp = false }: { isSignUp?: boolean }) {
 
   // Force hydration sync
   return (
-    <div className="w-full min-h-[100dvh] relative overflow-hidden flex items-center justify-center" style={{ background: '#0c081e' }}>
-      <div className="fixed inset-0 z-0 pointer-events-none">
-        <SmokeBackground smokeColor="#8A2BE2" />
-      </div>
-      <div className="fixed inset-0 z-[1] pointer-events-none" style={{ background: 'radial-gradient(60% 50% at 50% 20%, rgba(12,8,30,0) 0%, rgba(10,0,24,0.55) 100%), linear-gradient(180deg, rgba(10,0,24,0.35), rgba(10,0,24,0.8))', mixBlendMode: 'multiply' }} />
+    <div className="w-full min-h-[100dvh] relative flex items-center justify-center bg-transparent">
 
+      {/* Opacity is intentionally not animated here — the route template
+          already cross-fades pages, and stacking another opacity animation
+          on top causes a visible "blink" because the two multiply
+          (template_opacity × card_opacity). We keep only the y-translate so
+          the card still feels like it settles in. */}
       <motion.div
-        initial={{ opacity: 0, y: 15 }}
-        animate={{ opacity: 1, y: 0 }}
+        initial={{ y: 15 }}
+        animate={{ y: 0 }}
         transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
         className="w-full max-w-sm relative z-10"
         style={{ perspective: 1200 }}

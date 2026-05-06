@@ -46,7 +46,7 @@ export function GuideSection({
             {tryIt && <TryItLink href={tryIt.href} label={tryIt.label} className="hidden sm:inline-flex" />}
           </h2>
           {intro && (
-            <p className="mt-2 max-w-2xl text-base leading-relaxed text-muted-foreground">
+            <p className="mt-2 max-w-2xl text-base leading-relaxed text-foreground/85">
               {intro}
             </p>
           )}
@@ -64,7 +64,7 @@ export function GuideSection({
         </div>
       )}
 
-      <div className="prose prose-invert max-w-none text-[15px] leading-relaxed text-foreground/90 [&_h3]:mt-8 [&_h3]:mb-2 [&_h3]:text-lg [&_h3]:font-semibold [&_h3]:text-foreground [&_p]:my-3 [&_ul]:my-3 [&_ul]:list-none [&_ul]:pl-0 [&_ol]:my-3 [&_ol]:pl-5 [&_li]:my-1.5 [&_strong]:font-semibold [&_strong]:text-foreground">
+      <div className="prose prose-invert max-w-none text-[15px] leading-relaxed text-foreground [&_h3]:mt-8 [&_h3]:mb-2 [&_h3]:text-lg [&_h3]:font-semibold [&_h3]:text-foreground [&_p]:my-3 [&_p]:text-foreground [&_ul]:my-3 [&_ul]:list-none [&_ul]:pl-0 [&_ul]:text-foreground [&_ol]:my-3 [&_ol]:pl-5 [&_ol]:text-foreground [&_li]:my-1.5 [&_li]:text-foreground [&_strong]:font-semibold [&_strong]:text-foreground">
         {children}
       </div>
     </section>
@@ -80,7 +80,7 @@ export function StepList({ children }: { children: React.ReactNode }) {
 
 export function Step({ n, children }: { n: number; children: React.ReactNode }) {
   return (
-    <li className="flex items-start gap-3 text-[15px] leading-relaxed text-foreground/90">
+    <li className="flex items-start gap-3 text-[15px] leading-relaxed text-foreground">
       <span className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-primary/30 bg-primary/10 text-[12px] font-semibold text-primary">
         {n}
       </span>
@@ -95,8 +95,8 @@ export function Step({ n, children }: { n: number; children: React.ReactNode }) 
 export function FactRow({ label, children }: { label: React.ReactNode; children: React.ReactNode }) {
   return (
     <div className="grid grid-cols-[140px_1fr] items-start gap-x-4 gap-y-1 border-b border-white/5 py-2.5 last:border-b-0 sm:grid-cols-[180px_1fr]">
-      <div className="text-[13px] font-medium text-muted-foreground">{label}</div>
-      <div className="text-[14px] leading-relaxed text-foreground/95">{children}</div>
+      <div className="text-[13px] font-medium text-foreground/70">{label}</div>
+      <div className="text-[14px] leading-relaxed text-foreground">{children}</div>
     </div>
   );
 }

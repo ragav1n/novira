@@ -49,7 +49,7 @@ function Inner({ play }: { play: boolean }) {
   return (
     <div className="mx-auto max-w-md">
       <div className="rounded-2xl border border-white/10 bg-zinc-950/60 p-5">
-        <div className="text-[10px] uppercase tracking-widest text-muted-foreground/70">Last 90 days</div>
+        <div className="text-[10px] uppercase tracking-widest text-foreground/65">Last 90 days</div>
 
         {/* Fixed height fits the worst case (4 transactions stacked) so the
             section content below never shifts while the demo cycles. */}
@@ -70,8 +70,8 @@ function Inner({ play }: { play: boolean }) {
                     <Music className="h-3.5 w-3.5" />
                   </div>
                   <div className="min-w-0 flex-1 text-[13px] text-foreground/90">Spotify Premium</div>
-                  <div className="text-[11px] text-muted-foreground">{t.date}</div>
-                  <div className="font-mono text-[12px] text-foreground/85">−₹{t.amount}</div>
+                  <div className="text-[11px] text-foreground/75">{t.date}</div>
+                  <div className="font-mono text-[12px] text-foreground">−₹{t.amount}</div>
                 </motion.div>
               ))}
           </AnimatePresence>
@@ -97,7 +97,7 @@ function Inner({ play }: { play: boolean }) {
                     Track
                   </button>
                 </div>
-                <p className="mt-3 text-[11px] leading-relaxed text-muted-foreground">
+                <p className="mt-3 text-[11px] leading-relaxed text-foreground/75">
                   Spotted 4 similar charges on a steady monthly rhythm. Tap Track to start tracking it as recurring.
                 </p>
               </motion.div>

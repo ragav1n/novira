@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation'
 import { Session } from '@supabase/supabase-js'
 import { useUserPreferences } from '@/components/providers/user-preferences-provider'
 import { DataBoundary } from '@/components/boundaries/data-boundary'
+import { PageTransition } from '@/components/page-transition'
 
 export default function GroupsPage() {
     const router = useRouter()
@@ -29,8 +30,10 @@ export default function GroupsPage() {
     if (!isAuthenticated) return null
 
     return (
-        <DataBoundary>
-            <GroupsView />
-        </DataBoundary>
+        <PageTransition>
+            <DataBoundary>
+                <GroupsView />
+            </DataBoundary>
+        </PageTransition>
     )
 }

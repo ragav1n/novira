@@ -60,10 +60,10 @@ function Inner({ play }: { play: boolean }) {
       <div className="rounded-2xl border border-white/10 bg-zinc-950/60 p-5">
         <div className="flex items-center justify-between">
           <div>
-            <div className="text-[10px] uppercase tracking-widest text-muted-foreground/70">April</div>
+            <div className="text-[10px] uppercase tracking-widest text-foreground/65">April</div>
             <div className="text-sm font-semibold text-foreground">Spending heatmap</div>
           </div>
-          <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+          <div className="flex items-center gap-1 text-[10px] text-foreground/75">
             <span>less</span>
             {[0, 1, 2, 3, 4].map((n) => (
               <span key={n} className={`h-2 w-2 rounded-sm ${tone(n)}`} />

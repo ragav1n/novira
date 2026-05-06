@@ -27,7 +27,7 @@ export function Callout({
         <div className={cn('mt-0.5 shrink-0 rounded-lg p-1.5 ring-1', s.ring, s.tint)}>
           <Icon className={cn('h-3.5 w-3.5', s.text)} />
         </div>
-        <div className="flex-1 text-sm leading-relaxed text-foreground/90">
+        <div className="flex-1 text-sm leading-relaxed text-foreground">
           <div className={cn('mb-1 text-[11px] font-semibold uppercase tracking-wider', s.text)}>
             {title ?? s.label}
           </div>

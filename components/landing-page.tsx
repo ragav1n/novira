@@ -4,7 +4,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { SmokeBackground } from '@/components/ui/spooky-smoke-animation';
 import { AdvancedButton } from '@/components/ui/gradient-button';
 import { ShinyButton } from '@/components/ui/shiny-button';
 import {
@@ -89,7 +88,7 @@ function PhoneScreen() {
           <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)' }}>Good morning,</div>
           <div style={{ fontSize: 15, fontWeight: 700, letterSpacing: '-0.01em' }}>Raghul</div>
         </div>
-        <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'linear-gradient(135deg, #7B39FC, #C084FC)', display: 'grid', placeItems: 'center', fontSize: 12, fontWeight: 700 }}>S</div>
+        <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'linear-gradient(135deg, #7B39FC, #C084FC)', display: 'grid', placeItems: 'center', fontSize: 12, fontWeight: 700 }}>R</div>
       </div>
       <div style={{ background: 'linear-gradient(135deg, #4A0E8F 0%, #8A2BE2 50%, #EC4899 100%)', borderRadius: 18, padding: '14px 16px', position: 'relative', overflow: 'hidden', boxShadow: '0 10px 30px rgba(138,43,226,0.4)' }}>
         <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(120% 80% at 100% 0%, rgba(255,255,255,0.25), transparent 60%)' }} />
@@ -578,14 +577,6 @@ export function LandingPage() {
       }}
     >
 
-      {/* ── Background ─────────────────────────────────────────── */}
-      <div className="fixed inset-0 z-0 pointer-events-none" style={{ background: '#0c081e' }}>
-        <SmokeBackground smokeColor="#8A2BE2" />
-      </div>
-      {/* overlay */}
-      <div className="fixed inset-0 z-[1] pointer-events-none" style={{ background: 'radial-gradient(60% 50% at 50% 20%, rgba(12,8,30,0) 0%, rgba(10,0,24,0.55) 100%), linear-gradient(180deg, rgba(10,0,24,0.35), rgba(10,0,24,0.8))', mixBlendMode: 'multiply' }} />
-      {/* grain */}
-      <div className="fixed inset-0 z-[2] pointer-events-none" style={{ opacity: 0.07, mixBlendMode: 'overlay', backgroundImage: "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)' opacity='0.85'/></svg>\")" }} />
 
       {/* ── Fixed Nav ───────────────────────────────────────────── */}
       <header className="fixed top-0 left-0 right-0 z-50" style={{ backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', background: 'rgba(12,8,30,0.45)', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>

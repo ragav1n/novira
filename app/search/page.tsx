@@ -2,6 +2,7 @@
 
 import dynamic from 'next/dynamic';
 import { DataBoundary } from '@/components/boundaries/data-boundary';
+import { PageTransition } from '@/components/page-transition';
 
 const SearchSkeleton = () => (
   <div className="flex flex-col min-h-screen p-5 space-y-6 max-w-md mx-auto">
@@ -26,8 +27,10 @@ const SearchView = dynamic(
 
 export default function SearchPage() {
     return (
-        <DataBoundary onReset={() => window.location.reload()}>
-            <SearchView />
-        </DataBoundary>
+        <PageTransition>
+            <DataBoundary onReset={() => window.location.reload()}>
+                <SearchView />
+            </DataBoundary>
+        </PageTransition>
     );
 }

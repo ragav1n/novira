@@ -59,9 +59,9 @@ function Inner({ play }: { play: boolean }) {
   return (
     <div className="mx-auto max-w-sm">
       <div className="rounded-2xl border border-white/10 bg-zinc-950/60 p-5">
-        <div className="text-[10px] uppercase tracking-widest text-muted-foreground/70">Amount</div>
+        <div className="text-[10px] uppercase tracking-widest text-foreground/65">Amount</div>
         <div className="mt-2 flex items-baseline gap-2">
-          <span className="text-2xl font-medium text-muted-foreground">₹</span>
+          <span className="text-2xl font-medium text-foreground/75">₹</span>
           <div className="relative flex-1 font-mono text-3xl font-semibold tracking-tight text-foreground">
             <AnimatePresence mode="wait" initial={false}>
               {resolved ? (
@@ -111,7 +111,7 @@ function Inner({ play }: { play: boolean }) {
             )}
           </AnimatePresence>
         </div>
-        <div className="mt-4 text-[12px] leading-relaxed text-muted-foreground">
+        <div className="mt-4 text-[12px] leading-relaxed text-foreground/75">
           Type a math expression with <code className="rounded bg-white/5 px-1 text-[11px]">+</code>{' '}
           <code className="rounded bg-white/5 px-1 text-[11px]">-</code>{' '}
           <code className="rounded bg-white/5 px-1 text-[11px]">×</code>{' '}

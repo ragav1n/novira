@@ -23,12 +23,24 @@ function Inner({ play }: { play: boolean }) {
 
     async function loop() {
       while (mounted) {
-        await animate(scope.current, { x: 0 }, { duration: 0 });
-        await new Promise((r) => setTimeout(r, 800));
-        await animate(scope.current, { x: -128 }, SLIDE);
-        await new Promise((r) => setTimeout(r, 1500));
-        await animate(scope.current, { x: 0 }, SLIDE);
-        await new Promise((r) => setTimeout(r, 1900));
+        // Guard: bail if the row has unmounted mid-loop. Passing null to
+        // framer-motion's animate() makes its internal WeakMap throw.
+        if (!scope.current) break;
+        try {
+          await animate(scope.current, { x: 0 }, { duration: 0.001 });
+          if (!mounted || !scope.current) break;
+          await new Promise((r) => setTimeout(r, 800));
+          if (!mounted || !scope.current) break;
+          await animate(scope.current, { x: -128 }, SLIDE);
+          if (!mounted || !scope.current) break;
+          await new Promise((r) => setTimeout(r, 1500));
+          if (!mounted || !scope.current) break;
+          await animate(scope.current, { x: 0 }, SLIDE);
+          if (!mounted) break;
+          await new Promise((r) => setTimeout(r, 1900));
+        } catch {
+          break;
+        }
       }
     }
     loop();
@@ -61,12 +73,12 @@ function Inner({ play }: { play: boolean }) {
           </div>
           <div className="min-w-0 flex-1">
             <div className="truncate text-sm font-medium text-foreground">Blue Tokai</div>
-            <div className="text-[11px] text-muted-foreground">Food · Today</div>
+            <div className="text-[11px] text-foreground/75">Food · Today</div>
           </div>
           <div className="text-sm font-semibold text-foreground">−₹380</div>
         </motion.div>
       </div>
-      <p className="mt-3 text-center text-xs text-muted-foreground">
+      <p className="mt-3 text-center text-xs text-foreground/75">
         Swipe a transaction left to reveal <span className="text-foreground/90">Edit</span> and{' '}
         <span className="text-foreground/90">Delete</span>.
       </p>

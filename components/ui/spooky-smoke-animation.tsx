@@ -141,6 +141,11 @@ const hexToRgb = (hex: string): [number, number, number] | null => {
 
 interface SmokeBackgroundProps {
   smokeColor?: string;
+  /** When true, the requestAnimationFrame loop stops — the WebGL renderer
+   *  stays alive but no new frames are rendered, freeing CPU/GPU when the
+   *  background is hidden (e.g. on dashboard pages). Resuming restarts the
+   *  loop instantly. */
+  paused?: boolean;
 }
 
 // Reads `prefers-reduced-motion` and updates if the user toggles it.
@@ -158,13 +163,16 @@ function usePrefersReducedMotion(): boolean {
 
 export const SmokeBackground: React.FC<SmokeBackgroundProps> = ({
   smokeColor = '#808080',
+  paused = false,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rendererRef = useRef<Renderer | null>(null);
   const reducedMotion = usePrefersReducedMotion();
 
+  // Effect 1: WebGL renderer lifecycle — set up once, tear down on unmount or
+  // reduced-motion toggle. Independent of `paused` so the GPU context isn't
+  // torn down every time the background hides/shows.
   useEffect(() => {
-    // Honour prefers-reduced-motion: skip the WebGL/RAF pipeline entirely.
     if (reducedMotion) return;
     if (!canvasRef.current) return;
     const canvas = canvasRef.current;
@@ -175,6 +183,21 @@ export const SmokeBackground: React.FC<SmokeBackgroundProps> = ({
     handleResize();
     window.addEventListener('resize', handleResize);
 
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      renderer.reset();
+      rendererRef.current = null;
+    };
+  }, [reducedMotion]);
+
+  // Effect 2: RAF loop — only runs when not paused. Stopping cancels the
+  // animation frame chain entirely, so there's no per-frame callback cost
+  // when the smoke is invisible.
+  useEffect(() => {
+    if (reducedMotion || paused) return;
+    const renderer = rendererRef.current;
+    if (!renderer) return;
+
     let animationFrameId: number;
     const loop = (now: number) => {
       renderer.render(now);
@@ -182,13 +205,8 @@ export const SmokeBackground: React.FC<SmokeBackgroundProps> = ({
     };
     loop(0);
 
-    return () => {
-      window.removeEventListener('resize', handleResize);
-      cancelAnimationFrame(animationFrameId);
-      renderer.reset();
-      rendererRef.current = null;
-    };
-  }, [reducedMotion]);
+    return () => cancelAnimationFrame(animationFrameId);
+  }, [paused, reducedMotion]);
 
   useEffect(() => {
     const renderer = rendererRef.current;

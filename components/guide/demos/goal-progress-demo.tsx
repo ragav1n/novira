@@ -55,7 +55,7 @@ function Inner({ play }: { play: boolean }) {
           </div>
           <div className="min-w-0 flex-1">
             <div className="text-sm font-semibold text-foreground">Iceland trip</div>
-            <div className="text-[11px] text-muted-foreground">Goal · ₹{(progress * 1500).toLocaleString('en-IN')} of ₹1,50,000</div>
+            <div className="text-[11px] text-foreground/75">Goal · ₹{(progress * 1500).toLocaleString('en-IN')} of ₹1,50,000</div>
           </div>
           <motion.div
             key={progress}
@@ -85,7 +85,7 @@ function Inner({ play }: { play: boolean }) {
             />
           ))}
         </div>
-        <div className="mt-1 flex justify-between text-[10px] text-muted-foreground/70">
+        <div className="mt-1 flex justify-between text-[10px] text-foreground/65">
           <span>0%</span><span>25%</span><span>50%</span><span>75%</span><span>100%</span>
         </div>
 
