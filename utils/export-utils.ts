@@ -24,6 +24,19 @@ interface ExportTransaction {
     created_at?: string | null;
 }
 
+export interface ExportRecurringTemplate {
+    id: string;
+    description: string;
+    category: string;
+    amount: number;
+    currency: string;
+    frequency: 'daily' | 'weekly' | 'monthly' | 'yearly';
+    next_occurrence: string;
+    is_active: boolean;
+    payment_method?: string | null;
+    group_id?: string | null;
+}
+
 /**
  * Shared analytics computed once, consumed by both CSV and PDF generators.
  * Centralizing this prevents the two outputs from drifting in their numbers,
@@ -426,7 +439,8 @@ export const generateCSV = (
     buckets: any[] = [],
     groups: any[] = [],
     reportRange?: DateRange,
-    ownerInfo?: { email?: string; workspaceName?: string; monthlyBudget?: number }
+    ownerInfo?: { email?: string; workspaceName?: string; monthlyBudget?: number },
+    recurringTemplates: ExportRecurringTemplate[] = []
 ) => {
     // RFC 4180-compliant quoting — always quote strings
     const q = (val: string | number | null | undefined): string => {
@@ -645,6 +659,31 @@ export const generateCSV = (
         lines.push(blank());
     }
 
+    // ── Section 8b: Recurring Templates ───────────────────────────────────────
+    if (recurringTemplates.length > 0) {
+        lines.push(heading('RECURRING TEMPLATES'));
+        lines.push(row(
+            'Description', 'Category', 'Amount', 'Currency',
+            'Frequency', 'Next Occurrence', 'Active', 'Group', 'Payment Method'
+        ));
+        const sortedTemplates = [...recurringTemplates].sort((a, b) => a.next_occurrence.localeCompare(b.next_occurrence));
+        sortedTemplates.forEach(t => {
+            const group = t.group_id ? groupMap[t.group_id] : null;
+            lines.push(row(
+                t.description,
+                t.category.charAt(0).toUpperCase() + t.category.slice(1),
+                Number(t.amount).toFixed(2),
+                t.currency,
+                t.frequency.charAt(0).toUpperCase() + t.frequency.slice(1),
+                t.next_occurrence,
+                t.is_active ? 'Yes' : 'No',
+                group?.name || '',
+                t.payment_method || '',
+            ));
+        });
+        lines.push(blank());
+    }
+
     // ── Section 9: Transaction Details ────────────────────────────────────────
     lines.push(heading('TRANSACTION DETAILS'));
     lines.push(row(
@@ -711,7 +750,8 @@ export const generatePDF = async (
     buckets: any[] = [],
     groups: any[] = [],
     reportRange?: DateRange,
-    ownerInfo?: { email?: string; avatarUrl?: string | null; workspaceName?: string; monthlyBudget?: number }
+    ownerInfo?: { email?: string; avatarUrl?: string | null; workspaceName?: string; monthlyBudget?: number },
+    recurringTemplates: ExportRecurringTemplate[] = []
 ) => {
     const doc = new jsPDF({ putOnlyUsedFonts: true, compress: true });
     const pageWidth = doc.internal.pageSize.width;
@@ -1170,6 +1210,35 @@ export const generatePDF = async (
                 margin: { left: 14 },
             });
         }
+    }
+
+    // ── Recurring Templates (own page so it doesn't fight the transaction list) ──
+    if (recurringTemplates.length > 0) {
+        doc.addPage();
+        doc.setFontSize(13); doc.setFont('helvetica', 'bold'); doc.setTextColor(50, 50, 50);
+        doc.text('Recurring Templates', 14, 18);
+        doc.setFont('helvetica', 'normal');
+
+        const sortedTemplates = [...recurringTemplates].sort((a, b) => a.next_occurrence.localeCompare(b.next_occurrence));
+        const templateRows = sortedTemplates.map(t => [
+            t.description.length > 24 ? t.description.substring(0, 22) + '..' : t.description,
+            t.category.charAt(0).toUpperCase() + t.category.slice(1),
+            t.frequency.charAt(0).toUpperCase() + t.frequency.slice(1),
+            t.next_occurrence,
+            formatForPDF(Number(t.amount), t.currency),
+            t.is_active ? 'Active' : 'Paused',
+        ]);
+
+        autoTable(doc as any, {
+            head: [['Description', 'Category', 'Frequency', 'Next Due', 'Amount', 'Status']],
+            body: templateRows,
+            startY: 24,
+            theme: 'striped',
+            headStyles: { fillColor: [138, 43, 226], textColor: [255, 255, 255] },
+            styles: { fontSize: 8, cellPadding: 2 },
+            columnStyles: { 4: { halign: 'right' } },
+            margin: { top: 20 },
+        });
     }
 
     // ── Transaction Details (always on a fresh page so it can paginate cleanly) ──

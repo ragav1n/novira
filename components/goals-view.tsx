@@ -32,8 +32,12 @@ import {
     daysUntilDeadline, currentMilestone,
 } from '@/lib/goal-utils';
 import type { SavingsGoal, SavingsDeposit, GoalIcon, GoalColor } from '@/types/goal';
+import dynamic from 'next/dynamic';
 import { GoalCard } from '@/components/goals/goal-card';
-import { GoalHistorySheet } from '@/components/goals/goal-history-sheet';
+const GoalHistorySheet = dynamic(
+    () => import('@/components/goals/goal-history-sheet').then(m => m.GoalHistorySheet),
+    { ssr: false }
+);
 import { IconColorPicker } from '@/components/goals/icon-color-picker';
 import { resolveGoalColor, resolveGoalIcon } from '@/lib/goal-styles';
 

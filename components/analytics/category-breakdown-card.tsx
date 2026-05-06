@@ -1,5 +1,6 @@
 'use client';
 
+import { memo } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { ChartConfig, BasePieChart } from '@/components/charts/base-pie-chart';
@@ -23,7 +24,7 @@ interface Props {
     anomalies?: Record<string, { pct: number }>;
 }
 
-export function CategoryBreakdownCard({ title, categoryBreakdown, categorizedBreakdown, formatCurrency, analyticsDateRange, anomalies }: Props) {
+function CategoryBreakdownCardInner({ title, categoryBreakdown, categorizedBreakdown, formatCurrency, analyticsDateRange, anomalies }: Props) {
     const router = useRouter();
 
     return (
@@ -100,3 +101,5 @@ export function CategoryBreakdownCard({ title, categoryBreakdown, categorizedBre
         </div>
     );
 }
+
+export const CategoryBreakdownCard = memo(CategoryBreakdownCardInner);

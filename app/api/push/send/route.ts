@@ -20,6 +20,32 @@ interface PushPayload {
     url?: string;
 }
 
+const RATE_LIMIT_MAX = 10;
+const RATE_LIMIT_WINDOW_MS = 60_000;
+const rateBuckets = new Map<string, { count: number; resetAt: number }>();
+
+function checkRateLimit(userId: string): { allowed: boolean; retryAfterSec: number } {
+    const now = Date.now();
+    const bucket = rateBuckets.get(userId);
+    if (!bucket || bucket.resetAt <= now) {
+        rateBuckets.set(userId, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+        return { allowed: true, retryAfterSec: 0 };
+    }
+    if (bucket.count >= RATE_LIMIT_MAX) {
+        return { allowed: false, retryAfterSec: Math.ceil((bucket.resetAt - now) / 1000) };
+    }
+    bucket.count += 1;
+    return { allowed: true, retryAfterSec: 0 };
+}
+
+// Periodic cleanup so the map doesn't grow unbounded across stable users.
+setInterval(() => {
+    const now = Date.now();
+    for (const [k, v] of rateBuckets) {
+        if (v.resetAt <= now) rateBuckets.delete(k);
+    }
+}, RATE_LIMIT_WINDOW_MS).unref?.();
+
 /**
  * Internal API — send a push to a specific user_id.
  * Protected by a shared PUSH_SECRET to prevent abuse (only server-side callers).
@@ -42,6 +68,18 @@ export async function POST(request: NextRequest) {
 
     try {
         const { userId, payload }: { userId: string; payload: PushPayload } = await request.json();
+
+        if (!userId) {
+            return NextResponse.json({ error: 'userId required' }, { status: 400 });
+        }
+
+        const { allowed, retryAfterSec } = checkRateLimit(userId);
+        if (!allowed) {
+            return NextResponse.json(
+                { error: 'Rate limit exceeded', retryAfterSec },
+                { status: 429, headers: { 'Retry-After': String(retryAfterSec) } }
+            );
+        }
 
         // Use service-role client so RLS doesn't block this cron-style endpoint.
         // Curl / Vercel-cron calls carry no user session cookies, so the user

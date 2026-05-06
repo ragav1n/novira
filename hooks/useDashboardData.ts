@@ -6,6 +6,7 @@ import type { Transaction, AuditLog } from '@/types/transaction';
 import type { SyncPayload } from '@/lib/offline-sync-queue';
 import { discardFailedItem, enqueueMutation } from '@/lib/sync-manager';
 import { invalidateTransactionCaches } from '@/lib/sw-cache';
+import { reportNetworkError } from '@/lib/network-error-bus';
 import { useTransactionInvalidationListener } from './useTransactionInvalidationListener';
 
 const PAGE_SIZE = 100;
@@ -111,6 +112,11 @@ export function useDashboardData(
             if (process.env.NODE_ENV === 'development') {
                 console.error("Error loading transactions:", error);
             }
+            reportNetworkError({
+                message: "Couldn't load transactions",
+                source: 'useDashboardData.loadTransactions',
+                retry: () => loadTxRef.current?.(currentUserId, workspaceId, limit),
+            });
         }
     }, []);
 
@@ -209,11 +215,16 @@ export function useDashboardData(
                 if (userId) loadTxRef.current?.(userId, activeWorkspaceId);
             }
         };
+        const onRefreshRequested = () => {
+            if (userId) loadTxRef.current?.(userId, activeWorkspaceId);
+        };
         window.addEventListener('novira-queue-updated', onQueueUpdated);
         window.addEventListener('novira-mutation-synced', onMutationSynced);
+        window.addEventListener('novira-refresh-requested', onRefreshRequested);
         return () => {
             window.removeEventListener('novira-queue-updated', onQueueUpdated);
             window.removeEventListener('novira-mutation-synced', onMutationSynced);
+            window.removeEventListener('novira-refresh-requested', onRefreshRequested);
         };
     }, [userId, activeWorkspaceId, loadPendingFromQueue]);
 
@@ -224,7 +235,7 @@ export function useDashboardData(
                 .from('transactions')
                 .select(TX_SELECT)
                 .eq('id', txId)
-                .single();
+                .maybeSingle();
             if (!data) return null;
             return {
                 ...data,

@@ -1,5 +1,6 @@
 'use client';
 
+import { memo } from 'react';
 import { format, parseISO } from 'date-fns';
 import { Card, CardContent } from '@/components/ui/card';
 import { CATEGORY_COLORS } from '@/lib/categories';
@@ -18,7 +19,7 @@ interface Props {
     formatCurrency: (amount: number) => string;
 }
 
-export function LargestTransactionsCard({ top3Largest, formatCurrency }: Props) {
+function LargestTransactionsCardInner({ top3Largest, formatCurrency }: Props) {
     if (top3Largest.length === 0) return null;
 
     return (
@@ -54,3 +55,5 @@ export function LargestTransactionsCard({ top3Largest, formatCurrency }: Props) 
         </div>
     );
 }
+
+export const LargestTransactionsCard = memo(LargestTransactionsCardInner);

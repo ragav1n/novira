@@ -1,20 +1,30 @@
 'use client';
 
 import React, { startTransition } from 'react';
+import dynamic from 'next/dynamic';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronRight, Check, Wallet, Tag, Pencil, ArrowUpRight, ArrowDownLeft, Clock, LayoutGrid, Plus, TrendingUp, TrendingDown } from 'lucide-react';
 import { format, differenceInDays } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { Progress } from '@/components/ui/progress';
 import { Card, CardContent } from '@/components/ui/card';
-import { BasePieChart } from '@/components/charts/base-pie-chart';
 import { CHART_CONFIG } from '@/lib/categories';
 import { Currency, CURRENCY_SYMBOLS } from '@/components/providers/user-preferences-provider';
 import { Bucket } from '@/components/providers/buckets-provider';
 import { toast } from '@/utils/haptics';
-import { CashflowForecast } from './cashflow-forecast';
 import { UpcomingRecurringCard } from './upcoming-recurring-card';
 import type { UpcomingCharge } from '@/hooks/useUpcomingRecurring';
+
+// Recharts is the heaviest dep on the dashboard; defer it until the donut and
+// forecast are actually rendered (they're conditional, so many dashboards skip).
+const BasePieChart = dynamic(
+    () => import('@/components/charts/base-pie-chart').then(m => m.BasePieChart),
+    { ssr: false, loading: () => <div className="w-full h-full" aria-hidden /> }
+);
+const CashflowForecast = dynamic(
+    () => import('./cashflow-forecast').then(m => m.CashflowForecast),
+    { ssr: false, loading: () => <div className="h-32 w-full rounded-2xl bg-secondary/10 motion-safe:animate-pulse" aria-hidden /> }
+);
 
 type SpendingCategory = {
     name: string;

@@ -1,4 +1,6 @@
 import React from 'react';
+import { useRouter } from 'next/navigation';
+import { Receipt } from 'lucide-react';
 import { TransactionRow } from '@/components/transaction-row';
 import { CATEGORY_COLORS } from '@/lib/categories';
 import type { Transaction } from '@/types/transaction';
@@ -31,10 +33,23 @@ export const TransactionList = React.memo(function TransactionList({
   handleDeleteTransaction, getBucketChip, loadAuditLogs,
   canEditTransaction, hasMore, loadingMore, onLoadMore,
 }: TransactionListProps) {
+  const router = useRouter();
   if (transactions.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 text-muted-foreground/40 text-sm">
-        No transactions found.
+      <div className="flex flex-col items-center justify-center py-14 px-6 text-center">
+        <div className="w-14 h-14 rounded-2xl bg-secondary/20 border border-white/5 flex items-center justify-center mb-3">
+          <Receipt className="w-6 h-6 text-muted-foreground/50" strokeWidth={1.75} />
+        </div>
+        <p className="text-sm font-bold text-muted-foreground/80">No transactions yet</p>
+        <p className="text-xs text-muted-foreground/50 mt-1 max-w-[220px]">
+          Add your first expense to start seeing patterns and insights.
+        </p>
+        <button
+          onClick={() => router.push('/add')}
+          className="mt-4 text-xs font-bold uppercase tracking-wider px-4 py-2 rounded-full bg-primary/20 hover:bg-primary/30 border border-primary/30 text-primary transition-colors"
+        >
+          Add expense
+        </button>
       </div>
     );
   }

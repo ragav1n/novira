@@ -67,7 +67,7 @@ export function MapControls({
                 )}
                 title="Toggle Spending Trails"
             >
-                <Zap className={cn("w-5 h-5", showTrails && "fill-current animate-pulse")} />
+                <Zap className={cn("w-5 h-5", showTrails && "fill-current motion-safe:animate-pulse")} />
             </button>
 
         </div>

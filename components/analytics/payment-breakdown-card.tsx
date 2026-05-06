@@ -1,5 +1,6 @@
 'use client';
 
+import { memo } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { ChartConfig, BasePieChart } from '@/components/charts/base-pie-chart';
 
@@ -34,7 +35,7 @@ interface Props {
     formatCurrency: (amount: number) => string;
 }
 
-export function PaymentBreakdownCard({ paymentBreakdown, categorizedPayment, formatCurrency }: Props) {
+function PaymentBreakdownCardInner({ paymentBreakdown, categorizedPayment, formatCurrency }: Props) {
     return (
         <div className="space-y-2">
             <div className="flex items-center justify-between px-1">
@@ -82,3 +83,5 @@ export function PaymentBreakdownCard({ paymentBreakdown, categorizedPayment, for
         </div>
     );
 }
+
+export const PaymentBreakdownCard = memo(PaymentBreakdownCardInner);

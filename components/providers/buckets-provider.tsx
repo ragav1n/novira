@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { useUserPreferences } from './user-preferences-provider';
 import { toast } from '@/utils/haptics';
 import { BucketService, type BucketSpendingRow } from '@/lib/services/bucket-service';
+import { reportNetworkError } from '@/lib/network-error-bus';
 
 export interface Bucket {
     id: string;
@@ -87,6 +88,8 @@ export function BucketsProvider({ children }: { children: React.ReactNode }) {
     const [bucketSpending, setBucketSpending] = useState<Record<string, number>>({});
     const [loading, setLoading] = useState(true);
 
+    const fetchBucketsRef = useRef<() => Promise<void>>(async () => undefined);
+
     const fetchBuckets = useCallback(async () => {
         if (!userId) return;
         try {
@@ -102,10 +105,17 @@ export function BucketsProvider({ children }: { children: React.ReactNode }) {
             }
         } catch (error) {
             console.error('Error fetching buckets:', error);
+            reportNetworkError({
+                message: "Couldn't load buckets",
+                source: 'BucketsProvider.fetchBuckets',
+                retry: () => { void fetchBucketsRef.current(); },
+            });
         } finally {
             setLoading(false);
         }
     }, [userId, activeWorkspaceId, currency, convertAmount]);
+
+    fetchBucketsRef.current = fetchBuckets;
 
     const bucketsRef = useRef<Bucket[]>([]);
     bucketsRef.current = buckets;

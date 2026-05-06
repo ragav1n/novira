@@ -5,7 +5,7 @@ import {
     ChevronLeft, Search, SlidersHorizontal, Tag, Plane, Home, Gift,
     Car, Utensils, ShoppingCart, Heart, Gamepad2, School, Laptop, Music,
     X, Check, Calendar as CalendarIcon, Filter, Shirt, CheckSquare, Square, Trash2,
-    Bookmark, BookmarkPlus, RefreshCcw, Ban
+    Bookmark, BookmarkPlus, RefreshCcw, Ban, SearchX
 } from "lucide-react";
 import { CATEGORY_COLORS, getIconForCategory, getCategoryLabel, CATEGORIES as SYSTEM_CATEGORIES } from '@/lib/categories';
 import { TransactionRow } from '@/components/transaction-row';
@@ -1233,9 +1233,21 @@ export function SearchView() {
                             <motion.div
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}
-                                className="text-center py-8 text-muted-foreground text-sm"
+                                className="flex flex-col items-center justify-center py-12 px-6 text-center"
                             >
-                                No transactions found.
+                                <div className="w-14 h-14 rounded-2xl bg-secondary/20 border border-white/5 flex items-center justify-center mb-3">
+                                    <SearchX className="w-6 h-6 text-muted-foreground/50" strokeWidth={1.75} />
+                                </div>
+                                <p className="text-sm font-bold text-muted-foreground/80">No matches</p>
+                                <p className="text-xs text-muted-foreground/50 mt-1 max-w-[240px]">
+                                    Try a wider date range or clear some filters.
+                                </p>
+                                <button
+                                    onClick={resetFilters}
+                                    className="mt-4 text-xs font-bold uppercase tracking-wider px-4 py-2 rounded-full bg-primary/15 hover:bg-primary/25 border border-primary/30 text-primary transition-colors"
+                                >
+                                    Reset filters
+                                </button>
                             </motion.div>
                         )}
                     </AnimatePresence>

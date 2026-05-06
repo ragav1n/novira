@@ -366,6 +366,21 @@ export function SettingsView() {
                 return;
             }
 
+            // Recurring templates scoped to the same workspace as the transactions —
+            // exported as their own section so backups can recreate the schedule.
+            let templatesQuery = supabase
+                .from('recurring_templates')
+                .select('id, description, category, amount, currency, frequency, next_occurrence, is_active, payment_method, group_id')
+                .order('next_occurrence', { ascending: true });
+            if (groupId === 'personal') {
+                templatesQuery = templatesQuery.is('group_id', null).eq('user_id', userId);
+            } else if (groupId) {
+                templatesQuery = templatesQuery.eq('group_id', groupId);
+            } else {
+                templatesQuery = templatesQuery.eq('user_id', userId);
+            }
+            const { data: recurringTemplates } = await templatesQuery;
+
             const workspaceName = activeWorkspaceId && activeWorkspaceId !== 'personal'
                 ? groups.find(g => g.id === activeWorkspaceId)?.name
                 : 'Personal';
@@ -375,7 +390,7 @@ export function SettingsView() {
                     email: user?.email,
                     workspaceName,
                     monthlyBudget,
-                });
+                }, recurringTemplates ?? []);
                 toast.success('CSV Exported successfully');
             } else {
                 await generatePDF(transactions, currency, convertAmount, formatCurrency, buckets, groups, dateRange || undefined, {
@@ -383,7 +398,7 @@ export function SettingsView() {
                     avatarUrl,
                     workspaceName,
                     monthlyBudget,
-                });
+                }, recurringTemplates ?? []);
 
                 toast.success('PDF Exported successfully');
             }

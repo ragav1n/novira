@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { memo, useEffect, useMemo, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { LineChart, Line, XAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { endOfMonth, format, isAfter, parseISO } from 'date-fns';
@@ -42,7 +42,7 @@ interface Props {
     convertAmount: (amount: number, fromCurrency: string) => number;
 }
 
-export function SpendingTrendCard({
+function SpendingTrendCardInner({
     userId,
     dateRange,
     selectedBucketId,
@@ -296,3 +296,5 @@ export function SpendingTrendCard({
         </Card>
     );
 }
+
+export const SpendingTrendCard = memo(SpendingTrendCardInner);

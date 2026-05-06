@@ -15,6 +15,8 @@ import { useIsNative } from '@/hooks/use-native';
 import { useGroups } from '@/components/providers/groups-provider';
 import { PWAUpdater } from '@/components/pwa-updater';
 import { toast, ImpactStyle } from '@/utils/haptics';
+import { RefreshCcw } from 'lucide-react';
+import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 
 // ─── Desktop Top Nav ──────────────────────────────────────────────────────────
 
@@ -419,6 +421,21 @@ export function MobileLayout({ children, defaultIsDesktop = false }: { children:
     const showNav = !isAuthPage && !isPublicPage && isAuthenticated;
     const showDesktop = isDesktop && !isNative && showNav;
 
+    // Pull-to-refresh is mobile-only (touch). Only enable on the dashboard route
+    // — other routes have their own scroll containers / refresh affordances.
+    const ptrEnabled = showNav && !showDesktop && pathname === '/';
+    const { pull, refreshing, threshold } = usePullToRefresh(mainRef, {
+        enabled: ptrEnabled,
+        onRefresh: async () => {
+            if (isNative) toast.haptic(ImpactStyle.Light);
+            window.dispatchEvent(new Event('novira-refresh-requested'));
+            // Hold briefly so the spinner registers visually, even if listeners
+            // refetch instantly. The actual refetch is fire-and-forget.
+            await new Promise(r => setTimeout(r, 600));
+        },
+    });
+    const ptrProgress = Math.min(1, pull / threshold);
+
     return (
         <MotionConfig reducedMotion="user">
         <div className={cn(
@@ -461,10 +478,33 @@ export function MobileLayout({ children, defaultIsDesktop = false }: { children:
                 />
             )}
 
+            {/* Pull-to-refresh indicator */}
+            {ptrEnabled && (pull > 0 || refreshing) && (
+                <div
+                    className="absolute left-0 right-0 z-40 flex justify-center pointer-events-none"
+                    style={{ top: `calc(env(safe-area-inset-top) + ${pull * 0.6}px)` }}
+                    aria-hidden
+                >
+                    <div
+                        className="rounded-full bg-card/80 backdrop-blur-md border border-white/10 p-2 shadow-lg"
+                        style={{
+                            opacity: Math.max(0.4, ptrProgress),
+                            transform: `scale(${0.8 + ptrProgress * 0.2})`,
+                        }}
+                    >
+                        <RefreshCcw
+                            className={cn("w-4 h-4 text-primary", refreshing && "motion-safe:animate-spin")}
+                            style={{ transform: refreshing ? undefined : `rotate(${ptrProgress * 270}deg)` }}
+                        />
+                    </div>
+                </div>
+            )}
+
             {/* Main Content */}
             <main ref={mainRef} id="main-content" tabIndex={-1} className={cn(
                 "flex-1 w-full overflow-y-auto no-scrollbar relative flex flex-col",
-                showDesktop ? "pt-20" : (showNav ? "pb-24" : "pb-0")
+                showDesktop ? "pt-20" : (showNav ? "pb-24" : "pb-0"),
+                ptrEnabled && "overscroll-y-contain"
             )}>
                 <UIBoundary>
                     <AnimatePresence mode="wait" initial={false}>

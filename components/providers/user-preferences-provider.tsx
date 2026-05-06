@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { toast } from '@/utils/haptics';
 import { User, Session } from '@supabase/supabase-js';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
+import { useAppBadge } from '@/hooks/useAppBadge';
 
 export type Currency = 'USD' | 'EUR' | 'INR' | 'GBP' | 'CHF' | 'SGD' | 'VND' | 'TWD' | 'JPY' | 'KRW' | 'HKD' | 'MYR' | 'PHP' | 'THB' | 'CAD' | 'AUD' | 'MXN' | 'BRL' | 'IDR' | 'AED';
 
@@ -293,29 +294,6 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
                 console.error('Error fetching preferences:', error);
             }
 
-            // Best-effort timezone sync: keep profiles.timezone in step with the
-            // user's current device. Cron jobs use this to phrase notifications
-            // in the user's local frame (e.g., "yesterday" = the user's local
-            // yesterday, not UTC's). Failure is silent — column may not exist
-            // on older schemas, in which case Supabase returns an error we
-            // simply log and ignore.
-            try {
-                const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-                if (tz) {
-                    const { error: tzErr } = await supabase
-                        .from('profiles')
-                        .update({ timezone: tz })
-                        .eq('id', uid);
-                    if (tzErr && process.env.NODE_ENV === 'development') {
-                        console.warn('[preferences] timezone sync failed (column may not exist yet):', tzErr.message);
-                    }
-                }
-            } catch (e) {
-                if (process.env.NODE_ENV === 'development') {
-                    console.warn('[preferences] timezone capture skipped:', e);
-                }
-            }
-
             // Fetch workspace budgets (RLS ensures user only gets their groups)
             const { data: workspaceData, error: workspaceError } = await supabase
                 .from('workspace_budgets')
@@ -362,6 +340,26 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
     // Keep ref in sync so visibilitychange handler always has latest userId without re-subscribing
     useEffect(() => {
         userIdRef.current = userId;
+    }, [userId]);
+
+    useAppBadge(userId);
+
+    // One-shot timezone sync per tab session. Lives outside loadPreferences
+    // because the realtime listener on profile UPDATE re-calls loadPreferences,
+    // and updating timezone there would re-fire the listener → infinite loop.
+    useEffect(() => {
+        if (!userId) return;
+        if (typeof window === 'undefined') return;
+        const flagKey = `novira_tz_synced_${userId}`;
+        if (sessionStorage.getItem(flagKey) === '1') return;
+        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        if (!tz) return;
+        sessionStorage.setItem(flagKey, '1');
+        supabase.from('profiles').update({ timezone: tz }).eq('id', userId).then(({ error }) => {
+            if (error && process.env.NODE_ENV === 'development') {
+                console.warn('[preferences] timezone sync failed:', error.message);
+            }
+        });
     }, [userId]);
 
     // Hydrate privacyMode from localStorage on mount; auto-mask when the tab is hidden.

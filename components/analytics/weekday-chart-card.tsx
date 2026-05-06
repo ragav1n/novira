@@ -1,5 +1,6 @@
 'use client';
 
+import { memo } from 'react';
 import { motion } from 'framer-motion';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
@@ -12,7 +13,7 @@ interface Props {
     formatCurrency: (amount: number) => string;
 }
 
-export function WeekdayChartCard({ weekdayTotals, totalSpentInRange, formatCurrency }: Props) {
+function WeekdayChartCardInner({ weekdayTotals, totalSpentInRange, formatCurrency }: Props) {
     if (totalSpentInRange <= 0) return null;
     const maxWd = Math.max(...weekdayTotals.map(w => w.total));
     if (maxWd <= 0) return null;
@@ -64,3 +65,5 @@ export function WeekdayChartCard({ weekdayTotals, totalSpentInRange, formatCurre
         </Card>
     );
 }
+
+export const WeekdayChartCard = memo(WeekdayChartCardInner);

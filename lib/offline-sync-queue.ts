@@ -23,6 +23,7 @@ export function addToQueue(queue: SyncPayload[], payload: Omit<SyncPayload, 'sta
 
 const MAX_RETRIES = 5;
 export const MAX_QUEUE_SIZE = 500;
+export const MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
 export function incrementRetry(queue: SyncPayload[], id: string): SyncPayload[] {
     return queue.map(item => {
@@ -88,4 +89,68 @@ export function resetToPending(queue: SyncPayload[], id: string): SyncPayload[] 
 
 export function removeSynced(queue: SyncPayload[]): SyncPayload[] {
     return queue.filter(item => item.status !== 'synced');
+}
+
+/**
+ * Mark items older than MAX_AGE_MS as failed so they stop retrying forever and
+ * surface to the user (the failed list is shown in the sync indicator UI).
+ * Items currently 'syncing' are left alone — the in-flight request decides.
+ */
+export function expireStaleItems(queue: SyncPayload[], now = Date.now()): SyncPayload[] {
+    let changed = false;
+    const next = queue.map(item => {
+        if (item.status !== 'pending') return item;
+        if (now - item.createdAt < MAX_AGE_MS) return item;
+        changed = true;
+        return {
+            ...item,
+            status: 'failed' as const,
+            errorReason: 'Expired (older than 7 days)',
+            failedAt: now,
+        };
+    });
+    return changed ? next : queue;
+}
+
+/**
+ * Find a pending duplicate that should suppress a new enqueue.
+ * Only DELETE_TRANSACTION dedupes by exact tx id — duplicates are pure waste.
+ * UPDATE_TRANSACTION uses mergeUpdatePatch instead so newer patches win.
+ * ADD_FULL_TRANSACTION never dedupes (every add is a distinct new row).
+ */
+export function findPendingDuplicate(
+    queue: SyncPayload[],
+    type: string,
+    data: { id?: string }
+): SyncPayload | undefined {
+    if (type !== 'DELETE_TRANSACTION') return undefined;
+    if (!data?.id) return undefined;
+    return queue.find(item =>
+        item.type === type &&
+        (item.status === 'pending' || item.status === 'syncing') &&
+        item.data?.id === data.id
+    );
+}
+
+/**
+ * Merge a newer UPDATE_TRANSACTION patch into a pending one for the same row.
+ * Returns the new queue and the merged item id, or null if no merge happened.
+ */
+export function mergePendingUpdate(
+    queue: SyncPayload[],
+    data: { id: string; patch: Record<string, unknown> }
+): { queue: SyncPayload[]; mergedId: string } | null {
+    const idx = queue.findIndex(item =>
+        item.type === 'UPDATE_TRANSACTION' &&
+        item.status === 'pending' &&
+        item.data?.id === data.id
+    );
+    if (idx === -1) return null;
+    const existing = queue[idx];
+    const next = [...queue];
+    next[idx] = {
+        ...existing,
+        data: { id: data.id, patch: { ...existing.data?.patch, ...data.patch } },
+    };
+    return { queue: next, mergedId: existing.id };
 }

@@ -75,8 +75,8 @@ export function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
                         className="relative w-full max-w-2xl bg-[#0A0A0B]/98 backdrop-blur-xl border border-white/10 rounded-[2.5rem] shadow-[0_0_50px_-12px_rgba(138,43,226,0.3)] overflow-hidden z-[1100]"
                     >
                         {/* Decorative Background Elements */}
-                        <div className="absolute -top-32 -left-32 w-80 h-80 bg-primary/20 rounded-full blur-[100px] opacity-40 animate-pulse" />
-                        <div className="absolute -bottom-32 -right-32 w-80 h-80 bg-purple-600/20 rounded-full blur-[100px] opacity-40 animate-pulse" />
+                        <div className="absolute -top-32 -left-32 w-80 h-80 bg-primary/20 rounded-full blur-[100px] opacity-40 motion-safe:animate-pulse" />
+                        <div className="absolute -bottom-32 -right-32 w-80 h-80 bg-purple-600/20 rounded-full blur-[100px] opacity-40 motion-safe:animate-pulse" />
 
                         <div className="flex flex-col max-h-[90vh]">
                             {/* Scrollable Content Area */}
@@ -91,7 +91,7 @@ export function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
                                     >
                                         <div className="relative">
                                             <CheckCircle2 className="w-8 h-8 text-primary drop-shadow-[0_0_12px_rgba(138,43,226,0.8)]" />
-                                            <div className="absolute inset-0 blur-lg bg-primary/20 animate-pulse" />
+                                            <div className="absolute inset-0 blur-lg bg-primary/20 motion-safe:animate-pulse" />
                                         </div>
                                     </motion.div>
                                     <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight leading-tight px-4">

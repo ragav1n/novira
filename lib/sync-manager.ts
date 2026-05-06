@@ -10,6 +10,9 @@ import {
     incrementRetry,
     removeSynced,
     evictForCapacity,
+    expireStaleItems,
+    findPendingDuplicate,
+    mergePendingUpdate,
     MAX_QUEUE_SIZE
 } from './offline-sync-queue';
 import { TransactionService } from './services/transaction-service';
@@ -66,6 +69,23 @@ export class QueueFullError extends Error {
 export async function enqueueMutation(type: string, data: any): Promise<string> {
     let currentQueue = (await get<SyncPayload[]>(QUEUE_KEY)) || [];
 
+    // Dedup: a duplicate DELETE for the same tx id is pure waste — return the
+    // existing pending item's id so callers see the same idempotent result.
+    const dup = findPendingDuplicate(currentQueue, type, data);
+    if (dup) return dup.id;
+
+    // Merge: a newer UPDATE patch for the same tx folds into the pending one
+    // so we don't waste a round-trip and so newer field values win cleanly.
+    if (type === 'UPDATE_TRANSACTION' && data?.id) {
+        const merged = mergePendingUpdate(currentQueue, data);
+        if (merged) {
+            await set(QUEUE_KEY, merged.queue);
+            window.dispatchEvent(new CustomEvent('novira-queue-updated', { detail: { queue: merged.queue } }));
+            if (navigator.onLine) attemptSync();
+            return merged.mergedId;
+        }
+    }
+
     // Evict oldest failed/pending items if at capacity. Currently-syncing items are preserved.
     if (currentQueue.length >= MAX_QUEUE_SIZE) {
         const beforeCount = currentQueue.length;
@@ -101,6 +121,16 @@ export async function attemptSync() {
 
     let queue = (await get<SyncPayload[]>(QUEUE_KEY)) || [];
     const now = Date.now();
+
+    // Expire pending items older than 7 days so they stop retrying forever and
+    // surface to the user as "Expired" in the failed list.
+    const expired = expireStaleItems(queue, now);
+    if (expired !== queue) {
+        queue = expired;
+        await set(QUEUE_KEY, queue);
+        window.dispatchEvent(new CustomEvent('novira-queue-updated', { detail: { queue } }));
+    }
+
     const pendingItems = queue.filter(item =>
         item.status === 'pending' &&
         (!item.nextRetryAt || item.nextRetryAt <= now)

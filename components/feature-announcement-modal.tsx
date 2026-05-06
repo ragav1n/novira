@@ -67,8 +67,8 @@ export function FeatureAnnouncementModal({ showAnnouncement = false, userId, onC
                         className="relative w-full max-w-sm bg-[#0D0D0F]/98 backdrop-blur-xl border border-white/10 rounded-[2.5rem] shadow-[0_0_80px_-15px_rgba(138,43,226,0.4)] overflow-hidden z-[1100] mx-4 flex flex-col max-h-[90dvh]"
                     >
                         {/* More Dynamic Glass Glows */}
-                        <div className="absolute -top-24 -left-24 w-56 h-56 bg-primary/30 rounded-full blur-[70px] opacity-40 animate-pulse" />
-                        <div className="absolute -bottom-24 -right-24 w-56 h-56 bg-purple-500/30 rounded-full blur-[70px] opacity-40 animate-pulse" />
+                        <div className="absolute -top-24 -left-24 w-56 h-56 bg-primary/30 rounded-full blur-[70px] opacity-40 motion-safe:animate-pulse" />
+                        <div className="absolute -bottom-24 -right-24 w-56 h-56 bg-purple-500/30 rounded-full blur-[70px] opacity-40 motion-safe:animate-pulse" />
                         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-40 bg-white/5 rounded-full blur-[80px] pointer-events-none" />
 
                         {/* Close Button - more prominent hover */}

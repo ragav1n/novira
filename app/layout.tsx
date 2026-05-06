@@ -14,6 +14,7 @@ import { WorkspaceThemeProvider } from '@/components/providers/workspace-theme-p
 import { ErrorBoundary } from '@/components/error-boundary'
 import { ServiceWorkerRegistrar } from '@/components/service-worker-registrar'
 import { PWAInstallPrompt } from '@/components/pwa-install-prompt'
+import { NetworkErrorBanner } from '@/components/network-error-banner'
 import { AppResetModal } from '@/components/app-reset-modal'
 import { MonthlyRecapModal } from '@/components/recap/monthly-recap-modal'
 
@@ -101,6 +102,7 @@ export default async function RootLayout({
         </ErrorBoundary>
         <ServiceWorkerRegistrar />
         <PWAInstallPrompt />
+        <NetworkErrorBanner />
         <AppResetModal />
         <Analytics />
         <SpeedInsights />

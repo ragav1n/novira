@@ -8,6 +8,7 @@ import { TransactionRow } from '@/components/transaction-row';
 import { getIconForCategory, CATEGORY_COLORS } from '@/lib/categories';
 import { toast } from '@/utils/haptics';
 import { Currency } from '@/components/providers/user-preferences-provider';
+import { Bucket } from '@/components/providers/buckets-provider';
 import { DashboardTransactionsDrawer } from '@/components/dashboard-transactions-drawer';
 import { TransactionList } from '@/components/transaction-list';
 
@@ -21,7 +22,7 @@ interface TransactionListSectionProps {
     allTransactions?: Transaction[];
     userId: string | null;
     currency: string;
-    buckets: any[];
+    buckets: Bucket[];
     calculateUserShare: (tx: Transaction, userId: string | null) => number;
     canEditTransaction: (tx: Transaction) => boolean;
     getBucketChip: (tx: Transaction) => React.ReactNode;

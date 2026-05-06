@@ -2,11 +2,14 @@ import { supabase } from '@/lib/supabase';
 import { SavingsGoal, SavingsDeposit } from '@/types/goal';
 import { toast } from '@/utils/haptics';
 
+const GOAL_SELECT = 'id, user_id, name, target_amount, current_amount, currency, deadline, icon, color, group_id, created_at, last_threshold_notified, last_deadline_notified';
+const DEPOSIT_SELECT = 'id, goal_id, user_id, amount, currency, created_at';
+
 export const GoalService = {
     async getGoals(userId: string, workspaceId?: string | null) {
         let query = supabase
             .from('savings_goals')
-            .select('*')
+            .select(GOAL_SELECT)
             .order('created_at', { ascending: false });
 
         if (workspaceId && workspaceId !== 'personal') {
@@ -29,7 +32,7 @@ export const GoalService = {
         const { data: goal, error } = await supabase
             .from('savings_goals')
             .insert({ ...data, user_id: userId })
-            .select()
+            .select(GOAL_SELECT)
             .single();
 
         if (error) {
@@ -89,7 +92,7 @@ export const GoalService = {
         const since = new Date(Date.now() - sinceDays * 24 * 60 * 60 * 1000).toISOString();
         const { data, error } = await supabase
             .from('savings_deposits')
-            .select('*')
+            .select(DEPOSIT_SELECT)
             .eq('user_id', userId)
             .in('goal_id', goalIds)
             .gte('created_at', since)
@@ -104,7 +107,7 @@ export const GoalService = {
     async getAllDepositsForGoal(userId: string, goalId: string): Promise<SavingsDeposit[]> {
         const { data, error } = await supabase
             .from('savings_deposits')
-            .select('*')
+            .select(DEPOSIT_SELECT)
             .eq('user_id', userId)
             .eq('goal_id', goalId)
             .order('created_at', { ascending: false });

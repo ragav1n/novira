@@ -1,5 +1,6 @@
 'use client';
 
+import { memo } from 'react';
 import { useRouter } from 'next/navigation';
 import { MapPin } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
@@ -12,7 +13,7 @@ interface Props {
     formatCurrency: (amount: number) => string;
 }
 
-export function TopMerchantsCard({ topMerchants, newMerchantsCount, formatCurrency }: Props) {
+function TopMerchantsCardInner({ topMerchants, newMerchantsCount, formatCurrency }: Props) {
     const router = useRouter();
     if (topMerchants.length === 0) return null;
 
@@ -57,3 +58,5 @@ export function TopMerchantsCard({ topMerchants, newMerchantsCount, formatCurren
         </div>
     );
 }
+
+export const TopMerchantsCard = memo(TopMerchantsCardInner);

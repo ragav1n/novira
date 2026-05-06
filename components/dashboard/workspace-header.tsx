@@ -5,13 +5,14 @@ import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { Eye, EyeOff, HelpCircle, Plus, UserCircle, Heart, Home, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { FluidDropdown } from '@/components/ui/fluid-dropdown';
+import { FluidDropdown, Category } from '@/components/ui/fluid-dropdown';
 import { useUserPreferences } from '@/components/providers/user-preferences-provider';
+import { Group } from '@/components/providers/groups-provider';
 
 interface WorkspaceHeaderProps {
     userName: string;
     avatarUrl: string | null;
-    eligibleGroups: any[];
+    eligibleGroups: Group[];
     activeWorkspaceId: string | null;
     setActiveWorkspaceId: (id: string | null) => void;
     setDashboardFocus: (focus: string) => void;
@@ -63,7 +64,7 @@ export function WorkspaceHeader({
                                         color: g.type === 'couple' ? "#f43f5e" : g.type === 'home' ? "#eab308" : "#8a2be2",
                                     }))
                                 ]}
-                                onSelect={(category: any) => {
+                                onSelect={(category: Category) => {
                                     if (category.id === "personal") {
                                         setActiveWorkspaceId(null);
                                     } else {
