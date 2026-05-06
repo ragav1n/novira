@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useEffect, useState } from 'react';
 import { Calculator } from 'lucide-react';
 import { AutoPlay } from './auto-play';
-import { SNAPPY, FADE } from './transitions';
+import { POP, FADE } from './transitions';
 
 export function ExpressionAmountDemo() {
   return (
@@ -101,7 +101,7 @@ function Inner({ play }: { play: boolean }) {
                 initial={{ opacity: 0, scale: 0.8, y: 4 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.8 }}
-                transition={SNAPPY}
+                transition={POP}
                 className="inline-flex items-center gap-1 transform-gpu rounded-full border border-emerald-400/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-300"
                 style={{ willChange: 'transform, opacity' }}
               >

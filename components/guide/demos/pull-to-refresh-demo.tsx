@@ -5,7 +5,7 @@ import { useEffect } from 'react';
 import { RefreshCcw } from 'lucide-react';
 import { AutoPlay } from './auto-play';
 import { PhoneFrame } from './phone-frame';
-import { SLIDE, EASE_OUT_SOFT } from './transitions';
+import { GLIDE, EASE_OUT_SOFT } from './transitions';
 
 export function PullToRefreshDemo() {
   return (
@@ -49,9 +49,9 @@ function Inner({ play }: { play: boolean }) {
           await animateIcon(iconRef.current, { rotate: 270 + 720 }, { duration: 1.0, ease: 'linear' });
 
           if (!mounted || !contentRef.current || !iconRef.current) break;
-          // Snap back — soft spring on the content, gentle fade on the icon
+          // Snap back — smooth glide on the content, gentle fade on the icon
           await Promise.all([
-            animateContent(contentRef.current, { y: 0 }, SLIDE),
+            animateContent(contentRef.current, { y: 0 }, GLIDE),
             animateIcon(iconRef.current, { opacity: 0, scale: 0.6 }, { duration: 0.32, ease: EASE_OUT_SOFT }),
           ]);
 

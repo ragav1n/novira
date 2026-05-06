@@ -4,20 +4,20 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useEffect, useState } from 'react';
 import { Pizza, Users } from 'lucide-react';
 import { AutoPlay } from './auto-play';
-import { SLIDE, SNAPPY, FADE, STAGGER_NORMAL } from './transitions';
+import { STAGGER_NORMAL, EASE_GLIDE } from './transitions';
 
 export function SplitExpenseDemo() {
   return (
-    <AutoPlay ariaLabel="A 90 dollar expense splitting evenly into three 30 dollar shares across three avatars">
+    <AutoPlay ariaLabel="A 999 rupee expense splitting evenly into three 333 rupee shares across three avatars">
       {(inView) => <Inner play={inView} />}
     </AutoPlay>
   );
 }
 
 const PEOPLE = [
-  { name: 'You',  initial: 'Y', tone: 'from-primary to-fuchsia-500' },
-  { name: 'Maya', initial: 'M', tone: 'from-rose-400 to-rose-600' },
-  { name: 'Arjun',initial: 'A', tone: 'from-sky-400 to-sky-600' },
+  { name: 'Daniel', initial: 'D', tone: 'from-primary to-fuchsia-500' },
+  { name: 'Raghul', initial: 'R', tone: 'from-rose-400 to-rose-600' },
+  { name: 'Saara',  initial: 'S', tone: 'from-sky-400 to-sky-600' },
 ];
 
 function Inner({ play }: { play: boolean }) {
@@ -31,8 +31,8 @@ function Inner({ play }: { play: boolean }) {
     function loop() {
       setPhase(0);
       timeouts.push(setTimeout(() => !cancelled && setPhase(1), 1200));
-      timeouts.push(setTimeout(() => !cancelled && setPhase(2), 2400));
-      timeouts.push(setTimeout(loop, 5200));
+      timeouts.push(setTimeout(() => !cancelled && setPhase(2), 2900));
+      timeouts.push(setTimeout(loop, 5800));
     }
     loop();
     return () => {
@@ -54,23 +54,31 @@ function Inner({ play }: { play: boolean }) {
           </div>
           <div className="text-right">
             <div className="text-[11px] uppercase tracking-widest text-foreground/65">Total</div>
-            <div className="font-mono text-sm font-semibold text-foreground">₹90.00</div>
+            <div className="font-mono text-sm font-semibold text-foreground">₹999.00</div>
           </div>
         </div>
 
         {/* Fixed height keeps the demo card stable across phases — avatars (~48px)
-            plus reserved space for the ₹30 badges that appear in phase 2. */}
+            plus reserved space for the ₹333 badges that appear in phase 2. */}
         <div className="mt-5 flex h-[88px] items-start justify-center gap-3">
           {PEOPLE.map((p, i) => {
             const isShown = phase >= 1;
             return (
               <motion.div
                 key={p.name}
-                initial={{ opacity: 0.5, x: -36 * (i - 1) }}
-                animate={isShown ? { opacity: 1, x: 0 } : { opacity: 0.5, x: -36 * (i - 1) }}
-                transition={{ ...SLIDE, delay: isShown ? i * STAGGER_NORMAL : 0 }}
+                initial={{ opacity: 0, x: -28 * (i - 1), scale: 0.92 }}
+                animate={
+                  isShown
+                    ? { opacity: 1, x: 0, scale: 1 }
+                    : { opacity: 0, x: -28 * (i - 1), scale: 0.92 }
+                }
+                transition={{
+                  x: { duration: 1.15, ease: EASE_GLIDE, delay: isShown ? i * STAGGER_NORMAL : 0 },
+                  opacity: { duration: 0.55, ease: EASE_GLIDE, delay: isShown ? i * STAGGER_NORMAL : 0 },
+                  scale: { duration: 0.95, ease: EASE_GLIDE, delay: isShown ? i * STAGGER_NORMAL : 0 },
+                }}
                 style={{ willChange: 'transform, opacity' }}
-                className="flex flex-col items-center transform-gpu"
+                className="flex w-[76px] flex-col items-center transform-gpu"
               >
                 <div className={`flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br ${p.tone} text-sm font-bold text-white shadow-md`}>
                   {p.initial}
@@ -78,14 +86,18 @@ function Inner({ play }: { play: boolean }) {
                 <AnimatePresence>
                   {phase >= 2 && (
                     <motion.div
-                      initial={{ opacity: 0, y: -4, scale: 0.8 }}
+                      initial={{ opacity: 0, y: -3, scale: 0.92 }}
                       animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.8 }}
-                      transition={{ ...SNAPPY, delay: i * STAGGER_NORMAL }}
+                      exit={{ opacity: 0, scale: 0.92 }}
+                      transition={{
+                        duration: 0.7,
+                        ease: EASE_GLIDE,
+                        delay: i * STAGGER_NORMAL,
+                      }}
                       className="mt-1.5 rounded-full border border-emerald-400/30 bg-emerald-500/10 px-2 py-0.5 font-mono text-[11px] text-emerald-300 transform-gpu"
                       style={{ willChange: 'transform, opacity' }}
                     >
-                      ₹30.00
+                      ₹333.00
                     </motion.div>
                   )}
                 </AnimatePresence>
@@ -94,20 +106,24 @@ function Inner({ play }: { play: boolean }) {
           })}
         </div>
 
-        <div className="mt-5 flex h-4 items-center justify-center gap-1.5 text-[11px] text-foreground/75">
-          <Users className="h-3 w-3" />
+        <div className="mt-5 flex h-4 items-center justify-center text-[11px] text-foreground/75">
           <AnimatePresence mode="wait" initial={false}>
-            <motion.span
+            <motion.div
               key={phase}
-              initial={{ opacity: 0, y: 4 }}
+              initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -4 }}
-              transition={FADE}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.7, ease: EASE_GLIDE }}
+              style={{ willChange: 'transform, opacity' }}
+              className="flex items-center gap-1.5 transform-gpu"
             >
-              {phase < 1 && 'Single expense'}
-              {phase === 1 && 'Splitting evenly…'}
-              {phase >= 2 && 'Each owes ₹30 — settle anytime'}
-            </motion.span>
+              <Users className="h-3 w-3" />
+              <span>
+                {phase < 1 && 'Single expense'}
+                {phase === 1 && 'Splitting evenly…'}
+                {phase >= 2 && 'Each owes ₹333 — settle anytime'}
+              </span>
+            </motion.div>
           </AnimatePresence>
         </div>
       </div>

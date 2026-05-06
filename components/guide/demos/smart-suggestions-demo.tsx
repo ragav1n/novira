@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useEffect, useState } from 'react';
 import { Coffee, CreditCard, MapPin, Box } from 'lucide-react';
 import { AutoPlay } from './auto-play';
-import { SNAPPY, FADE, STAGGER_FAST } from './transitions';
+import { POP, FADE, STAGGER_FAST } from './transitions';
 
 export function SmartSuggestionsDemo() {
   return (
@@ -90,7 +90,7 @@ function Inner({ play }: { play: boolean }) {
                       key={s.label}
                       initial={{ opacity: 0, scale: 0.85, y: 4 }}
                       animate={{ opacity: 1, scale: 1, y: 0 }}
-                      transition={{ ...SNAPPY, delay: i * STAGGER_FAST }}
+                      transition={{ ...POP, delay: i * STAGGER_FAST }}
                       style={{ willChange: 'transform, opacity' }}
                       className={`inline-flex items-center gap-1.5 transform-gpu rounded-full border px-2.5 py-1 text-[12px] ${tones[s.tone]}`}
                     >

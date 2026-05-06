@@ -25,14 +25,6 @@ export const SNAPPY = {
   mass: 0.6,
 };
 
-/** Translation-heavy — sliding rows, drawers, swipes. */
-export const SLIDE = {
-  type: 'spring' as const,
-  damping: 28,
-  stiffness: 240,
-  mass: 0.95,
-};
-
 /** A subtle bounce — celebrations, milestone pops. Use sparingly. */
 export const BOUNCE = {
   type: 'spring' as const,
@@ -70,3 +62,22 @@ export const STAGGER_NORMAL = 0.08;
  */
 export const EASE_OUT_SOFT: [number, number, number, number] = [0.22, 1, 0.36, 1];
 export const EASE_IN_OUT_SOFT: [number, number, number, number] = [0.4, 0, 0.2, 1];
+
+/**
+ * iOS-style "emphasized decelerate" — stretches the final third of the curve
+ * so motion melts into rest instead of clicking into place. Use for translation
+ * and any element that visibly "locks" with a spring.
+ */
+export const EASE_GLIDE: [number, number, number, number] = [0.16, 1, 0.3, 1];
+
+/** Slide / translation tween that doesn't lock at endpoints. Use for swipes, drawers, snap-backs. */
+export const GLIDE = {
+  duration: 0.85,
+  ease: EASE_GLIDE,
+};
+
+/** Smooth chip / badge entrance — for elements that fade in and stay (preferred over SNAPPY). */
+export const POP = {
+  duration: 0.55,
+  ease: EASE_GLIDE,
+};

@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useEffect, useState } from 'react';
 import { TrendingDown } from 'lucide-react';
 import { AutoPlay } from './auto-play';
-import { SNAPPY, FADE, QUICK_FADE } from './transitions';
+import { POP, FADE, QUICK_FADE } from './transitions';
 
 export function CalendarHeatmapDemo() {
   return (
@@ -89,7 +89,7 @@ function Inner({ play }: { play: boolean }) {
                   <motion.div
                     initial={{ scale: 0.5, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
-                    transition={{ ...SNAPPY, delay: 0.18 }}
+                    transition={{ ...POP, delay: 0.18 }}
                     className="absolute inset-0 transform-gpu rounded-md ring-2 ring-amber-300"
                     style={{ willChange: 'transform, opacity' }}
                   />

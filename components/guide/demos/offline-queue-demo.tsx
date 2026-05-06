@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useEffect, useState } from 'react';
 import { Check, CloudOff, Wifi, WifiOff } from 'lucide-react';
 import { AutoPlay } from './auto-play';
-import { SNAPPY, FADE } from './transitions';
+import { POP, FADE } from './transitions';
 
 export function OfflineQueueDemo() {
   return (
@@ -48,7 +48,7 @@ function Inner({ play }: { play: boolean }) {
                 initial={{ opacity: 0, scale: 0.85, y: -2 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.85 }}
-                transition={SNAPPY}
+                transition={POP}
                 style={{ willChange: 'transform, opacity' }}
                 className="flex items-center gap-1.5 transform-gpu rounded-full border border-amber-400/30 bg-amber-500/10 px-2.5 py-1 text-[11px] text-amber-300"
               >
@@ -61,7 +61,7 @@ function Inner({ play }: { play: boolean }) {
                 initial={{ opacity: 0, scale: 0.85, y: -2 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.85 }}
-                transition={SNAPPY}
+                transition={POP}
                 style={{ willChange: 'transform, opacity' }}
                 className="flex items-center gap-1.5 transform-gpu rounded-full border border-emerald-400/30 bg-emerald-500/10 px-2.5 py-1 text-[11px] text-emerald-300"
               >
@@ -109,7 +109,7 @@ function Inner({ play }: { play: boolean }) {
                       initial={{ opacity: 0, scale: 0.6, rotate: -90 }}
                       animate={{ opacity: 1, scale: 1, rotate: 0 }}
                       exit={{ opacity: 0, scale: 0.6, rotate: 90 }}
-                      transition={SNAPPY}
+                      transition={POP}
                     >
                       {phase === 3 ? <Check className="h-4 w-4" /> : <CloudOff className="h-4 w-4" />}
                     </motion.div>

@@ -4,7 +4,7 @@ import { motion, useAnimate } from 'framer-motion';
 import { useEffect } from 'react';
 import { Coffee, Pencil, Trash2 } from 'lucide-react';
 import { AutoPlay } from './auto-play';
-import { SLIDE } from './transitions';
+import { GLIDE } from './transitions';
 
 export function SwipeRowDemo() {
   return (
@@ -31,11 +31,11 @@ function Inner({ play }: { play: boolean }) {
           if (!mounted || !scope.current) break;
           await new Promise((r) => setTimeout(r, 800));
           if (!mounted || !scope.current) break;
-          await animate(scope.current, { x: -128 }, SLIDE);
+          await animate(scope.current, { x: -128 }, GLIDE);
           if (!mounted || !scope.current) break;
           await new Promise((r) => setTimeout(r, 1500));
           if (!mounted || !scope.current) break;
-          await animate(scope.current, { x: 0 }, SLIDE);
+          await animate(scope.current, { x: 0 }, GLIDE);
           if (!mounted) break;
           await new Promise((r) => setTimeout(r, 1900));
         } catch {
