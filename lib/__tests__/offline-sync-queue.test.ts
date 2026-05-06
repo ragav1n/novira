@@ -8,7 +8,9 @@ import {
     removeSynced,
     incrementRetry,
     evictForCapacity,
+    expireStaleItems,
     MAX_QUEUE_SIZE,
+    MAX_AGE_MS,
     type SyncPayload,
 } from '../offline-sync-queue';
 
@@ -69,13 +71,20 @@ describe('offline sync queue state machine', () => {
     });
 
     describe('markFailed', () => {
-        it('marks item as failed with reason and timestamp', () => {
+        it('marks item as failed with reason, timestamp, and permanent errorKind by default', () => {
             queue = addToQueue(queue, { id: 'uuid-1', type: 'ADD_TX', data: {} });
             const before = Date.now();
             queue = markFailed(queue, 'uuid-1', 'Schema mismatch');
             expect(queue[0].status).toBe('failed');
             expect(queue[0].errorReason).toBe('Schema mismatch');
             expect(queue[0].failedAt).toBeGreaterThanOrEqual(before);
+            expect(queue[0].errorKind).toBe('permanent');
+        });
+
+        it('honors an explicit errorKind override', () => {
+            queue = addToQueue(queue, { id: 'uuid-1', type: 'ADD_TX', data: {} });
+            queue = markFailed(queue, 'uuid-1', 'Network down', 'transient');
+            expect(queue[0].errorKind).toBe('transient');
         });
     });
 
@@ -87,6 +96,36 @@ describe('offline sync queue state machine', () => {
             expect(queue[0].status).toBe('pending');
             expect(queue[0].errorReason).toBeUndefined();
             expect(queue[0].failedAt).toBeUndefined();
+            expect(queue[0].errorKind).toBeUndefined();
+        });
+    });
+
+    describe('expireStaleItems', () => {
+        it('marks pending items older than MAX_AGE_MS as failed with errorKind=expired', () => {
+            const now = Date.now();
+            const stale: SyncPayload = {
+                id: 'stale-1', type: 'ADD_TX', data: {}, status: 'pending',
+                createdAt: now - MAX_AGE_MS - 1000, retryCount: 0,
+            };
+            const fresh: SyncPayload = {
+                id: 'fresh-1', type: 'ADD_TX', data: {}, status: 'pending',
+                createdAt: now, retryCount: 0,
+            };
+            const next = expireStaleItems([stale, fresh], now);
+            expect(next[0].status).toBe('failed');
+            expect(next[0].errorKind).toBe('expired');
+            expect(next[0].errorReason).toMatch(/Expired/);
+            expect(next[1].status).toBe('pending');
+        });
+
+        it('returns the same reference when nothing changed', () => {
+            const now = Date.now();
+            const fresh: SyncPayload = {
+                id: 'fresh-1', type: 'ADD_TX', data: {}, status: 'pending',
+                createdAt: now, retryCount: 0,
+            };
+            const input = [fresh];
+            expect(expireStaleItems(input, now)).toBe(input);
         });
     });
 
@@ -158,7 +197,7 @@ describe('offline sync queue state machine', () => {
             expect(distinct.size).toBeGreaterThan(1);
         });
 
-        it('marks as failed after 5 retries (max)', () => {
+        it('marks as failed after 5 retries (max) with transient errorKind', () => {
             queue = addToQueue(queue, { id: 'uuid-1', type: 'ADD_TX', data: {} });
             for (let i = 0; i < 5; i++) {
                 queue = incrementRetry(queue, 'uuid-1');
@@ -166,6 +205,7 @@ describe('offline sync queue state machine', () => {
             expect(queue[0].status).toBe('failed');
             expect(queue[0].retryCount).toBe(5);
             expect(queue[0].errorReason).toBe('Max retries exceeded');
+            expect(queue[0].errorKind).toBe('transient');
         });
 
         it('doubles backoff on each retry (exponential)', () => {

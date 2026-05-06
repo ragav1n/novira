@@ -6,6 +6,7 @@ import { toast } from '@/utils/haptics';
 import { User, Session } from '@supabase/supabase-js';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { useAppBadge } from '@/hooks/useAppBadge';
+import { setQueueUser, attemptSync } from '@/lib/sync-manager';
 
 export type Currency = 'USD' | 'EUR' | 'INR' | 'GBP' | 'CHF' | 'SGD' | 'VND' | 'TWD' | 'JPY' | 'KRW' | 'HKD' | 'MYR' | 'PHP' | 'THB' | 'CAD' | 'AUD' | 'MXN' | 'BRL' | 'IDR' | 'AED';
 
@@ -320,11 +321,24 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
         setUser(currentUser);
         setUserId(currentUser?.id ?? null);
 
+        // Bind the offline-sync queue to this user before any mutation. On logout
+        // (currentUser=null) this clears the in-memory queue binding and dispatches
+        // an empty queue-updated event so the indicator clears. Awaited because
+        // setQueueUser may migrate the legacy single-key queue on first sign-in
+        // and we want that done before the flush below.
+        await setQueueUser(currentUser?.id ?? null);
+
         if (currentUser) {
             // Load preferences immediately (hydrates from cache first)
             loadPreferences(currentUser.id);
             // Process recurring expenses in the background
             setTimeout(() => processRecurringExpenses(currentUser.id), 1000);
+            // Flush any items that were stranded in the queue across a refresh or
+            // that had failed transient retries — without this, the queue stays
+            // dormant until a new mutation or a fresh `online` event.
+            if (typeof navigator !== 'undefined' && navigator.onLine) {
+                attemptSync();
+            }
         } else {
             // Reset preferences on logout
             setCurrencyState('INR');

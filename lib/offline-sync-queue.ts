@@ -1,4 +1,5 @@
 export type SyncStatus = 'pending' | 'syncing' | 'synced' | 'failed';
+export type SyncErrorKind = 'permanent' | 'transient' | 'expired';
 
 export interface SyncPayload {
     id: string; // Idempotency key (UUID generated at creation)
@@ -10,6 +11,9 @@ export interface SyncPayload {
     nextRetryAt?: number; // timestamp — skip item until this time passes
     errorReason?: string;
     failedAt?: number;
+    // Drives the failure UI: permanent = "discard, can't retry"; transient =
+    // "retry primary"; expired = "abandoned after 7 days, no retry."
+    errorKind?: SyncErrorKind;
 }
 
 /**
@@ -30,7 +34,7 @@ export function incrementRetry(queue: SyncPayload[], id: string): SyncPayload[] 
         if (item.id !== id) return item;
         const retryCount = (item.retryCount ?? 0) + 1;
         if (retryCount >= MAX_RETRIES) {
-            return { ...item, status: 'failed', retryCount, errorReason: 'Max retries exceeded', failedAt: Date.now() };
+            return { ...item, status: 'failed', retryCount, errorReason: 'Max retries exceeded', failedAt: Date.now(), errorKind: 'transient' };
         }
         // Exponential backoff: 2s, 4s, 8s, 16s, capped at 5 min, with ±15% jitter
         // to avoid thundering herd when many clients retry after a server outage.
@@ -69,21 +73,23 @@ export function markSynced(queue: SyncPayload[], id: string): SyncPayload[] {
     return queue.map(item => item.id === id ? { ...item, status: 'synced' } : item);
 }
 
-export function markFailed(queue: SyncPayload[], id: string, reason: string): SyncPayload[] {
-    return queue.map(item => item.id === id ? { 
-        ...item, 
-        status: 'failed', 
-        errorReason: reason, 
-        failedAt: Date.now() 
+export function markFailed(queue: SyncPayload[], id: string, reason: string, errorKind: SyncErrorKind = 'permanent'): SyncPayload[] {
+    return queue.map(item => item.id === id ? {
+        ...item,
+        status: 'failed',
+        errorReason: reason,
+        failedAt: Date.now(),
+        errorKind,
     } : item);
 }
 
 export function resetToPending(queue: SyncPayload[], id: string): SyncPayload[] {
-    return queue.map(item => item.id === id ? { 
-        ...item, 
-        status: 'pending', 
-        errorReason: undefined, 
-        failedAt: undefined 
+    return queue.map(item => item.id === id ? {
+        ...item,
+        status: 'pending',
+        errorReason: undefined,
+        failedAt: undefined,
+        errorKind: undefined,
     } : item);
 }
 
@@ -107,6 +113,7 @@ export function expireStaleItems(queue: SyncPayload[], now = Date.now()): SyncPa
             status: 'failed' as const,
             errorReason: 'Expired (older than 7 days)',
             failedAt: now,
+            errorKind: 'expired' as const,
         };
     });
     return changed ? next : queue;

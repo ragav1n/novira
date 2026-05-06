@@ -1,16 +1,14 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import { get } from 'idb-keyval';
 import { supabase } from '@/lib/supabase';
 import { toast } from '@/utils/haptics';
 import type { Transaction, AuditLog } from '@/types/transaction';
 import type { SyncPayload } from '@/lib/offline-sync-queue';
-import { discardFailedItem, enqueueMutation } from '@/lib/sync-manager';
+import { discardFailedItem, enqueueMutation, getCurrentQueue } from '@/lib/sync-manager';
 import { invalidateTransactionCaches } from '@/lib/sw-cache';
 import { reportNetworkError } from '@/lib/network-error-bus';
 import { useTransactionInvalidationListener } from './useTransactionInvalidationListener';
 
 const PAGE_SIZE = 100;
-const QUEUE_KEY = 'novira-offline-queue';
 
 function pendingItemToTransaction(
     item: SyncPayload,
@@ -126,10 +124,13 @@ export function useDashboardData(
     const loadPendingFromQueue = useCallback(async () => {
         if (!userId || typeof window === 'undefined') return;
         try {
-            const queue = (await get<SyncPayload[]>(QUEUE_KEY)) || [];
+            const queue = await getCurrentQueue();
             const filtered = queue.filter(item => {
                 if (item.type !== 'ADD_FULL_TRANSACTION') return false;
-                if (item.status === 'synced') return false;
+                // Synced items get removed from queue post-flush; failed items
+                // surface only in the global failed-sync banner so the dashboard
+                // list isn't cluttered with rows the user can't act on inline.
+                if (item.status === 'synced' || item.status === 'failed') return false;
                 const t = item.data?.transaction;
                 if (!t) return false;
                 if (activeWorkspaceId && activeWorkspaceId !== 'personal') {
@@ -215,15 +216,26 @@ export function useDashboardData(
                 if (userId) loadTxRef.current?.(userId, activeWorkspaceId);
             }
         };
+        const onMutationFailedPermanent = (e: Event) => {
+            const detail = (e as CustomEvent<{ id: string; type: string }>).detail;
+            if (detail?.type === 'ADD_FULL_TRANSACTION') {
+                // Permanent ADD failure: drop the optimistic pending row from the
+                // dashboard immediately. The user sees the failure surfaced via the
+                // global failed-sync banner with reason + Discard, not a stuck row.
+                setPendingTransactions(prev => prev.filter(t => t.id !== detail.id));
+            }
+        };
         const onRefreshRequested = () => {
             if (userId) loadTxRef.current?.(userId, activeWorkspaceId);
         };
         window.addEventListener('novira-queue-updated', onQueueUpdated);
         window.addEventListener('novira-mutation-synced', onMutationSynced);
+        window.addEventListener('novira-mutation-failed-permanent', onMutationFailedPermanent);
         window.addEventListener('novira-refresh-requested', onRefreshRequested);
         return () => {
             window.removeEventListener('novira-queue-updated', onQueueUpdated);
             window.removeEventListener('novira-mutation-synced', onMutationSynced);
+            window.removeEventListener('novira-mutation-failed-permanent', onMutationFailedPermanent);
             window.removeEventListener('novira-refresh-requested', onRefreshRequested);
         };
     }, [userId, activeWorkspaceId, loadPendingFromQueue]);

@@ -1,4 +1,4 @@
-import { get, set } from 'idb-keyval';
+import { get, set, del } from 'idb-keyval';
 import type { PostgrestError } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import {
@@ -18,9 +18,100 @@ import {
 import { TransactionService } from './services/transaction-service';
 import { invalidateTransactionCaches } from './sw-cache';
 
-const QUEUE_KEY = 'novira-offline-queue';
+const LEGACY_QUEUE_KEY = 'novira-offline-queue';
+const QUEUE_KEY_PREFIX = 'novira-offline-queue:';
 const MUTATION_TIMEOUT_MS = 20_000;
+const SYNC_LOCK_NAME = 'novira-sync-lock';
+const SYNC_BROADCAST_CHANNEL = 'novira-sync';
+
 let isSyncingLoopActive = false;
+let currentUserId: string | null = null;
+let legacyMigrationDone = false;
+let broadcastChannel: BroadcastChannel | null = null;
+
+function queueKey(): string | null {
+    if (!currentUserId) return null;
+    return QUEUE_KEY_PREFIX + currentUserId;
+}
+
+function getBroadcastChannel(): BroadcastChannel | null {
+    if (typeof window === 'undefined' || typeof BroadcastChannel === 'undefined') return null;
+    if (!broadcastChannel) broadcastChannel = new BroadcastChannel(SYNC_BROADCAST_CHANNEL);
+    return broadcastChannel;
+}
+
+/**
+ * Echo a queue-state event to other tabs so their UI reflects the change without
+ * each tab needing to re-read IndexedDB. Only the originating tab persists.
+ */
+function broadcast(type: string, payload?: unknown) {
+    const ch = getBroadcastChannel();
+    if (!ch) return;
+    try { ch.postMessage({ type, payload }); } catch { /* closed channel */ }
+}
+
+function dispatchQueueUpdated(queue: SyncPayload[]) {
+    if (typeof window === 'undefined') return;
+    window.dispatchEvent(new CustomEvent('novira-queue-updated', { detail: { queue } }));
+    broadcast('novira-queue-updated', { queue });
+}
+
+/**
+ * Bind the queue to the active user. Called by the auth provider on session
+ * change. Migrates a legacy single-key queue to the user-scoped key on first
+ * sign-in so existing pending items aren't stranded.
+ */
+export async function setQueueUser(userId: string | null): Promise<void> {
+    const previous = currentUserId;
+    currentUserId = userId;
+
+    if (typeof window === 'undefined') return;
+
+    if (userId && !legacyMigrationDone) {
+        legacyMigrationDone = true;
+        try {
+            const legacy = await get<SyncPayload[]>(LEGACY_QUEUE_KEY);
+            if (legacy && legacy.length > 0) {
+                const target = QUEUE_KEY_PREFIX + userId;
+                const existing = (await get<SyncPayload[]>(target)) || [];
+                const merged = existing.length === 0 ? legacy : [...existing, ...legacy];
+                await set(target, merged);
+                await del(LEGACY_QUEUE_KEY);
+            }
+        } catch {
+            // Migration is best-effort; failure leaves legacy items in place.
+        }
+    }
+
+    // Refresh listeners in this tab. On sign-out (userId===null), surface an
+    // empty queue so the indicator clears immediately. On user-switch, load the
+    // new user's queue from IDB.
+    if (userId !== previous) {
+        let next: SyncPayload[] = [];
+        if (userId) {
+            try { next = (await get<SyncPayload[]>(QUEUE_KEY_PREFIX + userId)) || []; } catch { next = []; }
+        }
+        dispatchQueueUpdated(next);
+    }
+}
+
+/** Read the active user's queue, or empty if no user is bound. */
+async function readQueue(): Promise<SyncPayload[]> {
+    const key = queueKey();
+    if (!key) return [];
+    return (await get<SyncPayload[]>(key)) || [];
+}
+
+/** Public read for UI hooks that want to hydrate on mount. */
+export async function getCurrentQueue(): Promise<SyncPayload[]> {
+    return readQueue();
+}
+
+async function writeQueue(queue: SyncPayload[]): Promise<void> {
+    const key = queueKey();
+    if (!key) return;
+    await set(key, queue);
+}
 
 function uuidv4() {
     if (typeof crypto !== 'undefined' && crypto.randomUUID) {
@@ -58,6 +149,25 @@ function classifyPgError(error: PostgrestError): { permanent: boolean; reason: s
     return { permanent, reason };
 }
 
+/**
+ * Generic error classifier for ADD path — the RPC throws either a Postgrest
+ * error (with `.code`/`.status`) or a plain Error from `data.error`. We treat
+ * known permanent codes / 4xx as permanent; everything else is transient.
+ */
+function classifyAddError(err: unknown): { permanent: boolean; reason: string } {
+    if (err && typeof err === 'object') {
+        const e = err as { code?: unknown; status?: unknown; message?: unknown };
+        const code = typeof e.code === 'string' ? e.code : undefined;
+        const status = typeof e.status === 'number' ? e.status : undefined;
+        const message = typeof e.message === 'string' ? e.message : 'Unknown error';
+        const is4xx = typeof status === 'number' && status >= 400 && status < 500;
+        const permanent = is4xx || (code !== undefined && PERMANENT_PG_CODES.has(code));
+        const reason = code ? `${code}: ${message}` : message;
+        return { permanent, reason };
+    }
+    return { permanent: false, reason: String(err) };
+}
+
 export class QueueFullError extends Error {
     constructor() {
         super(`Offline queue is full (${MAX_QUEUE_SIZE} items). Please reconnect to sync pending items.`);
@@ -67,7 +177,7 @@ export class QueueFullError extends Error {
 
 // 1. Enqueue Function
 export async function enqueueMutation(type: string, data: any): Promise<string> {
-    let currentQueue = (await get<SyncPayload[]>(QUEUE_KEY)) || [];
+    let currentQueue = await readQueue();
 
     // Dedup: a duplicate DELETE for the same tx id is pure waste — return the
     // existing pending item's id so callers see the same idempotent result.
@@ -79,8 +189,8 @@ export async function enqueueMutation(type: string, data: any): Promise<string> 
     if (type === 'UPDATE_TRANSACTION' && data?.id) {
         const merged = mergePendingUpdate(currentQueue, data);
         if (merged) {
-            await set(QUEUE_KEY, merged.queue);
-            window.dispatchEvent(new CustomEvent('novira-queue-updated', { detail: { queue: merged.queue } }));
+            await writeQueue(merged.queue);
+            dispatchQueueUpdated(merged.queue);
             if (navigator.onLine) attemptSync();
             return merged.mergedId;
         }
@@ -93,6 +203,7 @@ export async function enqueueMutation(type: string, data: any): Promise<string> 
         const evictedCount = beforeCount - currentQueue.length;
         if (evictedCount > 0) {
             window.dispatchEvent(new CustomEvent('novira-queue-evicted', { detail: { count: evictedCount } }));
+            broadcast('novira-queue-evicted', { count: evictedCount });
         }
         if (currentQueue.length >= MAX_QUEUE_SIZE) {
             throw new QueueFullError();
@@ -101,9 +212,9 @@ export async function enqueueMutation(type: string, data: any): Promise<string> 
 
     const id = uuidv4();
     const newQueue = addToQueue(currentQueue, { id, type, data });
-    await set(QUEUE_KEY, newQueue);
+    await writeQueue(newQueue);
 
-    window.dispatchEvent(new CustomEvent('novira-queue-updated', { detail: { queue: newQueue } }));
+    dispatchQueueUpdated(newQueue);
 
     if (navigator.onLine) {
         attemptSync();
@@ -115,20 +226,52 @@ export async function enqueueMutation(type: string, data: any): Promise<string> 
     return id;
 }
 
+/**
+ * Run `body` only if no other tab currently holds the sync lock. Falls back to
+ * an unguarded run on browsers without Web Locks (in which case the in-tab
+ * `isSyncingLoopActive` flag still prevents intra-tab overlap).
+ */
+async function withSyncLock(body: () => Promise<void>): Promise<void> {
+    if (typeof navigator !== 'undefined' && (navigator as any).locks?.request) {
+        await (navigator as any).locks.request(SYNC_LOCK_NAME, { ifAvailable: true }, async (lock: unknown) => {
+            if (!lock) return; // another tab is syncing — yield
+            await body();
+        });
+    } else {
+        await body();
+    }
+}
+
 // 3. Process the Queue
 export async function attemptSync() {
     if (isSyncingLoopActive) return;
+    if (!currentUserId) return;
+    if (typeof navigator !== 'undefined' && !navigator.onLine) return;
 
-    let queue = (await get<SyncPayload[]>(QUEUE_KEY)) || [];
+    isSyncingLoopActive = true;
+    try {
+        await withSyncLock(runSyncLoop);
+    } finally {
+        isSyncingLoopActive = false;
+    }
+}
+
+async function runSyncLoop(): Promise<void> {
+    let queue = await readQueue();
     const now = Date.now();
 
     // Expire pending items older than 7 days so they stop retrying forever and
     // surface to the user as "Expired" in the failed list.
     const expired = expireStaleItems(queue, now);
     if (expired !== queue) {
+        const expiredCount = expired.filter((it, i) => queue[i]?.status === 'pending' && it.status === 'failed').length;
         queue = expired;
-        await set(QUEUE_KEY, queue);
-        window.dispatchEvent(new CustomEvent('novira-queue-updated', { detail: { queue } }));
+        await writeQueue(queue);
+        dispatchQueueUpdated(queue);
+        if (expiredCount > 0) {
+            window.dispatchEvent(new CustomEvent('novira-queue-expired', { detail: { count: expiredCount } }));
+            broadcast('novira-queue-expired', { count: expiredCount });
+        }
     }
 
     const pendingItems = queue.filter(item =>
@@ -139,17 +282,19 @@ export async function attemptSync() {
     if (pendingItems.length === 0) return;
     if (!navigator.onLine) return;
 
-    isSyncingLoopActive = true;
-
     // Notify UI we are actively syncing
-    window.dispatchEvent(new Event('novira-sync-started'));
+    window.dispatchEvent(new CustomEvent('novira-sync-started', { detail: { total: pendingItems.length } }));
+    broadcast('novira-sync-started', { total: pendingItems.length });
+
+    let done = 0;
+    const total = pendingItems.length;
 
     try {
         for (const item of pendingItems) {
             // Transition to Syncing
             queue = startSyncing(queue, item.id);
-            await set(QUEUE_KEY, queue);
-            window.dispatchEvent(new CustomEvent('novira-queue-updated', { detail: { queue } }));
+            await writeQueue(queue);
+            dispatchQueueUpdated(queue);
 
             try {
                 if (item.type === 'ADD_FULL_TRANSACTION') {
@@ -191,7 +336,10 @@ export async function attemptSync() {
                             // Permanent failure: RLS violation, not found, or other 4xx.
                             // Note: RLS-filtered deletes succeed with 0 rows (no error), so this branch
                             // is only hit on actual rejection.
-                            queue = markFailed(queue, item.id, reason);
+                            queue = markFailed(queue, item.id, reason, 'permanent');
+                            window.dispatchEvent(new CustomEvent('novira-mutation-failed-permanent', {
+                                detail: { id: item.id, type: item.type, data: item.data, reason }
+                            }));
                         } else {
                             throw new Error(reason);
                         }
@@ -219,7 +367,10 @@ export async function attemptSync() {
                     if (error) {
                         const { permanent, reason } = classifyPgError(error);
                         if (permanent) {
-                            queue = markFailed(queue, item.id, reason);
+                            queue = markFailed(queue, item.id, reason, 'permanent');
+                            window.dispatchEvent(new CustomEvent('novira-mutation-failed-permanent', {
+                                detail: { id: item.id, type: item.type, data: item.data, reason }
+                            }));
                         } else {
                             throw new Error(reason);
                         }
@@ -231,6 +382,22 @@ export async function attemptSync() {
                     }
                 }
             } catch (e) {
+                // ADD path: some errors (RLS, validation) are permanent and won't pass on retry.
+                // Classify before backing off so the user isn't waiting on hopeless retries.
+                if (item.type === 'ADD_FULL_TRANSACTION') {
+                    const { permanent, reason } = classifyAddError(e);
+                    if (permanent) {
+                        queue = markFailed(queue, item.id, reason, 'permanent');
+                        window.dispatchEvent(new CustomEvent('novira-mutation-failed-permanent', {
+                            detail: { id: item.id, type: item.type, data: item.data, reason }
+                        }));
+                        await writeQueue(queue);
+                        done++;
+                        window.dispatchEvent(new CustomEvent('novira-sync-progress', { detail: { done, total } }));
+                        broadcast('novira-sync-progress', { done, total });
+                        continue;
+                    }
+                }
                 // Temporary network/server failure — apply exponential backoff with jitter.
                 if (process.env.NODE_ENV === 'development') {
                     console.error(`[sync-manager] ${item.type} failed, will retry:`, e);
@@ -238,13 +405,16 @@ export async function attemptSync() {
                 queue = incrementRetry(queue, item.id);
             }
 
-            await set(QUEUE_KEY, queue);
+            await writeQueue(queue);
+            done++;
+            window.dispatchEvent(new CustomEvent('novira-sync-progress', { detail: { done, total } }));
+            broadcast('novira-sync-progress', { done, total });
         }
 
         // Clean up
         queue = removeSynced(queue);
-        await set(QUEUE_KEY, queue);
-        window.dispatchEvent(new CustomEvent('novira-queue-updated', { detail: { queue } }));
+        await writeQueue(queue);
+        dispatchQueueUpdated(queue);
 
         // After offline-queued mutations land on the server, the SW's SWR cache for
         // transaction reads is stale until next refresh. Invalidate so the next read
@@ -252,30 +422,30 @@ export async function attemptSync() {
         invalidateTransactionCaches();
     } finally {
         window.dispatchEvent(new Event('novira-sync-finished'));
-        isSyncingLoopActive = false;
+        broadcast('novira-sync-finished');
     }
 }
 
 // 4. Manual Retry for Failed Items
 export async function retryFailedItem(id: string) {
-    let queue = (await get<SyncPayload[]>(QUEUE_KEY)) || [];
+    let queue = await readQueue();
     queue = queue.map(item => item.id === id
-        ? { ...item, status: 'pending', retryCount: 0, nextRetryAt: undefined, errorReason: undefined, failedAt: undefined }
+        ? { ...item, status: 'pending', retryCount: 0, nextRetryAt: undefined, errorReason: undefined, failedAt: undefined, errorKind: undefined }
         : item
     );
-    await set(QUEUE_KEY, queue);
-    window.dispatchEvent(new CustomEvent('novira-queue-updated', { detail: { queue } }));
+    await writeQueue(queue);
+    dispatchQueueUpdated(queue);
     attemptSync();
 }
 
 export async function discardFailedItem(id: string) {
-    let queue = (await get<SyncPayload[]>(QUEUE_KEY)) || [];
+    let queue = await readQueue();
     queue = queue.filter(item => item.id !== id);
-    await set(QUEUE_KEY, queue);
-    window.dispatchEvent(new CustomEvent('novira-queue-updated', { detail: { queue } }));
+    await writeQueue(queue);
+    dispatchQueueUpdated(queue);
 }
 
-// 5. Initialize Online Listeners + Background Sync
+// 5. Initialize Online Listeners + Background Sync + Cross-Tab Echo
 if (typeof window !== 'undefined') {
     window.addEventListener('online', () => {
         attemptSync();
@@ -294,6 +464,36 @@ if (typeof window !== 'undefined') {
                 attemptSync();
             }
         });
+    }
+
+    // Mirror sync events from sibling tabs into local DOM events so any
+    // listener that uses window.addEventListener picks them up uniformly.
+    const ch = getBroadcastChannel();
+    if (ch) {
+        ch.onmessage = (ev) => {
+            const msg = ev.data as { type?: string; payload?: any } | null;
+            if (!msg?.type) return;
+            switch (msg.type) {
+                case 'novira-queue-updated':
+                    window.dispatchEvent(new CustomEvent('novira-queue-updated', { detail: msg.payload }));
+                    break;
+                case 'novira-sync-started':
+                    window.dispatchEvent(new CustomEvent('novira-sync-started', { detail: msg.payload }));
+                    break;
+                case 'novira-sync-finished':
+                    window.dispatchEvent(new Event('novira-sync-finished'));
+                    break;
+                case 'novira-sync-progress':
+                    window.dispatchEvent(new CustomEvent('novira-sync-progress', { detail: msg.payload }));
+                    break;
+                case 'novira-queue-expired':
+                    window.dispatchEvent(new CustomEvent('novira-queue-expired', { detail: msg.payload }));
+                    break;
+                case 'novira-queue-evicted':
+                    window.dispatchEvent(new CustomEvent('novira-queue-evicted', { detail: msg.payload }));
+                    break;
+            }
+        };
     }
 }
 
