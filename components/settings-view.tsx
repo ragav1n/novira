@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { ChevronLeft, User, Shield, ChevronRight, LogOut, Trash2, Wrench, RefreshCcw, Download, SlidersHorizontal, Bell, Globe, Zap } from 'lucide-react';
+import { ChevronLeft, User, Shield, ChevronRight, LogOut, Trash2, Wrench, RefreshCcw, Download, SlidersHorizontal, Bell, Globe, Zap, LayoutDashboard } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -15,6 +15,8 @@ import { version as APP_VERSION } from '@/package.json';
 import { AlertBanner } from '@/components/ui/alert-banner';
 import { AnimatePresence, motion } from 'framer-motion';
 import { generateCSV, generatePDF } from '@/utils/export-utils';
+import { buildIcs, downloadIcs } from '@/lib/ics-export';
+import type { SavingsGoal } from '@/types/goal';
 import { FileTriggerButton } from '@/components/ui/file-trigger';
 import { DeleteAccountDialog } from '@/components/delete-account-dialog';
 import { ExportDateRangeModal } from '@/components/export-date-range-modal';
@@ -28,6 +30,7 @@ import type { RecurringTemplate } from '@/types/transaction';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { RecurringExpensesSection } from '@/components/settings/recurring-expenses-section';
 import { DataManagementSection } from '@/components/settings/data-management-section';
+import { DashboardLayoutSection } from '@/components/settings/dashboard-layout-section';
 import { PreferencesSection } from '@/components/settings/preferences-section';
 import { NotificationsSection } from '@/components/settings/notifications-section';
 import { LocaleSection } from '@/components/settings/locale-section';
@@ -46,6 +49,7 @@ export function SettingsView() {
     // Removed local budgetAlertsEnabled state
     const [showAlert, setShowAlert] = useState(false);
     const [loadingExport, setLoadingExport] = useState(false);
+    const [loadingIcs, setLoadingIcs] = useState(false);
     const [exportModalOpen, setExportModalOpen] = useState(false);
     const [exportType, setExportType] = useState<'csv' | 'pdf' | null>(null);
     const [uploadingAvatar, setUploadingAvatar] = useState(false);
@@ -107,7 +111,7 @@ export function SettingsView() {
     const [defaultOpenSections] = useState<string[]>(() => {
         if (typeof window === 'undefined') return [];
         const hash = window.location.hash.replace('#', '').trim();
-        const valid = ['recurring', 'data', 'notifications', 'locale', 'quick-add', 'general', 'security'];
+        const valid = ['recurring', 'data', 'notifications', 'locale', 'quick-add', 'dashboard-layout', 'general', 'security'];
         return hash && valid.includes(hash) ? [hash] : [];
     });
 
@@ -169,7 +173,7 @@ export function SettingsView() {
         try {
             const { data, error } = await supabase
                 .from('recurring_templates')
-                .select('id, description, amount, currency, frequency, created_at, next_occurrence, category, is_active')
+                .select('id, description, amount, currency, frequency, created_at, next_occurrence, category, is_active, is_income')
                 .eq('user_id', userId)
                 .order('created_at', { ascending: false });
 
@@ -329,6 +333,47 @@ export function SettingsView() {
     const handleExportClick = (type: 'csv' | 'pdf') => {
         setExportType(type);
         setExportModalOpen(true);
+    };
+
+    const handleExportICS = async () => {
+        if (!userId) {
+            toast.error('You must be signed in to export your calendar');
+            return;
+        }
+        setLoadingIcs(true);
+        try {
+            const [templatesRes, goalsRes] = await Promise.all([
+                supabase
+                    .from('recurring_templates')
+                    .select('id, description, amount, currency, frequency, next_occurrence, last_processed, category, is_active, created_at, payment_method, group_id, metadata')
+                    .eq('user_id', userId)
+                    .eq('is_active', true),
+                supabase
+                    .from('savings_goals')
+                    .select('id, user_id, name, target_amount, current_amount, currency, deadline, icon, color, group_id, created_at')
+                    .eq('user_id', userId),
+            ]);
+
+            const templates = (templatesRes.data ?? []) as RecurringTemplate[];
+            const goals = (goalsRes.data ?? []) as SavingsGoal[];
+
+            const ics = buildIcs({
+                recurringTemplates: templates,
+                goals,
+                buckets,
+                formatAmount: (amount, cur) => formatCurrency(amount, cur),
+            });
+
+            const stamp = new Date().toISOString().slice(0, 10);
+            downloadIcs(`novira-${stamp}.ics`, ics);
+            toast.success('Calendar file ready — import it into your calendar app');
+        } catch (error) {
+            const msg = error instanceof Error ? error.message : 'Unknown error';
+            console.error('Error building .ics:', error);
+            toast.error('Could not build calendar file: ' + msg);
+        } finally {
+            setLoadingIcs(false);
+        }
     };
 
     const handleExportConfirm = async (dateRange: DateRange | null, bucketId: string | null, groupId: string | 'personal' | null) => {
@@ -560,6 +605,8 @@ export function SettingsView() {
                                 onImport={() => router.push('/import')}
                                 onExportCSV={() => handleExportClick('csv')}
                                 onExportPDF={() => handleExportClick('pdf')}
+                                onExportICS={handleExportICS}
+                                icsLoading={loadingIcs}
                             />
                         </AccordionContent>
                     </AccordionItem>
@@ -625,6 +672,18 @@ export function SettingsView() {
                                 setDefaultBucketId={setDefaultBucketId}
                                 buckets={buckets}
                             />
+                        </AccordionContent>
+                    </AccordionItem>
+
+                    <AccordionItem value="dashboard-layout" className="border-b-0 px-3">
+                        <AccordionTrigger className="text-sm font-semibold text-muted-foreground hover:no-underline">
+                            <div className="flex items-center gap-2">
+                                <LayoutDashboard className="w-4 h-4" />
+                                <span>Dashboard Layout</span>
+                            </div>
+                        </AccordionTrigger>
+                        <AccordionContent>
+                            <DashboardLayoutSection />
                         </AccordionContent>
                     </AccordionItem>
 

@@ -38,6 +38,7 @@ interface ExpenseSubmissionParams {
     // Recurring State
     isRecurring: boolean;
     frequency: 'daily' | 'weekly' | 'monthly' | 'yearly';
+    isIncome?: boolean;
 }
 
 export type ExpenseFormErrors = {
@@ -135,7 +136,8 @@ function buildRecurringRecord(
     placeAddress: string | null,
     placeLat: number | null,
     placeLng: number | null,
-    tags: string[]
+    tags: string[],
+    isIncome: boolean,
 ): RecurringRecord {
     const intendedDay = date.getDate();
     const nextDate = new Date(date);
@@ -166,9 +168,10 @@ function buildRecurringRecord(
         next_occurrence: format(nextDate, 'yyyy-MM-dd'),
         intended_day: intendedDay,
         exclude_from_allowance: excludeFromAllowance,
+        is_income: isIncome,
         metadata: {
-            is_split: isSplitEnabled,
-            friend_ids: selectedFriendIds,
+            is_split: isSplitEnabled && !isIncome,
+            friend_ids: isIncome ? [] : selectedFriendIds,
             notes,
             bucket_id: selectedBucketId,
             ...(tags.length ? { tags } : {}),
@@ -187,7 +190,8 @@ export function useExpenseSubmission() {
             selectedGroupId, selectedBucketId, excludeFromAllowance,
             placeName, placeAddress, placeLat, placeLng,
             paymentMethod, notes, tags, isSplitEnabled, selectedFriendIds,
-            splitMode, customAmounts, isRecurring, frequency
+            splitMode, customAmounts, isRecurring, frequency,
+            isIncome = false,
         } = params;
 
         if (!validateExpenseForm(amount, description, date)) return;
@@ -223,13 +227,17 @@ export function useExpenseSubmission() {
                 base_currency: currency,
                 converted_amount: convertedAmount,
                 is_recurring: isRecurring,
+                is_income: isIncome,
                 exclude_from_allowance: excludeFromAllowance,
                 idempotency_key: idempotencyKey,
                 tags: cleanTags,
                 ...(placeName ? { place_name: placeName, place_address: placeAddress, place_lat: placeLat, place_lng: placeLng } : {})
             };
 
-            const splitResult = await buildSplitRecords(amount, userId, isSplitEnabled, selectedGroupId, selectedFriendIds, splitMode, customAmounts);
+            // Income can't be split — they're personal earnings, not shared expenses.
+            const splitResult: { records?: SplitRecord[]; error?: string } = isIncome
+                ? { records: undefined }
+                : await buildSplitRecords(amount, userId, isSplitEnabled, selectedGroupId, selectedFriendIds, splitMode, customAmounts);
             if (splitResult.error) {
                 toast.error(splitResult.error);
                 setLoading(false);
@@ -237,7 +245,7 @@ export function useExpenseSubmission() {
             }
 
             const recurringRecordToInsert = isRecurring
-                ? buildRecurringRecord(userId, description, amount, selectedCategory, txCurrency, selectedGroupId, paymentMethod, frequency, date!, excludeFromAllowance, isSplitEnabled, selectedFriendIds, notes, selectedBucketId, placeName, placeAddress, placeLat, placeLng, cleanTags)
+                ? buildRecurringRecord(userId, description, amount, selectedCategory, txCurrency, selectedGroupId, paymentMethod, frequency, date!, excludeFromAllowance, isSplitEnabled, selectedFriendIds, notes, selectedBucketId, placeName, placeAddress, placeLat, placeLng, cleanTags, isIncome)
                 : null;
 
             const result = await TransactionService.createTransaction({

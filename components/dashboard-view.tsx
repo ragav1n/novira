@@ -35,6 +35,7 @@ import { useDashboardData } from '@/hooks/useDashboardData';
 import { useDashboardState } from '@/hooks/useDashboardState';
 import { useDashboardStats } from '@/hooks/useDashboardStats';
 import { useUpcomingRecurring } from '@/hooks/useUpcomingRecurring';
+import { useDashboardLayout } from '@/hooks/useDashboardLayout';
 
 
 
@@ -55,6 +56,7 @@ export function DashboardView() {
     const { balances, groups, friends } = useGroups();
     const { buckets, bucketSpending } = useBuckets();
     const { items: upcomingRecurring } = useUpcomingRecurring(userId, activeWorkspaceId);
+    const { layout: dashboardLayout } = useDashboardLayout();
 
     // Pass current user's profile so offline-queued transactions render with the
     // correct payer info instead of a blank profile.
@@ -98,7 +100,7 @@ export function DashboardView() {
     const {
         focusedBucket, displayBudget, calculateUserShare, totalSpent,
         remaining, progress, spendingData, displayTransactions, recentFeed, runRateData, cashflowForecast,
-        todaySpent, lastMonthComparison
+        todaySpent, lastMonthComparison, lastMonthCarryover, incomeThisMonth
     } = useDashboardStats({
         transactions, 
         userId: activeWorkspaceId ? null : userId, // if workspace, null so we get all workspace txs
@@ -264,7 +266,7 @@ export function DashboardView() {
                     isCoupleWorkspace={isCoupleWorkspace}
                     isHomeWorkspace={isHomeWorkspace}
                     runRateData={runRateData}
-                    cashflowForecast={cashflowForecast}
+                    cashflowForecast={dashboardLayout.cashflow_forecast ? cashflowForecast : null}
                     dashboardFocus={dashboardFocus}
                     setDashboardFocus={setDashboardFocus}
                     isFocusMenuOpen={isFocusMenuOpen}
@@ -277,14 +279,18 @@ export function DashboardView() {
                     setHoveredFocusId={setHoveredFocusId}
                     focusSelectorRef={focusSelectorRef}
                     spendingData={spendingData}
+                    showCategoryDonut={dashboardLayout.category_donut}
                     balances={balances}
                     setIsAddFundsOpen={setIsAddFundsOpen}
                     baseCurrency={currency}
                     todaySpent={todaySpent}
                     lastMonthComparison={lastMonthComparison}
-                    upcomingRecurring={upcomingRecurring}
+                    upcomingRecurring={dashboardLayout.upcoming_recurring ? upcomingRecurring : []}
                     convertAmount={convertAmount}
+                    lastMonthCarryover={lastMonthCarryover}
+                    incomeThisMonth={incomeThisMonth}
                 />
+                {dashboardLayout.transaction_list && (
                 <TransactionListSection
                     isBucketFocused={isBucketFocused}
                     isMapOpen={isMapOpen}
@@ -311,8 +317,9 @@ export function DashboardView() {
                     loadingMore={loadingMore}
                     onLoadMore={loadMore}
                 />
+                )}
 
-                <DashboardDialogs 
+                <DashboardDialogs
                     userId={userId}
                     currency={currency}
                     isBudgetEditOpen={isBudgetEditOpen}

@@ -38,6 +38,7 @@ import { CalendarHeatmapCard } from '@/components/analytics/calendar-heatmap-car
 import { LocationInsightsCard } from '@/components/analytics/location-insights-card';
 import { InsightsChatCard } from '@/components/analytics/insights-chat-card';
 import { LazyMount } from '@/components/analytics/lazy-mount';
+import { WhatIfCard } from '@/components/analytics/what-if-card';
 
 function BucketIcon({ icon, className }: { icon?: string; className?: string }) {
     const el = getIconForCategory(icon || 'Tag') as React.ReactElement<{ className?: string }>;
@@ -142,10 +143,15 @@ export function AnalyticsView() {
                     : Promise.resolve([] as Transaction[]),
             ]);
 
+            // Income transactions belong to a separate "earning" model and shouldn't
+            // appear in spending analytics (category breakdown, top merchants, trend).
+            const filteredCurrent = (current || []).filter(t => !t.is_income);
+            const filteredPrior = (prior || []).filter(t => !t.is_income);
+
             // ALL-view safety: at high transaction counts charts and aggregations get
             // expensive. Cap the view at the latest 5000 and surface a footnote.
             const ALL_VIEW_LIMIT = 5000;
-            let nextCurrent = current || [];
+            let nextCurrent = filteredCurrent;
             let truncated = false;
             if (dateRange === 'ALL' && nextCurrent.length > ALL_VIEW_LIMIT) {
                 nextCurrent = [...nextCurrent]
@@ -178,7 +184,7 @@ export function AnalyticsView() {
                     setRangeEnd(now);
                 }
             }
-            setPriorTransactions(prior || []);
+            setPriorTransactions(filteredPrior);
             setPriorStart(priorStart);
         } catch (err) {
             console.error("Error fetching analytics:", err);
@@ -510,6 +516,16 @@ export function AnalyticsView() {
                     discretionaryTopItems={discretionaryTopItems}
                     formatCurrency={formatCurrency}
                 />
+
+                <LazyMount placeholderHeight={140}>
+                    <WhatIfCard
+                        transactions={transactions}
+                        userId={userId}
+                        currency={currency}
+                        convertAmount={convertAmount}
+                        formatCurrency={formatCurrency}
+                    />
+                </LazyMount>
 
                 <TagsFilterCard
                     tagBreakdown={tagBreakdown}

@@ -25,6 +25,7 @@ import { useRouter } from 'next/navigation';
 import { toast } from '@/utils/haptics';
 import { getCategoryLabel, getIconForCategory, CATEGORY_COLORS } from '@/lib/categories';
 import type { RecurringTemplate, SubscriptionMetadata } from '@/types/transaction';
+import { RecurringDetectCard } from '@/components/recurring-detect-card';
 
 type Tpl = RecurringTemplate;
 type Frequency = Tpl['frequency'];
@@ -104,7 +105,8 @@ export function SubscriptionsView() {
             console.error('Failed to load subscriptions', error);
             toast.error("Couldn't load subscriptions");
         } else if (data) {
-            setTemplates(data as Tpl[]);
+            // Subscriptions view is for recurring expenses; hide income templates.
+            setTemplates((data as Tpl[]).filter(t => !t.is_income));
         }
         setLoading(false);
     }, [userId, activeWorkspaceId]);
@@ -547,6 +549,14 @@ export function SubscriptionsView() {
                     </div>
                 </div>
             )}
+
+            <RecurringDetectCard
+                userId={userId}
+                activeWorkspaceId={activeWorkspaceId as string | 'personal' | null}
+                templates={templates}
+                formatCurrency={formatCurrency}
+                onCreated={loadTemplates}
+            />
 
             <div className="space-y-3">
                 <h3 className="text-lg font-bold mb-4">Upcoming Renewals</h3>

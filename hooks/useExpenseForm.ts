@@ -22,6 +22,7 @@ type DraftShape = {
     excludeFromAllowance: boolean;
     isRecurring: boolean;
     frequency: 'daily' | 'weekly' | 'monthly' | 'yearly';
+    isIncome: boolean;
     date: string | null;
 };
 
@@ -93,6 +94,7 @@ export function useExpenseForm(
     // Recurring State
     const [isRecurring, setIsRecurring] = useState(initialDraft?.isRecurring ?? false);
     const [frequency, setFrequency] = useState<'daily' | 'weekly' | 'monthly' | 'yearly'>(initialDraft?.frequency ?? 'monthly');
+    const [isIncome, setIsIncome] = useState<boolean>(initialDraft?.isIncome ?? false);
 
     // Exclusion State
     const [excludeFromAllowance, setExcludeFromAllowance] = useState(initialDraft?.excludeFromAllowance ?? false);
@@ -152,7 +154,7 @@ export function useExpenseForm(
                     amount, description, notes, selectedCategory, paymentMethod,
                     txCurrency, selectedBucketId, placeName, placeAddress,
                     placeLat, placeLng, tags, excludeFromAllowance, isRecurring,
-                    frequency,
+                    frequency, isIncome,
                     date: date ? date.toISOString() : null,
                 };
                 sessionStorage.setItem(draftKey, JSON.stringify(draft));
@@ -166,7 +168,7 @@ export function useExpenseForm(
     }, [
         draftKey, amount, description, notes, selectedCategory, paymentMethod,
         txCurrency, selectedBucketId, placeName, placeAddress, placeLat, placeLng,
-        tags, excludeFromAllowance, isRecurring, frequency, date,
+        tags, excludeFromAllowance, isRecurring, frequency, isIncome, date,
     ]);
 
     // Smart Location Memory: Suggest locations from previous transactions
@@ -432,6 +434,7 @@ export function useExpenseForm(
         setCustomAmounts({});
         setIsRecurring(false);
         setFrequency('monthly');
+        setIsIncome(false);
         setExcludeFromAllowance(false);
         setPlaceName(null);
         setPlaceAddress(null);
@@ -463,6 +466,7 @@ export function useExpenseForm(
         customAmounts, setCustomAmounts,
         isRecurring, setIsRecurring,
         frequency, setFrequency,
+        isIncome, setIsIncome,
         excludeFromAllowance, setExcludeFromAllowance,
         placeName, setPlaceName,
         placeAddress, setPlaceAddress,

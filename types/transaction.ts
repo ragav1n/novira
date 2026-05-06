@@ -16,6 +16,7 @@ export type Transaction = {
     converted_amount?: number;
     is_settlement?: boolean;
     is_recurring?: boolean;
+    is_income?: boolean;
     bucket_id?: string;
     exclude_from_allowance?: boolean;
     payment_method?: string;
@@ -59,6 +60,7 @@ export type TransactionRecord = {
     base_currency: string;
     converted_amount: number;
     is_recurring: boolean;
+    is_income?: boolean;
     exclude_from_allowance: boolean;
     idempotency_key?: string;
     place_name?: string;
@@ -88,6 +90,7 @@ export type RecurringRecord = {
     payment_method?: string;
     intended_day?: number;
     exclude_from_allowance?: boolean;
+    is_income?: boolean;
     metadata?: Record<string, unknown>;
 };
 
@@ -110,6 +113,7 @@ export type RecurringTemplate = {
     last_processed: string | null;
     category: string;
     is_active: boolean;
+    is_income?: boolean;
     created_at: string;
     user_id?: string;
     group_id?: string | null;

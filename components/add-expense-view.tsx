@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronLeft, CreditCard, Utensils, Car, Zap, ShoppingBag, HeartPulse, Clapperboard, Wallet, Banknote, HelpCircle, Calendar as CalendarIcon, Home, School, LayoutGrid, Building2, MapPin, Shirt, ShoppingCart, LocateFixed, ScanSearch, Sparkles, Camera, Image as ImageIcon } from 'lucide-react';
+import { ChevronLeft, CreditCard, Utensils, Car, Zap, ShoppingBag, HeartPulse, Clapperboard, Wallet, Banknote, HelpCircle, Calendar as CalendarIcon, Home, School, LayoutGrid, Building2, MapPin, Shirt, ShoppingCart, LocateFixed, ScanSearch, Sparkles, Camera, Image as ImageIcon, Plane } from 'lucide-react';
 import UniqueLoading from '@/components/ui/grid-loading';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -244,7 +244,8 @@ export function AddExpenseView() {
             paymentMethod: formState.paymentMethod, notes: formState.notes, tags: formState.tags,
             isSplitEnabled: formState.isSplitEnabled,
             selectedFriendIds: formState.selectedFriendIds, splitMode: formState.splitMode,
-            customAmounts: finalCustomAmounts, isRecurring: formState.isRecurring, frequency: formState.frequency
+            customAmounts: finalCustomAmounts, isRecurring: formState.isRecurring, frequency: formState.frequency,
+            isIncome: formState.isIncome,
         });
     };
     
@@ -258,6 +259,31 @@ export function AddExpenseView() {
             );
         }
     }, []);
+
+    // Trip mode: when the user picks a trip-type bucket whose start/end window
+    // covers today and whose currency differs from the form's, auto-switch the
+    // tx currency to the destination currency. Saves the user from manually
+    // changing currency on every transaction during a trip.
+    const activeTripBucket = React.useMemo(() => {
+        const id = formState.selectedBucketId;
+        if (!id) return null;
+        const b = buckets.find(x => x.id === id);
+        if (!b || b.is_archived || b.type !== 'trip') return null;
+        const today = new Date().toISOString().slice(0, 10);
+        if (b.start_date && today < b.start_date.slice(0, 10)) return null;
+        if (b.end_date && today > b.end_date.slice(0, 10)) return null;
+        return b;
+    }, [formState.selectedBucketId, buckets]);
+
+    const tripAutoCurrencyAppliedRef = useRef<string | null>(null);
+    useEffect(() => {
+        if (!activeTripBucket || !activeTripBucket.currency) return;
+        if (tripAutoCurrencyAppliedRef.current === activeTripBucket.id) return;
+        const target = activeTripBucket.currency.toUpperCase();
+        if (target === formState.txCurrency.toUpperCase()) return;
+        formState.setTxCurrency(target);
+        tripAutoCurrencyAppliedRef.current = activeTripBucket.id;
+    }, [activeTripBucket, formState]);
 
     // Sorted Suggestions
     const sortedSuggestions = React.useMemo(() => {
@@ -723,6 +749,17 @@ export function AddExpenseView() {
                     selectedBucketId={formState.selectedBucketId}
                     setSelectedBucketId={formState.setSelectedBucketId}
                 />
+                {activeTripBucket && (
+                    <div className="flex items-center gap-2 text-[11px] font-bold px-3 py-1.5 rounded-full bg-cyan-500/10 text-cyan-300 border border-cyan-500/20 self-start">
+                        <Plane className="w-3 h-3" aria-hidden="true" />
+                        <span>Trip mode: {activeTripBucket.name}</span>
+                        {activeTripBucket.currency && (
+                            <span className="text-cyan-400/70">
+                                · {activeTripBucket.currency.toUpperCase()}
+                            </span>
+                        )}
+                    </div>
+                )}
 
                 {/* Date & Payment */}
                 <div className="space-y-4">
@@ -852,6 +889,8 @@ export function AddExpenseView() {
                     frequency={formState.frequency}
                     setFrequency={formState.setFrequency}
                     date={formState.date}
+                    isIncome={formState.isIncome}
+                    setIsIncome={formState.setIsIncome}
                 />
 
                 {/* Tags */}

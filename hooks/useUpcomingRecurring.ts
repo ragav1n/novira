@@ -8,6 +8,7 @@ type UpcomingRow = {
     currency: string;
     category: string;
     next_occurrence: string;
+    is_income?: boolean;
 };
 
 const HORIZON_DAYS = 7;
@@ -62,15 +63,17 @@ export function useUpcomingRecurring(
             const { data, error } = await query;
             if (error) throw error;
 
-            const mapped: UpcomingCharge[] = ((data ?? []) as UpcomingRow[]).map(t => ({
-                id: t.id,
-                description: t.description,
-                amount: Number(t.amount),
-                currency: t.currency,
-                category: t.category,
-                nextOccurrence: t.next_occurrence,
-                daysUntil: Math.max(0, differenceInCalendarDays(parseISO(t.next_occurrence), today)),
-            }));
+            const mapped: UpcomingCharge[] = ((data ?? []) as UpcomingRow[])
+                .filter(t => !t.is_income)
+                .map(t => ({
+                    id: t.id,
+                    description: t.description,
+                    amount: Number(t.amount),
+                    currency: t.currency,
+                    category: t.category,
+                    nextOccurrence: t.next_occurrence,
+                    daysUntil: Math.max(0, differenceInCalendarDays(parseISO(t.next_occurrence), today)),
+                }));
             setItems(mapped);
         } catch (e) {
             if (process.env.NODE_ENV === 'development') {

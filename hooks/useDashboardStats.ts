@@ -63,6 +63,8 @@ export function useDashboardStats({
         deltaPct: number;
         isUp: boolean;
     } | null;
+    lastMonthCarryover: number;
+    incomeThisMonth: number;
 } {
     const focusedBucket = (isBucketFocused && Array.isArray(buckets) ? buckets.find(b => b.id === effectiveFocus) : null) ?? null;
     const displayBudget = isBucketFocused && focusedBucket ? Number(focusedBucket.budget) : (monthlyBudget || 0);
@@ -106,6 +108,7 @@ export function useDashboardStats({
     const filteredTransactions = useMemo(() => {
         if (!Array.isArray(transactions)) return [];
         return transactions.filter(tx => {
+            if (tx.is_income) return false;
             if (isBucketFocused) {
                 if (tx.bucket_id !== effectiveFocus) return false;
             } else {
@@ -127,7 +130,7 @@ export function useDashboardStats({
         if (!Array.isArray(transactions)) return 0;
         let total = 0;
         for (const tx of transactions) {
-            if (!tx || tx.exclude_from_allowance) continue;
+            if (!tx || tx.exclude_from_allowance || tx.is_income) continue;
             if (!tx.date.startsWith(lastMonthPrefix)) continue;
             const day = parseInt(tx.date.slice(8, 10), 10);
             if (isNaN(day) || day > currentDayOfMonth) continue;
@@ -327,6 +330,58 @@ export function useDashboardStats({
         };
     }, [isBucketFocused, currentDayOfMonth, lastMonthMTD, totalSpent]);
 
+    // Full last-month spend → carryover. Floors at 0 so an overspent month
+    // doesn't dock the next month's headroom.
+    const lastMonthFullSpend = useMemo(() => {
+        if (isBucketFocused) return 0;
+        if (!Array.isArray(transactions)) return 0;
+        let total = 0;
+        for (const tx of transactions) {
+            if (!tx || tx.exclude_from_allowance || tx.is_income) continue;
+            if (!tx.date.startsWith(lastMonthPrefix)) continue;
+            if (userId) {
+                const involved = tx.user_id === userId || (tx.splits && tx.splits.some(s => s.user_id === userId));
+                if (!involved) continue;
+            }
+            const myShare = calculateUserShare(tx, userId);
+            if (myShare <= 0) continue;
+            const txCurr = (tx.currency || 'USD').toUpperCase();
+            const baseCurr = (tx.base_currency || '').toUpperCase();
+            const hasExchange = !!tx.exchange_rate && tx.exchange_rate !== 1;
+            const amt = txCurr === bucketCurrency
+                ? myShare
+                : (hasExchange && baseCurr === bucketCurrency ? myShare * Number(tx.exchange_rate) : convertAmount(myShare, txCurr, bucketCurrency));
+            total += amt;
+        }
+        return total;
+    }, [transactions, isBucketFocused, lastMonthPrefix, userId, bucketCurrency, convertAmount, calculateUserShare]);
+
+    const lastMonthCarryover = useMemo(() => {
+        if (isBucketFocused) return 0;
+        if (displayBudget <= 0) return 0;
+        if (lastMonthFullSpend <= 0) return 0;
+        return Math.max(0, displayBudget - lastMonthFullSpend);
+    }, [isBucketFocused, displayBudget, lastMonthFullSpend]);
+
+    const incomeThisMonth = useMemo(() => {
+        if (!Array.isArray(transactions)) return 0;
+        let total = 0;
+        for (const tx of transactions) {
+            if (!tx || !tx.is_income) continue;
+            if (!tx.date.startsWith(currentMonthPrefix)) continue;
+            if (userId && tx.user_id !== userId) continue;
+            const txCurr = (tx.currency || 'USD').toUpperCase();
+            const baseCurr = (tx.base_currency || '').toUpperCase();
+            const hasExchange = !!tx.exchange_rate && tx.exchange_rate !== 1;
+            const amt = Number(tx.amount);
+            const converted = txCurr === bucketCurrency
+                ? amt
+                : (hasExchange && baseCurr === bucketCurrency ? amt * Number(tx.exchange_rate) : convertAmount(amt, txCurr, bucketCurrency));
+            total += converted;
+        }
+        return total;
+    }, [transactions, currentMonthPrefix, userId, bucketCurrency, convertAmount]);
+
     return {
         focusedBucket,
         displayBudget,
@@ -341,6 +396,8 @@ export function useDashboardStats({
         runRateData,
         cashflowForecast,
         todaySpent: aggregates.todaySpent,
-        lastMonthComparison
+        lastMonthComparison,
+        lastMonthCarryover,
+        incomeThisMonth,
     };
 }

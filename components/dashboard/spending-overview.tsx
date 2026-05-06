@@ -89,6 +89,9 @@ interface SpendingOverviewProps {
     } | null;
     upcomingRecurring: UpcomingCharge[];
     convertAmount: (amount: number, fromCurrency: string, toCurrency?: string) => number;
+    showCategoryDonut?: boolean;
+    lastMonthCarryover?: number;
+    incomeThisMonth?: number;
 }
 
 const containerVariants = {
@@ -133,7 +136,10 @@ export const SpendingOverview = React.memo(function SpendingOverview({
     todaySpent,
     lastMonthComparison,
     upcomingRecurring,
-    convertAmount
+    convertAmount,
+    showCategoryDonut = true,
+    lastMonthCarryover = 0,
+    incomeThisMonth = 0,
 }: SpendingOverviewProps) {
     return (
         <div className="space-y-6">
@@ -326,6 +332,27 @@ export const SpendingOverview = React.memo(function SpendingOverview({
                             </span>
                         </div>
                         <Progress value={progress} className="h-2 bg-black/30" indicatorClassName={cn(remaining < 0 ? "bg-red-400" : "bg-white")} />
+                        {!isBucketFocused && (lastMonthCarryover > 0 || incomeThisMonth > 0) && (
+                            <div className="flex flex-wrap items-center gap-1.5 self-start">
+                                {incomeThisMonth > 0 && (
+                                    <div className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-200/90 bg-emerald-500/10 border border-emerald-400/20 rounded-full px-2 py-0.5">
+                                        <ArrowDownLeft className="w-2.5 h-2.5" aria-hidden="true" />
+                                        Income: {formatCurrency(incomeThisMonth, bucketCurrency)}
+                                        {totalSpent > 0 && (
+                                            <span className="text-emerald-300/70">
+                                                · saved {formatCurrency(Math.max(0, incomeThisMonth - totalSpent), bucketCurrency)}
+                                            </span>
+                                        )}
+                                    </div>
+                                )}
+                                {lastMonthCarryover > 0 && (
+                                    <div className="flex items-center gap-1.5 text-[10px] font-bold text-cyan-200/90 bg-cyan-500/10 border border-cyan-400/20 rounded-full px-2 py-0.5">
+                                        <ArrowDownLeft className="w-2.5 h-2.5" aria-hidden="true" />
+                                        Carryover: {formatCurrency(lastMonthCarryover, bucketCurrency)}
+                                    </div>
+                                )}
+                            </div>
+                        )}
                         <div className="flex justify-between text-[11px] text-white/60 gap-2">
                             <span>{progress.toFixed(1)}% used</span>
                             <span className={isBucketFocused ? "flex flex-col items-end gap-1 text-right" : "text-right"}>
@@ -485,6 +512,7 @@ export const SpendingOverview = React.memo(function SpendingOverview({
             </div>
 
             {/* Spending by Category Pie Chart Section */}
+            {showCategoryDonut && (
             <div className="space-y-4">
                 <div className="flex flex-wrap justify-between items-center gap-2">
                     <h3 className="text-lg font-bold">Spending by Category</h3>
@@ -535,6 +563,7 @@ export const SpendingOverview = React.memo(function SpendingOverview({
                     </CardContent>
                 </Card>
             </div>
+            )}
         </div>
     );
 });
