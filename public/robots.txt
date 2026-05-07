@@ -1,9 +1,14 @@
 User-agent: *
-Allow: /signin
-Allow: /signup
-Allow: /forgot-password
-Allow: /privacy
-Allow: /terms
-Disallow: /
+Allow: /
+Disallow: /add
+Disallow: /analytics
+Disallow: /cashflow
+Disallow: /goals
+Disallow: /groups
+Disallow: /search
+Disallow: /settings
+Disallow: /subscriptions
+Disallow: /api/
+Disallow: /share-target
 
 Sitemap: https://novira.one/sitemap.xml
