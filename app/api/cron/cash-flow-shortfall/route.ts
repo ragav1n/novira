@@ -131,7 +131,7 @@ export async function GET(request: NextRequest) {
             title: 'Tight week ahead',
             body: `Projected short by ${fmtMoney(h.gap, ccy)} after ${billCount} upcoming bill${billCount === 1 ? '' : 's'}.`,
             url: '/cashflow',
-        }, expired);
+        }, expired, 'event:cash-flow');
         pushSent += sent;
         if (sent > 0) {
             await supabase.from('profiles')

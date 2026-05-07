@@ -111,7 +111,7 @@ export async function GET(request: NextRequest) {
             title: `Unusual ${cat} spend`,
             body: `${fmtMoney(Number(a.tx.amount), ccy)} — about ${a.mult.toFixed(1)}× your usual.`,
             url: '/dashboard',
-        }, expired);
+        }, expired, 'event:tx-anomaly');
         pushSent += sent;
         if (sent > 0) {
             await supabase.from('profiles').update({ last_anomaly_notified_at: ymd(today) }).eq('id', userId);

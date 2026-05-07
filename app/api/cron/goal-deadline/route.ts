@@ -63,7 +63,7 @@ export async function GET(request: NextRequest) {
             : `${pct.toFixed(0)}% saved so far.`;
         const sent = await sendToUser(supabase, subsByUser, g.user_id, {
             title, body, url: '/goals',
-        }, expired);
+        }, expired, 'event:goal-deadline');
         pushSent += sent;
         if (sent > 0) {
             await supabase.from('savings_goals')

@@ -1,6 +1,6 @@
 'use client';
 
-import { Bell, BellRing, CalendarClock, Moon, Newspaper, RefreshCcw, TrendingUp } from 'lucide-react';
+import { Bell, BellRing, CalendarClock, Moon, Newspaper, RefreshCcw, Sparkles, TrendingUp } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/utils/haptics';
@@ -21,6 +21,8 @@ interface Props {
     quietHoursStart: number | null;
     quietHoursEnd: number | null;
     setQuietHours: (start: number | null, end: number | null) => Promise<void> | void;
+    smartDigestsEnabled: boolean;
+    setSmartDigestsEnabled: (enabled: boolean) => Promise<void> | void;
 }
 
 const HOUR_OPTIONS = Array.from({ length: 24 }, (_, i) => i);
@@ -43,6 +45,8 @@ export function NotificationsSection({
     quietHoursStart,
     quietHoursEnd,
     setQuietHours,
+    smartDigestsEnabled,
+    setSmartDigestsEnabled,
 }: Props) {
     const quietEnabled = quietHoursStart != null && quietHoursEnd != null;
 
@@ -91,6 +95,22 @@ export function NotificationsSection({
 
             {push.isSupported && push.isSubscribed && (
                 <>
+                    <div className="flex items-center justify-between p-3">
+                        <div className="flex items-center gap-3 min-w-0">
+                            <Sparkles className="w-4 h-4 text-muted-foreground shrink-0" />
+                            <div className="min-w-0">
+                                <p className="text-sm font-medium">Smart Digests</p>
+                                <p className="text-[11px] text-muted-foreground">
+                                    Morning, midday and evening check-ins
+                                </p>
+                            </div>
+                        </div>
+                        <Switch
+                            checked={smartDigestsEnabled}
+                            onCheckedChange={(checked) => setSmartDigestsEnabled(checked)}
+                        />
+                    </div>
+
                     <div className="flex items-center justify-between p-3">
                         <div className="flex items-center gap-3 min-w-0">
                             <Newspaper className="w-4 h-4 text-muted-foreground shrink-0" />

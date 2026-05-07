@@ -136,7 +136,7 @@ export async function GET(request: NextRequest) {
             body = `${totalCount} new expenses by others.`;
             url = '/groups';
         }
-        const sent = await sendToUser(supabase, subsByUser, userId, { title, body, url }, expired);
+        const sent = await sendToUser(supabase, subsByUser, userId, { title, body, url }, expired, 'event:group-activity');
         pushSent += sent;
         if (sent > 0) {
             await supabase.from('profiles').update({ last_group_activity_at: new Date().toISOString() }).eq('id', userId);

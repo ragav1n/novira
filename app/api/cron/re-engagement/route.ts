@@ -73,7 +73,7 @@ export async function GET(request: NextRequest) {
             title: 'Quiet week?',
             body: "No expenses logged in 5 days. Tap to catch up.",
             url: '/add',
-        }, expired);
+        }, expired, 'event:re-engagement');
         pushSent += sent;
         if (sent > 0) {
             await supabase.from('profiles').update({ last_reengagement_at: ymd(today) }).eq('id', p.id);

@@ -78,7 +78,7 @@ export async function GET(request: NextRequest) {
             title: `${h.tpl.description} ${direction}`,
             body: `New price: ${fmtMoney(h.lastAmt, ccy)} (${arrow}${h.pct.toFixed(0)}%). Tap to review.`,
             url: '/subscriptions',
-        }, expired);
+        }, expired, 'event:price-change');
         pushSent += sent;
         if (sent > 0 || !pushReady) {
             const newMeta = { ...(h.tpl.metadata || {}), last_price_notified_amount: h.lastAmt };

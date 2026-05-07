@@ -59,7 +59,7 @@ export async function GET(request: NextRequest) {
             : `${c.pct.toFixed(0)}% of your savings goal saved.`;
         const sent = await sendToUser(supabase, subsByUser, c.goal.user_id, {
             title, body, url: '/goals',
-        }, expired);
+        }, expired, 'event:goal-threshold');
         pushSent += sent;
         if (sent > 0) {
             await supabase.from('savings_goals').update({ last_threshold_notified: c.threshold }).eq('id', c.goal.id);

@@ -1,6 +1,7 @@
 import 'server-only';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient as createServiceClient } from '@supabase/supabase-js';
+import { logSend } from '@/lib/server/send-log';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const webpush = require('web-push') as typeof import('web-push');
 
@@ -148,7 +149,10 @@ export async function GET(request: NextRequest) {
                 }
             });
 
-            if (anyFulfilled) notifiedBucketIds.push(b.id);
+            if (anyFulfilled) {
+                notifiedBucketIds.push(b.id);
+                await logSend(supabase, b.user_id, 'event:bucket-completion', new Date().toISOString().slice(0, 10));
+            }
         }
 
         if (expiredEndpoints.length) {

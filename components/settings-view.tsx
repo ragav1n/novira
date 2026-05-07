@@ -80,6 +80,8 @@ export function SettingsView() {
         quietHoursStart,
         quietHoursEnd,
         setQuietHours,
+        smartDigestsEnabled,
+        setSmartDigestsEnabled,
         firstDayOfWeek,
         setFirstDayOfWeek,
         dateFormat,
@@ -632,6 +634,8 @@ export function SettingsView() {
                                 quietHoursStart={quietHoursStart}
                                 quietHoursEnd={quietHoursEnd}
                                 setQuietHours={setQuietHours}
+                                smartDigestsEnabled={smartDigestsEnabled}
+                                setSmartDigestsEnabled={setSmartDigestsEnabled}
                             />
                         </AccordionContent>
                     </AccordionItem>

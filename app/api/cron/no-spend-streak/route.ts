@@ -97,7 +97,7 @@ export async function GET(request: NextRequest) {
             title: `${s.length}-day no-spend streak`,
             body: `Nice run.${teaser}`,
             url: '/analytics',
-        }, expired);
+        }, expired, 'event:no-spend');
         pushSent += sent;
         if (sent > 0) {
             await supabase.from('profiles').update({ last_no_spend_streak: s.length }).eq('id', s.profile.id);

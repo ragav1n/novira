@@ -59,6 +59,8 @@ interface UserPreferencesContextType {
     quietHoursStart: number | null;
     quietHoursEnd: number | null;
     setQuietHours: (start: number | null, end: number | null) => Promise<void>;
+    smartDigestsEnabled: boolean;
+    setSmartDigestsEnabled: (enabled: boolean) => Promise<void>;
     firstDayOfWeek: 0 | 1;
     setFirstDayOfWeek: (day: 0 | 1) => Promise<void>;
     dateFormat: 'MDY' | 'DMY' | 'YMD';
@@ -143,6 +145,7 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
     const [spendingPaceAlerts, setSpendingPaceAlertsState] = useState(true);
     const [quietHoursStart, setQuietHoursStartState] = useState<number | null>(null);
     const [quietHoursEnd, setQuietHoursEndState] = useState<number | null>(null);
+    const [smartDigestsEnabled, setSmartDigestsEnabledState] = useState(true);
     const [firstDayOfWeek, setFirstDayOfWeekState] = useState<0 | 1>(0);
     const [dateFormat, setDateFormatState] = useState<'MDY' | 'DMY' | 'YMD'>('MDY');
     const [defaultCategory, setDefaultCategoryState] = useState<string | null>(null);
@@ -198,6 +201,7 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
                     if (parsed.spending_pace_alerts != null) setSpendingPaceAlertsState(parsed.spending_pace_alerts);
                     if (parsed.quiet_hours_start !== undefined) setQuietHoursStartState(parsed.quiet_hours_start);
                     if (parsed.quiet_hours_end !== undefined) setQuietHoursEndState(parsed.quiet_hours_end);
+                    if (parsed.smart_digests_enabled != null) setSmartDigestsEnabledState(parsed.smart_digests_enabled);
                     if (parsed.first_day_of_week === 0 || parsed.first_day_of_week === 1) setFirstDayOfWeekState(parsed.first_day_of_week);
                     if (parsed.date_format === 'MDY' || parsed.date_format === 'DMY' || parsed.date_format === 'YMD') setDateFormatState(parsed.date_format);
                     if (parsed.default_category !== undefined) setDefaultCategoryState(parsed.default_category);
@@ -218,7 +222,7 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
             // Try the wide select first (includes new columns). If columns don't
             // exist yet on this deployment, fall back to the legacy column set
             // so the rest of the preferences still hydrate.
-            const FULL_COLUMNS = 'currency, budget_alerts, bill_reminder_lead_days, digest_frequency, monthly_budget, budgets, avatar_url, full_name, bucket_deadline_alerts, spending_pace_alerts, quiet_hours_start, quiet_hours_end, first_day_of_week, date_format, default_category, default_payment_method, default_bucket_id';
+            const FULL_COLUMNS = 'currency, budget_alerts, bill_reminder_lead_days, digest_frequency, monthly_budget, budgets, avatar_url, full_name, bucket_deadline_alerts, spending_pace_alerts, quiet_hours_start, quiet_hours_end, smart_digests_enabled, first_day_of_week, date_format, default_category, default_payment_method, default_bucket_id';
             const LEGACY_COLUMNS = 'currency, budget_alerts, bill_reminder_lead_days, digest_frequency, monthly_budget, budgets, avatar_url, full_name';
 
             type ProfileRow = {
@@ -234,6 +238,7 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
                 spending_pace_alerts?: boolean | null;
                 quiet_hours_start?: number | null;
                 quiet_hours_end?: number | null;
+                smart_digests_enabled?: boolean | null;
                 first_day_of_week?: 0 | 1 | null;
                 date_format?: 'MDY' | 'DMY' | 'YMD' | null;
                 default_category?: string | null;
@@ -276,6 +281,7 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
                 if (data.spending_pace_alerts != null) setSpendingPaceAlertsState(data.spending_pace_alerts);
                 if (data.quiet_hours_start !== undefined) setQuietHoursStartState(data.quiet_hours_start);
                 if (data.quiet_hours_end !== undefined) setQuietHoursEndState(data.quiet_hours_end);
+                if (data.smart_digests_enabled != null) setSmartDigestsEnabledState(data.smart_digests_enabled);
                 if (data.first_day_of_week === 0 || data.first_day_of_week === 1) setFirstDayOfWeekState(data.first_day_of_week);
                 if (data.date_format === 'MDY' || data.date_format === 'DMY' || data.date_format === 'YMD') setDateFormatState(data.date_format);
                 if (data.default_category !== undefined) setDefaultCategoryState(data.default_category);
@@ -728,6 +734,11 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
         await persistProfileField('spending_pace_alerts', enabled, 'spending_pace_alerts', 'spending pace alerts');
     }, [persistProfileField]);
 
+    const setSmartDigestsEnabled = useCallback(async (enabled: boolean) => {
+        setSmartDigestsEnabledState(enabled);
+        await persistProfileField('smart_digests_enabled', enabled, 'smart_digests_enabled', 'smart digests');
+    }, [persistProfileField]);
+
     const setQuietHours = useCallback(async (start: number | null, end: number | null) => {
         setQuietHoursStartState(start);
         setQuietHoursEndState(end);
@@ -892,6 +903,8 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
         quietHoursStart,
         quietHoursEnd,
         setQuietHours,
+        smartDigestsEnabled,
+        setSmartDigestsEnabled,
         firstDayOfWeek,
         setFirstDayOfWeek,
         dateFormat,
@@ -945,6 +958,8 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
         quietHoursStart,
         quietHoursEnd,
         setQuietHours,
+        smartDigestsEnabled,
+        setSmartDigestsEnabled,
         firstDayOfWeek,
         setFirstDayOfWeek,
         dateFormat,

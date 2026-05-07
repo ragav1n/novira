@@ -63,7 +63,22 @@ export async function sendToUser(
     subsByUser: Map<string, PushSubRow[]>,
     userId: string,
     payload: PushPayload,
-    expiredSink: string[]
+    expiredSink: string[],
+    /**
+     * Optional log kind, e.g. "event:bucket-deadline" or "slot:morning". When
+     * provided, a row is inserted into notification_send_log on successful
+     * delivery so the slot orchestrator can suppress slots within a 4-hour
+     * window of any other push (anti-stacking).
+     */
+    logKind?: string,
+    /**
+     * Override for the `local_date` column. Slot dedup uses the user's local
+     * civil date (so a slot only fires once per local day regardless of UTC
+     * crossover). Event-driven jobs can leave it undefined and use the UTC
+     * date — the slot-dedup unique index is partial (kind LIKE 'slot:%') so
+     * event rows never conflict.
+     */
+    logLocalDate?: string
 ): Promise<number> {
     const subs = subsByUser.get(userId);
     if (!subs?.length || !pushReady) return 0;
@@ -83,6 +98,15 @@ export async function sendToUser(
             sent++;
         }
     });
+    if (sent > 0 && logKind) {
+        const localDate = logLocalDate ?? new Date().toISOString().slice(0, 10);
+        const { error } = await supabase.from('notification_send_log').insert({
+            user_id: userId, kind: logKind, local_date: localDate,
+        });
+        if (error && error.code !== '23505') {
+            console.error('[push] send-log insert failed', { logKind, userId, error: error.message });
+        }
+    }
     return sent;
 }
 

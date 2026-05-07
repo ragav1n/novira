@@ -1,13 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 /**
- * Wrapper cron: runs every day, but only fans out on specific calendar days.
- *  - day 1 of each month → monthly-recap
- *  - Jan 2 each year     → yearly-recap (runs day after monthly so prior-year stats settle)
- * Other days no-op.
+ * Hourly wrapper cron. Two responsibilities:
  *
- * Lets us cover both monthly and yearly recaps with a single Vercel cron slot
- * (Hobby cap is 2 — this slot pairs with /api/cron/daily).
+ * 1. Every hour: dispatch /api/cron/slot-tick so the smart-digest 3/day floor
+ *    can hit each user at their local 08/13/19 hour regardless of timezone.
+ *
+ * 2. Once daily at 03:00 UTC: fan out to the calendar-conditional recap jobs:
+ *    - day 1 of each month → monthly-recap, monthly-allowance-reset
+ *    - day 15 of each month → midmonth-comparison
+ *    - Jan 2 each year     → yearly-recap
+ *
+ * Vercel Hobby caps cron entries at 2; the second slot is /api/cron/daily.
+ * Splitting these would need Pro, so we multiplex on the hour-of-day inside.
  */
 export async function GET(request: NextRequest) {
     const cronSecret = process.env.CRON_SECRET;
@@ -22,10 +27,10 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: 'CRON_SECRET not configured' }, { status: 503 });
     }
 
-    // Use UTC since Vercel cron runs in UTC. Recap content itself is timezone-agnostic.
     const now = new Date();
+    const hour = now.getUTCHours();
     const day = now.getUTCDate();
-    const month = now.getUTCMonth() + 1; // 1-12
+    const month = now.getUTCMonth() + 1;
 
     const origin = new URL(request.url).origin;
     const ran: { path: string; status: number | string; body?: unknown; error?: string }[] = [];
@@ -42,16 +47,23 @@ export async function GET(request: NextRequest) {
         }
     };
 
-    if (day === 1) {
-        await trigger('/api/cron/monthly-recap');
-        await trigger('/api/cron/monthly-allowance-reset');
-    }
-    if (day === 15) {
-        await trigger('/api/cron/midmonth-comparison');
-    }
-    if (month === 1 && day === 2) {
-        await trigger('/api/cron/yearly-recap');
+    // Slot tick fires every hour — the route itself filters to users whose
+    // local hour matches one of the slot windows.
+    await trigger('/api/cron/slot-tick');
+
+    // Calendar-conditional jobs once a day, at the historical 03:00 UTC tick.
+    if (hour === 3) {
+        if (day === 1) {
+            await trigger('/api/cron/monthly-recap');
+            await trigger('/api/cron/monthly-allowance-reset');
+        }
+        if (day === 15) {
+            await trigger('/api/cron/midmonth-comparison');
+        }
+        if (month === 1 && day === 2) {
+            await trigger('/api/cron/yearly-recap');
+        }
     }
 
-    return NextResponse.json({ ok: true, day, month, ran });
+    return NextResponse.json({ ok: true, hour, day, month, ran });
 }

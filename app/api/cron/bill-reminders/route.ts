@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient as createServiceClient } from '@supabase/supabase-js';
 import { isInQuietHours } from '@/lib/push-quiet-hours';
 import { processInBatches } from '@/lib/server/push';
+import { logSend } from '@/lib/server/send-log';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const webpush = require('web-push') as typeof import('web-push');
 
@@ -232,6 +233,7 @@ export async function GET(request: NextRequest) {
                 template_id: t.id,
                 next_occurrence: t.next_occurrence
             });
+            await logSend(supabase, t.user_id, 'event:bill-reminder', new Date().toISOString().slice(0, 10));
         }
     });
 

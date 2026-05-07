@@ -2,6 +2,7 @@ import 'server-only';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient as createServiceClient } from '@supabase/supabase-js';
 import { isInQuietHours } from '@/lib/push-quiet-hours';
+import { logSend } from '@/lib/server/send-log';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const webpush = require('web-push') as typeof import('web-push');
 
@@ -184,14 +185,19 @@ export async function GET(request: NextRequest) {
                     )
                 )
             );
+            let userSent = false;
             results.forEach((r, i) => {
                 if (r.status === 'rejected') {
                     const status = (r.reason as { statusCode?: number } | undefined)?.statusCode;
                     if (status === 404 || status === 410) expiredEndpoints.push(userSubs[i].endpoint);
                 } else {
                     pushSent++;
+                    userSent = true;
                 }
             });
+            if (userSent) {
+                await logSend(supabase, profile.id, 'event:spending-pace', new Date().toISOString().slice(0, 10));
+            }
         }
 
         if (expiredEndpoints.length) {
