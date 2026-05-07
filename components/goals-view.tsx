@@ -100,6 +100,7 @@ export function GoalsView() {
         if (!userId) return;
         const myGen = fetchGenRef.current;
         setLoading(true);
+        // Goals are author-scoped, then filtered to a workspace if one is active.
         let query = supabase
             .from('savings_goals')
             .select('*')
@@ -107,10 +108,8 @@ export function GoalsView() {
             .order('created_at', { ascending: false })
             .limit(200);
 
-        if (activeWorkspaceId && activeWorkspaceId !== 'personal') {
+        if (activeWorkspaceId) {
             query = query.eq('group_id', activeWorkspaceId);
-        } else if (activeWorkspaceId === 'personal') {
-            query = query.is('group_id', null);
         }
 
         const { data, error } = await query;
@@ -220,7 +219,7 @@ export function GoalsView() {
                     deadline: goalDeadline ? format(goalDeadline, 'yyyy-MM-dd') : null,
                     icon: goalIcon,
                     color: goalColor,
-                    group_id: activeWorkspaceId && activeWorkspaceId !== 'personal' ? activeWorkspaceId : null,
+                    group_id: activeWorkspaceId ?? null,
                 });
 
             if (error) {

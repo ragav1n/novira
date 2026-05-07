@@ -396,6 +396,20 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
         return () => document.removeEventListener('visibilitychange', onVisibility);
     }, []);
 
+    // Cross-tab workspace sync. Browsers fire 'storage' only in *other* tabs, so
+    // updating React state here can't loop back into a write.
+    useEffect(() => {
+        if (!userId || typeof window === 'undefined') return;
+        const key = `novira_active_workspace_${userId}`;
+        const onStorage = (e: StorageEvent) => {
+            if (e.storageArea !== localStorage) return;
+            if (e.key !== key) return;
+            setActiveWorkspaceId(e.newValue || null);
+        };
+        window.addEventListener('storage', onStorage);
+        return () => window.removeEventListener('storage', onStorage);
+    }, [userId]);
+
     const setPrivacyMode = useCallback((enabled: boolean) => {
         setPrivacyModeState(enabled);
         setIsPrivacyHidden(enabled);

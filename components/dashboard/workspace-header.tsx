@@ -16,6 +16,7 @@ interface WorkspaceHeaderProps {
     activeWorkspaceId: string | null;
     setActiveWorkspaceId: (id: string | null) => void;
     setDashboardFocus: (focus: string) => void;
+    setIsFocusMenuOpen: (open: boolean) => void;
     setIsHowToUseOpen: (open: boolean) => void;
     isCoupleWorkspace: boolean;
     isHomeWorkspace: boolean;
@@ -28,6 +29,7 @@ export function WorkspaceHeader({
     activeWorkspaceId,
     setActiveWorkspaceId,
     setDashboardFocus,
+    setIsFocusMenuOpen,
     setIsHowToUseOpen,
     isCoupleWorkspace,
     isHomeWorkspace
@@ -71,6 +73,7 @@ export function WorkspaceHeader({
                                         setActiveWorkspaceId(category.id);
                                     }
                                     setDashboardFocus('allowance');
+                                    setIsFocusMenuOpen(false);
                                 }}
                                 triggerClassName="h-auto py-1 px-2.5 bg-transparent border-0 hover:bg-white/5 focus:ring-0 w-auto inline-flex outline-none !text-sm text-muted-foreground hover:text-foreground shrink-0"
                             />

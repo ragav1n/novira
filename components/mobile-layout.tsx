@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { Home, Plus, BarChart2, Search, Settings, Users, Calendar, CalendarDays, Target, Menu } from 'lucide-react';
 import Image from 'next/image';
@@ -350,12 +350,26 @@ export function MobileLayout({ children, defaultIsDesktop = false }: { children:
     const pathname = usePathname();
     const isPublicPage = ['/privacy', '/terms', '/guide'].includes(pathname);
     const isAuthPage = ['/signin', '/signup', '/forgot-password', '/update-password'].includes(pathname);
-    const { isAuthenticated, isLoading, isNavigating, setIsNavigating, activeWorkspaceId } = useUserPreferences();
-    const { groups } = useGroups();
+    const { isAuthenticated, isLoading, isNavigating, setIsNavigating, activeWorkspaceId, setActiveWorkspaceId } = useUserPreferences();
+    const { groups, loading: groupsLoading } = useGroups();
 
     const activeWorkspace = groups.find(g => g.id === activeWorkspaceId);
     const isCoupleWorkspace = activeWorkspace?.type === 'couple';
     const isHomeWorkspace = activeWorkspace?.type === 'home';
+
+    // Reset to personal if the saved workspace ID no longer matches a group the
+    // user belongs to (group deleted, member removed). Lives here, not in
+    // dashboard-view, so it covers /search, /analytics, /goals, etc. too.
+    const eligibleGroups = useMemo(
+        () => groups.filter(g => g.type === 'couple' || g.type === 'home'),
+        [groups],
+    );
+    useEffect(() => {
+        if (groupsLoading || !activeWorkspaceId) return;
+        if (!eligibleGroups.some(g => g.id === activeWorkspaceId)) {
+            setActiveWorkspaceId(null);
+        }
+    }, [activeWorkspaceId, eligibleGroups, groupsLoading, setActiveWorkspaceId]);
 
     useEffect(() => {
         setIsNavigating(false);

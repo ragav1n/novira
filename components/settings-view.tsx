@@ -428,7 +428,7 @@ export function SettingsView() {
             }
             const { data: recurringTemplates } = await templatesQuery;
 
-            const workspaceName = activeWorkspaceId && activeWorkspaceId !== 'personal'
+            const workspaceName = activeWorkspaceId
                 ? groups.find(g => g.id === activeWorkspaceId)?.name
                 : 'Personal';
 

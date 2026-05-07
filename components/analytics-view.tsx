@@ -220,7 +220,7 @@ export function AnalyticsView() {
     useEffect(() => {
         if (!userId) return;
 
-        const txFilter = activeWorkspaceId && activeWorkspaceId !== 'personal'
+        const txFilter = activeWorkspaceId
             ? `group_id=eq.${activeWorkspaceId}`
             : `user_id=eq.${userId}`;
 

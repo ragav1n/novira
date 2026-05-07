@@ -98,10 +98,8 @@ export function SubscriptionsView() {
             .order('next_occurrence', { ascending: true })
             .limit(200);
 
-        if (activeWorkspaceId && activeWorkspaceId !== 'personal') {
+        if (activeWorkspaceId) {
             query = query.eq('group_id', activeWorkspaceId);
-        } else if (activeWorkspaceId === 'personal') {
-            query = query.is('group_id', null);
         }
 
         const { data, error } = await query;
@@ -145,10 +143,8 @@ export function SubscriptionsView() {
                         .ilike('description', escapedDesc)
                         .order('date', { ascending: false })
                         .limit(1);
-                    if (activeWorkspaceId && activeWorkspaceId !== 'personal') {
+                    if (activeWorkspaceId) {
                         q = q.eq('group_id', activeWorkspaceId);
-                    } else if (activeWorkspaceId === 'personal') {
-                        q = q.is('group_id', null);
                     }
                     const { data } = await q;
                     if (!data || data.length === 0) return;
@@ -559,7 +555,7 @@ export function SubscriptionsView() {
 
             <RecurringDetectCard
                 userId={userId}
-                activeWorkspaceId={activeWorkspaceId as string | 'personal' | null}
+                activeWorkspaceId={activeWorkspaceId}
                 templates={templates}
                 formatCurrency={formatCurrency}
                 onCreated={loadTemplates}

@@ -1,6 +1,7 @@
 import { supabase } from '../supabase';
 import { Transaction, TransactionRecord, SplitRecord, RecurringRecord } from '@/types/transaction';
 import { enqueueMutation } from '../sync-manager';
+import { applyWorkspaceFilter } from '@/lib/workspace-filter';
 import { toast } from '@/utils/haptics';
 import { format } from 'date-fns';
 
@@ -22,7 +23,7 @@ export const TransactionService = {
         endDate?: string;
         bucketId?: string;
     }) {
-        let query = supabase
+        const baseQuery = supabase
             .from('transactions')
             .select(`
                 *,
@@ -31,14 +32,7 @@ export const TransactionService = {
             `)
             .order('date', { ascending: false })
             .order('created_at', { ascending: false });
-
-        if (options.workspaceId && options.workspaceId !== 'personal') {
-            query = query.eq('group_id', options.workspaceId);
-        } else if (options.workspaceId === 'personal') {
-            query = query.is('group_id', null).eq('user_id', options.userId);
-        } else {
-            query = query.eq('user_id', options.userId);
-        }
+        let query = applyWorkspaceFilter(baseQuery, options.userId, options.workspaceId ?? null);
 
         if (options.bucketId) {
             query = query.eq('bucket_id', options.bucketId);

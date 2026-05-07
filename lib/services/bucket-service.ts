@@ -17,10 +17,10 @@ export const BucketService = {
             .select('id, user_id, name, type, icon, color, budget, currency, is_archived, start_date, end_date, created_at, allowed_categories, completed_at, completion_notified, group_id')
             .order('created_at', { ascending: false });
 
-        if (workspaceId && workspaceId !== 'personal') {
+        // Both args are optional in the signature; handle each combination so an
+        // unauthenticated/workspace-only call doesn't drop the filter entirely.
+        if (workspaceId) {
             query = query.eq('group_id', workspaceId);
-        } else if (workspaceId === 'personal' && userId) {
-            query = query.eq('user_id', userId).is('group_id', null);
         } else if (userId) {
             query = query.eq('user_id', userId);
         }

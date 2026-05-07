@@ -12,12 +12,10 @@ export const GoalService = {
             .select(GOAL_SELECT)
             .order('created_at', { ascending: false });
 
-        if (workspaceId && workspaceId !== 'personal') {
+        if (workspaceId) {
             query = query.eq('group_id', workspaceId);
-        } else if (workspaceId === 'personal') {
-            query = query.is('group_id', null);
         } else {
-             query = query.eq('user_id', userId);
+            query = query.eq('user_id', userId);
         }
 
         const { data, error } = await query;

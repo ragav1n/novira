@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
+import { applyWorkspaceFilter } from '@/lib/workspace-filter';
 import { format, parseISO, differenceInCalendarDays } from 'date-fns';
 type UpcomingRow = {
     id: string;
@@ -47,7 +48,7 @@ export function useUpcomingRecurring(
             horizon.setDate(today.getDate() + HORIZON_DAYS);
             const horizonStr = format(horizon, 'yyyy-MM-dd');
 
-            let query = supabase
+            const baseQuery = supabase
                 .from('recurring_templates')
                 .select('id, description, amount, currency, category, next_occurrence, is_active, group_id, user_id')
                 .eq('is_active', true)
@@ -55,14 +56,7 @@ export function useUpcomingRecurring(
                 .lte('next_occurrence', horizonStr)
                 .order('next_occurrence', { ascending: true })
                 .limit(20);
-
-            if (activeWorkspaceId && activeWorkspaceId !== 'personal') {
-                query = query.eq('group_id', activeWorkspaceId);
-            } else if (activeWorkspaceId === 'personal') {
-                query = query.is('group_id', null).eq('user_id', userId);
-            } else {
-                query = query.eq('user_id', userId);
-            }
+            const query = applyWorkspaceFilter(baseQuery, userId, activeWorkspaceId);
 
             const { data, error } = await query;
             if (fetchGenRef.current !== myGen) return;

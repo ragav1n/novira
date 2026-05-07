@@ -17,7 +17,7 @@ import { getCategoryLabel } from '@/lib/categories';
 
 interface Props {
     userId: string | null | undefined;
-    activeWorkspaceId: string | 'personal' | null;
+    activeWorkspaceId: string | null;
     templates: RecurringTemplate[];
     formatCurrency: (amount: number, currency?: string) => string;
     onCreated: () => void;
@@ -62,10 +62,8 @@ export function RecurringDetectCard({
                     .order('date', { ascending: false })
                     .limit(500);
 
-                if (activeWorkspaceId && activeWorkspaceId !== 'personal') {
+                if (activeWorkspaceId) {
                     q = q.eq('group_id', activeWorkspaceId);
-                } else if (activeWorkspaceId === 'personal') {
-                    q = q.is('group_id', null);
                 }
 
                 const { data, error } = await q;
@@ -110,7 +108,7 @@ export function RecurringDetectCard({
                 next_occurrence: c.nextEstimatedDate,
                 is_active: true,
             };
-            if (activeWorkspaceId && activeWorkspaceId !== 'personal') {
+            if (activeWorkspaceId) {
                 insert.group_id = activeWorkspaceId;
             }
             const { error } = await supabase

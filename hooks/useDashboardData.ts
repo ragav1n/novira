@@ -6,6 +6,7 @@ import type { SyncPayload } from '@/lib/offline-sync-queue';
 import { discardFailedItem, enqueueMutation, getCurrentQueue } from '@/lib/sync-manager';
 import { invalidateTransactionCaches } from '@/lib/sw-cache';
 import { reportNetworkError } from '@/lib/network-error-bus';
+import { applyWorkspaceFilter } from '@/lib/workspace-filter';
 import { useTransactionInvalidationListener } from './useTransactionInvalidationListener';
 
 const PAGE_SIZE = 100;
@@ -83,20 +84,13 @@ export function useDashboardData(
     const loadTransactions = useCallback(async (currentUserId: string, workspaceId: string | null = null, limit = loadLimitRef.current) => {
         const myGen = fetchGenRef.current;
         try {
-            let query = supabase
+            const baseQuery = supabase
                 .from('transactions')
                 .select(TX_SELECT)
                 .order('date', { ascending: false })
                 .order('created_at', { ascending: false })
                 .limit(limit);
-
-            if (workspaceId && workspaceId !== 'personal') {
-                query = query.eq('group_id', workspaceId);
-            } else if (workspaceId === 'personal') {
-                query = query.is('group_id', null).eq('user_id', currentUserId);
-            } else {
-                query = query.eq('user_id', currentUserId);
-            }
+            const query = applyWorkspaceFilter(baseQuery, currentUserId, workspaceId);
 
             const { data: txs } = await query;
 
@@ -140,11 +134,8 @@ export function useDashboardData(
                 if (item.status === 'synced' || item.status === 'failed') return false;
                 const t = item.data?.transaction;
                 if (!t) return false;
-                if (activeWorkspaceId && activeWorkspaceId !== 'personal') {
+                if (activeWorkspaceId) {
                     return t.group_id === activeWorkspaceId;
-                }
-                if (activeWorkspaceId === 'personal') {
-                    return t.group_id == null && t.user_id === userId;
                 }
                 return t.user_id === userId;
             });
@@ -271,7 +262,7 @@ export function useDashboardData(
         if (!userId) return;
 
         const myGen = fetchGenRef.current;
-        const txFilter = activeWorkspaceId && activeWorkspaceId !== 'personal'
+        const txFilter = activeWorkspaceId
             ? `group_id=eq.${activeWorkspaceId}`
             : `user_id=eq.${userId}`;
 
@@ -372,12 +363,9 @@ export function useDashboardData(
                     sessionStorage.removeItem('novira_just_created_tx');
                     const stashed = JSON.parse(raw) as Transaction;
                     if (stashed?.id) {
-                        const inWorkspace =
-                            !activeWorkspaceId
-                                ? stashed.user_id === userId
-                                : activeWorkspaceId === 'personal'
-                                    ? stashed.group_id == null && stashed.user_id === userId
-                                    : stashed.group_id === activeWorkspaceId;
+                        const inWorkspace = activeWorkspaceId
+                            ? stashed.group_id === activeWorkspaceId
+                            : stashed.user_id === userId;
                         if (inWorkspace) {
                             setServerTransactions(prev => {
                                 if (prev.some(t => t.id === stashed.id)) return prev;

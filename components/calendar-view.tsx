@@ -138,10 +138,8 @@ export function CalendarView() {
                 .select('id, description, amount, currency, frequency, next_occurrence, category, is_active')
                 .eq('user_id', userId)
                 .eq('is_active', true);
-            if (activeWorkspaceId && activeWorkspaceId !== 'personal') {
+            if (activeWorkspaceId) {
                 recurringQuery = recurringQuery.eq('group_id', activeWorkspaceId);
-            } else if (activeWorkspaceId === 'personal') {
-                recurringQuery = recurringQuery.is('group_id', null);
             }
 
             const goalsQuery = supabase
@@ -159,10 +157,8 @@ export function CalendarView() {
                 .eq('user_id', userId)
                 .gte('date', oneOffStart)
                 .lte('date', oneOffEnd);
-            if (activeWorkspaceId && activeWorkspaceId !== 'personal') {
+            if (activeWorkspaceId) {
                 oneOffQuery = oneOffQuery.eq('group_id', activeWorkspaceId);
-            } else if (activeWorkspaceId === 'personal') {
-                oneOffQuery = oneOffQuery.is('group_id', null);
             }
 
             const [{ data: recurringData }, { data: goalsData }, { data: oneOffData, error: oneOffError }] = await Promise.all([

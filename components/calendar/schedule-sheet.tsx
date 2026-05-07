@@ -61,7 +61,7 @@ export function ScheduleSheet({ open, onOpenChange, selectedDate, onCreated }: S
 
         setSaving(true);
         try {
-            const groupId = activeWorkspaceId && activeWorkspaceId !== 'personal' ? activeWorkspaceId : null;
+            const groupId = activeWorkspaceId ?? null;
             const { error } = await supabase.from('scheduled_events').insert({
                 user_id: userId,
                 group_id: groupId,

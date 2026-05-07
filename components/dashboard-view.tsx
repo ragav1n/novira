@@ -53,7 +53,7 @@ export function DashboardView() {
         activeWorkspaceId, setActiveWorkspaceId,
         workspaceBudgets, convertedWorkspaceBudgets, setWorkspaceBudget
     } = useUserPreferences();
-    const { balances, groups, friends, loading: groupsLoading } = useGroups();
+    const { balances, groups, friends } = useGroups();
     const { buckets, bucketSpending } = useBuckets();
     const { items: upcomingRecurring } = useUpcomingRecurring(userId, activeWorkspaceId);
     const { layout: dashboardLayout } = useDashboardLayout();
@@ -87,16 +87,6 @@ export function DashboardView() {
     const activeWorkspaceGroup = useMemo(() =>
         activeWorkspaceId ? eligibleGroups.find(g => g.id === activeWorkspaceId) : null,
     [eligibleGroups, activeWorkspaceId]);
-
-    // Reset to personal if the saved workspace ID no longer matches a group the
-    // user belongs to (group deleted, member removed). Without this the saved ID
-    // outlives membership and silently filters everything to empty.
-    useEffect(() => {
-        if (groupsLoading || !activeWorkspaceId) return;
-        if (!eligibleGroups.some(g => g.id === activeWorkspaceId)) {
-            setActiveWorkspaceId(null);
-        }
-    }, [activeWorkspaceId, eligibleGroups, groupsLoading, setActiveWorkspaceId]);
 
     const isCoupleWorkspace = activeWorkspaceGroup?.type === 'couple';
     const isHomeWorkspace = activeWorkspaceGroup?.type === 'home';
@@ -221,13 +211,14 @@ export function DashboardView() {
                             className="relative space-y-6"
                             inert={isAnyModalOpen ? true : undefined}
                         >
-                <WorkspaceHeader 
+                <WorkspaceHeader
                     userName={userName}
                     avatarUrl={avatarUrl}
                     eligibleGroups={eligibleGroups}
                     activeWorkspaceId={activeWorkspaceId}
                     setActiveWorkspaceId={setActiveWorkspaceId}
                     setDashboardFocus={setDashboardFocus}
+                    setIsFocusMenuOpen={setIsFocusMenuOpen}
                     setIsHowToUseOpen={setIsHowToUseOpen}
                     isCoupleWorkspace={isCoupleWorkspace}
                     isHomeWorkspace={isHomeWorkspace}

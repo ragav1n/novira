@@ -157,7 +157,7 @@ export function useWorkspaceTheme(defaultColor: 'primary' | 'cyan' | 'emerald' =
     const { groups } = useGroups();
 
     const activeWorkspace = useMemo(() =>
-        activeWorkspaceId && activeWorkspaceId !== 'personal'
+        activeWorkspaceId
             ? groups.find(g => g.id === activeWorkspaceId) ?? null
             : null,
         [activeWorkspaceId, groups]

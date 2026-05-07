@@ -294,11 +294,9 @@ export function SearchView() {
                 .from('transactions')
                 .select('id, description, amount, category, date, payment_method, created_at, user_id, group_id, currency, exchange_rate, base_currency, is_recurring, is_settlement, exclude_from_allowance, bucket_id, place_name, place_address, place_lat, place_lng, tags, notes, profile:profiles(full_name, avatar_url), splits(user_id, amount, is_paid)');
 
-            // Workspace filter
-            if (activeWorkspaceId && activeWorkspaceId !== 'personal') {
+            // Workspace filter — when null, RLS limits results to rows the user can see.
+            if (activeWorkspaceId) {
                 query = query.eq('group_id', activeWorkspaceId);
-            } else if (activeWorkspaceId === 'personal') {
-                query = query.is('group_id', null);
             }
 
             // Numeric shortcut: a leading operator (>, <, >=, <=, =) + number is
@@ -444,7 +442,7 @@ export function SearchView() {
     useEffect(() => {
         if (!userId) return;
 
-        const txFilter = activeWorkspaceId && activeWorkspaceId !== 'personal'
+        const txFilter = activeWorkspaceId
             ? `group_id=eq.${activeWorkspaceId}`
             : `user_id=eq.${userId}`;
 

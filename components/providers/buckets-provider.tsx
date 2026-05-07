@@ -167,13 +167,13 @@ export function BucketsProvider({ children }: { children: React.ReactNode }) {
             const handleExpenseAdded = () => fetchSpendingOnly();
             window.addEventListener('novira:expense-added', handleExpenseAdded);
 
-            const txFilter = activeWorkspaceId && activeWorkspaceId !== 'personal'
+            const txFilter = activeWorkspaceId
                 ? `group_id=eq.${activeWorkspaceId}`
                 : `user_id=eq.${userId}`;
             // In a shared workspace, partner-created/edited buckets carry their
             // partner's user_id but our group's id — filter by group so realtime
             // catches them. Personal stays user-scoped.
-            const bucketFilter = activeWorkspaceId && activeWorkspaceId !== 'personal'
+            const bucketFilter = activeWorkspaceId
                 ? `group_id=eq.${activeWorkspaceId}`
                 : `user_id=eq.${userId}`;
 
@@ -218,7 +218,7 @@ export function BucketsProvider({ children }: { children: React.ReactNode }) {
         try {
             const bucket = await BucketService.createBucket({
                 ...data,
-                group_id: activeWorkspaceId && activeWorkspaceId !== 'personal' ? activeWorkspaceId : null
+                group_id: activeWorkspaceId ?? null
             }, userId);
             toast.success('Bucket created successfully');
             await fetchBuckets();
