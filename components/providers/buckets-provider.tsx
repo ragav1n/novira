@@ -89,15 +89,20 @@ export function BucketsProvider({ children }: { children: React.ReactNode }) {
     const [loading, setLoading] = useState(true);
 
     const fetchBucketsRef = useRef<() => Promise<void>>(async () => undefined);
+    // Bumped on each workspace/user change so in-flight fetches from a previous
+    // workspace can't land their results on top of the new one.
+    const fetchGenRef = useRef(0);
 
     const fetchBuckets = useCallback(async () => {
         if (!userId) return;
+        const myGen = fetchGenRef.current;
         try {
             const [fetchedBuckets, spendingData] = await Promise.all([
                 BucketService.getBuckets(userId, activeWorkspaceId),
                 BucketService.getBucketSpending(userId, activeWorkspaceId)
             ]);
 
+            if (fetchGenRef.current !== myGen) return;
             setBuckets(fetchedBuckets);
 
             if (spendingData) {
@@ -111,7 +116,7 @@ export function BucketsProvider({ children }: { children: React.ReactNode }) {
                 retry: () => { void fetchBucketsRef.current(); },
             });
         } finally {
-            setLoading(false);
+            if (fetchGenRef.current === myGen) setLoading(false);
         }
     }, [userId, activeWorkspaceId, currency, convertAmount]);
 
@@ -122,8 +127,10 @@ export function BucketsProvider({ children }: { children: React.ReactNode }) {
 
     const fetchSpendingOnly = useCallback(async () => {
         if (!userId) return;
+        const myGen = fetchGenRef.current;
         try {
             const spendingData = await BucketService.getBucketSpending(userId, activeWorkspaceId);
+            if (fetchGenRef.current !== myGen) return;
             if (spendingData) {
                 setBucketSpending(computeBucketSpending(spendingData, bucketsRef.current, currency, convertAmount));
             }
@@ -154,6 +161,7 @@ export function BucketsProvider({ children }: { children: React.ReactNode }) {
 
     useEffect(() => {
         if (userId) {
+            fetchGenRef.current++;
             fetchBuckets();
 
             const handleExpenseAdded = () => fetchSpendingOnly();
@@ -162,12 +170,18 @@ export function BucketsProvider({ children }: { children: React.ReactNode }) {
             const txFilter = activeWorkspaceId && activeWorkspaceId !== 'personal'
                 ? `group_id=eq.${activeWorkspaceId}`
                 : `user_id=eq.${userId}`;
+            // In a shared workspace, partner-created/edited buckets carry their
+            // partner's user_id but our group's id — filter by group so realtime
+            // catches them. Personal stays user-scoped.
+            const bucketFilter = activeWorkspaceId && activeWorkspaceId !== 'personal'
+                ? `group_id=eq.${activeWorkspaceId}`
+                : `user_id=eq.${userId}`;
 
             const channel = supabase
                 .channel(`buckets-updates-${userId}-${activeWorkspaceId || 'personal'}`)
                 .on('postgres_changes', {
                     event: '*', schema: 'public', table: 'buckets',
-                    filter: `user_id=eq.${userId}`
+                    filter: bucketFilter
                 }, () => {
                     debouncedFetchBuckets();
                 })

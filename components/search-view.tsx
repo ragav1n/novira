@@ -147,6 +147,9 @@ export function SearchView() {
     const { formatCurrency, convertAmount, currency, activeWorkspaceId, userId } = useUserPreferences();
     const { buckets } = useBucketsList();
     const { theme: themeConfig } = useWorkspaceTheme();
+    // Bumped on each workspace/user change so in-flight fetches from a previous
+    // workspace can't land their results on top of the new one.
+    const fetchGenRef = useRef(0);
 
     // Debounce search query
     const debouncedSearchQuery = useDebounce(searchQuery, 300);
@@ -284,6 +287,7 @@ export function SearchView() {
     };
 
     const fetchAndFilter = useCallback(async () => {
+        const myGen = fetchGenRef.current;
         setLoading(true);
         try {
             let query = supabase
@@ -370,6 +374,7 @@ export function SearchView() {
 
             const { data } = await query;
 
+            if (fetchGenRef.current !== myGen) return;
             if (data) {
                 const formatted = data.map(tx => ({
                     ...tx,
@@ -391,11 +396,12 @@ export function SearchView() {
         } catch (error) {
             console.error('Error fetching transactions:', error);
         } finally {
-            setLoading(false);
+            if (fetchGenRef.current === myGen) setLoading(false);
         }
     }, [activeWorkspaceId, debouncedSearchQuery, selectedCategories, selectedPayments, dateRange, priceRange, selectedBucketId, selectedTags, sortBy, maxPossiblePrice, showRecurringOnly, showExcludedOnly]);
 
     useEffect(() => {
+        fetchGenRef.current++;
         fetchAndFilter();
     }, [fetchAndFilter]);
 

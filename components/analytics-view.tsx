@@ -65,6 +65,9 @@ export function AnalyticsView() {
 
     const { buckets } = useBucketsList();
     const { bucketSpending } = useBucketSpending();
+    // Bumped on each workspace/user change so in-flight fetches from a previous
+    // workspace can't land their results on top of the new one.
+    const fetchGenRef = useRef(0);
 
     const toggleTag = useCallback((tag: string) => {
         setActiveTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]);
@@ -73,6 +76,7 @@ export function AnalyticsView() {
     const clearTags = useCallback(() => setActiveTags([]), []);
 
     const fetchData = useCallback(async () => {
+        const myGen = fetchGenRef.current;
         setLoading(true);
         setError(null);
         try {
@@ -143,6 +147,7 @@ export function AnalyticsView() {
                     : Promise.resolve([] as Transaction[]),
             ]);
 
+            if (fetchGenRef.current !== myGen) return;
             // Income transactions belong to a separate "earning" model and shouldn't
             // appear in spending analytics (category breakdown, top merchants, trend).
             const filteredCurrent = (current || []).filter(t => !t.is_income);
@@ -187,16 +192,18 @@ export function AnalyticsView() {
             setPriorTransactions(filteredPrior);
             setPriorStart(priorStart);
         } catch (err) {
+            if (fetchGenRef.current !== myGen) return;
             console.error("Error fetching analytics:", err);
             setError(err instanceof Error ? err.message : 'Failed to load analytics data');
             toast.error('Failed to load analytics data');
         } finally {
-            setLoading(false);
+            if (fetchGenRef.current === myGen) setLoading(false);
         }
     }, [userId, activeWorkspaceId, dateRange, selectedBucketId, customStart, customEnd]);
 
     useEffect(() => {
         if (userId) {
+            fetchGenRef.current++;
             fetchData();
         }
     }, [fetchData, userId, currency]);

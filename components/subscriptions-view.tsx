@@ -2,7 +2,7 @@
 
 import { motion } from 'framer-motion';
 
-import React, { useEffect, useState, useCallback, useMemo, useDeferredValue } from 'react';
+import React, { useEffect, useRef, useState, useCallback, useMemo, useDeferredValue } from 'react';
 import Link from 'next/link';
 import { useUserPreferences } from '@/components/providers/user-preferences-provider';
 import { useWorkspaceTheme } from '@/hooks/useWorkspaceTheme';
@@ -62,6 +62,9 @@ export function SubscriptionsView() {
     const [templates, setTemplates] = useState<Tpl[]>([]);
     const [loading, setLoading] = useState(true);
     const [cancelTarget, setCancelTarget] = useState<string | null>(null);
+    // Bumped on each workspace/user change so in-flight fetches from a previous
+    // workspace can't land their results on top of the new one.
+    const fetchGenRef = useRef(0);
 
     type PriceChange = { lastAmount: number; lastDate: string; pctChange: number; templateAmount: number };
     type LastCharge = { lastAmount: number; lastDate: string; pctChange: number };
@@ -86,6 +89,7 @@ export function SubscriptionsView() {
 
     const loadTemplates = useCallback(async () => {
         if (!userId) return;
+        const myGen = fetchGenRef.current;
         setLoading(true);
         let query = supabase
             .from('recurring_templates')
@@ -102,6 +106,7 @@ export function SubscriptionsView() {
 
         const { data, error } = await query;
 
+        if (fetchGenRef.current !== myGen) return;
         if (error) {
             console.error('Failed to load subscriptions', error);
             toast.error("Couldn't load subscriptions");
@@ -113,6 +118,7 @@ export function SubscriptionsView() {
     }, [userId, activeWorkspaceId]);
 
     useEffect(() => {
+        fetchGenRef.current++;
         loadTemplates();
     }, [loadTemplates]);
 

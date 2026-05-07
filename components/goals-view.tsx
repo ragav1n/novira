@@ -2,7 +2,7 @@
 
 import { motion, AnimatePresence } from 'framer-motion';
 
-import React, { useCallback, useEffect, useMemo, useState, useDeferredValue } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState, useDeferredValue } from 'react';
 import Link from 'next/link';
 import { useUserPreferences, CURRENCY_SYMBOLS, type Currency } from '@/components/providers/user-preferences-provider';
 import { useWorkspaceTheme } from '@/hooks/useWorkspaceTheme';
@@ -68,6 +68,9 @@ export function GoalsView() {
     const [goals, setGoals] = useState<SavingsGoal[]>([]);
     const [deposits, setDeposits] = useState<SavingsDeposit[]>([]);
     const [loading, setLoading] = useState(true);
+    // Bumped on each workspace/user change so in-flight fetches from a previous
+    // workspace can't land their results on top of the new one.
+    const fetchGenRef = useRef(0);
 
     const [search, setSearch] = useState('');
     const deferredSearch = useDeferredValue(search);
@@ -95,6 +98,7 @@ export function GoalsView() {
 
     const loadGoals = useCallback(async () => {
         if (!userId) return;
+        const myGen = fetchGenRef.current;
         setLoading(true);
         let query = supabase
             .from('savings_goals')
@@ -111,6 +115,7 @@ export function GoalsView() {
 
         const { data, error } = await query;
 
+        if (fetchGenRef.current !== myGen) return;
         if (!error && data) {
             setGoals(data as SavingsGoal[]);
         }
@@ -118,6 +123,7 @@ export function GoalsView() {
     }, [userId, activeWorkspaceId]);
 
     useEffect(() => {
+        fetchGenRef.current++;
         loadGoals();
     }, [loadGoals]);
 

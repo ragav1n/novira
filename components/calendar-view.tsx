@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import {
@@ -124,9 +124,13 @@ export function CalendarView() {
     const [loading, setLoading] = useState(true);
     const [selectedDate, setSelectedDate] = useState<Date>(() => startOfDay(new Date()));
     const [scheduleOpen, setScheduleOpen] = useState(false);
+    // Bumped on each workspace/user change so in-flight fetches from a previous
+    // workspace can't land their results on top of the new one.
+    const fetchGenRef = useRef(0);
 
     const load = useCallback(async () => {
         if (!userId) return;
+        const myGen = fetchGenRef.current;
         setLoading(true);
         try {
             let recurringQuery = supabase
@@ -167,6 +171,7 @@ export function CalendarView() {
                 oneOffQuery.returns<OneOffRow[]>(),
             ]);
 
+            if (fetchGenRef.current !== myGen) return;
             if (oneOffError && oneOffError.code !== '42P01') {
                 // 42P01 = "relation does not exist" — surfaces if the migration hasn't been
                 // applied yet. Fail soft so the rest of the page still renders.
@@ -179,11 +184,11 @@ export function CalendarView() {
         } catch (error) {
             console.error('Error loading calendar data:', error);
         } finally {
-            setLoading(false);
+            if (fetchGenRef.current === myGen) setLoading(false);
         }
     }, [userId, activeWorkspaceId, viewMonth]);
 
-    useEffect(() => { load(); }, [load]);
+    useEffect(() => { fetchGenRef.current++; load(); }, [load]);
 
     // Build events for the visible month + a 60-day forward window so day-detail
     // works for buckets / goals whose dates fall within either range.

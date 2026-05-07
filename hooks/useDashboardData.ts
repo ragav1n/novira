@@ -74,10 +74,14 @@ export function useDashboardData(
     const loadLimitRef = useRef(PAGE_SIZE);
     const mutatingRef = useRef(false);
     const recurringToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    // Bumped on each workspace/user change so in-flight fetches from a previous
+    // workspace can't land their results on top of the new one.
+    const fetchGenRef = useRef(0);
 
     const TX_SELECT = 'id, description, amount, category, date, created_at, user_id, group_id, currency, exchange_rate, base_currency, bucket_id, exclude_from_allowance, is_recurring, is_settlement, place_name, place_address, place_lat, place_lng, tags, profile:profiles(full_name, avatar_url), splits(user_id, amount, is_paid)';
 
     const loadTransactions = useCallback(async (currentUserId: string, workspaceId: string | null = null, limit = loadLimitRef.current) => {
+        const myGen = fetchGenRef.current;
         try {
             let query = supabase
                 .from('transactions')
@@ -96,6 +100,7 @@ export function useDashboardData(
 
             const { data: txs } = await query;
 
+            if (fetchGenRef.current !== myGen) return;
             if (txs) {
                 // Flatten profile and splits if they are arrays (Supabase dynamic returns)
                 const formattedTxs = txs.map(tx => ({
@@ -123,8 +128,10 @@ export function useDashboardData(
 
     const loadPendingFromQueue = useCallback(async () => {
         if (!userId || typeof window === 'undefined') return;
+        const myGen = fetchGenRef.current;
         try {
             const queue = await getCurrentQueue();
+            if (fetchGenRef.current !== myGen) return;
             const filtered = queue.filter(item => {
                 if (item.type !== 'ADD_FULL_TRANSACTION') return false;
                 // Synced items get removed from queue post-flush; failed items
@@ -183,6 +190,7 @@ export function useDashboardData(
     // Reset pagination and re-fetch when user or workspace changes
     useEffect(() => {
         if (!userId) return;
+        const myGen = ++fetchGenRef.current;
         setLoadLimit(PAGE_SIZE);
         loadLimitRef.current = PAGE_SIZE;
 
@@ -194,7 +202,7 @@ export function useDashboardData(
                     loadPendingFromQueue(),
                 ]);
             } finally {
-                setLoading(false);
+                if (fetchGenRef.current === myGen) setLoading(false);
             }
         };
 
@@ -262,6 +270,7 @@ export function useDashboardData(
     useEffect(() => {
         if (!userId) return;
 
+        const myGen = fetchGenRef.current;
         const txFilter = activeWorkspaceId && activeWorkspaceId !== 'personal'
             ? `group_id=eq.${activeWorkspaceId}`
             : `user_id=eq.${userId}`;
@@ -274,6 +283,7 @@ export function useDashboardData(
                 async (payload) => {
                     // Fetch full transaction with profile/splits joins
                     const fullTx = await fetchFullTransaction(payload.new.id);
+                    if (fetchGenRef.current !== myGen) return;
                     if (fullTx) {
                         setServerTransactions(prev => {
                             // Avoid duplicates (e.g. from optimistic updates)
@@ -297,6 +307,7 @@ export function useDashboardData(
                 { event: 'UPDATE', schema: 'public', table: 'transactions', filter: txFilter },
                 async (payload) => {
                     const fullTx = await fetchFullTransaction(payload.new.id);
+                    if (fetchGenRef.current !== myGen) return;
                     if (fullTx) {
                         setServerTransactions(prev =>
                             prev.map(t => t.id === fullTx.id ? fullTx : t)
@@ -308,6 +319,7 @@ export function useDashboardData(
                 'postgres_changes',
                 { event: 'DELETE', schema: 'public', table: 'transactions', filter: txFilter },
                 (payload) => {
+                    if (fetchGenRef.current !== myGen) return;
                     setServerTransactions(prev => prev.filter(t => t.id !== payload.old.id));
                 }
             )

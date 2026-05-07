@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { format, parseISO, differenceInCalendarDays } from 'date-fns';
 type UpcomingRow = {
@@ -29,12 +29,16 @@ export function useUpcomingRecurring(
 ) {
     const [items, setItems] = useState<UpcomingCharge[]>([]);
     const [loading, setLoading] = useState(false);
+    // Bumped on each workspace/user change so in-flight fetches from a previous
+    // workspace can't land their results on top of the new one.
+    const fetchGenRef = useRef(0);
 
     const load = useCallback(async () => {
         if (!userId) {
             setItems([]);
             return;
         }
+        const myGen = fetchGenRef.current;
         setLoading(true);
         try {
             const today = new Date();
@@ -61,6 +65,7 @@ export function useUpcomingRecurring(
             }
 
             const { data, error } = await query;
+            if (fetchGenRef.current !== myGen) return;
             if (error) throw error;
 
             const mapped: UpcomingCharge[] = ((data ?? []) as UpcomingRow[])
@@ -76,16 +81,18 @@ export function useUpcomingRecurring(
                 }));
             setItems(mapped);
         } catch (e) {
+            if (fetchGenRef.current !== myGen) return;
             if (process.env.NODE_ENV === 'development') {
                 console.error('[useUpcomingRecurring] load failed:', e);
             }
             setItems([]);
         } finally {
-            setLoading(false);
+            if (fetchGenRef.current === myGen) setLoading(false);
         }
     }, [userId, activeWorkspaceId]);
 
     useEffect(() => {
+        fetchGenRef.current++;
         load();
     }, [load]);
 
