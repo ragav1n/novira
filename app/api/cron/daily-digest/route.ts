@@ -22,6 +22,7 @@ interface ProfileRow {
     quiet_hours_start?: number | null;
     quiet_hours_end?: number | null;
     timezone?: string | null;
+    smart_digests_enabled?: boolean | null;
 }
 
 interface TxRow {
@@ -82,7 +83,7 @@ export async function GET(request: NextRequest) {
     {
         const wide = await supabase
             .from('profiles')
-            .select('id, currency, digest_frequency, quiet_hours_start, quiet_hours_end, timezone')
+            .select('id, currency, digest_frequency, quiet_hours_start, quiet_hours_end, timezone, smart_digests_enabled')
             .in('digest_frequency', eligibleFrequencies)
             .returns<ProfileRow[]>();
         if (wide.error) {
@@ -183,6 +184,11 @@ export async function GET(request: NextRequest) {
         let pushSentLocal = 0;
 
         await processInBatches(profiles, 25, async (profile) => {
+            // Smart digests cover the same ground (yesterday recap is the morning
+            // slot's headline). Skip daily-digest only when smart digests are
+            // explicitly on. Legacy rows (column missing → undefined) and users
+            // who disabled smart digests still get the legacy daily-digest path.
+            if (profile.smart_digests_enabled === true) return;
             if (isInQuietHours(profile.timezone, profile.quiet_hours_start, profile.quiet_hours_end)) return;
             const userSubs = subsByUser.get(profile.id);
             if (!userSubs?.length) return;
