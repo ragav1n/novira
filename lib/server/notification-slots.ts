@@ -203,6 +203,9 @@ export function composeMorning(ctx: SlotContext): PushPayload | null {
     if (ctx.txCount14d === 0) return null;
 
     const parts: string[] = [];
+    if (ctx.yesterdayCount > 0) {
+        parts.push(`Yesterday ${fmtMoney(ctx.yesterdaySpend, baseCcy)}`);
+    }
     if (budget > 0) {
         const remaining = Math.max(0, budget - ctx.mtdSpend);
         const dayCount = daysInMonth(ctx.localToday);
@@ -270,14 +273,15 @@ export function composeEvening(ctx: SlotContext): PushPayload | null {
     const billTomorrow = ctx.upcomingBills.find(b => b.next_occurrence === ctx.localTomorrow);
     const parts: string[] = [];
 
-    if (ctx.yesterdayCount > 0) {
+    // Evening summary: prefer today's spend (the day is wrapping up) and fall
+    // back to yesterday only if there were no transactions today.
+    if (ctx.todayCount > 0) {
+        parts.push(`Today ${fmtMoney(ctx.todaySpend, baseCcy)} across ${ctx.todayCount} ${ctx.todayCount === 1 ? 'expense' : 'expenses'}`);
+    } else if (ctx.yesterdayCount > 0) {
         parts.push(`Yesterday ${fmtMoney(ctx.yesterdaySpend, baseCcy)} across ${ctx.yesterdayCount} ${ctx.yesterdayCount === 1 ? 'expense' : 'expenses'}`);
     }
     if (billTomorrow) {
         parts.push(`${billTomorrow.description} due tomorrow`);
-    }
-    if (!parts.length && ctx.todayCount > 0) {
-        parts.push(`Today ${fmtMoney(ctx.todaySpend, baseCcy)} across ${ctx.todayCount} ${ctx.todayCount === 1 ? 'expense' : 'expenses'}`);
     }
 
     if (!parts.length) return null;
