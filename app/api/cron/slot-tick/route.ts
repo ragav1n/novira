@@ -82,7 +82,7 @@ export async function GET(request: NextRequest) {
     if (previewUserId) {
         const { data: profile, error: previewErr } = await supabase
             .from('profiles')
-            .select('id, currency, monthly_budget, timezone, quiet_hours_start, quiet_hours_end, created_at')
+            .select('id, currency, monthly_budget, timezone, quiet_hours_start, quiet_hours_end')
             .eq('id', previewUserId)
             .single<SlotProfile & {
                 quiet_hours_start: number | null;
@@ -119,7 +119,7 @@ export async function GET(request: NextRequest) {
 
     const { data: profiles, error: profilesErr } = await supabase
         .from('profiles')
-        .select('id, currency, monthly_budget, timezone, quiet_hours_start, quiet_hours_end, created_at, smart_digests_enabled')
+        .select('id, currency, monthly_budget, timezone, quiet_hours_start, quiet_hours_end, smart_digests_enabled')
         .eq('smart_digests_enabled', true)
         .returns<Array<SlotProfile & {
             quiet_hours_start: number | null;

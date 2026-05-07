@@ -7,7 +7,6 @@ export interface SlotProfile {
     currency: string | null;
     monthly_budget: number | null;
     timezone: string | null;
-    created_at: string | null;
 }
 
 export interface SlotContext {
@@ -177,18 +176,14 @@ export async function loadSlotContext(
 }
 
 /**
- * "Active user" predicate. Slots fire for users with recent activity OR who
- * are within their 7-day onboarding grace. Dormant users stay owned by the
- * re-engagement cron solo.
+ * "Active user" predicate. Slots fire for users with at least one transaction
+ * in the last 14 days. Dormant users stay owned by the re-engagement cron
+ * solo. Brand-new users without any transactions naturally fall through —
+ * composers also return null when there's no data, so empty pushes are
+ * suppressed at both layers.
  */
 export function isActiveUser(ctx: SlotContext): boolean {
-    if (ctx.txCount14d > 0) return true;
-    const created = ctx.profile.created_at ? new Date(ctx.profile.created_at) : null;
-    if (created) {
-        const ageDays = (Date.now() - created.getTime()) / (1000 * 60 * 60 * 24);
-        if (ageDays < 7) return true;
-    }
-    return false;
+    return ctx.txCount14d > 0;
 }
 
 function dayOfMonth(yyyymmdd: string): number {
@@ -205,19 +200,7 @@ export function composeMorning(ctx: SlotContext): PushPayload | null {
     const baseCcy = (ctx.profile.currency || 'USD').toUpperCase();
     const budget = Number(ctx.profile.monthly_budget) || 0;
 
-    const isNew = ctx.txCount14d === 0;
-    if (isNew) {
-        const created = ctx.profile.created_at ? new Date(ctx.profile.created_at) : null;
-        const ageDays = created ? (Date.now() - created.getTime()) / (1000 * 60 * 60 * 24) : 99;
-        if (ageDays < 7) {
-            return {
-                title: 'Good morning',
-                body: 'Log your first expense to start tracking your day at a glance.',
-                url: '/dashboard',
-            };
-        }
-        return null;
-    }
+    if (ctx.txCount14d === 0) return null;
 
     const parts: string[] = [];
     if (budget > 0) {
