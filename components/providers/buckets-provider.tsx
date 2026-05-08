@@ -72,7 +72,7 @@ function computeBucketSpending(
         let amountInBucketCurrency: number;
         if (txCurrency === bucketCurrency) {
             amountInBucketCurrency = share;
-        } else if (row.exchange_rate && row.base_currency === bucketCurrency) {
+        } else if (row.exchange_rate && row.base_currency?.toUpperCase() === bucketCurrency) {
             amountInBucketCurrency = share * Number(row.exchange_rate);
         } else {
             amountInBucketCurrency = share * getRate(txCurrency, bucketCurrency);

@@ -38,6 +38,16 @@ export function AddFundsDialog({ isOpen, onClose, userId, defaultBucketId, onSuc
         setTxCurrency(currency);
     }, [currency]);
 
+    // Reset on reopen so a previously-typed-but-cancelled value doesn't pre-fill.
+    React.useEffect(() => {
+        if (isOpen) {
+            setAmount('');
+            setDescription('');
+            setErrors({});
+            setTxCurrency(currency);
+        }
+    }, [isOpen, currency]);
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 

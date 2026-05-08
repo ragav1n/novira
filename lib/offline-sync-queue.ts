@@ -69,6 +69,22 @@ export function startSyncing(queue: SyncPayload[], id: string): SyncPayload[] {
     return queue.map(item => item.id === id ? { ...item, status: 'syncing' } : item);
 }
 
+/**
+ * Reset items left in 'syncing' from a previous session (tab killed mid-flight,
+ * device crash, hard reload) back to 'pending' so the next sync loop picks them
+ * up. Without this, a crashed-mid-sync mutation is stranded forever — the loop
+ * only retries 'pending' items.
+ */
+export function resetStaleSyncing(queue: SyncPayload[]): SyncPayload[] {
+    let changed = false;
+    const next = queue.map(item => {
+        if (item.status !== 'syncing') return item;
+        changed = true;
+        return { ...item, status: 'pending' as const, nextRetryAt: undefined };
+    });
+    return changed ? next : queue;
+}
+
 export function markSynced(queue: SyncPayload[], id: string): SyncPayload[] {
     return queue.map(item => item.id === id ? { ...item, status: 'synced' } : item);
 }

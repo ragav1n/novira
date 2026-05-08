@@ -11,6 +11,7 @@ import {
     removeSynced,
     evictForCapacity,
     expireStaleItems,
+    resetStaleSyncing,
     findPendingDuplicate,
     mergePendingUpdate,
     MAX_QUEUE_SIZE
@@ -259,6 +260,16 @@ export async function attemptSync() {
 async function runSyncLoop(): Promise<void> {
     let queue = await readQueue();
     const now = Date.now();
+
+    // Recover items stranded in 'syncing' by a previous session (tab killed
+    // mid-flight). Without this they're invisible to the pending filter below
+    // and never retry.
+    const recovered = resetStaleSyncing(queue);
+    if (recovered !== queue) {
+        queue = recovered;
+        await writeQueue(queue);
+        dispatchQueueUpdated(queue);
+    }
 
     // Expire pending items older than 7 days so they stop retrying forever and
     // surface to the user as "Expired" in the failed list.
