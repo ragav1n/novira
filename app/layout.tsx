@@ -34,7 +34,7 @@ export const metadata: Metadata = {
     template: '%s - Novira',
     default: 'Novira — Smarter personal finance',
   },
-  description: 'Track spending, split with friends, and understand your money — in one quietly brilliant app that works anywhere, even offline. 150+ currencies, AI receipt scanning, beautiful analytics.',
+  description: 'Track spending, split with friends, and understand your money — works offline, supports 150+ currencies, with AI receipt scanning and analytics.',
   icons: {
     icon: [
       { url: '/icons/novira-192.png', sizes: '192x192', type: 'image/png' },
