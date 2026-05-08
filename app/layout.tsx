@@ -45,6 +45,9 @@ export const metadata: Metadata = {
   },
   manifest: '/manifest.json',
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'https://novira.one'),
+  alternates: {
+    canonical: '/',
+  },
   openGraph: {
     title: 'Novira — Smarter personal finance',
     description: 'Track spending, split with friends, and understand your money — in one quietly brilliant app that works anywhere, even offline.',
