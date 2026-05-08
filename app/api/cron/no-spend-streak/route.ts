@@ -53,6 +53,8 @@ export async function GET(request: NextRequest) {
         .gte('date', ymd(lookback))
         .lte('date', ymd(today))
         .eq('exclude_from_allowance', false)
+        .eq('is_settlement', false)
+        .eq('is_income', false)
         .returns<DateRow[]>();
 
     const datesByUser = new Map<string, Set<string>>();

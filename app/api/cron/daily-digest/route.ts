@@ -117,6 +117,8 @@ export async function GET(request: NextRequest) {
         .in('user_id', allUserIds)
         .gte('date', eightDaysAgo.toISOString().slice(0, 10))
         .is('group_id', null)
+        .eq('is_settlement', false)
+        .eq('is_income', false)
         .returns<TxRow[]>();
 
     const yesterday = new Date(now);

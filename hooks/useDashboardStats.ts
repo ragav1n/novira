@@ -109,6 +109,7 @@ export function useDashboardStats({
         if (!Array.isArray(transactions)) return [];
         return transactions.filter(tx => {
             if (tx.is_income) return false;
+            if (tx.is_settlement) return false;
             if (isBucketFocused) {
                 if (tx.bucket_id !== effectiveFocus) return false;
             } else {
@@ -130,7 +131,7 @@ export function useDashboardStats({
         if (!Array.isArray(transactions)) return 0;
         let total = 0;
         for (const tx of transactions) {
-            if (!tx || tx.exclude_from_allowance || tx.is_income) continue;
+            if (!tx || tx.exclude_from_allowance || tx.is_income || tx.is_settlement) continue;
             if (!tx.date.startsWith(lastMonthPrefix)) continue;
             const day = parseInt(tx.date.slice(8, 10), 10);
             if (isNaN(day) || day > currentDayOfMonth) continue;
@@ -337,7 +338,7 @@ export function useDashboardStats({
         if (!Array.isArray(transactions)) return 0;
         let total = 0;
         for (const tx of transactions) {
-            if (!tx || tx.exclude_from_allowance || tx.is_income) continue;
+            if (!tx || tx.exclude_from_allowance || tx.is_income || tx.is_settlement) continue;
             if (!tx.date.startsWith(lastMonthPrefix)) continue;
             if (userId) {
                 const involved = tx.user_id === userId || (tx.splits && tx.splits.some(s => s.user_id === userId));

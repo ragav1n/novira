@@ -72,6 +72,7 @@ export function WhatIfCard({
         for (const tx of monthlyTxs) {
             if (tx.exclude_from_allowance) continue;
             if (tx.is_income) continue;
+            if (tx.is_settlement) continue;
             const txCurr = (tx.currency || 'USD').toUpperCase();
             const amt = txCurr === currency.toUpperCase()
                 ? Number(tx.amount)

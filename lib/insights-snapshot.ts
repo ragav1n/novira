@@ -115,6 +115,7 @@ export async function buildInsightsSnapshot(
     let q = supabase
         .from('transactions')
         .select('id, amount, category, payment_method, date, place_name, description, user_id, currency, exchange_rate, base_currency, converted_amount, is_recurring, tags, bucket_id, splits(user_id, amount)')
+        .eq('is_settlement', false)
         .order('date', { ascending: false })
         .limit(2000);
 

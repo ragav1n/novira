@@ -87,7 +87,7 @@ function convertOnce(
     if (tx.exchange_rate && baseCurr === currency.toUpperCase()) {
         return { amount: share * Number(tx.exchange_rate), converted: false };
     }
-    return { amount: convertAmount(share, txCurr), converted: true };
+    return { amount: convertAmount(share, txCurr, currency), converted: true };
 }
 
 export function useAnalyticsData(opts: {

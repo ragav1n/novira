@@ -112,6 +112,8 @@ export async function loadSlotContext(
         .eq('user_id', profile.id)
         .gte('date', fourteenAgo)
         .is('group_id', null)
+        .eq('is_settlement', false)
+        .eq('is_income', false)
         .returns<TxRow[]>();
 
     let todaySpend = 0, todayCount = 0;

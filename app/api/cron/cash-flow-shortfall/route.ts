@@ -69,6 +69,8 @@ export async function GET(request: NextRequest) {
         .in('user_id', userIds)
         .gte('date', ymd(monthStart))
         .lte('date', ymd(today))
+        .eq('is_settlement', false)
+        .eq('is_income', false)
         .returns<TxRow[]>();
 
     const { data: bills } = await supabase

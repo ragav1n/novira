@@ -49,6 +49,8 @@ export async function GET(request: NextRequest) {
         .select('id, user_id, amount, currency, category, description, date')
         .eq('date', ymd(yesterday))
         .eq('exclude_from_allowance', false)
+        .eq('is_settlement', false)
+        .eq('is_income', false)
         .returns<TxRow[]>();
     if (!yesterdayTxs?.length) return NextResponse.json({ scanned: 0, notified: 0 });
 
@@ -70,6 +72,8 @@ export async function GET(request: NextRequest) {
         .gte('date', ymd(ninetyAgo))
         .lt('date', ymd(yesterday))
         .eq('exclude_from_allowance', false)
+        .eq('is_settlement', false)
+        .eq('is_income', false)
         .returns<{ user_id: string; amount: number; currency: string | null; category: string | null; date: string }[]>();
 
     const histByKey = new Map<string, number[]>();

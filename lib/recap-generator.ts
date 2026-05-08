@@ -272,6 +272,7 @@ export async function generateRecap(
             .select('amount, category, payment_method, date, place_name, description, user_id, currency, exchange_rate, base_currency, converted_amount, splits(user_id, amount)')
             .gte('date', start)
             .lte('date', end)
+            .eq('is_settlement', false)
             .returns<TxRow[]>();
         if (error) throw error;
         return data || [];

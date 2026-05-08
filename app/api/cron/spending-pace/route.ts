@@ -115,6 +115,8 @@ export async function GET(request: NextRequest) {
         .in('user_id', userIds)
         .gte('date', monthStartStr)
         .is('group_id', null)
+        .eq('is_settlement', false)
+        .eq('is_income', false)
         .returns<TxRow[]>();
 
     const totalsByUser = new Map<string, number>();

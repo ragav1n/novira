@@ -150,8 +150,8 @@ export function AnalyticsView() {
             if (fetchGenRef.current !== myGen) return;
             // Income transactions belong to a separate "earning" model and shouldn't
             // appear in spending analytics (category breakdown, top merchants, trend).
-            const filteredCurrent = (current || []).filter(t => !t.is_income);
-            const filteredPrior = (prior || []).filter(t => !t.is_income);
+            const filteredCurrent = (current || []).filter(t => !t.is_income && !t.is_settlement);
+            const filteredPrior = (prior || []).filter(t => !t.is_income && !t.is_settlement);
 
             // ALL-view safety: at high transaction counts charts and aggregations get
             // expensive. Cap the view at the latest 5000 and surface a footnote.

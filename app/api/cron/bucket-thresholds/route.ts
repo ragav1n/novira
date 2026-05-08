@@ -90,6 +90,9 @@ export async function GET(request: NextRequest) {
         .from('transactions')
         .select('bucket_id, user_id, amount, category, currency, exchange_rate, base_currency, splits(user_id, amount)')
         .in('bucket_id', bucketIds)
+        .eq('is_settlement', false)
+        .eq('is_income', false)
+        .eq('exclude_from_allowance', false)
         .returns<TxRow[]>();
 
     // Compute per-bucket spend in the bucket's currency. Currency conversion is
@@ -126,7 +129,7 @@ export async function GET(request: NextRequest) {
         if (txCcy !== bucketCcy) {
             if (tx.exchange_rate && (tx.base_currency || '').toUpperCase() === bucketCcy) {
                 inBucketCcy = share * Number(tx.exchange_rate);
-            }
+            } else continue;
         }
         spendByBucket.set(bId, (spendByBucket.get(bId) || 0) + inBucketCcy);
     }
