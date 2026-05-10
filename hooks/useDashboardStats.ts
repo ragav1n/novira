@@ -1,5 +1,5 @@
 import { useMemo, useCallback } from 'react';
-import { differenceInDays, endOfMonth, startOfMonth, format, subMonths } from 'date-fns';
+import { differenceInDays, endOfMonth, startOfMonth, format, subMonths, parseISO } from 'date-fns';
 import type { Transaction } from '@/types/transaction';
 import { CATEGORY_COLORS } from '@/lib/categories';
 import type { Currency } from '@/components/providers/user-preferences-provider';
@@ -45,6 +45,8 @@ export function useDashboardStats({
     recentFeed: Transaction[];
     runRateData: {
         dailyAverage: number;
+        last7DayRate: number;
+        mtdRate: number;
         projectedSpend: number;
         isExceeding: boolean;
         daysInMonth: number;
@@ -65,6 +67,8 @@ export function useDashboardStats({
     } | null;
     lastMonthCarryover: number;
     incomeThisMonth: number;
+    topCategoryMover: { category: string; delta: number; direction: 'up' | 'down' } | null;
+    weekdaySpending: { totals: number[]; maxValue: number; todayIndex: number } | null;
 } {
     const focusedBucket = (isBucketFocused && Array.isArray(buckets) ? buckets.find(b => b.id === effectiveFocus) : null) ?? null;
     const displayBudget = isBucketFocused && focusedBucket ? Number(focusedBucket.budget) : (monthlyBudget || 0);
@@ -152,6 +156,35 @@ export function useDashboardStats({
         return total;
     }, [transactions, isBucketFocused, lastMonthPrefix, currentDayOfMonth, userId, bucketCurrency, convertAmount, calculateUserShare]);
 
+    // Per-category last-month MTD totals (target currency = user's display `currency`,
+    // matching how `aggregates.byCategory` is computed for non-bucket views).
+    const lastMonthByCategory = useMemo(() => {
+        if (isBucketFocused) return null;
+        if (!Array.isArray(transactions)) return null;
+        const byCat: Record<string, number> = {};
+        for (const tx of transactions) {
+            if (!tx || tx.exclude_from_allowance || tx.is_income || tx.is_settlement) continue;
+            if (!tx.date.startsWith(lastMonthPrefix)) continue;
+            const day = parseInt(tx.date.slice(8, 10), 10);
+            if (isNaN(day) || day > currentDayOfMonth) continue;
+            if (userId) {
+                const involved = tx.user_id === userId || (tx.splits && tx.splits.some(s => s.user_id === userId));
+                if (!involved) continue;
+            }
+            const myShare = calculateUserShare(tx, userId);
+            if (myShare <= 0) continue;
+            const txCurr = (tx.currency || 'USD').toUpperCase();
+            const baseCurr = (tx.base_currency || '').toUpperCase();
+            const hasExchange = !!tx.exchange_rate && tx.exchange_rate !== 1;
+            const amt = txCurr === currency
+                ? myShare
+                : (hasExchange && baseCurr === currency ? myShare * Number(tx.exchange_rate) : convertAmount(myShare, txCurr, currency));
+            const cat = tx.category.toLowerCase();
+            byCat[cat] = (byCat[cat] ?? 0) + amt;
+        }
+        return byCat;
+    }, [transactions, isBucketFocused, lastMonthPrefix, currentDayOfMonth, userId, currency, convertAmount, calculateUserShare]);
+
     // Single pass over filteredTransactions producing totalSpent + spendingByCategory + recentSpent
     // (the run-rate window). Avoids three independent O(n) walks with redundant conversions.
     const aggregates = useMemo(() => {
@@ -213,6 +246,34 @@ export function useDashboardStats({
         fill: CATEGORY_COLORS[cat] || CATEGORY_COLORS.others,
     })), [spendingByCategory]);
 
+    // Mon..Sun spending pattern for the current month, in bucketCurrency.
+    // Skipped during bucket focus (no monthly cadence concept). Returns null
+    // when there's no spend at all so the card can hide itself.
+    const weekdaySpending = useMemo(() => {
+        if (isBucketFocused) return null;
+        const totals = [0, 0, 0, 0, 0, 0, 0]; // index 0 = Mon, 6 = Sun
+        for (const tx of filteredTransactions) {
+            const myShare = calculateUserShare(tx, userId);
+            if (myShare <= 0) continue;
+            const txCurr = (tx.currency || 'USD').toUpperCase();
+            const baseCurr = (tx.base_currency || '').toUpperCase();
+            const hasExchange = !!tx.exchange_rate && tx.exchange_rate !== 1;
+            const amt = txCurr === bucketCurrency
+                ? myShare
+                : (hasExchange && baseCurr === bucketCurrency ? myShare * Number(tx.exchange_rate) : convertAmount(myShare, txCurr, bucketCurrency));
+            // parseISO with the date-only slice avoids the project's known
+            // `new Date(tx.date)` timezone bug for ISO timestamps.
+            const dow = parseISO(tx.date.slice(0, 10)).getDay(); // 0 = Sunday
+            const idx = (dow + 6) % 7; // shift so Monday = 0
+            totals[idx] += amt;
+        }
+        const maxValue = Math.max(...totals);
+        if (maxValue <= 0) return null;
+        const todayDow = new Date().getDay();
+        const todayIndex = (todayDow + 6) % 7;
+        return { totals, maxValue, todayIndex };
+    }, [isBucketFocused, filteredTransactions, userId, calculateUserShare, bucketCurrency, convertAmount]);
+
     // displayTransactions is now just the pre-filtered set
     const displayTransactions = filteredTransactions;
 
@@ -251,6 +312,8 @@ export function useDashboardStats({
 
         return {
             dailyAverage,
+            last7DayRate: recentDailyRate,
+            mtdRate: mtdDailyRate,
             projectedSpend,
             isExceeding: displayBudget > 0 && projectedSpend > displayBudget,
             daysInMonth,
@@ -331,6 +394,28 @@ export function useDashboardStats({
         };
     }, [isBucketFocused, currentDayOfMonth, lastMonthMTD, totalSpent]);
 
+    // Highlight the single category whose MTD spend moved most vs same window last month.
+    // Hidden during bucket focus, on day 1, and when the absolute delta is below the noise
+    // threshold ($10 in the user's display currency). Same currency on both sides because
+    // both inputs are pre-converted to `currency`.
+    const topCategoryMover = useMemo(() => {
+        if (isBucketFocused) return null;
+        if (currentDayOfMonth < 2) return null;
+        if (!lastMonthByCategory) return null;
+        const allCats = new Set<string>([...Object.keys(aggregates.byCategory), ...Object.keys(lastMonthByCategory)]);
+        let best: { category: string; delta: number; direction: 'up' | 'down' } | null = null;
+        for (const cat of allCats) {
+            const now = aggregates.byCategory[cat] ?? 0;
+            const prev = lastMonthByCategory[cat] ?? 0;
+            const delta = now - prev;
+            if (Math.abs(delta) < 10) continue;
+            if (!best || Math.abs(delta) > Math.abs(best.delta)) {
+                best = { category: cat, delta, direction: delta >= 0 ? 'up' : 'down' };
+            }
+        }
+        return best;
+    }, [isBucketFocused, currentDayOfMonth, aggregates.byCategory, lastMonthByCategory]);
+
     // Full last-month spend → carryover. Floors at 0 so an overspent month
     // doesn't dock the next month's headroom.
     const lastMonthFullSpend = useMemo(() => {
@@ -400,5 +485,7 @@ export function useDashboardStats({
         lastMonthComparison,
         lastMonthCarryover,
         incomeThisMonth,
+        topCategoryMover,
+        weekdaySpending,
     };
 }

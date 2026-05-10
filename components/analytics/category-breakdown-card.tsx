@@ -44,6 +44,7 @@ function CategoryBreakdownCardInner({ title, categoryBreakdown, categorizedBreak
                                 innerRadius={46}
                                 outerRadius={68}
                                 hideLabel={true}
+                                valueFormatter={(v) => `${Math.round(v)}%`}
                             />
                         ) : (
                             <div className="flex items-center justify-center h-full text-muted-foreground text-[10px] font-bold uppercase">

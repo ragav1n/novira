@@ -2,7 +2,7 @@
 
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
-import { TrendingUp, RotateCw, PieChart, Receipt, RotateCcw } from 'lucide-react';
+import { TrendingUp, RotateCw, PieChart, Receipt, RotateCcw, BarChart3 } from 'lucide-react';
 import { useDashboardLayout, type DashboardCardId } from '@/hooks/useDashboardLayout';
 
 const CARDS: { id: DashboardCardId; label: string; description: string; icon: React.ReactNode }[] = [
@@ -29,6 +29,12 @@ const CARDS: { id: DashboardCardId; label: string; description: string; icon: Re
         label: 'Recent transactions',
         description: 'Feed of latest transactions on the dashboard',
         icon: <Receipt className="w-4 h-4" />,
+    },
+    {
+        id: 'weekday_spending',
+        label: 'Weekday pattern',
+        description: 'Mon–Sun bars showing where your spend lands in the week',
+        icon: <BarChart3 className="w-4 h-4" />,
     },
 ];
 

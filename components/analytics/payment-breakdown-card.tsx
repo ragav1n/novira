@@ -53,6 +53,7 @@ function PaymentBreakdownCardInner({ paymentBreakdown, categorizedPayment, forma
                                 innerRadius={40}
                                 outerRadius={60}
                                 hideLabel={true}
+                                valueFormatter={(v) => `${Math.round(v)}%`}
                             />
                         ) : (
                             <div className="flex items-center justify-center h-full text-muted-foreground text-[10px] font-bold uppercase">

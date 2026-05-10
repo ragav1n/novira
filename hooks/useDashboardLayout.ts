@@ -4,7 +4,8 @@ export type DashboardCardId =
     | 'cashflow_forecast'
     | 'upcoming_recurring'
     | 'category_donut'
-    | 'transaction_list';
+    | 'transaction_list'
+    | 'weekday_spending';
 
 export type DashboardLayout = Record<DashboardCardId, boolean>;
 
@@ -15,6 +16,7 @@ export const DEFAULT_DASHBOARD_LAYOUT: DashboardLayout = {
     upcoming_recurring: true,
     category_donut: true,
     transaction_list: true,
+    weekday_spending: true,
 };
 
 function readLayout(): DashboardLayout {

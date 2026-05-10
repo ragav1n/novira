@@ -30,6 +30,9 @@ interface BasePieChartProps {
     hideLabel?: boolean;
     nameKey?: string;
     dataKey?: string;
+    onSliceClick?: (datum: PieDatum) => void;
+    selectedName?: string | null;
+    valueFormatter?: (value: number) => string;
 }
 
 export function BasePieChart({
@@ -40,14 +43,18 @@ export function BasePieChart({
     className,
     hideLabel = true,
     nameKey = "name",
-    dataKey = "value"
+    dataKey = "value",
+    onSliceClick,
+    selectedName,
+    valueFormatter
 }: BasePieChartProps) {
+    const selected = selectedName ? selectedName.toLowerCase() : null;
     return (
         <ChartContainer config={config} className={cn("mx-auto aspect-square", className)}>
             <PieChart margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
-                <ChartTooltip 
-                    cursor={false} 
-                    content={<ChartTooltipContent hideLabel={hideLabel} />} 
+                <ChartTooltip
+                    cursor={false}
+                    content={<ChartTooltipContent hideLabel={hideLabel} valueFormatter={valueFormatter} />}
                 />
                 <Pie
                     data={data}
@@ -64,10 +71,20 @@ export function BasePieChart({
                     animationEasing="ease-out"
                     startAngle={90}
                     endAngle={-270}
+                    style={onSliceClick ? { cursor: 'pointer' } : undefined}
                 >
-                    {data.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color || entry.fill} />
-                    ))}
+                    {data.map((entry, index) => {
+                        const dimmed = selected !== null && (entry.name || '').toLowerCase() !== selected;
+                        return (
+                            <Cell
+                                key={`cell-${index}`}
+                                fill={entry.color || entry.fill}
+                                fillOpacity={dimmed ? 0.3 : 1}
+                                onClick={onSliceClick ? () => onSliceClick(entry) : undefined}
+                                style={onSliceClick ? { cursor: 'pointer' } : undefined}
+                            />
+                        );
+                    })}
                 </Pie>
             </PieChart>
         </ChartContainer>

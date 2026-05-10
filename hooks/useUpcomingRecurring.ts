@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { applyWorkspaceFilter } from '@/lib/workspace-filter';
-import { format, parseISO, differenceInCalendarDays } from 'date-fns';
+import { format, parseISO, differenceInCalendarDays, endOfMonth } from 'date-fns';
 type UpcomingRow = {
     id: string;
     description: string;
@@ -11,8 +11,6 @@ type UpcomingRow = {
     next_occurrence: string;
     is_income?: boolean;
 };
-
-const HORIZON_DAYS = 7;
 
 export type UpcomingCharge = {
     id: string;
@@ -44,9 +42,10 @@ export function useUpcomingRecurring(
         try {
             const today = new Date();
             const todayStr = format(today, 'yyyy-MM-dd');
-            const horizon = new Date(today);
-            horizon.setDate(today.getDate() + HORIZON_DAYS);
-            const horizonStr = format(horizon, 'yyyy-MM-dd');
+            // Horizon is end-of-current-month so the card reflects the user's
+            // total recurring commitment for the rest of the month, not just a
+            // rolling 7-day slice.
+            const horizonStr = format(endOfMonth(today), 'yyyy-MM-dd');
 
             const baseQuery = supabase
                 .from('recurring_templates')

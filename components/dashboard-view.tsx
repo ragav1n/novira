@@ -82,6 +82,13 @@ export function DashboardView() {
 
     const [isBudgetEditOpen, setIsBudgetEditOpen] = useState(false);
     const [tempBudgetInput, setTempBudgetInput] = useState("");
+    const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+
+    // Reset category filter when the user switches focus or workspace —
+    // a stale "Groceries" filter shouldn't carry across buckets/workspaces.
+    useEffect(() => {
+        setSelectedCategory(null);
+    }, [dashboardFocus, activeWorkspaceId]);
 
     const eligibleGroups = useMemo(() => groups.filter(g => g.type === 'couple' || g.type === 'home'), [groups]);
     const activeWorkspaceGroup = useMemo(() =>
@@ -100,7 +107,7 @@ export function DashboardView() {
     const {
         focusedBucket, displayBudget, calculateUserShare, totalSpent,
         remaining, progress, spendingData, displayTransactions, recentFeed, runRateData, cashflowForecast,
-        todaySpent, lastMonthComparison, lastMonthCarryover, incomeThisMonth
+        todaySpent, lastMonthComparison, lastMonthCarryover, incomeThisMonth, topCategoryMover, weekdaySpending
     } = useDashboardStats({
         transactions, 
         userId: activeWorkspaceId ? null : userId, // if workspace, null so we get all workspace txs
@@ -290,6 +297,11 @@ export function DashboardView() {
                     convertAmount={convertAmount}
                     lastMonthCarryover={lastMonthCarryover}
                     incomeThisMonth={incomeThisMonth}
+                    selectedCategory={selectedCategory}
+                    onCategorySelect={setSelectedCategory}
+                    topCategoryMover={topCategoryMover}
+                    weekdaySpending={weekdaySpending}
+                    showWeekdaySpending={dashboardLayout.weekday_spending}
                 />
                 {dashboardLayout.transaction_list && (
                 <TransactionListSection
@@ -317,6 +329,8 @@ export function DashboardView() {
                     hasMore={hasMore}
                     loadingMore={loadingMore}
                     onLoadMore={loadMore}
+                    selectedCategory={selectedCategory}
+                    onClearCategory={() => setSelectedCategory(null)}
                 />
                 )}
 

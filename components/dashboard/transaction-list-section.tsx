@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useRef } from 'react';
-import { Wallet, ChevronRight, Check, Pencil, Clock, ArrowUpRight, ArrowDownLeft, LayoutGrid, MapPin } from 'lucide-react';
+import { Wallet, ChevronRight, Check, Pencil, Clock, ArrowUpRight, ArrowDownLeft, LayoutGrid, MapPin, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Transaction } from '@/types/transaction';
 import { TransactionRow } from '@/components/transaction-row';
@@ -37,6 +37,8 @@ interface TransactionListSectionProps {
     hasMore?: boolean;
     loadingMore?: boolean;
     onLoadMore?: () => void;
+    selectedCategory?: string | null;
+    onClearCategory?: () => void;
 }
 
 export function TransactionListSection({
@@ -63,15 +65,41 @@ export function TransactionListSection({
     convertAmount,
     hasMore,
     loadingMore,
-    onLoadMore
+    onLoadMore,
+    selectedCategory = null,
+    onClearCategory
 }: TransactionListSectionProps) {
     const drawerScrollRef = useRef<HTMLDivElement>(null);
+    // When filtering by category, also exclude settlements so the visible rows reconcile
+    // with the pie slice value (which excludes settlements via useDashboardStats).
+    const filteredRecents = selectedCategory
+        ? displayTransactions.filter(tx => !tx.is_settlement && tx.category.toLowerCase() === selectedCategory)
+        : displayTransactions;
     return (
         <div className="space-y-4">
-            <div className="flex justify-between items-center">
-                <h3 className="text-lg font-bold">{isBucketFocused ? "Mission" : "Recent"} Transactions</h3>
+            <div className="flex justify-between items-center gap-2 flex-wrap">
+                <div className="flex items-center gap-2 flex-wrap min-w-0">
+                    <h3 className="text-lg font-bold">{isBucketFocused ? "Mission" : "Recent"} Transactions</h3>
+                    {selectedCategory && onClearCategory && (
+                        <button
+                            type="button"
+                            onClick={onClearCategory}
+                            className={cn(
+                                "inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full border transition-colors",
+                                isCoupleWorkspace
+                                    ? "bg-rose-500/10 text-rose-300 border-rose-500/20 hover:bg-rose-500/15"
+                                    : isHomeWorkspace
+                                        ? "bg-yellow-500/10 text-yellow-300 border-yellow-500/20 hover:bg-yellow-500/15"
+                                        : "bg-primary/10 text-primary border-primary/20 hover:bg-primary/15"
+                            )}
+                        >
+                            <span className="capitalize">{selectedCategory}</span>
+                            <X className="w-3 h-3" />
+                        </button>
+                    )}
+                </div>
                 <div className="flex items-center gap-2">
-                    {displayTransactions.some(tx => tx.place_lat && tx.place_lng) && (
+                    {filteredRecents.some(tx => tx.place_lat && tx.place_lng) && (
                         <button
                             onClick={() => setIsMapOpen(true)}
                             className="text-xs text-emerald-400 font-bold hover:text-emerald-300 transition-colors uppercase tracking-wider px-2 py-1 flex items-center gap-1"
@@ -93,7 +121,7 @@ export function TransactionListSection({
             </div>
 
             <div className="space-y-1">
-                {displayTransactions.slice(0, 5).map((tx: Transaction) => {
+                {filteredRecents.slice(0, 5).map((tx: Transaction) => {
                     const myShare = calculateUserShare(tx, userId);
                     const showConverted = tx.currency && tx.currency.toUpperCase() !== currency.toUpperCase();
                     return (
@@ -123,9 +151,24 @@ export function TransactionListSection({
                         />
                     );
                 })}
-                {displayTransactions.length === 0 && (
+                {filteredRecents.length === 0 && (
                     <div className="text-center text-sm text-muted-foreground/40 py-8">
-                        No recent transactions found.
+                        {selectedCategory ? (
+                            <>
+                                <span className="capitalize">{selectedCategory}</span> has no recent transactions.
+                                {onClearCategory && (
+                                    <button
+                                        type="button"
+                                        onClick={onClearCategory}
+                                        className="ml-2 text-primary font-bold hover:underline"
+                                    >
+                                        Clear filter
+                                    </button>
+                                )}
+                            </>
+                        ) : (
+                            'No recent transactions found.'
+                        )}
                     </div>
                 )}
             </div>
