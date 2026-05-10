@@ -70,10 +70,22 @@ export function TransactionListSection({
     onClearCategory
 }: TransactionListSectionProps) {
     const drawerScrollRef = useRef<HTMLDivElement>(null);
-    // When filtering by category, also exclude settlements so the visible rows reconcile
-    // with the pie slice value (which excludes settlements via useDashboardStats).
+    // When filtering by category, also exclude settlements AND bound to the pie's
+    // scope so the visible rows reconcile with the pie slice value:
+    //   - non-bucket: pie covers the current calendar month, so filter rows to the
+    //     same `yyyy-MM` prefix.
+    //   - bucket focus: pie covers all bucket transactions, so no month bound.
+    const currentMonthPrefix = (() => {
+        if (!selectedCategory || isBucketFocused) return '';
+        const d = new Date();
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    })();
     const filteredRecents = selectedCategory
-        ? displayTransactions.filter(tx => !tx.is_settlement && tx.category.toLowerCase() === selectedCategory)
+        ? displayTransactions.filter(tx =>
+            !tx.is_settlement &&
+            tx.category.toLowerCase() === selectedCategory &&
+            (isBucketFocused || tx.date.startsWith(currentMonthPrefix))
+        )
         : displayTransactions;
     return (
         <div className="space-y-4">

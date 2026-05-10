@@ -69,7 +69,10 @@ export const WeekdaySpendingCard = React.memo(function WeekdaySpendingCard({
             <div className="flex items-start justify-between mb-3 gap-2">
                 <div className="flex items-center gap-2 min-w-0">
                     <CalendarDays className={cn('w-4 h-4 shrink-0', iconClass)} />
-                    <h3 className="text-sm font-bold truncate">Weekday Pattern</h3>
+                    <div className="min-w-0">
+                        <h3 className="text-sm font-bold truncate">Weekday Pattern</h3>
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">Last 30 days</p>
+                    </div>
                 </div>
                 <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground bg-secondary/30 px-2 py-0.5 rounded-full whitespace-nowrap">
                     Peak {DAY_NAMES[peakIndex]}
@@ -88,9 +91,6 @@ export const WeekdaySpendingCard = React.memo(function WeekdaySpendingCard({
                     >
                         <span className="text-sm font-bold text-foreground">
                             {DAY_NAMES[displayIdx]}
-                            {displayIdx === todayIndex && selectedIdx === null && (
-                                <span className="ml-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">today</span>
-                            )}
                         </span>
                         <span className="text-sm font-bold tabular-nums text-foreground">
                             {formatCurrency(displayValue, displayCurrency)}

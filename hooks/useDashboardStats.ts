@@ -1,5 +1,5 @@
 import { useMemo, useCallback } from 'react';
-import { differenceInDays, endOfMonth, startOfMonth, format, subMonths, parseISO } from 'date-fns';
+import { differenceInDays, endOfMonth, startOfMonth, format, subMonths, subDays, parseISO } from 'date-fns';
 import type { Transaction } from '@/types/transaction';
 import { CATEGORY_COLORS } from '@/lib/categories';
 import type { Currency } from '@/components/providers/user-preferences-provider';
@@ -246,13 +246,24 @@ export function useDashboardStats({
         fill: CATEGORY_COLORS[cat] || CATEGORY_COLORS.others,
     })), [spendingByCategory]);
 
-    // Mon..Sun spending pattern for the current month, in bucketCurrency.
-    // Skipped during bucket focus (no monthly cadence concept). Returns null
-    // when there's no spend at all so the card can hide itself.
+    // Mon..Sun spending pattern over the trailing 30 days, in bucketCurrency.
+    // Iterates raw `transactions` (not the month-bound `filteredTransactions`)
+    // so the window crosses month boundaries cleanly. Skipped during bucket
+    // focus and when there's no spend.
     const weekdaySpending = useMemo(() => {
         if (isBucketFocused) return null;
+        if (!Array.isArray(transactions)) return null;
+        const today = new Date();
+        const startStr = format(subDays(today, 29), 'yyyy-MM-dd'); // 30 days inclusive of today
         const totals = [0, 0, 0, 0, 0, 0, 0]; // index 0 = Mon, 6 = Sun
-        for (const tx of filteredTransactions) {
+        for (const tx of transactions) {
+            if (!tx || tx.exclude_from_allowance || tx.is_income || tx.is_settlement) continue;
+            const txDate = tx.date.slice(0, 10);
+            if (txDate < startStr) continue;
+            if (userId) {
+                const involved = tx.user_id === userId || (tx.splits && tx.splits.some(s => s.user_id === userId));
+                if (!involved) continue;
+            }
             const myShare = calculateUserShare(tx, userId);
             if (myShare <= 0) continue;
             const txCurr = (tx.currency || 'USD').toUpperCase();
@@ -263,16 +274,16 @@ export function useDashboardStats({
                 : (hasExchange && baseCurr === bucketCurrency ? myShare * Number(tx.exchange_rate) : convertAmount(myShare, txCurr, bucketCurrency));
             // parseISO with the date-only slice avoids the project's known
             // `new Date(tx.date)` timezone bug for ISO timestamps.
-            const dow = parseISO(tx.date.slice(0, 10)).getDay(); // 0 = Sunday
+            const dow = parseISO(txDate).getDay(); // 0 = Sunday
             const idx = (dow + 6) % 7; // shift so Monday = 0
             totals[idx] += amt;
         }
         const maxValue = Math.max(...totals);
         if (maxValue <= 0) return null;
-        const todayDow = new Date().getDay();
+        const todayDow = today.getDay();
         const todayIndex = (todayDow + 6) % 7;
         return { totals, maxValue, todayIndex };
-    }, [isBucketFocused, filteredTransactions, userId, calculateUserShare, bucketCurrency, convertAmount]);
+    }, [isBucketFocused, transactions, userId, calculateUserShare, bucketCurrency, convertAmount]);
 
     // displayTransactions is now just the pre-filtered set
     const displayTransactions = filteredTransactions;
@@ -380,11 +391,12 @@ export function useDashboardStats({
         displayBudget
     ]);
 
-    // Last-month comparison: only meaningful past day 2 of the current month
-    // (day 1 has too small a sample to be useful) and when last month had any spend.
+    // Last-month comparison: only meaningful past day 5 of the current month
+    // (smaller samples are too volatile — a single outlier can produce
+    // "+800% vs last month") and when last month had any spend.
     const lastMonthComparison = useMemo(() => {
         if (isBucketFocused) return null;
-        if (currentDayOfMonth < 2) return null;
+        if (currentDayOfMonth < 5) return null;
         if (lastMonthMTD <= 0) return null;
         const deltaPct = ((totalSpent - lastMonthMTD) / lastMonthMTD) * 100;
         return {
@@ -395,12 +407,13 @@ export function useDashboardStats({
     }, [isBucketFocused, currentDayOfMonth, lastMonthMTD, totalSpent]);
 
     // Highlight the single category whose MTD spend moved most vs same window last month.
-    // Hidden during bucket focus, on day 1, and when the absolute delta is below the noise
-    // threshold ($10 in the user's display currency). Same currency on both sides because
-    // both inputs are pre-converted to `currency`.
+    // Hidden during bucket focus, before day 5 (single-day comparisons are too noisy —
+    // one coffee can blow past the $10 threshold), and when the absolute delta is below
+    // the noise threshold ($10 in the user's display currency). Same currency on both
+    // sides because both inputs are pre-converted to `currency`.
     const topCategoryMover = useMemo(() => {
         if (isBucketFocused) return null;
-        if (currentDayOfMonth < 2) return null;
+        if (currentDayOfMonth < 5) return null;
         if (!lastMonthByCategory) return null;
         const allCats = new Set<string>([...Object.keys(aggregates.byCategory), ...Object.keys(lastMonthByCategory)]);
         let best: { category: string; delta: number; direction: 'up' | 'down' } | null = null;
