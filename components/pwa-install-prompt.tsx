@@ -9,6 +9,9 @@ interface BeforeInstallPromptEvent extends Event {
     userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
 }
 
+const DISMISS_KEY = 'pwa-install-dismissed-at';
+const DISMISS_TTL_MS = 14 * 24 * 60 * 60 * 1000;
+
 export function PWAInstallPrompt() {
     const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
     const [isVisible, setIsVisible] = useState(false);
@@ -16,8 +19,10 @@ export function PWAInstallPrompt() {
     useEffect(() => {
         // Don't show if already installed (standalone mode)
         if (window.matchMedia('(display-mode: standalone)').matches) return;
-        // Don't show if dismissed in this session
-        if (sessionStorage.getItem('pwa-install-dismissed')) return;
+        // Skip if dismissed within the last 14 days. Persisting in localStorage
+        // (not sessionStorage) keeps the dismiss across tab closes.
+        const dismissedAt = Number(localStorage.getItem(DISMISS_KEY));
+        if (Number.isFinite(dismissedAt) && dismissedAt > 0 && Date.now() - dismissedAt < DISMISS_TTL_MS) return;
 
         let timer: ReturnType<typeof setTimeout> | null = null;
         const handler = (e: Event) => {
@@ -45,7 +50,7 @@ export function PWAInstallPrompt() {
 
     const handleDismiss = () => {
         setIsVisible(false);
-        sessionStorage.setItem('pwa-install-dismissed', '1');
+        localStorage.setItem(DISMISS_KEY, String(Date.now()));
     };
 
     return (

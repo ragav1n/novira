@@ -84,26 +84,31 @@ export function useDashboardData(
     const loadTransactions = useCallback(async (currentUserId: string, workspaceId: string | null = null, limit = loadLimitRef.current) => {
         const myGen = fetchGenRef.current;
         try {
+            // Fetch one extra row so we can distinguish "exactly `limit` rows total"
+            // from "more available" — otherwise hasMore stays true at exact multiples
+            // of PAGE_SIZE and the "Load more" button fetches a no-op page.
             const baseQuery = supabase
                 .from('transactions')
                 .select(TX_SELECT)
                 .order('date', { ascending: false })
                 .order('created_at', { ascending: false })
-                .limit(limit);
+                .limit(limit + 1);
             const query = applyWorkspaceFilter(baseQuery, currentUserId, workspaceId);
 
             const { data: txs } = await query;
 
             if (fetchGenRef.current !== myGen) return;
             if (txs) {
+                const more = txs.length > limit;
+                const visible = more ? txs.slice(0, limit) : txs;
                 // Flatten profile and splits if they are arrays (Supabase dynamic returns)
-                const formattedTxs = txs.map(tx => ({
+                const formattedTxs = visible.map(tx => ({
                     ...tx,
                     profile: Array.isArray(tx.profile) ? tx.profile[0] : tx.profile,
                     splits: tx.splits || []
                 })) as Transaction[];
                 setServerTransactions(formattedTxs);
-                setHasMore(txs.length >= limit);
+                setHasMore(more);
             }
         } catch (error) {
             if (process.env.NODE_ENV === 'development') {

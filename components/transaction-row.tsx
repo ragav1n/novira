@@ -110,13 +110,32 @@ export const TransactionRow = memo(function TransactionRow({
 
   const snapTo = (target: number) => animate(x, target, { type: 'spring', stiffness: 320, damping: 34, mass: 0.8 });
 
-  const handleDragEnd = (_: unknown, info: { offset: { x: number } }) => {
-    if (!canEdit) return;
-    if (info.offset.x < -SWIPE_THRESHOLD) { snapTo(-SNAP_DISTANCE); setSwiped(true); }
-    else { snapTo(0); setSwiped(false); }
+  const openSwipe = () => {
+    snapTo(-SNAP_DISTANCE);
+    setSwiped(true);
+    // Tell sibling rows to close themselves so only one swipe stays open at a time.
+    window.dispatchEvent(new CustomEvent('novira-row-swiped', { detail: { id: tx.id } }));
   };
 
   const closeSwipe = () => { snapTo(0); setSwiped(false); };
+
+  const handleDragEnd = (_: unknown, info: { offset: { x: number } }) => {
+    if (!canEdit) return;
+    if (info.offset.x < -SWIPE_THRESHOLD) openSwipe();
+    else closeSwipe();
+  };
+
+  // When another row opens its swipe panel, close ours.
+  useEffect(() => {
+    const onOtherSwiped = (e: Event) => {
+      const detail = (e as CustomEvent<{ id: string }>).detail;
+      if (!detail || detail.id === tx.id) return;
+      if (swiped) closeSwipe();
+    };
+    window.addEventListener('novira-row-swiped', onOtherSwiped);
+    return () => window.removeEventListener('novira-row-swiped', onOtherSwiped);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tx.id, swiped]);
 
   const paidByLabel = tx.user_id === userId ? 'You' : (tx.profile?.full_name?.split(' ')[0] ?? 'Other');
   const isPending = !!tx._pending;
