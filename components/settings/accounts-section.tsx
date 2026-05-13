@@ -150,17 +150,24 @@ export function AccountsSection({ defaultCurrency, formatCurrency }: Props) {
 
     const openNew = () => setEditing(emptyDraft(defaultCurrency));
     const openEdit = (a: Account) => {
+        // For credit cards, the canonical sign is negative-for-debt so the
+        // balance math (opening + activity) works the same as every other
+        // account type. The form labels it "Starting debt" and the user enters
+        // a positive number — flip the sign across the boundary so neither
+        // side has to think about it.
+        const isCard = a.type === 'credit_card';
+        const flipSign = (v: number) => isCard ? -v : v;
         const extras: Record<string, string> = {};
         const map = a.opening_balances ?? {};
         for (const [curr, amt] of Object.entries(map)) {
-            if (curr !== a.currency) extras[curr] = String(amt);
+            if (curr !== a.currency) extras[curr] = String(flipSign(amt));
         }
         setEditing({
             id: a.id,
             name: a.name,
             type: a.type,
             currency: a.currency,
-            opening_balance: String(a.opening_balance),
+            opening_balance: String(flipSign(a.opening_balance)),
             opening_extras: extras,
             credit_limit: a.credit_limit !== null ? String(a.credit_limit) : '',
             color: a.color || TYPE_DEFAULT_COLORS[a.type],
@@ -174,11 +181,17 @@ export function AccountsSection({ defaultCurrency, formatCurrency }: Props) {
             toast.error('Name is required');
             return;
         }
-        const opening = parseFloat(editing.opening_balance || '0');
-        if (Number.isNaN(opening)) {
+        const openingInput = parseFloat(editing.opening_balance || '0');
+        if (Number.isNaN(openingInput)) {
             toast.error('Opening balance must be a number');
             return;
         }
+        // Credit cards: form takes "Starting debt" as a positive number; we
+        // store as negative so the balance formula (opening + activity)
+        // matches every other account type without per-type casing.
+        const isCardForm = editing.type === 'credit_card';
+        const flipSign = (v: number) => isCardForm ? -v : v;
+        const opening = flipSign(openingInput);
         // Build the per-currency opening map (default + extras).
         const openingMap: Record<string, number> = {};
         if (opening !== 0) openingMap[editing.currency] = opening;
@@ -189,7 +202,7 @@ export function AccountsSection({ defaultCurrency, formatCurrency }: Props) {
                 toast.error(`${curr} opening balance must be a number`);
                 return;
             }
-            if (parsed !== 0) openingMap[curr] = parsed;
+            if (parsed !== 0) openingMap[curr] = flipSign(parsed);
         }
         let creditLimit: number | null = null;
         if (editing.type === 'credit_card' && editing.credit_limit.trim()) {
@@ -296,13 +309,20 @@ export function AccountsSection({ defaultCurrency, formatCurrency }: Props) {
 
                     // Primary label per type:
                     //   credit_card: "₹X owed" / "₹Y available"
-                    //   digital_wallet: per-currency breakdown (rendered separately)
+                    //   digital_wallet (single currency): balance in that currency
+                    //   digital_wallet (multi-currency): rendered separately below
                     //   everything else: "₹X spent"
                     let primaryLabel: string | null = null;
                     if (isCard && computedBalance !== undefined) {
                         primaryLabel = computedBalance >= 0
                             ? `${formatCurrency(computedBalance)} available`
                             : `${formatCurrency(-computedBalance)} owed`;
+                    } else if (isWallet && breakdown.length === 1) {
+                        const only = breakdown[0];
+                        primaryLabel = formatCurrency(only.amount, only.currency);
+                    } else if (isWallet && breakdown.length === 0) {
+                        // No activity / no opening yet — surface zero in account currency.
+                        primaryLabel = `${formatCurrency(0, a.currency)} balance`;
                     } else if (!isWallet && spent[a.id] !== undefined) {
                         primaryLabel = `${formatCurrency(spent[a.id])} spent`;
                     }
