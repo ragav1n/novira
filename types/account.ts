@@ -16,6 +16,12 @@ export type Account = {
     type: AccountType;
     currency: string;
     opening_balance: number;
+    /**
+     * Per-currency opening balances. Keys are currency codes (e.g. "EUR"),
+     * values are numbers. Empty/missing means the legacy single-currency
+     * model — fall back to {[account.currency]: opening_balance}.
+     */
+    opening_balances: Record<string, number>;
     credit_limit: number | null;
     color: string;
     icon: string;

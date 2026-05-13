@@ -131,12 +131,21 @@ export function AccountsProvider({ children }: { children: React.ReactNode }) {
 
     const createAccount = useCallback(async (data: Partial<Account> & { name: string; type: AccountType; currency: string }) => {
         if (!userId) return null;
+        // Keep opening_balance (default currency) in sync with the map so
+        // back-compat readers see the same number.
+        const map = data.opening_balances ?? {};
+        const defaultOpening = data.opening_balance ?? map[data.currency] ?? 0;
+        const finalMap: Record<string, number> = { ...map };
+        if (defaultOpening !== 0 || Object.keys(finalMap).length === 0) {
+            finalMap[data.currency] = defaultOpening;
+        }
         const payload = {
             user_id: userId,
             name: data.name,
             type: data.type,
             currency: data.currency,
-            opening_balance: data.opening_balance ?? 0,
+            opening_balance: defaultOpening,
+            opening_balances: finalMap,
             credit_limit: data.type === 'credit_card' ? (data.credit_limit ?? null) : null,
             color: data.color ?? '#8A2BE2',
             icon: data.icon ?? 'wallet',
@@ -163,15 +172,33 @@ export function AccountsProvider({ children }: { children: React.ReactNode }) {
     }, [userId]);
 
     const updateAccount = useCallback(async (id: string, patch: Partial<Account>) => {
+        // If either opening_balance or opening_balances is in the patch, keep
+        // the default-currency entry consistent across both fields.
+        const finalPatch: Partial<Account> = { ...patch };
+        if (patch.opening_balances || patch.opening_balance !== undefined) {
+            const existing = accounts.find(a => a.id === id);
+            const currency = patch.currency ?? existing?.currency;
+            const map = patch.opening_balances ?? existing?.opening_balances ?? {};
+            const merged: Record<string, number> = { ...map };
+            if (currency && patch.opening_balance !== undefined) {
+                merged[currency] = patch.opening_balance;
+            } else if (currency && merged[currency] === undefined && existing?.opening_balance !== undefined) {
+                merged[currency] = existing.opening_balance;
+            }
+            finalPatch.opening_balances = merged;
+            if (currency && finalPatch.opening_balance === undefined) {
+                finalPatch.opening_balance = merged[currency] ?? 0;
+            }
+        }
         const { data, error } = await supabase
             .from('accounts')
-            .update(patch)
+            .update(finalPatch)
             .eq('id', id)
             .select()
             .single();
         if (error) throw error;
         setAccounts(prev => prev.map(a => a.id === id ? (data as Account) : a));
-    }, []);
+    }, [accounts]);
 
     const archiveAccount = useCallback(async (id: string, archive: boolean) => {
         const { data, error } = await supabase

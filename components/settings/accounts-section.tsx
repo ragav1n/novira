@@ -56,6 +56,11 @@ type DraftAccount = {
     type: AccountType;
     currency: string;
     opening_balance: string;
+    /**
+     * Extra openings keyed by currency (excludes the default-currency row,
+     * which lives in opening_balance). For forex / multi-currency wallets.
+     */
+    opening_extras: Record<string, string>;
     credit_limit: string;
     color: string;
     is_primary: boolean;
@@ -66,6 +71,7 @@ const emptyDraft = (defaultCurrency: string): DraftAccount => ({
     type: 'cash',
     currency: defaultCurrency,
     opening_balance: '0',
+    opening_extras: {},
     credit_limit: '',
     color: TYPE_DEFAULT_COLORS.cash,
     is_primary: false,
@@ -133,16 +139,24 @@ export function AccountsSection({ defaultCurrency, formatCurrency }: Props) {
     }, [fetchBalances]);
 
     const openNew = () => setEditing(emptyDraft(defaultCurrency));
-    const openEdit = (a: Account) => setEditing({
-        id: a.id,
-        name: a.name,
-        type: a.type,
-        currency: a.currency,
-        opening_balance: String(a.opening_balance),
-        credit_limit: a.credit_limit !== null ? String(a.credit_limit) : '',
-        color: a.color || TYPE_DEFAULT_COLORS[a.type],
-        is_primary: a.is_primary,
-    });
+    const openEdit = (a: Account) => {
+        const extras: Record<string, string> = {};
+        const map = a.opening_balances ?? {};
+        for (const [curr, amt] of Object.entries(map)) {
+            if (curr !== a.currency) extras[curr] = String(amt);
+        }
+        setEditing({
+            id: a.id,
+            name: a.name,
+            type: a.type,
+            currency: a.currency,
+            opening_balance: String(a.opening_balance),
+            opening_extras: extras,
+            credit_limit: a.credit_limit !== null ? String(a.credit_limit) : '',
+            color: a.color || TYPE_DEFAULT_COLORS[a.type],
+            is_primary: a.is_primary,
+        });
+    };
 
     const handleSave = async () => {
         if (!editing) return;
@@ -154,6 +168,18 @@ export function AccountsSection({ defaultCurrency, formatCurrency }: Props) {
         if (Number.isNaN(opening)) {
             toast.error('Opening balance must be a number');
             return;
+        }
+        // Build the per-currency opening map (default + extras).
+        const openingMap: Record<string, number> = {};
+        if (opening !== 0) openingMap[editing.currency] = opening;
+        for (const [curr, str] of Object.entries(editing.opening_extras)) {
+            if (!str.trim()) continue;
+            const parsed = parseFloat(str);
+            if (Number.isNaN(parsed)) {
+                toast.error(`${curr} opening balance must be a number`);
+                return;
+            }
+            if (parsed !== 0) openingMap[curr] = parsed;
         }
         let creditLimit: number | null = null;
         if (editing.type === 'credit_card' && editing.credit_limit.trim()) {
@@ -172,6 +198,7 @@ export function AccountsSection({ defaultCurrency, formatCurrency }: Props) {
                     type: editing.type,
                     currency: editing.currency,
                     opening_balance: opening,
+                    opening_balances: openingMap,
                     credit_limit: creditLimit,
                     color: editing.color,
                 });
@@ -183,6 +210,7 @@ export function AccountsSection({ defaultCurrency, formatCurrency }: Props) {
                     type: editing.type,
                     currency: editing.currency,
                     opening_balance: opening,
+                    opening_balances: openingMap,
                     credit_limit: creditLimit,
                     color: editing.color,
                     is_primary: editing.is_primary,
@@ -256,18 +284,18 @@ export function AccountsSection({ defaultCurrency, formatCurrency }: Props) {
                     // unset opening balance. Surface a one-line nudge.
                     const showOpeningHint = !isCard && computed !== undefined && computed < 0 && a.opening_balance === 0;
                     // Per-currency breakdown for forex / multi-currency wallets.
-                    // Include the account's default-currency line via opening_balance,
-                    // and surface every other currency the account has touched.
+                    // Use opening_balances map when populated; fall back to the
+                    // legacy single-currency opening_balance for accounts that
+                    // pre-date the per-currency feature.
                     const accountNative = perCurrency[a.id] ?? {};
+                    const openings: Record<string, number> = (a.opening_balances && Object.keys(a.opening_balances).length > 0)
+                        ? a.opening_balances
+                        : (Math.abs(a.opening_balance) >= 0.005 ? { [a.currency]: a.opening_balance } : {});
+                    const allCurrencies = new Set<string>([...Object.keys(openings), ...Object.keys(accountNative)]);
                     const breakdown: { currency: string; amount: number }[] = [];
-                    const seen = new Set<string>();
-                    for (const [curr, amt] of Object.entries(accountNative)) {
-                        const total = (curr === a.currency ? a.opening_balance : 0) + amt;
+                    for (const curr of allCurrencies) {
+                        const total = (openings[curr] ?? 0) + (accountNative[curr] ?? 0);
                         if (Math.abs(total) >= 0.005) breakdown.push({ currency: curr, amount: total });
-                        seen.add(curr);
-                    }
-                    if (!seen.has(a.currency) && Math.abs(a.opening_balance) >= 0.005) {
-                        breakdown.push({ currency: a.currency, amount: a.opening_balance });
                     }
                     const isMultiCurrency = breakdown.length > 1;
                     return (
@@ -494,7 +522,7 @@ export function AccountsSection({ defaultCurrency, formatCurrency }: Props) {
 
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
-                                    <Label htmlFor="account-opening" className="text-xs">Opening balance</Label>
+                                    <Label htmlFor="account-opening" className="text-xs">Opening ({editing.currency})</Label>
                                     <Input
                                         id="account-opening"
                                         type="text"
@@ -520,6 +548,63 @@ export function AccountsSection({ defaultCurrency, formatCurrency }: Props) {
                                     </div>
                                 )}
                             </div>
+
+                            {/* Per-currency openings for forex / multi-currency wallets */}
+                            {Object.keys(editing.opening_extras).length > 0 && (
+                                <div className="space-y-2 rounded-xl border border-white/5 bg-secondary/5 p-3">
+                                    <p className="text-[10.5px] uppercase tracking-wider text-muted-foreground/70 font-bold">Other-currency openings</p>
+                                    {Object.entries(editing.opening_extras).map(([curr, amt]) => (
+                                        <div key={curr} className="grid grid-cols-[80px_1fr_auto] gap-2 items-center">
+                                            <div className="text-[12px] font-semibold tabular-nums px-2 py-1 rounded bg-secondary/30 text-center">{curr}</div>
+                                            <Input
+                                                type="text"
+                                                inputMode="decimal"
+                                                value={amt}
+                                                onChange={(e) => setEditing({
+                                                    ...editing,
+                                                    opening_extras: { ...editing.opening_extras, [curr]: e.target.value },
+                                                })}
+                                                placeholder="0.00"
+                                                className="h-8 tabular-nums"
+                                            />
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                                                onClick={() => {
+                                                    const next = { ...editing.opening_extras };
+                                                    delete next[curr];
+                                                    setEditing({ ...editing, opening_extras: next });
+                                                }}
+                                                aria-label={`Remove ${curr} opening`}
+                                            >
+                                                <Trash2 className="w-3.5 h-3.5" />
+                                            </Button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                            <details className="text-[11px]">
+                                <summary className="cursor-pointer text-muted-foreground/70 hover:text-muted-foreground">
+                                    + Add another currency opening
+                                </summary>
+                                <div className="flex gap-2 mt-2">
+                                    <div className="flex-1">
+                                        <CurrencyDropdown
+                                            value={editing.currency}
+                                            onValueChange={(c) => {
+                                                if (c === editing.currency) return;
+                                                if (editing.opening_extras[c] !== undefined) return;
+                                                setEditing({
+                                                    ...editing,
+                                                    opening_extras: { ...editing.opening_extras, [c]: '0' },
+                                                });
+                                            }}
+                                        />
+                                    </div>
+                                </div>
+                                <p className="text-[10px] text-muted-foreground/60 mt-1">Pick a currency to add a row above.</p>
+                            </details>
 
                             <div>
                                 <Label className="text-xs">Color</Label>
