@@ -27,6 +27,9 @@ export type Transaction = {
     tags?: string[];
     notes?: string;
     receipt_path?: string | null;
+    account_id?: string | null;
+    is_transfer?: boolean;
+    transfer_pair_id?: string | null;
     splits?: {
         user_id: string;
         amount: number;

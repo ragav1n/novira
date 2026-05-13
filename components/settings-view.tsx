@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { ChevronLeft, User, Shield, ChevronRight, LogOut, Trash2, Wrench, RefreshCcw, Download, SlidersHorizontal, Bell, Globe, Zap, LayoutDashboard, BookOpen, Sparkles } from 'lucide-react';
+import { ChevronLeft, User, Shield, ChevronRight, LogOut, Trash2, Wrench, RefreshCcw, Download, SlidersHorizontal, Bell, Globe, Zap, LayoutDashboard, BookOpen, Sparkles, Wallet } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -30,6 +30,7 @@ import type { RecurringTemplate } from '@/types/transaction';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { RecurringExpensesSection } from '@/components/settings/recurring-expenses-section';
 import { CategorizationRulesSection } from '@/components/settings/categorization-rules-section';
+import { AccountsSection } from '@/components/settings/accounts-section';
 import { useCategorizationRules } from '@/hooks/useCategorizationRules';
 import { DataManagementSection } from '@/components/settings/data-management-section';
 import { DashboardLayoutSection } from '@/components/settings/dashboard-layout-section';
@@ -593,6 +594,21 @@ export function SettingsView() {
                                 loading={loadingTemplates}
                                 formatCurrency={formatCurrency}
                                 onDelete={deleteRecurringTemplate}
+                            />
+                        </AccordionContent>
+                    </AccordionItem>
+
+                    <AccordionItem value="accounts" className="border-b-0 px-3">
+                        <AccordionTrigger className="text-sm font-semibold text-muted-foreground hover:no-underline">
+                            <div className="flex items-center gap-2">
+                                <Wallet className="w-4 h-4" />
+                                <span>Accounts</span>
+                            </div>
+                        </AccordionTrigger>
+                        <AccordionContent>
+                            <AccountsSection
+                                defaultCurrency={currency}
+                                formatCurrency={formatCurrency}
                             />
                         </AccordionContent>
                     </AccordionItem>
