@@ -6,6 +6,7 @@ import { BulkActionBar } from '@/components/bulk-action-bar';
 import { CATEGORY_COLORS } from '@/lib/categories';
 import type { Transaction } from '@/types/transaction';
 import type { Bucket } from '@/components/providers/buckets-provider';
+import { useAccounts } from '@/components/providers/accounts-provider';
 
 interface TransactionListProps {
   transactions: Transaction[];
@@ -27,7 +28,7 @@ interface TransactionListProps {
   onLoadMore?: () => void;
   onViewReceipt?: (tx: Transaction) => void;
   onBulkDelete?: (txs: Transaction[]) => Promise<{ count: number }>;
-  onBulkUpdate?: (txs: Transaction[], patch: { category?: string; bucket_id?: string | null }) => Promise<{ count: number }>;
+  onBulkUpdate?: (txs: Transaction[], patch: { category?: string; bucket_id?: string | null; account_id?: string | null }) => Promise<{ count: number }>;
 }
 
 export const TransactionList = React.memo(function TransactionList({
@@ -39,6 +40,7 @@ export const TransactionList = React.memo(function TransactionList({
   onBulkDelete, onBulkUpdate,
 }: TransactionListProps) {
   const router = useRouter();
+  const { accounts: allAccounts } = useAccounts();
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
@@ -94,6 +96,16 @@ export const TransactionList = React.memo(function TransactionList({
     return first;
   }, [selectedTxs]);
 
+  const sharedAccountId = useMemo<string | null | undefined>(() => {
+    if (selectedTxs.length === 0) return undefined;
+    const first = selectedTxs[0].account_id ?? null;
+    for (let i = 1; i < selectedTxs.length; i++) {
+      const next = selectedTxs[i].account_id ?? null;
+      if (next !== first) return undefined;
+    }
+    return first;
+  }, [selectedTxs]);
+
   const handleBulkDeleteClick = useCallback(async () => {
     if (!onBulkDelete || selectedTxs.length === 0) return;
     const result = await onBulkDelete(selectedTxs);
@@ -109,6 +121,12 @@ export const TransactionList = React.memo(function TransactionList({
   const handleMoveToBucket = useCallback(async (bucketId: string | null) => {
     if (!onBulkUpdate || selectedTxs.length === 0) return;
     const result = await onBulkUpdate(selectedTxs, { bucket_id: bucketId });
+    if (result.count > 0) exitSelect();
+  }, [onBulkUpdate, selectedTxs, exitSelect]);
+
+  const handleMoveToAccount = useCallback(async (accountId: string) => {
+    if (!onBulkUpdate || selectedTxs.length === 0) return;
+    const result = await onBulkUpdate(selectedTxs, { account_id: accountId });
     if (result.count > 0) exitSelect();
   }, [onBulkUpdate, selectedTxs, exitSelect]);
 
@@ -221,12 +239,15 @@ export const TransactionList = React.memo(function TransactionList({
         <BulkActionBar
           count={selectedIds.size}
           buckets={buckets}
+          accounts={allAccounts.filter(a => !a.archived_at)}
           onCancel={exitSelect}
           onDelete={handleBulkDeleteClick}
           onRecategorize={handleRecategorize}
           onMoveToBucket={handleMoveToBucket}
+          onMoveToAccount={handleMoveToAccount}
           currentBucketId={sharedBucketId}
           currentCategory={sharedCategory}
+          currentAccountId={sharedAccountId ?? undefined}
         />
       )}
     </div>

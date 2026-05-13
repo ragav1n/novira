@@ -662,7 +662,7 @@ export function useDashboardData(
 
     const handleBulkUpdate = async (
         txs: Transaction[],
-        patch: { category?: string; bucket_id?: string | null; exclude_from_allowance?: boolean },
+        patch: { category?: string; bucket_id?: string | null; account_id?: string | null; exclude_from_allowance?: boolean },
     ): Promise<{ count: number }> => {
         const eligible = txs.filter(t => !t._pending && !t._failed);
         if (eligible.length === 0) return { count: 0 };
@@ -678,6 +678,7 @@ export function useDashboardData(
             ...(patch.category !== undefined ? { category: patch.category } : {}),
             ...(patch.exclude_from_allowance !== undefined ? { exclude_from_allowance: patch.exclude_from_allowance } : {}),
             ...(patch.bucket_id !== undefined ? { bucket_id: patch.bucket_id ?? undefined } : {}),
+            ...(patch.account_id !== undefined ? { account_id: patch.account_id ?? null } : {}),
         };
         setServerTransactions(prev => prev.map(t => idSet.has(t.id) ? { ...t, ...localPatch } : t));
 

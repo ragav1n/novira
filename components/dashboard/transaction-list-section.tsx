@@ -41,7 +41,7 @@ interface TransactionListSectionProps {
     onClearCategory?: () => void;
     onViewReceipt?: (tx: Transaction) => void;
     onBulkDelete?: (txs: Transaction[]) => Promise<{ count: number }>;
-    onBulkUpdate?: (txs: Transaction[], patch: { category?: string; bucket_id?: string | null }) => Promise<{ count: number }>;
+    onBulkUpdate?: (txs: Transaction[], patch: { category?: string; bucket_id?: string | null; account_id?: string | null }) => Promise<{ count: number }>;
 }
 
 export function TransactionListSection({

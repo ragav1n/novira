@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Trash2, FolderInput, Tag as TagIcon, Check } from 'lucide-react';
+import { Trash2, FolderInput, Tag as TagIcon, Check, Wallet, Landmark, PiggyBank, CreditCard as CardIcon, Smartphone, CircleDollarSign } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
     AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -12,6 +12,17 @@ import {
 } from '@/components/ui/dialog';
 import { CATEGORIES as SYSTEM_CATEGORIES, CATEGORY_COLORS, getIconForCategory } from '@/lib/categories';
 import type { Bucket } from '@/components/providers/buckets-provider';
+import type { Account, AccountType } from '@/types/account';
+import { ACCOUNT_TYPE_LABELS } from '@/types/account';
+
+const ACCOUNT_TYPE_ICONS_BULK: Record<AccountType, React.ComponentType<{ className?: string; style?: React.CSSProperties }>> = {
+    cash: Wallet,
+    checking: Landmark,
+    savings: PiggyBank,
+    credit_card: CardIcon,
+    digital_wallet: Smartphone,
+    other: CircleDollarSign,
+};
 
 interface BulkActionBarProps {
     count: number;
@@ -19,7 +30,9 @@ interface BulkActionBarProps {
     onDelete: () => Promise<void> | void;
     onRecategorize: (categoryId: string) => Promise<void> | void;
     onMoveToBucket: (bucketId: string | null) => Promise<void> | void;
+    onMoveToAccount?: (accountId: string) => Promise<void> | void;
     buckets: Bucket[];
+    accounts?: Account[];
     /**
      * Current bucket id shared by all selected transactions, or null if they
      * are all unbucketed. `undefined` means a mixed set — no highlight.
@@ -27,17 +40,22 @@ interface BulkActionBarProps {
     currentBucketId?: string | null | undefined;
     /** Same idea for category — undefined means "mixed selection". */
     currentCategory?: string | undefined;
+    /** Same idea for account. */
+    currentAccountId?: string | null | undefined;
 }
 
 export function BulkActionBar({
-    count, onCancel, onDelete, onRecategorize, onMoveToBucket, buckets,
-    currentBucketId, currentCategory,
+    count, onCancel, onDelete, onRecategorize, onMoveToBucket, onMoveToAccount, buckets, accounts,
+    currentBucketId, currentCategory, currentAccountId,
 }: BulkActionBarProps) {
     const [confirmDelete, setConfirmDelete] = useState(false);
     const [categoryPickerOpen, setCategoryPickerOpen] = useState(false);
     const [bucketPickerOpen, setBucketPickerOpen] = useState(false);
+    const [accountPickerOpen, setAccountPickerOpen] = useState(false);
 
     const activeBuckets = buckets.filter(b => !b.is_archived);
+    const activeAccounts = (accounts ?? []).filter(a => !a.archived_at);
+    const accountActionAvailable = !!onMoveToAccount && activeAccounts.length > 0;
 
     return (
         <>
@@ -71,9 +89,22 @@ export function BulkActionBar({
                         className="flex-1 h-9 gap-1.5 text-[12px]"
                     >
                         <FolderInput className="w-3.5 h-3.5" />
-                        <span className="hidden sm:inline">Move</span>
+                        <span className="hidden sm:inline">Bucket</span>
                         <span className="sm:hidden">Bkt</span>
                     </Button>
+                    {accountActionAvailable && (
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setAccountPickerOpen(true)}
+                            disabled={count === 0}
+                            className="flex-1 h-9 gap-1.5 text-[12px]"
+                        >
+                            <Wallet className="w-3.5 h-3.5" />
+                            <span className="hidden sm:inline">Account</span>
+                            <span className="sm:hidden">Acct</span>
+                        </Button>
+                    )}
                     <Button
                         variant="ghost"
                         size="sm"
@@ -154,6 +185,59 @@ export function BulkActionBar({
                                         )}
                                     </span>
                                     <span className="text-[12px] font-semibold truncate flex-1">{cat.label}</span>
+                                    {isCurrent && <Check className="w-3.5 h-3.5 text-primary shrink-0" strokeWidth={3} />}
+                                </button>
+                            );
+                        })}
+                    </div>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={accountPickerOpen} onOpenChange={setAccountPickerOpen}>
+                <DialogContent className="max-w-md z-[130]">
+                    <DialogHeader>
+                        <DialogTitle>Move {count} to account</DialogTitle>
+                    </DialogHeader>
+                    {currentAccountId === undefined && count > 0 && (
+                        <p className="px-1 pt-1 text-[11px] text-amber-300/80">
+                            Mixed selection — these transactions are currently on different accounts.
+                        </p>
+                    )}
+                    <div className="space-y-1.5 pt-2 max-h-[60vh] overflow-y-auto">
+                        {activeAccounts.length === 0 && (
+                            <p className="px-3 py-6 text-center text-[12px] text-muted-foreground/60">
+                                No accounts yet. Add one in settings.
+                            </p>
+                        )}
+                        {activeAccounts.map(a => {
+                            const isCurrent = currentAccountId === a.id;
+                            const TypeIcon = ACCOUNT_TYPE_ICONS_BULK[a.type] || CircleDollarSign;
+                            return (
+                                <button
+                                    key={a.id}
+                                    type="button"
+                                    onClick={async () => {
+                                        if (isCurrent) { setAccountPickerOpen(false); return; }
+                                        setAccountPickerOpen(false);
+                                        if (onMoveToAccount) await onMoveToAccount(a.id);
+                                    }}
+                                    aria-current={isCurrent ? 'true' : undefined}
+                                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border text-left transition-colors ${
+                                        isCurrent
+                                            ? 'border-primary/40 bg-primary/10'
+                                            : 'border-white/5 bg-secondary/10 hover:border-white/20 hover:bg-secondary/15'
+                                    }`}
+                                >
+                                    <span
+                                        className="w-7 h-7 rounded-full flex items-center justify-center shrink-0"
+                                        style={{ backgroundColor: `${a.color}22`, border: `1px solid ${a.color}50` }}
+                                    >
+                                        <TypeIcon className="w-3.5 h-3.5" style={{ color: a.color }} />
+                                    </span>
+                                    <div className="min-w-0 flex-1">
+                                        <p className="text-[12px] font-semibold truncate">{a.name}</p>
+                                        <p className="text-[10px] text-muted-foreground/60">{ACCOUNT_TYPE_LABELS[a.type]} · {a.currency}</p>
+                                    </div>
                                     {isCurrent && <Check className="w-3.5 h-3.5 text-primary shrink-0" strokeWidth={3} />}
                                 </button>
                             );
