@@ -5,6 +5,7 @@ import type { Transaction, AuditLog } from '@/types/transaction';
 import type { SyncPayload } from '@/lib/offline-sync-queue';
 import { discardFailedItem, enqueueMutation, getCurrentQueue } from '@/lib/sync-manager';
 import { invalidateTransactionCaches } from '@/lib/sw-cache';
+import { deleteReceipt } from '@/lib/receipt-storage';
 import { reportNetworkError } from '@/lib/network-error-bus';
 import { applyWorkspaceFilter } from '@/lib/workspace-filter';
 import { useTransactionInvalidationListener } from './useTransactionInvalidationListener';
@@ -79,7 +80,7 @@ export function useDashboardData(
     // workspace can't land their results on top of the new one.
     const fetchGenRef = useRef(0);
 
-    const TX_SELECT = 'id, description, amount, category, date, created_at, user_id, group_id, currency, exchange_rate, base_currency, bucket_id, exclude_from_allowance, is_recurring, is_settlement, place_name, place_address, place_lat, place_lng, tags, profile:profiles(full_name, avatar_url), splits(user_id, amount, is_paid)';
+    const TX_SELECT = 'id, description, amount, category, date, created_at, user_id, group_id, currency, exchange_rate, base_currency, bucket_id, exclude_from_allowance, is_recurring, is_settlement, place_name, place_address, place_lat, place_lng, tags, receipt_path, profile:profiles(full_name, avatar_url), splits(user_id, amount, is_paid)';
 
     const loadTransactions = useCallback(async (currentUserId: string, workspaceId: string | null = null, limit = loadLimitRef.current) => {
         const myGen = fetchGenRef.current;
@@ -474,6 +475,15 @@ export function useDashboardData(
 
             if (error) throw error;
             invalidateTransactionCaches();
+
+            // Best-effort: drop the attached receipt from storage. Failure
+            // here doesn't roll the user back — the tx row is already gone
+            // and an orphaned object is invisible to the user.
+            if (tx.receipt_path) {
+                deleteReceipt(tx.receipt_path).catch(err => {
+                    console.error('[useDashboardData] receipt cleanup failed', err);
+                });
+            }
 
             // If recurring, ask if user wants to stop future ones
             if (tx.is_recurring) {

@@ -39,6 +39,7 @@ interface TransactionListSectionProps {
     onLoadMore?: () => void;
     selectedCategory?: string | null;
     onClearCategory?: () => void;
+    onViewReceipt?: (tx: Transaction) => void;
 }
 
 export function TransactionListSection({
@@ -67,7 +68,8 @@ export function TransactionListSection({
     loadingMore,
     onLoadMore,
     selectedCategory = null,
-    onClearCategory
+    onClearCategory,
+    onViewReceipt,
 }: TransactionListSectionProps) {
     const drawerScrollRef = useRef<HTMLDivElement>(null);
     // When filtering by category, also exclude settlements AND bound to the pie's
@@ -160,6 +162,7 @@ export function TransactionListSection({
                                     action: { label: 'Delete', onClick: () => handleDeleteTransaction(tx) }
                                 });
                             }}
+                            onViewReceipt={onViewReceipt ? () => onViewReceipt(tx) : undefined}
                         />
                     );
                 })}
@@ -208,6 +211,7 @@ export function TransactionListSection({
                     hasMore={hasMore}
                     loadingMore={loadingMore}
                     onLoadMore={onLoadMore}
+                    onViewReceipt={onViewReceipt}
                 />
             </DashboardTransactionsDrawer>
         </div>

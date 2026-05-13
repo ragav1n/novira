@@ -26,6 +26,7 @@ export type Transaction = {
     place_lng?: number;
     tags?: string[];
     notes?: string;
+    receipt_path?: string | null;
     splits?: {
         user_id: string;
         amount: number;

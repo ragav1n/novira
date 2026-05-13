@@ -112,6 +112,11 @@ export function useExpenseForm(
     const [suggestedCategory, setSuggestedCategory] = useState<string | null>(null);
     const [suggestedBucket, setSuggestedBucket] = useState<string | null>(null);
 
+    // Receipt attach: held in-memory only (not persisted to sessionStorage — File
+    // objects don't survive JSON.stringify, and sharing a multi-MB blob to the
+    // draft would thrash storage). Cleared on submit/reset.
+    const [receiptFile, setReceiptFile] = useState<File | Blob | null>(null);
+
     // Description autocomplete: top 3 distinct past descriptions matching the prefix,
     // each carrying its full prior context for one-tap prefill.
     type DescriptionSuggestion = {
@@ -445,6 +450,7 @@ export function useExpenseForm(
         setSuggestedBucket(null);
         setDescriptionSuggestions([]);
         setSmartDefaults(null);
+        setReceiptFile(null);
         if (typeof window !== 'undefined') {
             try { sessionStorage.removeItem(draftKey); } catch { /* noop */ }
         }
@@ -479,6 +485,7 @@ export function useExpenseForm(
         suggestedBucket, setSuggestedBucket,
         descriptionSuggestions, setDescriptionSuggestions,
         smartDefaults, setSmartDefaults,
+        receiptFile, setReceiptFile,
         resetForm
     };
 }

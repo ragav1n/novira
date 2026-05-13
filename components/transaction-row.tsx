@@ -3,7 +3,7 @@
 import React, { memo, useState, useEffect, useRef } from 'react';
 import { parseISO } from 'date-fns';
 import { useFormattedDate } from '@/utils/format-date';
-import { History, MoreVertical, Users, RefreshCcw, Ban, MapPin, Pencil, Trash2, Globe, ArrowLeftRight, Cloud, AlertTriangle, StickyNote } from 'lucide-react';
+import { History, MoreVertical, Users, RefreshCcw, Ban, MapPin, Pencil, Trash2, Globe, ArrowLeftRight, Cloud, AlertTriangle, StickyNote, Paperclip } from 'lucide-react';
 import type { Transaction } from '@/types/transaction';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
@@ -28,6 +28,7 @@ interface TransactionRowProps {
   onHistory: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  onViewReceipt?: () => void;
 }
 
 function CategoryIcon({ icon, color }: { icon: React.ReactNode; color: string }) {
@@ -57,6 +58,7 @@ export const TransactionRow = memo(function TransactionRow({
   onHistory,
   onEdit,
   onDelete,
+  onViewReceipt,
 }: TransactionRowProps) {
   const hasSplits = tx.splits && tx.splits.length > 0;
   const isSettlement = tx.is_settlement;
@@ -249,6 +251,17 @@ export const TransactionRow = memo(function TransactionRow({
                   ? <Globe className="shrink-0 w-3 h-3 text-blue-400/60 ml-0.5" aria-label="Online purchase" />
                   : <MapPin className="shrink-0 w-3 h-3 text-emerald-400/50 ml-0.5" aria-label="Has location" />
               )}
+              {/* Receipt indicator — tap to open viewer */}
+              {tx.receipt_path && onViewReceipt && (
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); onViewReceipt(); }}
+                  className="shrink-0 ml-0.5 p-0.5 -m-0.5 rounded text-sky-300/70 hover:text-sky-300 transition-colors"
+                  aria-label="View attached receipt"
+                >
+                  <Paperclip className="w-3 h-3" />
+                </button>
+              )}
               {/* Note indicator — tap to reveal */}
               {tx.notes && tx.notes.trim() && (
                 <Popover>
@@ -311,6 +324,15 @@ export const TransactionRow = memo(function TransactionRow({
                   <History className="w-3.5 h-3.5" />
                   History
                 </DropdownMenuItem>
+                {tx.receipt_path && onViewReceipt && (
+                  <DropdownMenuItem
+                    onClick={(e) => { e.stopPropagation(); onViewReceipt(); }}
+                    className="rounded-lg cursor-pointer gap-2 text-[13px]"
+                  >
+                    <Paperclip className="w-3.5 h-3.5" />
+                    View receipt
+                  </DropdownMenuItem>
+                )}
                 {canEdit && !isSettlement && !hasSplits && (
                   <>
                     <DropdownMenuItem

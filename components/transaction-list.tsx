@@ -24,6 +24,7 @@ interface TransactionListProps {
   hasMore?: boolean;
   loadingMore?: boolean;
   onLoadMore?: () => void;
+  onViewReceipt?: (tx: Transaction) => void;
 }
 
 export const TransactionList = React.memo(function TransactionList({
@@ -31,7 +32,7 @@ export const TransactionList = React.memo(function TransactionList({
   calculateUserShare, getIconForCategory, formatCurrency,
   convertAmount, setEditingTransaction, setIsEditOpen,
   handleDeleteTransaction, getBucketChip, loadAuditLogs,
-  canEditTransaction, hasMore, loadingMore, onLoadMore,
+  canEditTransaction, hasMore, loadingMore, onLoadMore, onViewReceipt,
 }: TransactionListProps) {
   const router = useRouter();
   if (transactions.length === 0) {
@@ -85,6 +86,7 @@ export const TransactionList = React.memo(function TransactionList({
                 setIsEditOpen(true);
               }}
               onDelete={() => handleDeleteTransaction(tx)}
+              onViewReceipt={onViewReceipt ? () => onViewReceipt(tx) : undefined}
             />
           </div>
         );

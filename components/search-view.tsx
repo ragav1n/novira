@@ -9,6 +9,8 @@ import {
 } from "lucide-react";
 import { CATEGORY_COLORS, getIconForCategory, getCategoryLabel, CATEGORIES as SYSTEM_CATEGORIES } from '@/lib/categories';
 import { TransactionRow } from '@/components/transaction-row';
+import { ReceiptViewerDialog } from '@/components/receipt-viewer-dialog';
+import { useReceiptViewer } from '@/hooks/useReceiptViewer';
 import { Transaction } from '@/types/transaction';
 import { enqueueMutation } from '@/lib/sync-manager';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -147,6 +149,7 @@ export function SearchView() {
     const { formatCurrency, convertAmount, currency, activeWorkspaceId, userId } = useUserPreferences();
     const { buckets } = useBucketsList();
     const { theme: themeConfig } = useWorkspaceTheme();
+    const receiptViewer = useReceiptViewer();
     // Bumped on each workspace/user change so in-flight fetches from a previous
     // workspace can't land their results on top of the new one.
     const fetchGenRef = useRef(0);
@@ -1205,6 +1208,7 @@ export function SearchView() {
                                                 onHistory={() => toast('History is available from the dashboard')}
                                                 onEdit={() => {}}
                                                 onDelete={() => {}}
+                                                onViewReceipt={tx.receipt_path ? () => receiptViewer.view(tx.receipt_path) : undefined}
                                             />
                                         );
                                         if (!bulkMode) {
@@ -1347,6 +1351,11 @@ export function SearchView() {
                     </div>
                 </SheetContent>
             </Sheet>
+            <ReceiptViewerDialog
+                open={receiptViewer.open}
+                onOpenChange={receiptViewer.setOpen}
+                receiptPath={receiptViewer.path}
+            />
         </motion.div>
     );
 }

@@ -4,6 +4,8 @@ import { toast } from '@/utils/haptics';
 import { Haptics, NotificationType } from '@capacitor/haptics';
 import { TransactionService } from '@/lib/services/transaction-service';
 import { invalidateTransactionCaches } from '@/lib/sw-cache';
+import { uploadReceipt, validateReceiptFile } from '@/lib/receipt-storage';
+import { supabase } from '@/lib/supabase';
 import type { AppRouterInstance } from 'next/dist/shared/lib/app-router-context.shared-runtime';
 import type { Transaction, TransactionRecord, SplitRecord, RecurringRecord } from '@/types/transaction';
 
@@ -39,6 +41,8 @@ interface ExpenseSubmissionParams {
     isRecurring: boolean;
     frequency: 'daily' | 'weekly' | 'monthly' | 'yearly';
     isIncome?: boolean;
+    // Receipt attach (optional). Uploaded after the tx row is created.
+    receiptFile?: File | Blob | null;
 }
 
 export type ExpenseFormErrors = {
@@ -191,10 +195,17 @@ export function useExpenseSubmission() {
             placeName, placeAddress, placeLat, placeLng,
             paymentMethod, notes, tags, isSplitEnabled, selectedFriendIds,
             splitMode, customAmounts, isRecurring, frequency,
-            isIncome = false,
+            isIncome = false, receiptFile,
         } = params;
 
         if (!validateExpenseForm(amount, description, date)) return;
+        if (receiptFile) {
+            const v = validateReceiptFile(receiptFile);
+            if (!v.valid) {
+                toast.error(v.reason);
+                return;
+            }
+        }
 
         const idempotencyKey = crypto.randomUUID();
         setLoading(true);
@@ -267,6 +278,38 @@ export function useExpenseSubmission() {
                     toast.success('Expense added successfully!');
                 }
                 
+                // Receipt upload happens before resetForm so we can read `receiptFile`,
+                // and only on the online path — the offline queue doesn't yet know how
+                // to upload to storage and we'd lose the file across a refresh anyway.
+                let uploadedReceiptPath: string | null = null;
+                if (result.offline && receiptFile) {
+                    toast("Receipt can't be saved offline — attach again when online.", {
+                        icon: '⚠️',
+                        style: { background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.2)', color: '#FBBF24' }
+                    });
+                }
+                if (!result.offline && receiptFile) {
+                    const typedResultEarly = result as { data?: { id?: string }; idempotent?: boolean };
+                    const createdId = typedResultEarly.data?.id;
+                    if (createdId && !typedResultEarly.idempotent) {
+                        try {
+                            const { path } = await uploadReceipt(userId, createdId, receiptFile);
+                            const { error: updErr } = await supabase
+                                .from('transactions')
+                                .update({ receipt_path: path })
+                                .eq('id', createdId);
+                            if (updErr) throw updErr;
+                            uploadedReceiptPath = path;
+                        } catch (uploadErr) {
+                            console.error('[useExpenseSubmission] receipt upload failed', uploadErr);
+                            toast('Expense saved, but receipt upload failed. You can re-attach later.', {
+                                icon: '⚠️',
+                                style: { background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.2)', color: '#FBBF24' }
+                            });
+                        }
+                    }
+                }
+
                 resetForm();
                 if (!result.offline) {
                     invalidateTransactionCaches();
@@ -301,6 +344,7 @@ export function useExpenseSubmission() {
                             place_lng: transactionRecord.place_lng ?? undefined,
                             tags: transactionRecord.tags,
                             group_id: transactionRecord.group_id,
+                            receipt_path: uploadedReceiptPath ?? undefined,
                             splits: (splitResult.records ?? []).map(s => ({ user_id: s.user_id, amount: s.amount })),
                             profile: userProfile,
                         };

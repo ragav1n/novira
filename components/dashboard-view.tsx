@@ -19,6 +19,8 @@ import { TransactionListSection } from './dashboard/transaction-list-section';
 import { DashboardDialogs } from './dashboard/dashboard-dialogs';
 import { DashboardSkeleton } from './dashboard/dashboard-skeleton';
 import { AddFriendDialog } from './groups/add-friend-dialog';
+import { ReceiptViewerDialog } from './receipt-viewer-dialog';
+import { useReceiptViewer } from '@/hooks/useReceiptViewer';
 
 
 
@@ -83,6 +85,7 @@ export function DashboardView() {
     const [isBudgetEditOpen, setIsBudgetEditOpen] = useState(false);
     const [tempBudgetInput, setTempBudgetInput] = useState("");
     const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+    const receiptViewer = useReceiptViewer();
 
     // Reset category filter when the user switches focus or workspace —
     // a stale "Groceries" filter shouldn't carry across buckets/workspaces.
@@ -331,8 +334,14 @@ export function DashboardView() {
                     onLoadMore={loadMore}
                     selectedCategory={selectedCategory}
                     onClearCategory={() => setSelectedCategory(null)}
+                    onViewReceipt={(tx) => receiptViewer.view(tx.receipt_path)}
                 />
                 )}
+                <ReceiptViewerDialog
+                    open={receiptViewer.open}
+                    onOpenChange={receiptViewer.setOpen}
+                    receiptPath={receiptViewer.path}
+                />
 
                 <DashboardDialogs
                     userId={userId}
