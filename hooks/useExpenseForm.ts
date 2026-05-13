@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
+import { applyRules } from '@/lib/categorization-rules';
+import { useCategorizationRules } from '@/hooks/useCategorizationRules';
 
 // Persist a subset of the form to sessionStorage so an accidental refresh or
 // background-tab eviction doesn't lose what the user typed. Workspace + user
@@ -116,6 +118,16 @@ export function useExpenseForm(
     // objects don't survive JSON.stringify, and sharing a multi-MB blob to the
     // draft would thrash storage). Cleared on submit/reset.
     const [receiptFile, setReceiptFile] = useState<File | Blob | null>(null);
+
+    // Auto-categorization rules: applied on description blur and on place pick.
+    // Rules only fill fields that are still at their initial-default value, so a
+    // user's manual category/bucket choice can't be stomped.
+    const { rules: categorizationRules } = useCategorizationRules(userId);
+    const ruleDefaultsRef = useRef({
+        category: initialDraft.selectedCategory ?? quickAddDefaults.category ?? 'food',
+        bucketId: (initialDraft.selectedBucketId ?? quickAddDefaults.bucketId ?? null) as string | null,
+        excludeFromAllowance: initialDraft.excludeFromAllowance ?? false,
+    });
 
     // Description autocomplete: top 3 distinct past descriptions matching the prefix,
     // each carrying its full prior context for one-tap prefill.
@@ -422,6 +434,43 @@ export function useExpenseForm(
         }, 250);
         return () => { cancelled = true; clearTimeout(timer); };
     }, [userId, placeName, selectedCategory, paymentMethod, selectedBucketId]);
+
+    // Effect-internal refs so the rule effect doesn't re-fire on every output
+    // field change. We need to *read* the latest values inside the timer
+    // callback, not depend on them.
+    const selectedCategoryRef = useRef(selectedCategory);
+    selectedCategoryRef.current = selectedCategory;
+    const selectedBucketIdRef = useRef(selectedBucketId);
+    selectedBucketIdRef.current = selectedBucketId;
+    const excludeFromAllowanceRef = useRef(excludeFromAllowance);
+    excludeFromAllowanceRef.current = excludeFromAllowance;
+
+    useEffect(() => {
+        if (categorizationRules.length === 0) return;
+        if (!description.trim() && !placeName) return;
+        const timer = setTimeout(() => {
+            const out = applyRules(
+                { description, place_name: placeName },
+                categorizationRules,
+            );
+            const defaults = ruleDefaultsRef.current;
+            // Only fill if the field is still at its initial default — this
+            // is the simple guard against stomping the user's manual choice.
+            if (out.category && selectedCategoryRef.current === defaults.category) {
+                setSelectedCategory(out.category);
+            }
+            if (out.bucket_id && selectedBucketIdRef.current === defaults.bucketId) {
+                setSelectedBucketId(out.bucket_id);
+            }
+            if (
+                out.exclude_from_allowance !== undefined
+                && excludeFromAllowanceRef.current === defaults.excludeFromAllowance
+            ) {
+                setExcludeFromAllowance(out.exclude_from_allowance);
+            }
+        }, 400);
+        return () => clearTimeout(timer);
+    }, [description, placeName, categorizationRules]);
 
     const resetForm = () => {
         setAmount('');

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { ChevronLeft, User, Shield, ChevronRight, LogOut, Trash2, Wrench, RefreshCcw, Download, SlidersHorizontal, Bell, Globe, Zap, LayoutDashboard, BookOpen } from 'lucide-react';
+import { ChevronLeft, User, Shield, ChevronRight, LogOut, Trash2, Wrench, RefreshCcw, Download, SlidersHorizontal, Bell, Globe, Zap, LayoutDashboard, BookOpen, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -29,6 +29,8 @@ import { useTransactionInvalidationListener } from '@/hooks/useTransactionInvali
 import type { RecurringTemplate } from '@/types/transaction';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { RecurringExpensesSection } from '@/components/settings/recurring-expenses-section';
+import { CategorizationRulesSection } from '@/components/settings/categorization-rules-section';
+import { useCategorizationRules } from '@/hooks/useCategorizationRules';
 import { DataManagementSection } from '@/components/settings/data-management-section';
 import { DashboardLayoutSection } from '@/components/settings/dashboard-layout-section';
 import { PreferencesSection } from '@/components/settings/preferences-section';
@@ -97,6 +99,7 @@ export function SettingsView() {
     const { buckets } = useBucketsList();
     const { groups } = useGroups();
     const push = usePushNotifications();
+    const { rules: categorizationRules, loading: loadingRules } = useCategorizationRules(userId);
 
     // Local state for budget input to allow typing before saving
     const [localBudget, setLocalBudget] = useState(monthlyBudget.toString());
@@ -590,6 +593,23 @@ export function SettingsView() {
                                 loading={loadingTemplates}
                                 formatCurrency={formatCurrency}
                                 onDelete={deleteRecurringTemplate}
+                            />
+                        </AccordionContent>
+                    </AccordionItem>
+
+                    <AccordionItem value="auto-categorization" className="border-b-0 px-3">
+                        <AccordionTrigger className="text-sm font-semibold text-muted-foreground hover:no-underline">
+                            <div className="flex items-center gap-2">
+                                <Sparkles className="w-4 h-4" />
+                                <span>Auto-categorization rules</span>
+                            </div>
+                        </AccordionTrigger>
+                        <AccordionContent>
+                            <CategorizationRulesSection
+                                userId={userId}
+                                rules={categorizationRules}
+                                loading={loadingRules}
+                                buckets={buckets}
                             />
                         </AccordionContent>
                     </AccordionItem>

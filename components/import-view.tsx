@@ -29,6 +29,8 @@ import {
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useUserPreferences } from '@/components/providers/user-preferences-provider';
+import { useCategorizationRules } from '@/hooks/useCategorizationRules';
+import { applyRules } from '@/lib/categorization-rules';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
@@ -66,6 +68,7 @@ interface ParsedTransaction {
 export function ImportView() {
     const router = useRouter();
     const { userId, currency: baseCurrency } = useUserPreferences();
+    const { rules: categorizationRules } = useCategorizationRules(userId);
     const [step, setStep] = useState<ImportStep>('upload');
     const [file, setFile] = useState<File | null>(null);
     const [headers, setHeaders] = useState<string[]>([]);
@@ -394,16 +397,28 @@ export function ImportView() {
         }
 
         try {
-            const records = validTransactions.map(t => ({
-                user_id: userId,
-                date: format(t.date, 'yyyy-MM-dd'),
-                description: t.description,
-                amount: t.amount, // Positive for expense, negative for income
-                category: t.category,
-                currency: importCurrency,
-                payment_method: t.paymentMethod,
-                created_at: new Date().toISOString()
-            }));
+            const records = validTransactions.map(t => {
+                // Apply user's auto-categorization rules per row. Import gives us
+                // a fresh draft — there's no "user touched this" signal — so we
+                // let rules override the description-keyword auto-category from
+                // `autoCategorize()` if a rule matches.
+                const ruleOut = applyRules(
+                    { description: t.description, place_name: null },
+                    categorizationRules,
+                );
+                return {
+                    user_id: userId,
+                    date: format(t.date, 'yyyy-MM-dd'),
+                    description: t.description,
+                    amount: t.amount, // Positive for expense, negative for income
+                    category: ruleOut.category ?? t.category,
+                    bucket_id: ruleOut.bucket_id ?? null,
+                    exclude_from_allowance: ruleOut.exclude_from_allowance ?? false,
+                    currency: importCurrency,
+                    payment_method: t.paymentMethod,
+                    created_at: new Date().toISOString(),
+                };
+            });
 
             const { error } = await supabase.from('transactions').insert(records);
 
