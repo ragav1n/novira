@@ -40,6 +40,8 @@ interface TransactionListSectionProps {
     selectedCategory?: string | null;
     onClearCategory?: () => void;
     onViewReceipt?: (tx: Transaction) => void;
+    onBulkDelete?: (txs: Transaction[]) => Promise<{ count: number }>;
+    onBulkUpdate?: (txs: Transaction[], patch: { category?: string; bucket_id?: string | null }) => Promise<{ count: number }>;
 }
 
 export function TransactionListSection({
@@ -70,6 +72,8 @@ export function TransactionListSection({
     selectedCategory = null,
     onClearCategory,
     onViewReceipt,
+    onBulkDelete,
+    onBulkUpdate,
 }: TransactionListSectionProps) {
     const drawerScrollRef = useRef<HTMLDivElement>(null);
     // When filtering by category, also exclude settlements AND bound to the pie's
@@ -212,6 +216,8 @@ export function TransactionListSection({
                     loadingMore={loadingMore}
                     onLoadMore={onLoadMore}
                     onViewReceipt={onViewReceipt}
+                    onBulkDelete={onBulkDelete}
+                    onBulkUpdate={onBulkUpdate}
                 />
             </DashboardTransactionsDrawer>
         </div>

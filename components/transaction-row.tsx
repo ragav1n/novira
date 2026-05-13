@@ -3,7 +3,7 @@
 import React, { memo, useState, useEffect, useRef } from 'react';
 import { parseISO } from 'date-fns';
 import { useFormattedDate } from '@/utils/format-date';
-import { History, MoreVertical, Users, RefreshCcw, Ban, MapPin, Pencil, Trash2, Globe, ArrowLeftRight, Cloud, AlertTriangle, StickyNote, Paperclip } from 'lucide-react';
+import { History, MoreVertical, Users, RefreshCcw, Ban, MapPin, Pencil, Trash2, Globe, ArrowLeftRight, Cloud, AlertTriangle, StickyNote, Paperclip, Check } from 'lucide-react';
 import type { Transaction } from '@/types/transaction';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
@@ -29,6 +29,9 @@ interface TransactionRowProps {
   onEdit: () => void;
   onDelete: () => void;
   onViewReceipt?: () => void;
+  selectable?: boolean;
+  selected?: boolean;
+  onToggleSelect?: () => void;
 }
 
 function CategoryIcon({ icon, color }: { icon: React.ReactNode; color: string }) {
@@ -59,6 +62,9 @@ export const TransactionRow = memo(function TransactionRow({
   onEdit,
   onDelete,
   onViewReceipt,
+  selectable = false,
+  selected = false,
+  onToggleSelect,
 }: TransactionRowProps) {
   const hasSplits = tx.splits && tx.splits.length > 0;
   const isSettlement = tx.is_settlement;
@@ -146,7 +152,8 @@ export const TransactionRow = memo(function TransactionRow({
   // action buttons (sitting absolutely behind the card) bleed through. Disable
   // swipe + hide those buttons until the row syncs. Also gate by `isNear` so
   // off-screen rows in long lists don't pay the drag/overlay cost.
-  const swipeEnabled = canEdit && !isPending && !isFailed && isNear;
+  const swipeEnabled = canEdit && !isPending && !isFailed && isNear && !selectable;
+  const canBulkSelect = selectable && !isPending && !isFailed;
 
   return (
     <motion.div
@@ -185,12 +192,37 @@ export const TransactionRow = memo(function TransactionRow({
         dragElastic={0.07}
         onDragEnd={handleDragEnd}
         style={{ x, borderLeft: `3px solid ${color}` }}
-        onClick={swiped ? closeSwipe : undefined}
+        onClick={(e) => {
+          if (canBulkSelect && onToggleSelect) {
+            e.stopPropagation();
+            onToggleSelect();
+            return;
+          }
+          if (swiped) closeSwipe();
+        }}
         className={cn(
-          "relative flex items-center gap-3 px-4 py-3.5 bg-card select-none transition-opacity",
-          isPending && "opacity-70"
+          "relative flex items-center gap-3 px-4 py-3.5 bg-card select-none transition-colors",
+          isPending && "opacity-70",
+          selectable && !canBulkSelect && "opacity-40",
+          canBulkSelect && "cursor-pointer",
+          selected && "bg-primary/10"
         )}
       >
+        {/* Bulk-select checkbox */}
+        {selectable && (
+          <div
+            className={cn(
+              "shrink-0 w-5 h-5 rounded-md flex items-center justify-center transition-colors",
+              selected
+                ? "bg-primary border border-primary"
+                : "border border-white/20 bg-secondary/20",
+              !canBulkSelect && "opacity-50"
+            )}
+            aria-hidden="true"
+          >
+            {selected && <Check className="w-3.5 h-3.5 text-white" strokeWidth={3} />}
+          </div>
+        )}
         {/* Icon */}
         <div className="relative shrink-0">
           <div

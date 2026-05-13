@@ -597,6 +597,118 @@ export function useDashboardData(
         }
     };
 
+    // Supabase URL length limit on .in() — split big batches into chunks to be safe.
+    const BULK_CHUNK = 100;
+
+    const handleBulkDelete = async (txs: Transaction[]): Promise<{ count: number }> => {
+        // Offline-pending rows can't be bulk-deleted via supabase — they aren't on
+        // the server yet. Filter them out; the caller can use single-row delete for those.
+        const eligible = txs.filter(t => !t._pending && !t._failed);
+        if (eligible.length === 0) return { count: 0 };
+        if (mutatingRef.current) return { count: 0 };
+        mutatingRef.current = true;
+
+        const ids = eligible.map(t => t.id);
+        const idSet = new Set(ids);
+        const previousServerTransactions = [...serverTransactions];
+        setServerTransactions(prev => prev.filter(t => !idSet.has(t.id)));
+
+        if (typeof navigator !== 'undefined' && !navigator.onLine) {
+            try {
+                await Promise.all(ids.map(id => enqueueMutation('DELETE_TRANSACTION', { id })));
+                toast.success(`Queued ${ids.length} for deletion`);
+                mutatingRef.current = false;
+                return { count: ids.length };
+            } catch (err: any) {
+                setServerTransactions(previousServerTransactions);
+                toast.error(err?.name === 'QueueFullError' ? err.message : 'Failed to queue deletes');
+                mutatingRef.current = false;
+                return { count: 0 };
+            }
+        }
+
+        try {
+            for (let i = 0; i < ids.length; i += BULK_CHUNK) {
+                const slice = ids.slice(i, i + BULK_CHUNK);
+                const { error } = await supabase.from('transactions').delete().in('id', slice);
+                if (error) throw error;
+            }
+            invalidateTransactionCaches();
+            // Best-effort receipt cleanup for the deleted rows.
+            for (const tx of eligible) {
+                if (tx.receipt_path) {
+                    deleteReceipt(tx.receipt_path).catch(err => {
+                        console.error('[useDashboardData] bulk receipt cleanup failed', err);
+                    });
+                }
+            }
+            toast.success(`Deleted ${ids.length} transaction${ids.length === 1 ? '' : 's'}`);
+            // Wake buckets / groups providers so their aggregates refetch.
+            window.dispatchEvent(new Event('novira:expense-added'));
+            return { count: ids.length };
+        } catch (error: any) {
+            setServerTransactions(previousServerTransactions);
+            toast.error('Bulk delete failed: ' + (error?.message ?? 'unknown error'));
+            return { count: 0 };
+        } finally {
+            mutatingRef.current = false;
+        }
+    };
+
+    const handleBulkUpdate = async (
+        txs: Transaction[],
+        patch: { category?: string; bucket_id?: string | null; exclude_from_allowance?: boolean },
+    ): Promise<{ count: number }> => {
+        const eligible = txs.filter(t => !t._pending && !t._failed);
+        if (eligible.length === 0) return { count: 0 };
+        if (mutatingRef.current) return { count: 0 };
+        mutatingRef.current = true;
+
+        const ids = eligible.map(t => t.id);
+        const idSet = new Set(ids);
+        const previousServerTransactions = [...serverTransactions];
+        // Local Transaction type uses `?: string` (not `| null`), so coerce a
+        // null bucket_id to undefined for the in-memory patch.
+        const localPatch: Partial<Transaction> = {
+            ...(patch.category !== undefined ? { category: patch.category } : {}),
+            ...(patch.exclude_from_allowance !== undefined ? { exclude_from_allowance: patch.exclude_from_allowance } : {}),
+            ...(patch.bucket_id !== undefined ? { bucket_id: patch.bucket_id ?? undefined } : {}),
+        };
+        setServerTransactions(prev => prev.map(t => idSet.has(t.id) ? { ...t, ...localPatch } : t));
+
+        if (typeof navigator !== 'undefined' && !navigator.onLine) {
+            try {
+                await Promise.all(ids.map(id => enqueueMutation('UPDATE_TRANSACTION', { id, patch })));
+                toast.success(`Queued ${ids.length} updates`);
+                mutatingRef.current = false;
+                return { count: ids.length };
+            } catch (err: any) {
+                setServerTransactions(previousServerTransactions);
+                toast.error(err?.name === 'QueueFullError' ? err.message : 'Failed to queue updates');
+                mutatingRef.current = false;
+                return { count: 0 };
+            }
+        }
+
+        try {
+            for (let i = 0; i < ids.length; i += BULK_CHUNK) {
+                const slice = ids.slice(i, i + BULK_CHUNK);
+                const { error } = await supabase.from('transactions').update(patch).in('id', slice);
+                if (error) throw error;
+            }
+            invalidateTransactionCaches();
+            toast.success(`Updated ${ids.length} transaction${ids.length === 1 ? '' : 's'}`);
+            window.dispatchEvent(new Event('novira:expense-added'));
+            return { count: ids.length };
+        } catch (error: any) {
+            setServerTransactions(previousServerTransactions);
+            toast.error('Bulk update failed: ' + (error?.message ?? 'unknown error'));
+            return { count: 0 };
+        } finally {
+            mutatingRef.current = false;
+        }
+    };
+
     const loadAuditLogs = async (tx: Transaction) => {
         setSelectedAuditTx(tx);
         setLoadingAudit(true);
@@ -650,6 +762,8 @@ export function useDashboardData(
         loadTransactions,
         handleDeleteTransaction,
         handleUpdateTransaction,
+        handleBulkDelete,
+        handleBulkUpdate,
         loadAuditLogs
     };
 }

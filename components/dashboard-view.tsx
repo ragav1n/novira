@@ -70,7 +70,9 @@ export function DashboardView() {
         transactions, loading, hasMore, loadingMore, loadMore,
         editingTransaction, setEditingTransaction,
         isEditOpen, setIsEditOpen, selectedAuditTx, setSelectedAuditTx,
-        auditLogs, loadingAudit, handleDeleteTransaction, handleUpdateTransaction, loadAuditLogs, loadTransactions
+        auditLogs, loadingAudit, handleDeleteTransaction, handleUpdateTransaction,
+        handleBulkDelete, handleBulkUpdate,
+        loadAuditLogs, loadTransactions
     } = useDashboardData(userId, activeWorkspaceId, currentUserProfile);
 
 
@@ -335,6 +337,8 @@ export function DashboardView() {
                     selectedCategory={selectedCategory}
                     onClearCategory={() => setSelectedCategory(null)}
                     onViewReceipt={(tx) => receiptViewer.view(tx.receipt_path)}
+                    onBulkDelete={handleBulkDelete}
+                    onBulkUpdate={handleBulkUpdate}
                 />
                 )}
                 <ReceiptViewerDialog
