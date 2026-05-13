@@ -113,6 +113,7 @@ export function useDashboardStats({
         if (!Array.isArray(transactions)) return [];
         return transactions.filter(tx => {
             if (tx.is_income) return false;
+            if (tx.is_transfer) return false;
             if (tx.is_settlement) return false;
             if (isBucketFocused) {
                 if (tx.bucket_id !== effectiveFocus) return false;

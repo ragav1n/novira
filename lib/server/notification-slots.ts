@@ -114,6 +114,7 @@ export async function loadSlotContext(
         .is('group_id', null)
         .eq('is_settlement', false)
         .eq('is_income', false)
+        .eq('is_transfer', false)
         .returns<TxRow[]>();
 
     let todaySpend = 0, todayCount = 0;

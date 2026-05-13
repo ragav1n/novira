@@ -59,6 +59,7 @@ export async function GET(request: NextRequest) {
         .eq('exclude_from_allowance', false)
         .eq('is_settlement', false)
         .eq('is_income', false)
+        .eq('is_transfer', false)
         .returns<TxRow[]>();
 
     interface Hit { profile: ProfileRow; thisMtd: number; lastMtd: number; deltaPct: number; }

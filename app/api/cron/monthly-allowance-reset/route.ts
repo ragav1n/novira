@@ -61,6 +61,7 @@ export async function GET(request: NextRequest) {
         .lte('date', ymd(lastMonthEnd))
         .eq('is_settlement', false)
         .eq('is_income', false)
+        .eq('is_transfer', false)
         .returns<TxRow[]>();
 
     const subsByUser = await loadSubsByUser(supabase, eligible.map(p => p.id));

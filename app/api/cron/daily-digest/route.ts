@@ -119,6 +119,7 @@ export async function GET(request: NextRequest) {
         .is('group_id', null)
         .eq('is_settlement', false)
         .eq('is_income', false)
+        .eq('is_transfer', false)
         .returns<TxRow[]>();
 
     const yesterday = new Date(now);

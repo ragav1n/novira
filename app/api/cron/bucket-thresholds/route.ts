@@ -92,6 +92,7 @@ export async function GET(request: NextRequest) {
         .in('bucket_id', bucketIds)
         .eq('is_settlement', false)
         .eq('is_income', false)
+        .eq('is_transfer', false)
         .eq('exclude_from_allowance', false)
         .returns<TxRow[]>();
 

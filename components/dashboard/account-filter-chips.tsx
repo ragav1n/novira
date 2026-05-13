@@ -1,12 +1,13 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { cn } from '@/lib/utils';
 import {
-    Wallet, Landmark, PiggyBank, CreditCard, Smartphone, CircleDollarSign, LayoutGrid,
+    Wallet, Landmark, PiggyBank, CreditCard, Smartphone, CircleDollarSign, LayoutGrid, ArrowRightLeft,
 } from 'lucide-react';
 import { useAccounts } from '@/components/providers/accounts-provider';
 import type { AccountType } from '@/types/account';
+import { TransferDialog } from '@/components/transfer-dialog';
 
 const TYPE_ICONS: Record<AccountType, React.ComponentType<{ className?: string; style?: React.CSSProperties }>> = {
     cash: Wallet,
@@ -24,6 +25,7 @@ const TYPE_ICONS: Record<AccountType, React.ComponentType<{ className?: string; 
  */
 export function AccountFilterChips() {
     const { accounts, activeAccountId, setActiveAccountId } = useAccounts();
+    const [transferOpen, setTransferOpen] = useState(false);
     const active = accounts.filter(a => !a.archived_at);
     if (active.length < 2) return null;
 
@@ -58,26 +60,38 @@ export function AccountFilterChips() {
     );
 
     return (
-        <div className="flex gap-1.5 overflow-x-auto no-scrollbar -mx-1 px-1 pb-1">
-            {renderChip(
-                'all',
-                activeAccountId === null,
-                () => setActiveAccountId(null),
-                <LayoutGrid className="w-3 h-3" />,
-                'All',
-                '#8A2BE2',
-            )}
-            {active.map(a => {
-                const Icon = TYPE_ICONS[a.type] || CircleDollarSign;
-                return renderChip(
-                    a.id,
-                    activeAccountId === a.id,
-                    () => setActiveAccountId(a.id),
-                    <Icon className="w-3 h-3" style={{ color: a.color }} />,
-                    a.name,
-                    a.color,
-                );
-            })}
-        </div>
+        <>
+            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar -mx-1 px-1 pb-1">
+                {renderChip(
+                    'all',
+                    activeAccountId === null,
+                    () => setActiveAccountId(null),
+                    <LayoutGrid className="w-3 h-3" />,
+                    'All',
+                    '#8A2BE2',
+                )}
+                {active.map(a => {
+                    const Icon = TYPE_ICONS[a.type] || CircleDollarSign;
+                    return renderChip(
+                        a.id,
+                        activeAccountId === a.id,
+                        () => setActiveAccountId(a.id),
+                        <Icon className="w-3 h-3" style={{ color: a.color }} />,
+                        a.name,
+                        a.color,
+                    );
+                })}
+                <button
+                    type="button"
+                    onClick={() => setTransferOpen(true)}
+                    className="shrink-0 ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-cyan-500/30 bg-cyan-500/10 text-cyan-300 text-[12px] font-semibold hover:bg-cyan-500/15 transition-colors"
+                    aria-label="Record a transfer between accounts"
+                >
+                    <ArrowRightLeft className="w-3 h-3" />
+                    <span>Transfer</span>
+                </button>
+            </div>
+            <TransferDialog open={transferOpen} onOpenChange={setTransferOpen} />
+        </>
     );
 }
