@@ -18,7 +18,18 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { Button } from "@/components/ui/button"
-import { Wallet, X } from 'lucide-react';
+import { Wallet, Landmark, PiggyBank, CreditCard as CardIcon, Smartphone, CircleDollarSign, X } from 'lucide-react';
+import { useAccounts } from '@/components/providers/accounts-provider';
+import type { AccountType } from '@/types/account';
+
+const ACCOUNT_TYPE_ICONS_EDIT: Record<AccountType, React.ComponentType<{ className?: string; style?: React.CSSProperties }>> = {
+    cash: Wallet,
+    checking: Landmark,
+    savings: PiggyBank,
+    credit_card: CardIcon,
+    digital_wallet: Smartphone,
+    other: CircleDollarSign,
+};
 import { cn } from '@/lib/utils';
 import { CHART_CONFIG } from '@/lib/categories';
 import dynamic from 'next/dynamic';
@@ -120,6 +131,11 @@ export function DashboardDialogs({
     isBucketFocused,
     loadTransactions
 }: DashboardDialogsProps) {
+    const { accounts: allAccounts } = useAccounts();
+    const editableAccounts = React.useMemo(
+        () => allAccounts.filter(a => !a.archived_at),
+        [allAccounts],
+    );
     return (
         <>
             {/* Budget Edit Dialog */}
@@ -242,6 +258,41 @@ export function DashboardDialogs({
                                     ))}
                                 </div>
                             </div>
+                            {/* Account Selection in Edit Mode */}
+                            {editableAccounts.length > 0 && (
+                                <div className="space-y-2">
+                                    <Label>Account</Label>
+                                    <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+                                        {editableAccounts.map((a) => {
+                                            const TypeIcon = ACCOUNT_TYPE_ICONS_EDIT[a.type] || CircleDollarSign;
+                                            const selected = editingTransaction.account_id === a.id;
+                                            return (
+                                                <div
+                                                    key={a.id}
+                                                    onClick={() => setEditingTransaction({ ...editingTransaction, account_id: a.id })}
+                                                    className={cn(
+                                                        'flex flex-col items-center gap-1.5 p-2 rounded-xl border transition-all min-w-[70px] cursor-pointer',
+                                                        !selected && 'bg-background/20 border-white/5 hover:border-white/10',
+                                                    )}
+                                                    style={selected ? {
+                                                        backgroundColor: `${a.color}1F`,
+                                                        borderColor: `${a.color}80`,
+                                                        boxShadow: `0 0 15px ${a.color}26`,
+                                                    } : undefined}
+                                                >
+                                                    <div
+                                                        className="w-8 h-8 rounded-full flex items-center justify-center"
+                                                        style={{ backgroundColor: `${a.color}22`, border: `1px solid ${a.color}50` }}
+                                                    >
+                                                        <TypeIcon className="w-3.5 h-3.5" style={{ color: a.color }} />
+                                                    </div>
+                                                    <span className="text-[9px] font-medium truncate w-14 text-center">{a.name}</span>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
                             {/* Exclude from Allowance Toggle */}
                             <div className="space-y-4 pt-2">
                                 <div className="flex items-center justify-between">

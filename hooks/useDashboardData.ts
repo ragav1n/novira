@@ -556,6 +556,7 @@ export function useDashboardData(
             category: savedEditingTx.category,
             amount: savedEditingTx.amount,
             bucket_id: savedEditingTx.bucket_id || null,
+            account_id: savedEditingTx.account_id || null,
             exclude_from_allowance: savedEditingTx.exclude_from_allowance || false,
             place_name: savedEditingTx.place_name || null,
             place_address: savedEditingTx.place_address || null,

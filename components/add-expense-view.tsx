@@ -40,9 +40,7 @@ const RecurringExpenseSection = dynamic(
 import { CategorySelector, BucketSelector } from './add-expense/selectors';
 import { useAccounts } from '@/components/providers/accounts-provider';
 import { Landmark, PiggyBank, CreditCard as CardIcon, Smartphone, CircleDollarSign } from 'lucide-react';
-import { ACCOUNT_TYPE_LABELS, type AccountType } from '@/types/account';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-
+import type { AccountType } from '@/types/account';
 const ACCOUNT_TYPE_ICONS: Record<AccountType, React.ComponentType<{ className?: string; style?: React.CSSProperties }>> = {
     cash: Wallet,
     checking: Landmark,
@@ -862,52 +860,50 @@ export function AddExpenseView() {
                     setSelectedBucketId={formState.setSelectedBucketId}
                 />
 
-                {activeAccounts.length > 0 && (() => {
-                    const current = activeAccounts.find(a => a.id === formState.selectedAccountId);
-                    const Icon = current ? (ACCOUNT_TYPE_ICONS[current.type] || CircleDollarSign) : Wallet;
-                    return (
-                        <div className="space-y-2">
-                            <p className="text-sm font-medium">Account</p>
-                            <Select
-                                value={formState.selectedAccountId ?? ''}
-                                onValueChange={(v) => formState.setSelectedAccountId(v || null)}
-                            >
-                                <SelectTrigger className="h-12 rounded-xl bg-secondary/10 border-white/10 hover:bg-secondary/20">
-                                    {current ? (
-                                        <div className="flex items-center gap-2.5 min-w-0">
-                                            <span
-                                                className="w-7 h-7 rounded-full flex items-center justify-center shrink-0"
-                                                style={{ backgroundColor: `${current.color}20`, border: `1px solid ${current.color}40` }}
-                                            >
-                                                <Icon className="w-3.5 h-3.5" style={{ color: current.color }} />
-                                            </span>
-                                            <div className="flex flex-col items-start min-w-0">
-                                                <span className="text-sm font-semibold truncate">{current.name}</span>
-                                                <span className="text-[10.5px] text-muted-foreground/70">{ACCOUNT_TYPE_LABELS[current.type]} · {current.currency}</span>
-                                            </div>
+                {activeAccounts.length > 0 && (
+                    <div className="space-y-2">
+                        <p className="text-sm font-medium">Account</p>
+                        <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1 custom-scrollbar">
+                            {activeAccounts.map(a => {
+                                const TypeIcon = ACCOUNT_TYPE_ICONS[a.type] || CircleDollarSign;
+                                const selected = formState.selectedAccountId === a.id;
+                                return (
+                                    <button
+                                        key={a.id}
+                                        type="button"
+                                        onClick={() => {
+                                            if (isNative) Haptics.impact({ style: ImpactStyle.Light }).catch(() => { });
+                                            formState.setSelectedAccountId(a.id);
+                                        }}
+                                        aria-pressed={selected}
+                                        className={cn(
+                                            'flex flex-col items-center gap-1.5 p-3 rounded-xl border transition-all min-w-[80px] cursor-pointer text-center',
+                                            selected
+                                                ? 'shadow-[0_0_15px_rgba(138,43,226,0.15)]'
+                                                : 'bg-background/20 border-white/5 hover:border-white/10',
+                                        )}
+                                        style={selected ? {
+                                            backgroundColor: `${a.color}1F`,
+                                            borderColor: `${a.color}80`,
+                                        } : undefined}
+                                    >
+                                        <div
+                                            className="w-10 h-10 rounded-full flex items-center justify-center"
+                                            style={{
+                                                backgroundColor: `${a.color}22`,
+                                                border: `1px solid ${a.color}50`,
+                                            }}
+                                        >
+                                            <TypeIcon className="w-4 h-4" style={{ color: a.color }} />
                                         </div>
-                                    ) : (
-                                        <SelectValue placeholder="Pick an account" />
-                                    )}
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {activeAccounts.map(a => {
-                                        const TypeIcon = ACCOUNT_TYPE_ICONS[a.type] || CircleDollarSign;
-                                        return (
-                                            <SelectItem key={a.id} value={a.id}>
-                                                <div className="flex items-center gap-2">
-                                                    <TypeIcon className="w-3.5 h-3.5 shrink-0" style={{ color: a.color }} />
-                                                    <span>{a.name}</span>
-                                                    <span className="text-[10px] text-muted-foreground/60">· {a.currency}</span>
-                                                </div>
-                                            </SelectItem>
-                                        );
-                                    })}
-                                </SelectContent>
-                            </Select>
+                                        <span className="text-[11px] font-medium truncate w-16">{a.name}</span>
+                                        <span className="text-[9.5px] uppercase tracking-wider text-muted-foreground/60 leading-none">{a.currency}</span>
+                                    </button>
+                                );
+                            })}
                         </div>
-                    );
-                })()}
+                    </div>
+                )}
                 {activeTripBucket && (
                     <div className="flex items-center gap-2 text-[11px] font-bold px-3 py-1.5 rounded-full bg-cyan-500/10 text-cyan-300 border border-cyan-500/20 self-start">
                         <Plane className="w-3 h-3" aria-hidden="true" />
