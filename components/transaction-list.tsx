@@ -72,6 +72,28 @@ export const TransactionList = React.memo(function TransactionList({
     [transactions, selectedIds],
   );
 
+  // For the picker dialogs: if every selected row shares the same bucket /
+  // category, surface that as "current" so the picker can highlight it and
+  // skip a no-op write. Mixed selection → undefined (no highlight).
+  const sharedBucketId = useMemo<string | null | undefined>(() => {
+    if (selectedTxs.length === 0) return undefined;
+    const first = selectedTxs[0].bucket_id ?? null;
+    for (let i = 1; i < selectedTxs.length; i++) {
+      const next = selectedTxs[i].bucket_id ?? null;
+      if (next !== first) return undefined;
+    }
+    return first;
+  }, [selectedTxs]);
+
+  const sharedCategory = useMemo<string | undefined>(() => {
+    if (selectedTxs.length === 0) return undefined;
+    const first = selectedTxs[0].category;
+    for (let i = 1; i < selectedTxs.length; i++) {
+      if (selectedTxs[i].category !== first) return undefined;
+    }
+    return first;
+  }, [selectedTxs]);
+
   const handleBulkDeleteClick = useCallback(async () => {
     if (!onBulkDelete || selectedTxs.length === 0) return;
     const result = await onBulkDelete(selectedTxs);
@@ -203,6 +225,8 @@ export const TransactionList = React.memo(function TransactionList({
           onDelete={handleBulkDeleteClick}
           onRecategorize={handleRecategorize}
           onMoveToBucket={handleMoveToBucket}
+          currentBucketId={sharedBucketId}
+          currentCategory={sharedCategory}
         />
       )}
     </div>

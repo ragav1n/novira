@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Trash2, FolderInput, Tag as TagIcon } from 'lucide-react';
+import { Trash2, FolderInput, Tag as TagIcon, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
     AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -20,10 +20,18 @@ interface BulkActionBarProps {
     onRecategorize: (categoryId: string) => Promise<void> | void;
     onMoveToBucket: (bucketId: string | null) => Promise<void> | void;
     buckets: Bucket[];
+    /**
+     * Current bucket id shared by all selected transactions, or null if they
+     * are all unbucketed. `undefined` means a mixed set — no highlight.
+     */
+    currentBucketId?: string | null | undefined;
+    /** Same idea for category — undefined means "mixed selection". */
+    currentCategory?: string | undefined;
 }
 
 export function BulkActionBar({
     count, onCancel, onDelete, onRecategorize, onMoveToBucket, buckets,
+    currentBucketId, currentCategory,
 }: BulkActionBarProps) {
     const [confirmDelete, setConfirmDelete] = useState(false);
     const [categoryPickerOpen, setCategoryPickerOpen] = useState(false);
@@ -119,15 +127,22 @@ export function BulkActionBar({
                     <div className="grid grid-cols-2 gap-2 pt-2">
                         {SYSTEM_CATEGORIES.map(cat => {
                             const color = CATEGORY_COLORS[cat.id] || '#8A2BE2';
+                            const isCurrent = currentCategory === cat.id;
                             return (
                                 <button
                                     key={cat.id}
                                     type="button"
                                     onClick={async () => {
+                                        if (isCurrent) { setCategoryPickerOpen(false); return; }
                                         setCategoryPickerOpen(false);
                                         await onRecategorize(cat.id);
                                     }}
-                                    className="flex items-center gap-2 px-3 py-2.5 rounded-xl border border-white/5 bg-secondary/10 hover:border-white/20 hover:bg-secondary/15 transition-colors text-left"
+                                    aria-current={isCurrent ? 'true' : undefined}
+                                    className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-left transition-colors ${
+                                        isCurrent
+                                            ? 'border-primary/40 bg-primary/10'
+                                            : 'border-white/5 bg-secondary/10 hover:border-white/20 hover:bg-secondary/15'
+                                    }`}
                                 >
                                     <span
                                         className="w-7 h-7 rounded-full flex items-center justify-center shrink-0"
@@ -138,7 +153,8 @@ export function BulkActionBar({
                                             { style: { color } },
                                         )}
                                     </span>
-                                    <span className="text-[12px] font-semibold truncate">{cat.label}</span>
+                                    <span className="text-[12px] font-semibold truncate flex-1">{cat.label}</span>
+                                    {isCurrent && <Check className="w-3.5 h-3.5 text-primary shrink-0" strokeWidth={3} />}
                                 </button>
                             );
                         })}
@@ -151,50 +167,78 @@ export function BulkActionBar({
                     <DialogHeader>
                         <DialogTitle>Move {count} to bucket</DialogTitle>
                     </DialogHeader>
+                    {currentBucketId === undefined && count > 0 && (
+                        <p className="px-1 pt-1 text-[11px] text-amber-300/80">
+                            Mixed selection — these transactions are currently in different buckets.
+                        </p>
+                    )}
                     <div className="space-y-1.5 pt-2 max-h-[60vh] overflow-y-auto">
-                        <button
-                            type="button"
-                            onClick={async () => {
-                                setBucketPickerOpen(false);
-                                await onMoveToBucket(null);
-                            }}
-                            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border border-white/5 bg-secondary/10 hover:border-white/20 hover:bg-secondary/15 transition-colors text-left"
-                        >
-                            <span className="w-7 h-7 rounded-full bg-secondary/30 flex items-center justify-center shrink-0">
-                                <FolderInput className="w-3.5 h-3.5 text-muted-foreground" />
-                            </span>
-                            <span className="text-[12px] font-semibold">No bucket</span>
-                            <span className="ml-auto text-[10px] text-muted-foreground/60">Clear</span>
-                        </button>
+                        {(() => {
+                            const isNoneCurrent = currentBucketId === null;
+                            return (
+                                <button
+                                    type="button"
+                                    onClick={async () => {
+                                        if (isNoneCurrent) { setBucketPickerOpen(false); return; }
+                                        setBucketPickerOpen(false);
+                                        await onMoveToBucket(null);
+                                    }}
+                                    aria-current={isNoneCurrent ? 'true' : undefined}
+                                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border text-left transition-colors ${
+                                        isNoneCurrent
+                                            ? 'border-primary/40 bg-primary/10'
+                                            : 'border-white/5 bg-secondary/10 hover:border-white/20 hover:bg-secondary/15'
+                                    }`}
+                                >
+                                    <span className="w-7 h-7 rounded-full bg-secondary/30 flex items-center justify-center shrink-0">
+                                        <FolderInput className="w-3.5 h-3.5 text-muted-foreground" />
+                                    </span>
+                                    <span className="text-[12px] font-semibold flex-1">No bucket</span>
+                                    {isNoneCurrent
+                                        ? <Check className="w-3.5 h-3.5 text-primary shrink-0" strokeWidth={3} />
+                                        : <span className="text-[10px] text-muted-foreground/60">Clear</span>}
+                                </button>
+                            );
+                        })()}
                         {activeBuckets.length === 0 && (
                             <p className="px-3 py-6 text-center text-[12px] text-muted-foreground/60">
                                 No buckets yet. Create one in the dashboard.
                             </p>
                         )}
-                        {activeBuckets.map(b => (
-                            <button
-                                key={b.id}
-                                type="button"
-                                onClick={async () => {
-                                    setBucketPickerOpen(false);
-                                    await onMoveToBucket(b.id);
-                                }}
-                                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border border-white/5 bg-secondary/10 hover:border-white/20 hover:bg-secondary/15 transition-colors text-left"
-                            >
-                                <span
-                                    className="w-7 h-7 rounded-full flex items-center justify-center shrink-0"
-                                    style={{ backgroundColor: `${b.color || '#8A2BE2'}20`, border: `1px solid ${b.color || '#8A2BE2'}40` }}
+                        {activeBuckets.map(b => {
+                            const isCurrent = currentBucketId === b.id;
+                            return (
+                                <button
+                                    key={b.id}
+                                    type="button"
+                                    onClick={async () => {
+                                        if (isCurrent) { setBucketPickerOpen(false); return; }
+                                        setBucketPickerOpen(false);
+                                        await onMoveToBucket(b.id);
+                                    }}
+                                    aria-current={isCurrent ? 'true' : undefined}
+                                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border text-left transition-colors ${
+                                        isCurrent
+                                            ? 'border-primary/40 bg-primary/10'
+                                            : 'border-white/5 bg-secondary/10 hover:border-white/20 hover:bg-secondary/15'
+                                    }`}
                                 >
-                                    <span className="text-[10px] font-bold" style={{ color: b.color || '#8A2BE2' }}>
-                                        {b.name.charAt(0).toUpperCase()}
+                                    <span
+                                        className="w-7 h-7 rounded-full flex items-center justify-center shrink-0"
+                                        style={{ backgroundColor: `${b.color || '#8A2BE2'}20`, border: `1px solid ${b.color || '#8A2BE2'}40` }}
+                                    >
+                                        <span className="text-[10px] font-bold" style={{ color: b.color || '#8A2BE2' }}>
+                                            {b.name.charAt(0).toUpperCase()}
+                                        </span>
                                     </span>
-                                </span>
-                                <div className="min-w-0 flex-1">
-                                    <p className="text-[12px] font-semibold truncate">{b.name}</p>
-                                    {b.type && <p className="text-[10px] text-muted-foreground/60 capitalize">{b.type}</p>}
-                                </div>
-                            </button>
-                        ))}
+                                    <div className="min-w-0 flex-1">
+                                        <p className="text-[12px] font-semibold truncate">{b.name}</p>
+                                        {b.type && <p className="text-[10px] text-muted-foreground/60 capitalize">{b.type}</p>}
+                                    </div>
+                                    {isCurrent && <Check className="w-3.5 h-3.5 text-primary shrink-0" strokeWidth={3} />}
+                                </button>
+                            );
+                        })}
                     </div>
                 </DialogContent>
             </Dialog>
