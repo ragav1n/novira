@@ -6,6 +6,24 @@ const SUPABASE_TX_PATHS = [
 
 export const TRANSACTIONS_INVALIDATED_CHANNEL = 'novira-transactions-invalidated';
 
+// Per-tab sender id. BroadcastChannel excludes only the exact source instance
+// from receiving its own messages — but the sender and the listener live in
+// different instances here, so without an id the originating tab would receive
+// its own broadcast and race-refetch a row it just deleted (before Postgres
+// replication settles), causing the row to briefly reappear.
+const SENDER_ID: string = (() => {
+    try {
+        if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+            return crypto.randomUUID();
+        }
+    } catch { /* fallthrough */ }
+    return `s-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+})();
+
+export function getInvalidationSenderId(): string {
+    return SENDER_ID;
+}
+
 let cachedChannel: BroadcastChannel | null | undefined;
 function getChannel(): BroadcastChannel | null {
     if (cachedChannel !== undefined) return cachedChannel;
@@ -29,7 +47,7 @@ export function invalidateTransactionCaches() {
     // tab holds its own React state — wake other tabs so they refetch instead of
     // sitting on stale rows until their next mount or visibility flip.
     try {
-        getChannel()?.postMessage({ type: 'invalidated', at: Date.now() });
+        getChannel()?.postMessage({ type: 'invalidated', at: Date.now(), senderId: SENDER_ID });
     } catch {
         // BroadcastChannel can throw if closed; non-fatal
     }
