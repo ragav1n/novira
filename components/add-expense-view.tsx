@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronLeft, CreditCard, Utensils, Car, Zap, ShoppingBag, HeartPulse, Clapperboard, Wallet, Banknote, HelpCircle, Calendar as CalendarIcon, Home, School, LayoutGrid, Building2, MapPin, Shirt, ShoppingCart, LocateFixed, ScanSearch, Sparkles, Camera, Image as ImageIcon, Plane, Paperclip, X, FileText } from 'lucide-react';
+import { ChevronLeft, CreditCard, Utensils, Car, Zap, ShoppingBag, HeartPulse, Clapperboard, Wallet, Banknote, HelpCircle, Calendar as CalendarIcon, Home, School, LayoutGrid, Building2, MapPin, Shirt, ShoppingCart, LocateFixed, ScanSearch, Sparkles, Camera, Image as ImageIcon, Plane, X, FileText } from 'lucide-react';
 import UniqueLoading from '@/components/ui/grid-loading';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -106,7 +106,6 @@ export function AddExpenseView() {
     const { handleSubmit, loading } = useExpenseSubmission();
     const fileInputRef = useRef<HTMLInputElement>(null);
     const cameraInputRef = useRef<HTMLInputElement>(null);
-    const receiptInputRef = useRef<HTMLInputElement>(null);
     const scanAbortRef = useRef<AbortController | null>(null);
     const [scanning, setScanning] = React.useState(false);
     const [errors, setErrors] = React.useState<ExpenseFormErrors>({});
@@ -124,17 +123,6 @@ export function AddExpenseView() {
         }
         formState.setReceiptFile(file);
     }, [formState]);
-
-    const handleAttachOnly = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        const target = e.currentTarget;
-        try {
-            if (!file) return;
-            stashAsReceipt(file);
-        } finally {
-            target.value = '';
-        }
-    };
 
     const receiptPreviewUrl = React.useMemo(() => {
         if (!formState.receiptFile) return null;
@@ -439,24 +427,6 @@ export function AddExpenseView() {
                         <ImageIcon className="w-3.5 h-3.5" />
                         Or choose from gallery
                     </button>
-                    <input
-                        ref={receiptInputRef}
-                        type="file"
-                        accept="image/*,application/pdf"
-                        className="hidden"
-                        onChange={handleAttachOnly}
-                    />
-                    {!formState.receiptFile && (
-                        <button
-                            type="button"
-                            onClick={() => receiptInputRef.current?.click()}
-                            aria-label="Attach a receipt without scanning"
-                            className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-[12px] font-semibold text-muted-foreground hover:text-primary hover:bg-primary/5 transition-all"
-                        >
-                            <Paperclip className="w-3.5 h-3.5" />
-                            Just attach a receipt (no scan)
-                        </button>
-                    )}
                     {formState.receiptFile && (
                         <div className="flex items-center gap-3 px-3 py-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10">
                             {receiptPreviewUrl ? (
