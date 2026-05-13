@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useUserPreferences } from './user-preferences-provider';
+import { useAccounts } from './accounts-provider';
 import { toast } from '@/utils/haptics';
 import { BucketService, type BucketSpendingRow } from '@/lib/services/bucket-service';
 import { reportNetworkError } from '@/lib/network-error-bus';
@@ -84,6 +85,10 @@ function computeBucketSpending(
 
 export function BucketsProvider({ children }: { children: React.ReactNode }) {
     const { userId, currency, convertAmount, activeWorkspaceId } = useUserPreferences();
+    const { activeAccountId } = useAccounts();
+    // Account filter is personal-only (a shared workspace's spending isn't
+    // tied to one member's account).
+    const effectiveAccountId = !activeWorkspaceId ? activeAccountId : null;
     const [buckets, setBuckets] = useState<Bucket[]>([]);
     const [bucketSpending, setBucketSpending] = useState<Record<string, number>>({});
     const [loading, setLoading] = useState(true);
@@ -99,7 +104,7 @@ export function BucketsProvider({ children }: { children: React.ReactNode }) {
         try {
             const [fetchedBuckets, spendingData] = await Promise.all([
                 BucketService.getBuckets(userId, activeWorkspaceId),
-                BucketService.getBucketSpending(userId, activeWorkspaceId)
+                BucketService.getBucketSpending(userId, activeWorkspaceId, effectiveAccountId)
             ]);
 
             if (fetchGenRef.current !== myGen) return;
@@ -118,7 +123,7 @@ export function BucketsProvider({ children }: { children: React.ReactNode }) {
         } finally {
             if (fetchGenRef.current === myGen) setLoading(false);
         }
-    }, [userId, activeWorkspaceId, currency, convertAmount]);
+    }, [userId, activeWorkspaceId, effectiveAccountId, currency, convertAmount]);
 
     fetchBucketsRef.current = fetchBuckets;
 
@@ -129,7 +134,7 @@ export function BucketsProvider({ children }: { children: React.ReactNode }) {
         if (!userId) return;
         const myGen = fetchGenRef.current;
         try {
-            const spendingData = await BucketService.getBucketSpending(userId, activeWorkspaceId);
+            const spendingData = await BucketService.getBucketSpending(userId, activeWorkspaceId, effectiveAccountId);
             if (fetchGenRef.current !== myGen) return;
             if (spendingData) {
                 setBucketSpending(computeBucketSpending(spendingData, bucketsRef.current, currency, convertAmount));
@@ -137,7 +142,7 @@ export function BucketsProvider({ children }: { children: React.ReactNode }) {
         } catch (error) {
             console.error('Error refreshing bucket spending:', error);
         }
-    }, [userId, activeWorkspaceId, currency, convertAmount]);
+    }, [userId, activeWorkspaceId, effectiveAccountId, currency, convertAmount]);
 
     const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const spendingDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);

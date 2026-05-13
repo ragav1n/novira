@@ -30,11 +30,12 @@ export const BucketService = {
         return data as Bucket[];
     },
 
-    async getBucketSpending(userId?: string, workspaceId?: string | null) {
+    async getBucketSpending(userId?: string, workspaceId?: string | null, accountId?: string | null) {
         if (!userId) return [];
         const { data, error } = await supabase.rpc('compute_user_bucket_spending', {
             p_user_id: userId,
             p_workspace_id: workspaceId ?? null,
+            p_account_id: accountId ?? null,
         });
         if (error) throw error;
         return data as BucketSpendingRow[];

@@ -94,14 +94,14 @@ export default async function RootLayout({
               <GroupsProvider>
                 <WorkspaceThemeProvider />
                 <SyncIndicator />
-                <BucketsProvider>
-                  <AccountsProvider>
+                <AccountsProvider>
+                  <BucketsProvider>
                     <MobileLayout defaultIsDesktop={defaultIsDesktop}>
                       {children}
                     </MobileLayout>
                     <MonthlyRecapModal />
-                  </AccountsProvider>
-                </BucketsProvider>
+                  </BucketsProvider>
+                </AccountsProvider>
               </GroupsProvider>
             </UserPreferencesProvider>
           </MotionConfig>
