@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { applyRules } from '@/lib/categorization-rules';
 import { useCategorizationRules } from '@/hooks/useCategorizationRules';
+import { useAccounts } from '@/components/providers/accounts-provider';
 
 // Persist a subset of the form to sessionStorage so an accidental refresh or
 // background-tab eviction doesn't lose what the user typed. Workspace + user
@@ -26,6 +27,7 @@ type DraftShape = {
     frequency: 'daily' | 'weekly' | 'monthly' | 'yearly';
     isIncome: boolean;
     date: string | null;
+    selectedAccountId: string | null;
 };
 
 function readDraft(key: string): Partial<DraftShape> | null {
@@ -77,6 +79,31 @@ export function useExpenseForm(
     const [selectedBucketId, setSelectedBucketId] = useState<string | null>(
         initialDraft.selectedBucketId ?? quickAddDefaults.bucketId ?? null
     );
+    const [selectedAccountId, setSelectedAccountId] = useState<string | null>(
+        initialDraft.selectedAccountId ?? null
+    );
+
+    // Default account selection from AccountsProvider once it loads. Only sets
+    // if the user hasn't already picked an account (state null + no draft).
+    const { accounts: availableAccounts, primaryAccount } = useAccounts();
+    const accountDefaultAppliedRef = useRef(!!initialDraft.selectedAccountId);
+    useEffect(() => {
+        if (accountDefaultAppliedRef.current) return;
+        if (selectedAccountId) {
+            accountDefaultAppliedRef.current = true;
+            return;
+        }
+        if (primaryAccount) {
+            setSelectedAccountId(primaryAccount.id);
+            accountDefaultAppliedRef.current = true;
+            return;
+        }
+        const fallback = availableAccounts.find(a => !a.archived_at);
+        if (fallback) {
+            setSelectedAccountId(fallback.id);
+            accountDefaultAppliedRef.current = true;
+        }
+    }, [primaryAccount, availableAccounts, selectedAccountId]);
 
     useEffect(() => {
         // Only force-reset to the user's preferred currency if the draft on mount
@@ -173,6 +200,7 @@ export function useExpenseForm(
                     placeLat, placeLng, tags, excludeFromAllowance, isRecurring,
                     frequency, isIncome,
                     date: date ? date.toISOString() : null,
+                    selectedAccountId,
                 };
                 sessionStorage.setItem(draftKey, JSON.stringify(draft));
             } catch {
@@ -186,6 +214,7 @@ export function useExpenseForm(
         draftKey, amount, description, notes, selectedCategory, paymentMethod,
         txCurrency, selectedBucketId, placeName, placeAddress, placeLat, placeLng,
         tags, excludeFromAllowance, isRecurring, frequency, isIncome, date,
+        selectedAccountId,
     ]);
 
     // Smart Location Memory: Suggest locations from previous transactions
@@ -515,6 +544,7 @@ export function useExpenseForm(
         setDescriptionSuggestions([]);
         setSmartDefaults(null);
         setReceiptFile(null);
+        setSelectedAccountId(primaryAccount?.id ?? null);
         if (typeof window !== 'undefined') {
             try { sessionStorage.removeItem(draftKey); } catch { /* noop */ }
         }
@@ -550,6 +580,7 @@ export function useExpenseForm(
         descriptionSuggestions, setDescriptionSuggestions,
         smartDefaults, setSmartDefaults,
         receiptFile, setReceiptFile,
+        selectedAccountId, setSelectedAccountId,
         resetForm
     };
 }

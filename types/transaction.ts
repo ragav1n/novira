@@ -60,6 +60,7 @@ export type TransactionRecord = {
     currency: string;
     group_id: string | null;
     bucket_id: string | null;
+    account_id?: string | null;
     exchange_rate: number;
     base_currency: string;
     converted_amount: number;

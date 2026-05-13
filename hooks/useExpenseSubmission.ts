@@ -43,6 +43,9 @@ interface ExpenseSubmissionParams {
     isIncome?: boolean;
     // Receipt attach (optional). Uploaded after the tx row is created.
     receiptFile?: File | Blob | null;
+    // Source account. If unset, the DB BEFORE-INSERT trigger falls back to the
+    // user's primary account so we never lose the assignment.
+    selectedAccountId?: string | null;
 }
 
 export type ExpenseFormErrors = {
@@ -195,7 +198,7 @@ export function useExpenseSubmission() {
             placeName, placeAddress, placeLat, placeLng,
             paymentMethod, notes, tags, isSplitEnabled, selectedFriendIds,
             splitMode, customAmounts, isRecurring, frequency,
-            isIncome = false, receiptFile,
+            isIncome = false, receiptFile, selectedAccountId,
         } = params;
 
         if (!validateExpenseForm(amount, description, date)) return;
@@ -234,6 +237,7 @@ export function useExpenseSubmission() {
                 currency: txCurrency,
                 group_id: selectedGroupId,
                 bucket_id: selectedBucketId,
+                account_id: selectedAccountId ?? null,
                 exchange_rate: exchangeRate,
                 base_currency: currency,
                 converted_amount: convertedAmount,
@@ -344,6 +348,7 @@ export function useExpenseSubmission() {
                             place_lng: transactionRecord.place_lng ?? undefined,
                             tags: transactionRecord.tags,
                             group_id: transactionRecord.group_id,
+                            account_id: transactionRecord.account_id ?? undefined,
                             receipt_path: uploadedReceiptPath ?? undefined,
                             splits: (splitResult.records ?? []).map(s => ({ user_id: s.user_id, amount: s.amount })),
                             profile: userProfile,
