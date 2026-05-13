@@ -35,6 +35,7 @@ export const GUIDE_GROUPS = [
   'Understand',
   'Together',
   'Platform',
+  'Releases',
 ] as const;
 
 export const GUIDE_SECTIONS: GuideSection[] = [
@@ -62,4 +63,6 @@ export const GUIDE_SECTIONS: GuideSection[] = [
   { id: 'data', title: 'Import & export', icon: Database, group: 'Platform', blurb: 'Bank statements in. Spreadsheets, PDFs, and calendar files out.' },
   { id: 'settings', title: 'Settings reference', icon: Settings, group: 'Platform', blurb: 'Every toggle, organized by section.' },
   { id: 'troubleshooting', title: 'Troubleshooting', icon: HelpCircle, group: 'Platform', blurb: 'Stuck on something? Start here.' },
+
+  { id: 'whats-new', title: 'What’s new', icon: Sparkles, group: 'Releases', blurb: 'A running log of what shipped, in plain language.' },
 ];

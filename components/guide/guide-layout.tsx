@@ -36,6 +36,7 @@ const GesturesSection = dynamic(() => import('./sections/gestures').then(m => ({
 const DataSection = dynamic(() => import('./sections/data').then(m => ({ default: m.DataSection })), { ssr: false });
 const SettingsSection = dynamic(() => import('./sections/settings').then(m => ({ default: m.SettingsSection })), { ssr: false });
 const TroubleshootingSection = dynamic(() => import('./sections/troubleshooting').then(m => ({ default: m.TroubleshootingSection })), { ssr: false });
+const WhatsNewSection = dynamic(() => import('./sections/whats-new').then(m => ({ default: m.WhatsNewSection })), { ssr: false });
 
 // The Novira root layout puts the page inside <main id="main-content"> which is
 // the actual scroll container (overflow-y-auto). Window scroll never fires for
@@ -157,6 +158,7 @@ export function GuideLayout() {
           <DataSection />
           <SettingsSection />
           <TroubleshootingSection />
+          <WhatsNewSection />
 
           <footer className="mt-16 rounded-3xl border border-white/10 bg-gradient-to-br from-primary/[0.06] via-fuchsia-500/[0.03] to-transparent p-8 text-center">
             <h3 className="text-xl font-semibold text-foreground">That’s the whole tour.</h3>

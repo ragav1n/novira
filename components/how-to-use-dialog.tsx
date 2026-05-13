@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
@@ -12,15 +12,30 @@ type HowToUseDialogProps = {
     onClose: () => void;
 };
 
+type StepGroup = 'Capture' | 'Plan' | 'Share' | 'Understand' | 'Platform';
+
+const GROUP_ORDER: StepGroup[] = ['Capture', 'Plan', 'Share', 'Understand', 'Platform'];
+
 export function HowToUseDialog({ isOpen, onClose }: HowToUseDialogProps) {
     const [mounted, setMounted] = useState(false);
+    const [activeGroup, setActiveGroup] = useState<StepGroup>('Capture');
+    const scrollRef = useRef<HTMLDivElement | null>(null);
 
     useEffect(() => {
         setMounted(true);
     }, []);
 
-    const steps = [
+    const steps: {
+        group: StepGroup;
+        icon: React.ReactNode;
+        accent: string;
+        title: string;
+        desc: string;
+        subPoints: string[];
+    }[] = [
+        // ─── Capture ─────────────────────────────────────────────
         {
+            group: 'Capture',
             icon: <Plus className="w-6 h-6 text-emerald-400" />,
             accent: 'from-emerald-500/30 to-teal-500/10',
             title: "Smart Expense Capture",
@@ -33,6 +48,21 @@ export function HowToUseDialog({ isOpen, onClose }: HowToUseDialogProps) {
             ]
         },
         {
+            group: 'Capture',
+            icon: <RefreshCcw className="w-6 h-6 text-orange-400" />,
+            accent: 'from-orange-500/30 to-amber-500/10',
+            title: "Recurring & Subscriptions",
+            desc: "Track everything that hits monthly in the Subscriptions tab. Novira watches your last three months and auto-detects subscriptions you forgot to add. It flags silent price drifts (e.g. Spotify ₹199 → ₹229) so you're never surprised. Bulk edit and Pause-Until make spring cleaning painless.",
+            subPoints: [
+                "Auto-detect subscriptions from 3 months of activity",
+                "Price-drift alerts on quiet price hikes",
+                "Pause, pin, bulk-edit",
+                "Export bill schedule as a calendar file"
+            ]
+        },
+        // ─── Plan ────────────────────────────────────────────────
+        {
+            group: 'Plan',
             icon: <Wallet className="w-6 h-6 text-primary" />,
             accent: 'from-primary/30 to-violet-500/10',
             title: "Living Dashboard",
@@ -45,30 +75,57 @@ export function HowToUseDialog({ isOpen, onClose }: HowToUseDialogProps) {
             ]
         },
         {
-            icon: <Hand className="w-6 h-6 text-fuchsia-400" />,
-            accent: 'from-fuchsia-500/30 to-pink-500/10',
-            title: "Gestures Built In",
-            desc: "Novira is gesture-first. Swipe-left on any transaction to reveal Edit and Delete with a satisfying spring. Pull-to-refresh anywhere on the dashboard. Drag panels in Settings → Dashboard layout to reorder. Long-press in Search to enter bulk-select mode.",
+            group: 'Plan',
+            icon: <PieChart className="w-6 h-6 text-pink-400" />,
+            accent: 'from-pink-500/30 to-fuchsia-500/10',
+            title: "Allowance & Guardrails",
+            desc: "Set a Monthly Allowance to see Safe-to-Spend at all times. Smart alerts fire at 80% and again near the limit. Use Add Funds for income, refunds, or bonuses without polluting expense reports. Privacy mode in the dashboard header blurs every amount on demand.",
             subPoints: [
-                "Swipe-left → Edit / Delete on every row",
-                "Pull-to-refresh on dashboard & lists",
-                "Drag-to-reorder dashboard panels per device",
-                "Soft haptics on installed iPhone version"
+                "Monthly allowance with weighted pacing",
+                "Overspend safety alerts (80% / near-limit)",
+                "Add Funds for income & refunds",
+                "One-tap privacy blur"
             ]
         },
         {
-            icon: <Smartphone className="w-6 h-6 text-sky-400" />,
-            accent: 'from-sky-500/30 to-cyan-500/10',
-            title: "Install Anywhere",
-            desc: "Novira runs in your browser today, on your home screen tomorrow. One tap on iPhone (Share → Add to Home Screen), Android (three dots → Install app), or desktop Chrome / Edge (install icon in the address bar) — Novira gets its own icon, opens in a clean window, and unlocks offline + push.",
+            group: 'Plan',
+            icon: <Tag className="w-6 h-6 text-cyan-400" />,
+            accent: 'from-cyan-500/30 to-teal-500/10',
+            title: "Mission Buckets",
+            desc: "Create a Mission Bucket for trips or big purchases — each bucket has its own budget, currency, and date range. Use the Focus pill on the dashboard to isolate everything to one mission. Tags add a second dimension you can filter by anywhere.",
             subPoints: [
-                "Install banner appears automatically after 3s",
-                "Service worker keeps offline data and assets fresh",
-                "Background Sync flushes the queue when you reconnect",
-                "Tap Settings → About to see your installed version"
+                "Localized currency and budget per mission",
+                "Focus mode isolates the entire dashboard",
+                "Transaction tags for cross-cutting filters"
             ]
         },
         {
+            group: 'Plan',
+            icon: <Target className="w-6 h-6 text-emerald-400" />,
+            accent: 'from-emerald-500/30 to-green-500/10',
+            title: "Savings Goals",
+            desc: "Set targets like 'New Car' or 'Emergency Fund' and log periodic deposits. The Goals tab tracks progress, deposit history, and milestones. The What-If simulator on Analytics tells you how many months sooner you'd hit a goal if you cut a category.",
+            subPoints: [
+                "Visual progress with milestone markers",
+                "Deposit log history",
+                "What-If simulator links cuts to goal dates"
+            ]
+        },
+        {
+            group: 'Plan',
+            icon: <CalendarClock className="w-6 h-6 text-amber-400" />,
+            accent: 'from-amber-500/30 to-yellow-500/10',
+            title: "Calendar & Cashflow",
+            desc: "The cash flow calendar visualises day-by-day spending so heavy weeks pop out. Tap any day to drill in. Combined with the dashboard's Cashflow Forecast, you always know what's behind and what's ahead.",
+            subPoints: [
+                "Day-by-day cash flow heatmap",
+                "Drill into any day's transactions",
+                "End-of-month trajectory line"
+            ]
+        },
+        // ─── Share ───────────────────────────────────────────────
+        {
+            group: 'Share',
             icon: <Users className="w-6 h-6 text-blue-400" />,
             accent: 'from-blue-500/30 to-indigo-500/10',
             title: "Splits & Friends",
@@ -81,6 +138,7 @@ export function HowToUseDialog({ isOpen, onClose }: HowToUseDialogProps) {
             ]
         },
         {
+            group: 'Share',
             icon: <Home className="w-6 h-6 text-indigo-400" />,
             accent: 'from-indigo-500/30 to-purple-500/10',
             title: "Dedicated Workspaces",
@@ -91,75 +149,9 @@ export function HowToUseDialog({ isOpen, onClose }: HowToUseDialogProps) {
                 "Per-workspace transaction history & analytics"
             ]
         },
+        // ─── Understand ──────────────────────────────────────────
         {
-            icon: <Tag className="w-6 h-6 text-cyan-400" />,
-            accent: 'from-cyan-500/30 to-teal-500/10',
-            title: "Mission Buckets",
-            desc: "Create a Mission Bucket for trips or big purchases — each bucket has its own budget, currency, and date range. Use the Focus pill on the dashboard to isolate everything to one mission. Tags add a second dimension you can filter by anywhere.",
-            subPoints: [
-                "Localized currency and budget per mission",
-                "Focus mode isolates the entire dashboard",
-                "Transaction tags for cross-cutting filters"
-            ]
-        },
-        {
-            icon: <Target className="w-6 h-6 text-emerald-400" />,
-            accent: 'from-emerald-500/30 to-green-500/10',
-            title: "Savings Goals",
-            desc: "Set targets like 'New Car' or 'Emergency Fund' and log periodic deposits. The Goals tab tracks progress, deposit history, and milestones. The What-If simulator on Analytics tells you how many months sooner you'd hit a goal if you cut a category.",
-            subPoints: [
-                "Visual progress with milestone markers",
-                "Deposit log history",
-                "What-If simulator links cuts to goal dates"
-            ]
-        },
-        {
-            icon: <RefreshCcw className="w-6 h-6 text-orange-400" />,
-            accent: 'from-orange-500/30 to-amber-500/10',
-            title: "Recurring & Subscriptions",
-            desc: "Track everything that hits monthly in the Subscriptions tab. Novira watches your last three months and auto-detects subscriptions you forgot to add. It flags silent price drifts (e.g. Spotify ₹199 → ₹229) so you're never surprised. Bulk edit and Pause-Until make spring cleaning painless.",
-            subPoints: [
-                "Auto-detect subscriptions from 3 months of activity",
-                "Price-drift alerts on quiet price hikes",
-                "Pause, pin, bulk-edit",
-                "Export bill schedule as a calendar file"
-            ]
-        },
-        {
-            icon: <Bell className="w-6 h-6 text-yellow-400" />,
-            accent: 'from-yellow-500/30 to-orange-500/10',
-            title: "Bills & Nudges",
-            desc: "Opt into push notifications in Settings → Notifications and Novira can quietly buzz you for things that matter: a bill due tomorrow, a spending pace warning at 80% of allowance, a bucket deadline, or a daily / weekly recap. Quiet hours respect your local time.",
-            subPoints: [
-                "Bill reminders — off, 1 day, 3 days, or a week",
-                "Spending-pace nudges at 80% of allowance",
-                "Daily / weekly digest pushes",
-                "Quiet hours (default 22:00 → 07:00)"
-            ]
-        },
-        {
-            icon: <CalendarClock className="w-6 h-6 text-amber-400" />,
-            accent: 'from-amber-500/30 to-yellow-500/10',
-            title: "Calendar & Cashflow",
-            desc: "The cash flow calendar visualises day-by-day spending so heavy weeks pop out. Tap any day to drill in. Combined with the dashboard's Cashflow Forecast, you always know what's behind and what's ahead.",
-            subPoints: [
-                "Day-by-day cash flow heatmap",
-                "Drill into any day's transactions",
-                "End-of-month trajectory line"
-            ]
-        },
-        {
-            icon: <MapPin className="w-6 h-6 text-rose-400" />,
-            accent: 'from-rose-500/30 to-pink-500/10',
-            title: "Expense Map",
-            desc: "Every geo-tagged spend appears on the Expense Map. Drag a pin anywhere, switch to Heatmap for density, or Trip Trails to see day-by-day flows. The map remembers merchants so suggestions get sharper over time.",
-            subPoints: [
-                "Drag-drop pins, Heatmap & Trip Trails",
-                "Smart Quick Pins from your visit history",
-                "Place-aware default suggestions"
-            ]
-        },
-        {
+            group: 'Understand',
             icon: <Search className="w-6 h-6 text-violet-400" />,
             accent: 'from-violet-500/30 to-purple-500/10',
             title: "Search & Analytics",
@@ -172,18 +164,99 @@ export function HowToUseDialog({ isOpen, onClose }: HowToUseDialogProps) {
             ]
         },
         {
-            icon: <PieChart className="w-6 h-6 text-pink-400" />,
-            accent: 'from-pink-500/30 to-fuchsia-500/10',
-            title: "Allowance & Guardrails",
-            desc: "Set a Monthly Allowance to see Safe-to-Spend at all times. Smart alerts fire at 80% and again near the limit. Use Add Funds for income, refunds, or bonuses without polluting expense reports. Privacy mode in the dashboard header blurs every amount on demand.",
+            group: 'Understand',
+            icon: <MapPin className="w-6 h-6 text-rose-400" />,
+            accent: 'from-rose-500/30 to-pink-500/10',
+            title: "Expense Map",
+            desc: "Every geo-tagged spend appears on the Expense Map. Drag a pin anywhere, switch to Heatmap for density, or Trip Trails to see day-by-day flows. The map remembers merchants so suggestions get sharper over time.",
             subPoints: [
-                "Monthly allowance with weighted pacing",
-                "Overspend safety alerts (80% / near-limit)",
-                "Add Funds for income & refunds",
-                "One-tap privacy blur"
+                "Drag-drop pins, Heatmap & Trip Trails",
+                "Smart Quick Pins from your visit history",
+                "Place-aware default suggestions"
+            ]
+        },
+        // ─── Platform ────────────────────────────────────────────
+        {
+            group: 'Platform',
+            icon: <Smartphone className="w-6 h-6 text-sky-400" />,
+            accent: 'from-sky-500/30 to-cyan-500/10',
+            title: "Install Anywhere",
+            desc: "Novira runs in your browser today, on your home screen tomorrow. One tap on iPhone (Share → Add to Home Screen), Android (three dots → Install app), or desktop Chrome / Edge (install icon in the address bar) — Novira gets its own icon, opens in a clean window, and unlocks offline + push.",
+            subPoints: [
+                "Install banner appears automatically after 3s",
+                "Service worker keeps offline data and assets fresh",
+                "Background Sync flushes the queue when you reconnect",
+                "Tap Settings → About to see your installed version"
+            ]
+        },
+        {
+            group: 'Platform',
+            icon: <Hand className="w-6 h-6 text-fuchsia-400" />,
+            accent: 'from-fuchsia-500/30 to-pink-500/10',
+            title: "Gestures Built In",
+            desc: "Novira is gesture-first. Swipe-left on any transaction to reveal Edit and Delete with a satisfying spring. Pull-to-refresh anywhere on the dashboard. Drag panels in Settings → Dashboard layout to reorder. Long-press in Search to enter bulk-select mode.",
+            subPoints: [
+                "Swipe-left → Edit / Delete on every row",
+                "Pull-to-refresh on dashboard & lists",
+                "Drag-to-reorder dashboard panels per device",
+                "Soft haptics on installed iPhone version"
+            ]
+        },
+        {
+            group: 'Platform',
+            icon: <Bell className="w-6 h-6 text-yellow-400" />,
+            accent: 'from-yellow-500/30 to-orange-500/10',
+            title: "Bills & Nudges",
+            desc: "Opt into push notifications in Settings → Notifications and Novira can quietly buzz you for things that matter: a bill due tomorrow, a spending pace warning at 80% of allowance, a bucket deadline, or a daily / weekly recap. Quiet hours respect your local time.",
+            subPoints: [
+                "Bill reminders — off, 1 day, 3 days, or a week",
+                "Spending-pace nudges at 80% of allowance",
+                "Daily / weekly digest pushes",
+                "Quiet hours (default 22:00 → 07:00)"
             ]
         }
     ];
+
+    // Index of the first step in each group, for the pill-strip jump-to behaviour
+    const firstIndexByGroup = useMemo(() => {
+        const m = new Map<StepGroup, number>();
+        steps.forEach((s, i) => { if (!m.has(s.group)) m.set(s.group, i); });
+        return m;
+    }, [steps]);
+
+    // Track which group's region is currently in view inside the scrollable area
+    useEffect(() => {
+        if (!isOpen || !mounted) return;
+        const root = scrollRef.current;
+        if (!root) return;
+        const observer = new IntersectionObserver(
+            (entries) => {
+                // Pick the topmost intersecting marker
+                const visible = entries
+                    .filter(e => e.isIntersecting)
+                    .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+                if (visible.length > 0) {
+                    const g = visible[0].target.getAttribute('data-group') as StepGroup | null;
+                    if (g) setActiveGroup(g);
+                }
+            },
+            { root, rootMargin: '-20% 0px -70% 0px', threshold: 0 }
+        );
+        // Re-query each open since elements remount
+        const nodes = root.querySelectorAll<HTMLElement>('[data-group]');
+        nodes.forEach(n => observer.observe(n));
+        return () => observer.disconnect();
+    }, [isOpen, mounted]);
+
+    const jumpToGroup = (group: StepGroup) => {
+        const root = scrollRef.current;
+        if (!root) return;
+        const target = root.querySelector<HTMLElement>(`[data-group="${group}"]`);
+        if (!target) return;
+        // Scroll within the dialog's overflow container, not the window
+        const top = target.offsetTop - 8;
+        root.scrollTo({ top, behavior: 'smooth' });
+    };
 
     if (!mounted) return null;
 
@@ -240,15 +313,62 @@ export function HowToUseDialog({ isOpen, onClose }: HowToUseDialogProps) {
                                 </button>
                             </div>
 
+                            {/* Quick-jump pill strip */}
+                            <div className="relative shrink-0 border-b border-white/5 bg-black/30 backdrop-blur-xl z-10 px-4 sm:px-8 py-2.5 overflow-x-auto custom-scrollbar-horizontal">
+                                <div className="flex items-center gap-1.5 min-w-max">
+                                    {GROUP_ORDER.map((g) => {
+                                        const isActive = activeGroup === g;
+                                        const count = steps.filter(s => s.group === g).length;
+                                        return (
+                                            <button
+                                                key={g}
+                                                type="button"
+                                                onClick={() => jumpToGroup(g)}
+                                                className={`relative inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold transition-all duration-300 ${
+                                                    isActive
+                                                        ? 'bg-primary/20 text-white border border-primary/40 shadow-[0_0_12px_rgba(138,43,226,0.25)]'
+                                                        : 'bg-white/[0.03] text-white/65 border border-white/10 hover:text-white hover:border-white/20'
+                                                }`}
+                                            >
+                                                {isActive && (
+                                                    <motion.span
+                                                        layoutId="pill-active-dot"
+                                                        className="w-1.5 h-1.5 rounded-full bg-primary shadow-[0_0_8px_rgba(138,43,226,0.7)]"
+                                                        transition={{ type: 'spring', stiffness: 400, damping: 28 }}
+                                                    />
+                                                )}
+                                                {g}
+                                                <span className={`ml-0.5 text-[9.5px] font-mono ${isActive ? 'text-white/80' : 'text-white/40'}`}>
+                                                    {count}
+                                                </span>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+
                             {/* Scrollable Content Area - Single Column */}
-                            <div className="flex-1 overflow-y-auto custom-scrollbar px-4 sm:px-8 py-4 sm:py-5">
+                            <div ref={scrollRef} className="flex-1 overflow-y-auto custom-scrollbar px-4 sm:px-8 py-4 sm:py-5">
                                 <div className="space-y-3 pb-2">
-                                    {steps.map((step, i) => (
+                                    {steps.map((step, i) => {
+                                        const isGroupStart = firstIndexByGroup.get(step.group) === i;
+                                        return (
+                                        <div key={i} data-group={isGroupStart ? step.group : undefined}>
+                                            {isGroupStart && (
+                                                <motion.div
+                                                    initial={{ opacity: 0, x: -8 }}
+                                                    animate={{ opacity: 1, x: 0 }}
+                                                    transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+                                                    className="flex items-center gap-2 mt-4 mb-2 first:mt-0"
+                                                >
+                                                    <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">{step.group}</span>
+                                                    <span className="flex-1 h-px bg-gradient-to-r from-primary/30 to-transparent" />
+                                                </motion.div>
+                                            )}
                                         <motion.div
-                                            key={i}
                                             initial={{ opacity: 0, y: 14 }}
                                             animate={{ opacity: 1, y: 0 }}
-                                            transition={{ delay: 0.08 + i * 0.04, duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+                                            transition={{ delay: 0.08 + i * 0.03, duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
                                             className="group relative p-5 sm:p-6 rounded-3xl bg-white/[0.03] border border-white/5 hover:bg-white/[0.06] hover:border-white/15 transition-all duration-500 overflow-hidden"
                                         >
                                             {/* Per-card accent glow — fades in on hover */}
@@ -292,7 +412,9 @@ export function HowToUseDialog({ isOpen, onClose }: HowToUseDialogProps) {
                                                 </div>
                                             </div>
                                         </motion.div>
-                                    ))}
+                                        </div>
+                                        );
+                                    })}
                                 </div>
                             </div>
 
@@ -333,6 +455,12 @@ export function HowToUseDialog({ isOpen, onClose }: HowToUseDialogProps) {
                             }
                             .custom-scrollbar::-webkit-scrollbar-thumb:hover {
                                 background: rgba(255, 255, 255, 0.2);
+                            }
+                            .custom-scrollbar-horizontal::-webkit-scrollbar {
+                                height: 0;
+                            }
+                            .custom-scrollbar-horizontal {
+                                scrollbar-width: none;
                             }
                         `}</style>
                     </motion.div>

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, CheckCircle2, Zap, Users, RefreshCw, BarChart3, QrCode, Upload, Bell, Globe, FileDown, Target, Calendar, Home } from 'lucide-react';
+import { X, CheckCircle2, Zap, Users, RefreshCw, BarChart3, QrCode, Upload, Bell, Globe, FileDown, Target, Calendar, Home, Smartphone, Hand, MapPin, Receipt } from 'lucide-react';
 import { WELCOME_FEATURES } from '@/lib/feature-flags';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -26,6 +26,10 @@ const ICON_MAP: Record<string, any> = {
     target: Target,
     calendar: Calendar,
     home: Home,
+    mobile: Smartphone,
+    gestures: Hand,
+    map: MapPin,
+    receipt: Receipt,
 };
 
 const COLOR_MAP: Record<string, string> = {
@@ -34,12 +38,16 @@ const COLOR_MAP: Record<string, string> = {
     qr: 'text-cyan-400 bg-cyan-400/10 border-cyan-400/20 group-hover:bg-cyan-400/20 group-hover:border-cyan-400/40',
     upload: 'text-indigo-400 bg-indigo-400/10 border-indigo-400/20 group-hover:bg-indigo-400/20 group-hover:border-indigo-400/40',
     chart: 'text-violet-400 bg-violet-400/10 border-violet-400/20 group-hover:bg-violet-400/20 group-hover:border-violet-400/40',
-    bell: 'text-rose-400 bg-rose-400/10 border-rose-400/20 group-hover:bg-rose-400/20 group-hover:border-rose-400/40',
+    bell: 'text-yellow-400 bg-yellow-400/10 border-yellow-400/20 group-hover:bg-yellow-400/20 group-hover:border-yellow-400/40',
     globe: 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20 group-hover:bg-emerald-400/20 group-hover:border-emerald-400/40',
     export: 'text-pink-400 bg-pink-400/10 border-pink-400/20 group-hover:bg-pink-400/20 group-hover:border-pink-400/40',
     target: 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20 group-hover:bg-emerald-400/20 group-hover:border-emerald-400/40',
     calendar: 'text-orange-400 bg-orange-400/10 border-orange-400/20 group-hover:bg-orange-400/20 group-hover:border-orange-400/40',
-    home: 'text-rose-400 bg-rose-400/10 border-rose-400/20 group-hover:bg-rose-400/20 group-hover:border-rose-400/40',
+    home: 'text-indigo-400 bg-indigo-400/10 border-indigo-400/20 group-hover:bg-indigo-400/20 group-hover:border-indigo-400/40',
+    mobile: 'text-sky-400 bg-sky-400/10 border-sky-400/20 group-hover:bg-sky-400/20 group-hover:border-sky-400/40',
+    gestures: 'text-fuchsia-400 bg-fuchsia-400/10 border-fuchsia-400/20 group-hover:bg-fuchsia-400/20 group-hover:border-fuchsia-400/40',
+    map: 'text-rose-400 bg-rose-400/10 border-rose-400/20 group-hover:bg-rose-400/20 group-hover:border-rose-400/40',
+    receipt: 'text-lime-400 bg-lime-400/10 border-lime-400/20 group-hover:bg-lime-400/20 group-hover:border-lime-400/40',
 };
 
 export function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {

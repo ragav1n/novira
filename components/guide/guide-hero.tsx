@@ -97,6 +97,7 @@ export function GuideHero() {
               Jump to
             </div>
             {[
+              'whats-new',
               'adding-transactions',
               'splits',
               'recurring',

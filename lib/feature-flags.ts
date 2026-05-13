@@ -28,63 +28,63 @@ export const LATEST_FEATURE_ANNOUNCEMENT = {
 
 export const WELCOME_FEATURES = [
     {
-        title: 'Seamless Tracking',
-        description: 'Log daily transactions in seconds with smart category detection.',
-        icon: 'zap'
+        title: 'Install Anywhere',
+        description: 'One-tap install on iPhone, Android, Mac, and Windows — own icon, works offline, no app store.',
+        icon: 'mobile'
+    },
+    {
+        title: 'AI Receipt Scanning',
+        description: 'Snap a receipt — Novira reads the amount, merchant, date, and category in under two seconds.',
+        icon: 'receipt'
     },
     {
         title: 'Smart Bill Splitting',
-        description: 'Divide costs among friends or groups with flexible splitting rules.',
+        description: 'Even, custom, or share-weighted splits. Smart Settle clears all debts in the fewest transfers.',
         icon: 'users'
     },
     {
-        title: 'QR Code Sharing',
-        description: 'Instantly add friends or join groups by scanning their unique QR code.',
-        icon: 'qr'
+        title: 'Swipe Gestures',
+        description: 'Swipe-left to edit or delete, pull to refresh, drag to reorder — Novira gets faster the more you use it.',
+        icon: 'gestures'
     },
     {
-        title: 'Bank Statement Import',
-        description: 'Upload your CSV bank statements to bulk-import data without manual entry.',
-        icon: 'upload'
+        title: 'Multi-Currency',
+        description: '20 currencies with live exchange rates and a base-currency that stays steady over time.',
+        icon: 'globe'
+    },
+    {
+        title: 'Subscription Manager',
+        description: 'Auto-detect subscriptions and quietly flag silent price hikes before they pile up.',
+        icon: 'calendar'
     },
     {
         title: 'Advanced Analytics',
-        description: 'Visualize your spending habits with beautiful, interactive charts and insights.',
+        description: 'Custom date ranges, beautiful charts, AI insights, and a What-If simulator tied to your goals.',
         icon: 'chart'
     },
     {
-        title: 'Intelligent Alerts',
-        description: 'Set custom spending limits and get notified before you overspend.',
-        icon: 'bell'
-    },
-    {
         title: 'Dedicated Workspaces',
-        description: 'Isolate personal finances from shared couple/home finances perfectly.',
+        description: 'Personal, Couple, Home, and Trip — each with its own budget, history, and analytics.',
         icon: 'home'
     },
     {
         title: 'Savings Goals',
-        description: 'Track long-term financial targets with deposits and visual progress.',
+        description: 'Set targets, log deposits, and see how many months sooner a category cut gets you there.',
         icon: 'target'
     },
     {
-        title: 'Subscription Manager',
-        description: 'See all recurring expenses in one place to manage monthly drain.',
-        icon: 'calendar'
+        title: 'Bills & Nudges',
+        description: 'Opt-in push for bills, pace warnings, and daily or weekly digests — with quiet hours.',
+        icon: 'bell'
     },
     {
-        title: 'Multi-Currency',
-        description: 'Spend globally with automatic conversions and historical rates.',
-        icon: 'globe'
-    },
-    {
-        title: 'Map & Location Tracking',
-        description: 'Tag expenses with locations, drop a pin anywhere on the map, and visualize your spending journey interactively.',
+        title: 'Map & Location',
+        description: 'Tag expenses anywhere on Earth, switch to heatmap, replay a trip as a trail of pins.',
         icon: 'map'
     },
     {
         title: 'Flexible Exports',
-        description: 'Generate professional PDF or CSV reports for your accounting needs.',
+        description: 'Multi-page PDFs, CSV, and an ICS bill schedule for Google, Apple, or Outlook calendar.',
         icon: 'export'
     }
 ];
