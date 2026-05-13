@@ -2,9 +2,10 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-    Plus, Pencil, Archive, ArchiveRestore, Trash2, Star, StarOff, Scale,
+    Plus, Pencil, Archive, ArchiveRestore, Trash2, Star, StarOff, Scale, Wand2,
     Wallet, Landmark, PiggyBank, CreditCard, Smartphone, CircleDollarSign,
 } from 'lucide-react';
+import { BulkAssignByPaymentDialog } from './bulk-assign-by-payment-dialog';
 import { supabase } from '@/lib/supabase';
 import { useUserPreferences } from '@/components/providers/user-preferences-provider';
 import { Button } from '@/components/ui/button';
@@ -88,6 +89,7 @@ export function AccountsSection({ defaultCurrency, formatCurrency }: Props) {
     // Opening balance is added client-side after a currency conversion.
     const [activity, setActivity] = useState<Record<string, number>>({});
     const [reconciling, setReconciling] = useState<Account | null>(null);
+    const [bulkAssignOpen, setBulkAssignOpen] = useState(false);
 
     const active = accounts.filter(a => !a.archived_at);
     const archived = accounts.filter(a => !!a.archived_at);
@@ -377,10 +379,28 @@ export function AccountsSection({ defaultCurrency, formatCurrency }: Props) {
                 </details>
             )}
 
-            <Button onClick={openNew} variant="outline" size="sm" className="w-full">
-                <Plus className="w-4 h-4 mr-2" />
-                Add account
-            </Button>
+            <div className="grid grid-cols-2 gap-2">
+                <Button onClick={openNew} variant="outline" size="sm">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add account
+                </Button>
+                <Button
+                    onClick={() => setBulkAssignOpen(true)}
+                    variant="outline"
+                    size="sm"
+                    disabled={active.length < 2}
+                    title={active.length < 2 ? 'Add another account first' : 'Reassign historical tx by payment method'}
+                >
+                    <Wand2 className="w-4 h-4 mr-2" />
+                    Bulk reassign
+                </Button>
+            </div>
+
+            <BulkAssignByPaymentDialog
+                open={bulkAssignOpen}
+                onOpenChange={setBulkAssignOpen}
+                onApplied={() => { /* realtime + dispatch refresh the section */ }}
+            />
 
             <Dialog open={!!editing} onOpenChange={(o) => { if (!o) setEditing(null); }}>
                 <DialogContent className="max-w-md p-0 gap-0 overflow-hidden">
