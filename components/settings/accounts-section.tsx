@@ -76,7 +76,7 @@ interface Props {
 }
 
 export function AccountsSection({ defaultCurrency, formatCurrency }: Props) {
-    const { userId } = useUserPreferences();
+    const { userId, currency: baseCurrency, convertAmount } = useUserPreferences();
     const {
         accounts, loading, createAccount, updateAccount, archiveAccount,
         deleteAccount, setPrimary,
@@ -84,7 +84,9 @@ export function AccountsSection({ defaultCurrency, formatCurrency }: Props) {
     const [editing, setEditing] = useState<DraftAccount | null>(null);
     const [confirmDelete, setConfirmDelete] = useState<Account | null>(null);
     const [saving, setSaving] = useState(false);
-    const [balances, setBalances] = useState<Record<string, number>>({});
+    // Activity (signed Σ converted_amount) in the user's base currency, per account.
+    // Opening balance is added client-side after a currency conversion.
+    const [activity, setActivity] = useState<Record<string, number>>({});
     const [reconciling, setReconciling] = useState<Account | null>(null);
 
     const active = accounts.filter(a => !a.archived_at);
@@ -98,10 +100,10 @@ export function AccountsSection({ defaultCurrency, formatCurrency }: Props) {
             return;
         }
         const map: Record<string, number> = {};
-        for (const row of (data ?? []) as { account_id: string; balance: number }[]) {
-            map[row.account_id] = Number(row.balance);
+        for (const row of (data ?? []) as { account_id: string; activity_base: number }[]) {
+            map[row.account_id] = Number(row.activity_base);
         }
-        setBalances(map);
+        setActivity(map);
     }, [userId]);
 
     useEffect(() => { fetchBalances(); }, [fetchBalances, accounts]);
@@ -209,20 +211,28 @@ export function AccountsSection({ defaultCurrency, formatCurrency }: Props) {
                 )}
                 {!loading && active.map(a => {
                     const Icon = TYPE_ICONS[a.type] || CircleDollarSign;
-                    const computed = balances[a.id];
+                    // Balance in base currency: opening (account.currency → base)
+                    // + activity (already in base from the RPC).
+                    const activityVal = activity[a.id];
+                    const openingInBase = convertAmount(a.opening_balance, a.currency, baseCurrency);
+                    const computed = activityVal === undefined ? undefined : openingInBase + activityVal;
                     const isCard = a.type === 'credit_card';
                     // For credit cards, "balance" goes negative as you charge.
-                    // Surface the amount owed as a positive number plus utilization
-                    // against the credit limit.
+                    // Surface the amount owed as a positive number plus utilization.
                     const balanceLabel = computed === undefined
                         ? null
                         : isCard
                             ? (computed >= 0
-                                ? `${formatCurrency(computed, a.currency)} available`
-                                : `${formatCurrency(-computed, a.currency)} owed`)
-                            : formatCurrency(computed, a.currency);
-                    const utilizationPct = (isCard && a.credit_limit && a.credit_limit > 0 && computed !== undefined && computed < 0)
-                        ? Math.min(100, Math.round((-computed / a.credit_limit) * 100))
+                                ? `${formatCurrency(computed)} available`
+                                : `${formatCurrency(-computed)} owed`)
+                            : formatCurrency(computed);
+                    // Credit limit utilization needs to be compared in the same
+                    // currency: convert the limit to base for the math.
+                    const limitInBase = (a.credit_limit ?? null) !== null
+                        ? convertAmount(a.credit_limit as number, a.currency, baseCurrency)
+                        : null;
+                    const utilizationPct = (isCard && limitInBase && limitInBase > 0 && computed !== undefined && computed < 0)
+                        ? Math.min(100, Math.round((-computed / limitInBase) * 100))
                         : null;
                     // Non-credit accounts shouldn't have a negative computed balance;
                     // when they do, it's almost always backfill noise or an
@@ -486,7 +496,10 @@ export function AccountsSection({ defaultCurrency, formatCurrency }: Props) {
 
             <ReconcileDialog
                 account={reconciling}
-                computedBalance={reconciling ? balances[reconciling.id] : undefined}
+                computedBalance={reconciling && activity[reconciling.id] !== undefined
+                    ? convertAmount(reconciling.opening_balance, reconciling.currency, baseCurrency) + activity[reconciling.id]
+                    : undefined}
+                baseCurrency={baseCurrency}
                 formatCurrency={formatCurrency}
                 onOpenChange={(o) => { if (!o) setReconciling(null); }}
             />
@@ -518,11 +531,12 @@ export function AccountsSection({ defaultCurrency, formatCurrency }: Props) {
 interface ReconcileDialogProps {
     account: Account | null;
     computedBalance: number | undefined;
+    baseCurrency: string;
     formatCurrency: (amount: number, currency?: string) => string;
     onOpenChange: (open: boolean) => void;
 }
 
-function ReconcileDialog({ account, computedBalance, formatCurrency, onOpenChange }: ReconcileDialogProps) {
+function ReconcileDialog({ account, computedBalance, baseCurrency, formatCurrency, onOpenChange }: ReconcileDialogProps) {
     const [actualStr, setActualStr] = useState('');
 
     useEffect(() => {
@@ -536,9 +550,9 @@ function ReconcileDialog({ account, computedBalance, formatCurrency, onOpenChang
         ? '—'
         : isCard
             ? (computedBalance >= 0
-                ? `${formatCurrency(computedBalance, account.currency)} available`
-                : `${formatCurrency(-computedBalance, account.currency)} owed`)
-            : formatCurrency(computedBalance, account.currency);
+                ? `${formatCurrency(computedBalance)} available`
+                : `${formatCurrency(-computedBalance)} owed`)
+            : formatCurrency(computedBalance);
 
     const actual = parseFloat(actualStr);
     const actualValid = Number.isFinite(actual);
@@ -563,7 +577,7 @@ function ReconcileDialog({ account, computedBalance, formatCurrency, onOpenChang
                     </div>
                     <div>
                         <Label htmlFor="reconcile-actual" className="text-xs">
-                            Your actual balance{isCard ? ' (amount owed)' : ''}
+                            Your actual balance in {baseCurrency}{isCard ? ' (amount owed)' : ''}
                         </Label>
                         <Input
                             id="reconcile-actual"
@@ -587,7 +601,7 @@ function ReconcileDialog({ account, computedBalance, formatCurrency, onOpenChang
                             ) : (
                                 <>
                                     <p className="text-[13px] font-semibold">
-                                        Off by {formatCurrency(Math.abs(delta as number), account.currency)}
+                                        Off by {formatCurrency(Math.abs(delta as number))}
                                     </p>
                                     <p className="text-[10.5px] mt-1 opacity-80">
                                         {(delta as number) > 0
