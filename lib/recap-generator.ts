@@ -1,6 +1,7 @@
 import 'server-only';
 import Anthropic from '@anthropic-ai/sdk';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { getServerRatesMap } from '@/lib/server-exchange-rates';
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -136,7 +137,7 @@ export function previousPeriod(period: string) {
     return isYearKey(period) ? `${yearOf(period) - 1}-FY` : previousMonth(period);
 }
 
-function aggregate(txs: TxRow[], userId: string, baseCurrency: string) {
+function aggregate(txs: TxRow[], userId: string, baseCurrency: string, liveRates: Map<string, number>) {
     const byCategory = new Map<string, CategoryAgg>();
     const byPayment = new Map<string, number>();
     const byMerchant = new Map<string, MerchantAgg>();
@@ -159,12 +160,23 @@ function aggregate(txs: TxRow[], userId: string, baseCurrency: string) {
 
         const txCurr = (tx.currency || baseCurrency).toUpperCase();
         const baseCurr = (tx.base_currency || '').toUpperCase();
+        const targetBase = baseCurrency.toUpperCase();
         let converted = myShare;
-        if (txCurr !== baseCurrency.toUpperCase()) {
-            if (tx.exchange_rate && baseCurr === baseCurrency.toUpperCase()) {
+        if (txCurr !== targetBase) {
+            if (tx.exchange_rate && baseCurr === targetBase) {
+                // Stored rate is already to the user's CURRENT base. Trust it.
                 converted = myShare * Number(tx.exchange_rate);
-            } else if (tx.converted_amount && tx.amount) {
-                converted = myShare * (Number(tx.converted_amount) / Number(tx.amount));
+            } else {
+                // Either no stored rate, or rate is to an older base currency
+                // the user has since changed away from. Prefer a fresh rate;
+                // only fall back to stored converted_amount if we couldn't
+                // fetch anything (the rate map is empty without an API key).
+                const liveRate = liveRates.get(`${txCurr}->${targetBase}`);
+                if (liveRate !== undefined) {
+                    converted = myShare * liveRate;
+                } else if (tx.converted_amount && tx.amount) {
+                    converted = myShare * (Number(tx.converted_amount) / Number(tx.amount));
+                }
             }
         }
 
@@ -283,8 +295,26 @@ export async function generateRecap(
         fetchRange(prevRange.start, prevRange.end)
     ]);
 
-    const currentAgg = aggregate(current, userId, baseCurrency);
-    const prevAgg = aggregate(previous, userId, baseCurrency);
+    // Collect every distinct tx currency where the stored base_currency
+    // differs from the user's CURRENT base. Those rows' stored exchange_rate
+    // points to an old base; fetch fresh rates so the recap doesn't drift.
+    const targetBase = baseCurrency.toUpperCase();
+    const mismatchedCurrencies = new Set<string>();
+    for (const tx of [...current, ...previous]) {
+        const txCurr = (tx.currency || baseCurrency).toUpperCase();
+        const txBase = (tx.base_currency || '').toUpperCase();
+        if (txCurr !== targetBase && txBase !== targetBase) {
+            mismatchedCurrencies.add(txCurr);
+        }
+    }
+    const liveRates = mismatchedCurrencies.size > 0
+        ? await getServerRatesMap(
+            [...mismatchedCurrencies].map(from => ({ from, to: targetBase })),
+          )
+        : new Map<string, number>();
+
+    const currentAgg = aggregate(current, userId, baseCurrency, liveRates);
+    const prevAgg = aggregate(previous, userId, baseCurrency, liveRates);
 
     const analyzed: RecapAnalyzed = {
         transactions: currentAgg.count,
@@ -324,7 +354,7 @@ export async function generateRecap(
         }
         byMonth = Array.from(buckets.entries())
             .map(([m, slice]) => {
-                const agg = aggregate(slice, userId, baseCurrency);
+                const agg = aggregate(slice, userId, baseCurrency, liveRates);
                 return { month: m, total: Math.round(agg.total * 100) / 100, count: agg.count };
             })
             .sort((a, b) => a.month.localeCompare(b.month));

@@ -1,5 +1,6 @@
 import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { getServerRatesMap } from '@/lib/server-exchange-rates';
 
 export type SnapshotRange =
     | { kind: 'preset'; value: '1M' | 'LM' | '3M' | '6M' | '1Y' | 'ALL' }
@@ -37,13 +38,26 @@ function shareOf(tx: TxRow, userId: string): number {
     return Number(tx.amount);
 }
 
-function convert(tx: TxRow, share: number, baseCurrency: string): number {
+function convert(
+    tx: TxRow,
+    share: number,
+    baseCurrency: string,
+    liveRates: Map<string, number>,
+): number {
+    const targetBase = baseCurrency.toUpperCase();
     const txCurr = (tx.currency || baseCurrency).toUpperCase();
-    if (txCurr === baseCurrency.toUpperCase()) return share;
+    if (txCurr === targetBase) return share;
     const baseCurr = (tx.base_currency || '').toUpperCase();
-    if (tx.exchange_rate && baseCurr === baseCurrency.toUpperCase()) {
+    if (tx.exchange_rate && baseCurr === targetBase) {
+        // Stored rate is to current base — trust it.
         return share * Number(tx.exchange_rate);
     }
+    // Stored rate is to an old base (user changed base since this tx). Use a
+    // freshly fetched rate to avoid mixing units across base-currency changes.
+    const liveRate = liveRates.get(`${txCurr}->${targetBase}`);
+    if (liveRate !== undefined) return share * liveRate;
+    // No live rate (e.g. API key missing). Fall back to the stored ratio so
+    // the snapshot still returns something rather than skipping the row.
     if (tx.converted_amount && tx.amount) {
         return share * (Number(tx.converted_amount) / Number(tx.amount));
     }
@@ -127,6 +141,22 @@ export async function buildInsightsSnapshot(
     if (error) throw error;
     const txs = data || [];
 
+    // Fresh rates for any tx whose stored base_currency doesn't match the
+    // user's current base — same reasoning as recap-generator. Stored
+    // converted_amount drifts after a base-currency change.
+    const targetBase = baseCurrency;
+    const mismatchedCurrencies = new Set<string>();
+    for (const tx of txs) {
+        const txCurr = (tx.currency || baseCurrency).toUpperCase();
+        const txBase = (tx.base_currency || '').toUpperCase();
+        if (txCurr !== targetBase && txBase !== targetBase) {
+            mismatchedCurrencies.add(txCurr);
+        }
+    }
+    const liveRates = mismatchedCurrencies.size > 0
+        ? await getServerRatesMap([...mismatchedCurrencies].map(from => ({ from, to: targetBase })))
+        : new Map<string, number>();
+
     const byCategory = new Map<string, { total: number; count: number }>();
     const byMerchant = new Map<string, { total: number; count: number }>();
     const byPayment = new Map<string, { total: number; count: number }>();
@@ -141,7 +171,7 @@ export async function buildInsightsSnapshot(
     for (const tx of txs) {
         const share = shareOf(tx, userId);
         if (share <= 0) continue;
-        const amt = convert(tx, share, baseCurrency);
+        const amt = convert(tx, share, baseCurrency, liveRates);
 
         totalSpent += amt;
         txCount += 1;
