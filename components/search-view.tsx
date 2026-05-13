@@ -11,6 +11,7 @@ import { CATEGORY_COLORS, getIconForCategory, getCategoryLabel, CATEGORIES as SY
 import { TransactionRow } from '@/components/transaction-row';
 import { ReceiptViewerDialog } from '@/components/receipt-viewer-dialog';
 import { useReceiptViewer } from '@/hooks/useReceiptViewer';
+import { useAccounts } from '@/components/providers/accounts-provider';
 import { Transaction } from '@/types/transaction';
 import { enqueueMutation } from '@/lib/sync-manager';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -150,6 +151,7 @@ export function SearchView() {
     const { buckets } = useBucketsList();
     const { theme: themeConfig } = useWorkspaceTheme();
     const receiptViewer = useReceiptViewer();
+    const { activeAccountId } = useAccounts();
     // Bumped on each workspace/user change so in-flight fetches from a previous
     // workspace can't land their results on top of the new one.
     const fetchGenRef = useRef(0);
@@ -302,6 +304,12 @@ export function SearchView() {
                 query = query.eq('group_id', activeWorkspaceId);
             }
 
+            // Account filter — personal workspace only (group rows are on each
+            // member's own account, so a single-account filter would hide partners).
+            if (!activeWorkspaceId && activeAccountId) {
+                query = query.eq('account_id', activeAccountId);
+            }
+
             // Numeric shortcut: a leading operator (>, <, >=, <=, =) + number is
             // applied as an amount filter instead of a text search.
             const numeric = parseNumericQuery(debouncedSearchQuery);
@@ -399,7 +407,7 @@ export function SearchView() {
         } finally {
             if (fetchGenRef.current === myGen) setLoading(false);
         }
-    }, [activeWorkspaceId, debouncedSearchQuery, selectedCategories, selectedPayments, dateRange, priceRange, selectedBucketId, selectedTags, sortBy, maxPossiblePrice, showRecurringOnly, showExcludedOnly]);
+    }, [activeWorkspaceId, activeAccountId, debouncedSearchQuery, selectedCategories, selectedPayments, dateRange, priceRange, selectedBucketId, selectedTags, sortBy, maxPossiblePrice, showRecurringOnly, showExcludedOnly]);
 
     useEffect(() => {
         fetchGenRef.current++;

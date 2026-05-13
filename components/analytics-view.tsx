@@ -10,6 +10,7 @@ import { getIconForCategory } from '@/lib/categories';
 import { format, startOfMonth, endOfMonth, startOfWeek, startOfYear, subMonths, subYears, subDays, parseISO } from 'date-fns';
 import { useUserPreferences } from '@/components/providers/user-preferences-provider';
 import { useBucketsList, useBucketSpending } from '@/components/providers/buckets-provider';
+import { useAccounts } from '@/components/providers/accounts-provider';
 import { useWorkspaceTheme } from '@/hooks/useWorkspaceTheme';
 import { useTransactionInvalidationListener } from '@/hooks/useTransactionInvalidationListener';
 import { useAnalyticsData, type DateRange } from '@/hooks/useAnalyticsData';
@@ -61,6 +62,7 @@ export function AnalyticsView() {
     const [customEnd, setCustomEnd] = useState<string>('');
     const [activeTags, setActiveTags] = useState<string[]>([]);
     const { formatCurrency, currency, convertAmount, userId, activeWorkspaceId, ratesLastUpdated, firstDayOfWeek } = useUserPreferences();
+    const { activeAccountId } = useAccounts();
     const { activeWorkspace, theme: themeConfig } = useWorkspaceTheme('cyan');
 
     const { buckets } = useBucketsList();
@@ -130,6 +132,7 @@ export function AnalyticsView() {
                 userId,
                 workspaceId: activeWorkspaceId,
                 bucketId: selectedBucketId === 'all' ? undefined : selectedBucketId,
+                accountId: activeAccountId,
             };
 
             const [current, prior] = await Promise.all([
@@ -199,7 +202,7 @@ export function AnalyticsView() {
         } finally {
             if (fetchGenRef.current === myGen) setLoading(false);
         }
-    }, [userId, activeWorkspaceId, dateRange, selectedBucketId, customStart, customEnd]);
+    }, [userId, activeWorkspaceId, activeAccountId, dateRange, selectedBucketId, customStart, customEnd]);
 
     useEffect(() => {
         if (userId) {

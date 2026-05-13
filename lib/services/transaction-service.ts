@@ -15,13 +15,14 @@ export const TransactionService = {
     /**
      * Fetch transactions for the current user or workspace.
      */
-    async getTransactions(options: { 
-        userId: string; 
+    async getTransactions(options: {
+        userId: string;
         workspaceId?: string | null;
         limit?: number;
         startDate?: string;
         endDate?: string;
         bucketId?: string;
+        accountId?: string | null;
     }) {
         const baseQuery = supabase
             .from('transactions')
@@ -36,6 +37,12 @@ export const TransactionService = {
 
         if (options.bucketId) {
             query = query.eq('bucket_id', options.bucketId);
+        }
+
+        // Account filter only makes sense in personal scope; in a group
+        // workspace, each member's tx is on their own account.
+        if (!options.workspaceId && options.accountId) {
+            query = query.eq('account_id', options.accountId);
         }
 
         if (options.startDate) {
