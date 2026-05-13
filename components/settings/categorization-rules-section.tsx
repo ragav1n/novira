@@ -220,134 +220,190 @@ export function CategorizationRulesSection({ userId, rules, loading, buckets }: 
             </Button>
 
             <Dialog open={!!editing} onOpenChange={(o) => { if (!o) setEditing(null); }}>
-                <DialogContent className="max-w-md">
-                    <DialogHeader>
-                        <DialogTitle>{editing?.id ? 'Edit rule' : 'New rule'}</DialogTitle>
+                <DialogContent className="max-w-md p-0 gap-0 overflow-hidden">
+                    <DialogHeader className="px-5 py-4 border-b border-white/5">
+                        <DialogTitle className="text-base">{editing?.id ? 'Edit rule' : 'New rule'}</DialogTitle>
                     </DialogHeader>
-                    {editing && (
-                        <div className="space-y-4">
-                            <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                    <Label className="text-xs">When</Label>
-                                    <Select
-                                        value={editing.match_field}
-                                        onValueChange={(v) => setEditing({ ...editing, match_field: v as RuleMatchField })}
-                                    >
-                                        <SelectTrigger><SelectValue /></SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="description">Description</SelectItem>
-                                            <SelectItem value="place_name">Place name</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                                <div>
-                                    <Label className="text-xs">Match</Label>
-                                    <Select
-                                        value={editing.match_type}
-                                        onValueChange={(v) => setEditing({ ...editing, match_type: v as RuleMatchType })}
-                                    >
-                                        <SelectTrigger><SelectValue /></SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="contains">Contains</SelectItem>
-                                            <SelectItem value="equals">Equals</SelectItem>
-                                            <SelectItem value="regex">Regex</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                            </div>
 
-                            <div>
-                                <Label className="text-xs">Pattern</Label>
-                                <Input
-                                    value={editing.pattern}
-                                    onChange={(e) => setEditing({ ...editing, pattern: e.target.value })}
-                                    placeholder={editing.match_type === 'regex' ? '^uber\\b' : 'uber'}
-                                    maxLength={200}
-                                />
-                                <p className="text-[10px] text-muted-foreground/60 mt-1">Case-insensitive.</p>
-                            </div>
+                    {editing && (() => {
+                        const verb = editing.match_type === 'equals'
+                            ? 'equals'
+                            : editing.match_type === 'regex'
+                                ? 'matches'
+                                : 'contains';
+                        const fieldLabel = editing.match_field === 'description' ? 'description' : 'place name';
+                        const previewParts: string[] = [];
+                        if (editing.category) previewParts.push(`set category to ${getCategoryLabel(editing.category)}`);
+                        if (editing.bucket_id) {
+                            const b = buckets.find(x => x.id === editing.bucket_id);
+                            previewParts.push(`set bucket to ${b?.name ?? 'bucket'}`);
+                        }
+                        if (editing.exclude_from_allowance === true) previewParts.push('exclude from allowance');
+                        if (editing.exclude_from_allowance === false) previewParts.push('include in allowance');
+                        const previewReady = editing.pattern.trim().length > 0 && previewParts.length > 0;
 
-                            <div className="border-t border-white/5 pt-3 space-y-3">
-                                <p className="text-xs font-semibold text-muted-foreground">Then set</p>
+                        // Default values when a user toggles an action on.
+                        const defaultCategory = SYSTEM_CATEGORIES[0]?.id ?? 'food';
+                        const defaultBucketId = buckets.find(b => !b.is_archived)?.id ?? null;
 
-                                <div>
-                                    <Label className="text-xs">Category (optional)</Label>
-                                    <Select
-                                        value={editing.category ?? '__none__'}
-                                        onValueChange={(v) => setEditing({ ...editing, category: v === '__none__' ? null : v })}
-                                    >
-                                        <SelectTrigger><SelectValue placeholder="No change" /></SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="__none__">No change</SelectItem>
-                                            {SYSTEM_CATEGORIES.map(c => (
-                                                <SelectItem key={c.id} value={c.id}>{c.label}</SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-
-                                <div>
-                                    <Label className="text-xs">Bucket (optional)</Label>
-                                    <Select
-                                        value={editing.bucket_id ?? '__none__'}
-                                        onValueChange={(v) => setEditing({ ...editing, bucket_id: v === '__none__' ? null : v })}
-                                    >
-                                        <SelectTrigger><SelectValue placeholder="No change" /></SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="__none__">No change</SelectItem>
-                                            {buckets.filter(b => !b.is_archived).map(b => (
-                                                <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-
-                                <div>
-                                    <Label className="text-xs">Allowance (optional)</Label>
-                                    <Select
-                                        value={editing.exclude_from_allowance === null ? '__none__' : editing.exclude_from_allowance ? 'exclude' : 'include'}
-                                        onValueChange={(v) => setEditing({
-                                            ...editing,
-                                            exclude_from_allowance: v === '__none__' ? null : v === 'exclude',
-                                        })}
-                                    >
-                                        <SelectTrigger><SelectValue /></SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="__none__">No change</SelectItem>
-                                            <SelectItem value="include">Count in allowance</SelectItem>
-                                            <SelectItem value="exclude">Exclude from allowance</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-3 border-t border-white/5 pt-3">
-                                <div>
-                                    <Label className="text-xs">Priority</Label>
-                                    <Input
-                                        type="number"
-                                        value={editing.priority}
-                                        onChange={(e) => setEditing({ ...editing, priority: Number(e.target.value) || 0 })}
-                                    />
-                                </div>
-                                <div className="flex flex-col">
-                                    <Label className="text-xs">Active</Label>
-                                    <div className="flex items-center h-9 mt-0">
-                                        <Switch
-                                            checked={editing.is_active}
-                                            onCheckedChange={(next) => setEditing({ ...editing, is_active: next })}
+                        return (
+                            <>
+                                <div className="px-5 py-4 space-y-5">
+                                    {/* When */}
+                                    <div className="space-y-2">
+                                        <p className="text-[10px] font-semibold text-muted-foreground/70 uppercase tracking-wider">When</p>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-[12px] text-muted-foreground shrink-0">the</span>
+                                            <Select
+                                                value={editing.match_field}
+                                                onValueChange={(v) => setEditing({ ...editing, match_field: v as RuleMatchField })}
+                                            >
+                                                <SelectTrigger className="flex-1 h-9"><SelectValue /></SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="description">description</SelectItem>
+                                                    <SelectItem value="place_name">place name</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                            <Select
+                                                value={editing.match_type}
+                                                onValueChange={(v) => setEditing({ ...editing, match_type: v as RuleMatchType })}
+                                            >
+                                                <SelectTrigger className="flex-1 h-9"><SelectValue /></SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="contains">contains</SelectItem>
+                                                    <SelectItem value="equals">equals</SelectItem>
+                                                    <SelectItem value="regex">matches regex</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                        <Input
+                                            value={editing.pattern}
+                                            onChange={(e) => setEditing({ ...editing, pattern: e.target.value })}
+                                            placeholder={editing.match_type === 'regex' ? '^uber\\b' : 'uber'}
+                                            maxLength={200}
+                                            className="h-9"
+                                            autoFocus
                                         />
+                                        <p className="text-[10px] text-muted-foreground/50">
+                                            Case-insensitive · up to 200 characters
+                                        </p>
+                                    </div>
+
+                                    {/* Then set — toggleable action rows */}
+                                    <div className="space-y-2">
+                                        <p className="text-[10px] font-semibold text-muted-foreground/70 uppercase tracking-wider">Then</p>
+
+                                        <ActionRow
+                                            label="Set category"
+                                            enabled={editing.category !== null}
+                                            onToggle={(next) => setEditing({
+                                                ...editing,
+                                                category: next ? defaultCategory : null,
+                                            })}
+                                        >
+                                            <Select
+                                                value={editing.category ?? defaultCategory}
+                                                onValueChange={(v) => setEditing({ ...editing, category: v })}
+                                            >
+                                                <SelectTrigger className="h-8 text-[12px] w-[150px]"><SelectValue /></SelectTrigger>
+                                                <SelectContent>
+                                                    {SYSTEM_CATEGORIES.map(c => (
+                                                        <SelectItem key={c.id} value={c.id}>{c.label}</SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        </ActionRow>
+
+                                        <ActionRow
+                                            label="Move to bucket"
+                                            enabled={editing.bucket_id !== null}
+                                            onToggle={(next) => setEditing({
+                                                ...editing,
+                                                bucket_id: next ? defaultBucketId : null,
+                                            })}
+                                            disabledReason={!defaultBucketId ? 'Create a bucket first' : undefined}
+                                        >
+                                            <Select
+                                                value={editing.bucket_id ?? ''}
+                                                onValueChange={(v) => setEditing({ ...editing, bucket_id: v })}
+                                            >
+                                                <SelectTrigger className="h-8 text-[12px] w-[150px]"><SelectValue placeholder="Pick a bucket" /></SelectTrigger>
+                                                <SelectContent>
+                                                    {buckets.filter(b => !b.is_archived).map(b => (
+                                                        <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        </ActionRow>
+
+                                        <ActionRow
+                                            label="Adjust allowance"
+                                            enabled={editing.exclude_from_allowance !== null}
+                                            onToggle={(next) => setEditing({
+                                                ...editing,
+                                                exclude_from_allowance: next ? false : null,
+                                            })}
+                                        >
+                                            <Select
+                                                value={editing.exclude_from_allowance === true ? 'exclude' : 'include'}
+                                                onValueChange={(v) => setEditing({
+                                                    ...editing,
+                                                    exclude_from_allowance: v === 'exclude',
+                                                })}
+                                            >
+                                                <SelectTrigger className="h-8 text-[12px] w-[150px]"><SelectValue /></SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="include">Include</SelectItem>
+                                                    <SelectItem value="exclude">Exclude</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </ActionRow>
+                                    </div>
+
+                                    {/* Live preview */}
+                                    <div className={`rounded-lg border px-3 py-2.5 text-[11.5px] leading-relaxed transition-colors ${
+                                        previewReady
+                                            ? 'border-primary/20 bg-primary/5 text-primary/90'
+                                            : 'border-white/5 bg-secondary/5 text-muted-foreground/50 italic'
+                                    }`}>
+                                        {previewReady
+                                            ? <>If the {fieldLabel} {verb} <span className="font-semibold">&ldquo;{editing.pattern.trim()}&rdquo;</span>, {previewParts.join(' and ')}.</>
+                                            : 'Fill in a pattern and at least one action to see a preview.'}
+                                    </div>
+
+                                    {/* Priority + Active row */}
+                                    <div className="flex items-center justify-between gap-4 pt-3 border-t border-white/5">
+                                        <div className="flex items-center gap-2">
+                                            <Label htmlFor="rule-priority" className="text-[11px] text-muted-foreground">Priority</Label>
+                                            <Input
+                                                id="rule-priority"
+                                                type="number"
+                                                value={editing.priority}
+                                                onChange={(e) => setEditing({ ...editing, priority: Number(e.target.value) || 0 })}
+                                                className="h-8 w-[64px] text-[12px] tabular-nums"
+                                            />
+                                            <span className="text-[10px] text-muted-foreground/60">higher wins</span>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <Label htmlFor="rule-active" className="text-[11px] text-muted-foreground">Active</Label>
+                                            <Switch
+                                                id="rule-active"
+                                                checked={editing.is_active}
+                                                onCheckedChange={(next) => setEditing({ ...editing, is_active: next })}
+                                            />
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        </div>
-                    )}
-                    <DialogFooter>
-                        <Button variant="ghost" onClick={() => setEditing(null)} disabled={saving}>Cancel</Button>
-                        <Button onClick={handleSave} disabled={saving}>
-                            {saving ? 'Saving…' : 'Save'}
-                        </Button>
-                    </DialogFooter>
+
+                                <DialogFooter className="px-5 py-3 border-t border-white/5 bg-secondary/5">
+                                    <Button variant="ghost" onClick={() => setEditing(null)} disabled={saving}>Cancel</Button>
+                                    <Button onClick={handleSave} disabled={saving || !previewReady}>
+                                        {saving ? 'Saving…' : 'Save rule'}
+                                    </Button>
+                                </DialogFooter>
+                            </>
+                        );
+                    })()}
                 </DialogContent>
             </Dialog>
 
@@ -370,6 +426,56 @@ export function CategorizationRulesSection({ userId, rules, loading, buckets }: 
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
+        </div>
+    );
+}
+
+interface ActionRowProps {
+    label: string;
+    enabled: boolean;
+    onToggle: (next: boolean) => void;
+    disabledReason?: string;
+    children: React.ReactNode;
+}
+
+function ActionRow({ label, enabled, onToggle, disabledReason, children }: ActionRowProps) {
+    return (
+        <div className={`flex items-center justify-between gap-3 rounded-lg border px-3 py-2 transition-colors ${
+            enabled ? 'border-primary/15 bg-primary/5' : 'border-white/5 bg-secondary/5'
+        }`}>
+            <button
+                type="button"
+                onClick={() => !disabledReason && onToggle(!enabled)}
+                disabled={!!disabledReason}
+                className="flex-1 text-left disabled:opacity-50"
+            >
+                <p className={`text-[12.5px] font-medium ${enabled ? 'text-foreground' : 'text-muted-foreground'}`}>
+                    {label}
+                </p>
+                {disabledReason && (
+                    <p className="text-[10px] text-muted-foreground/60 mt-0.5">{disabledReason}</p>
+                )}
+            </button>
+            {enabled
+                ? <div className="shrink-0">{children}</div>
+                : (
+                    <Switch
+                        checked={false}
+                        onCheckedChange={() => !disabledReason && onToggle(true)}
+                        disabled={!!disabledReason}
+                        aria-label={`Enable: ${label}`}
+                    />
+                )}
+            {enabled && (
+                <button
+                    type="button"
+                    onClick={() => onToggle(false)}
+                    className="shrink-0 p-1 -m-1 text-muted-foreground/50 hover:text-muted-foreground"
+                    aria-label={`Disable: ${label}`}
+                >
+                    <span className="block w-4 text-center text-base leading-none">×</span>
+                </button>
+            )}
         </div>
     );
 }
