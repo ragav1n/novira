@@ -1,10 +1,12 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
-    Plus, Pencil, Archive, ArchiveRestore, Trash2, Star, StarOff,
+    Plus, Pencil, Archive, ArchiveRestore, Trash2, Star, StarOff, Scale,
     Wallet, Landmark, PiggyBank, CreditCard, Smartphone, CircleDollarSign,
 } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
+import { useUserPreferences } from '@/components/providers/user-preferences-provider';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -74,6 +76,7 @@ interface Props {
 }
 
 export function AccountsSection({ defaultCurrency, formatCurrency }: Props) {
+    const { userId } = useUserPreferences();
     const {
         accounts, loading, createAccount, updateAccount, archiveAccount,
         deleteAccount, setPrimary,
@@ -81,9 +84,34 @@ export function AccountsSection({ defaultCurrency, formatCurrency }: Props) {
     const [editing, setEditing] = useState<DraftAccount | null>(null);
     const [confirmDelete, setConfirmDelete] = useState<Account | null>(null);
     const [saving, setSaving] = useState(false);
+    const [balances, setBalances] = useState<Record<string, number>>({});
+    const [reconciling, setReconciling] = useState<Account | null>(null);
 
     const active = accounts.filter(a => !a.archived_at);
     const archived = accounts.filter(a => !!a.archived_at);
+
+    const fetchBalances = useCallback(async () => {
+        if (!userId) return;
+        const { data, error } = await supabase.rpc('compute_account_balances', { p_user_id: userId });
+        if (error) {
+            console.error('[AccountsSection] balances failed', error);
+            return;
+        }
+        const map: Record<string, number> = {};
+        for (const row of (data ?? []) as { account_id: string; balance: number }[]) {
+            map[row.account_id] = Number(row.balance);
+        }
+        setBalances(map);
+    }, [userId]);
+
+    useEffect(() => { fetchBalances(); }, [fetchBalances, accounts]);
+
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        const onChange = () => fetchBalances();
+        window.addEventListener('novira:expense-added', onChange);
+        return () => window.removeEventListener('novira:expense-added', onChange);
+    }, [fetchBalances]);
 
     const openNew = () => setEditing(emptyDraft(defaultCurrency));
     const openEdit = (a: Account) => setEditing({
@@ -181,6 +209,21 @@ export function AccountsSection({ defaultCurrency, formatCurrency }: Props) {
                 )}
                 {!loading && active.map(a => {
                     const Icon = TYPE_ICONS[a.type] || CircleDollarSign;
+                    const computed = balances[a.id];
+                    const isCard = a.type === 'credit_card';
+                    // For credit cards, "balance" goes negative as you charge.
+                    // Surface the amount owed as a positive number plus utilization
+                    // against the credit limit.
+                    const balanceLabel = computed === undefined
+                        ? null
+                        : isCard
+                            ? (computed >= 0
+                                ? `${formatCurrency(computed, a.currency)} available`
+                                : `${formatCurrency(-computed, a.currency)} owed`)
+                            : formatCurrency(computed, a.currency);
+                    const utilizationPct = (isCard && a.credit_limit && a.credit_limit > 0 && computed !== undefined && computed < 0)
+                        ? Math.min(100, Math.round((-computed / a.credit_limit) * 100))
+                        : null;
                     return (
                         <div key={a.id} className="flex items-center justify-between gap-2 p-3">
                             <button
@@ -199,12 +242,36 @@ export function AccountsSection({ defaultCurrency, formatCurrency }: Props) {
                                         <p className="text-[13px] font-semibold truncate">{a.name}</p>
                                         {a.is_primary && <Star className="w-3 h-3 text-amber-400 shrink-0" fill="currentColor" />}
                                     </div>
-                                    <p className="text-[10.5px] text-muted-foreground/60">
-                                        {ACCOUNT_TYPE_LABELS[a.type]} · Opening {formatCurrency(a.opening_balance, a.currency)}
-                                        {a.credit_limit !== null && ` · Limit ${formatCurrency(a.credit_limit, a.currency)}`}
+                                    <p className="text-[10.5px] text-muted-foreground/60 truncate">
+                                        {ACCOUNT_TYPE_LABELS[a.type]}
+                                        {balanceLabel && <> · <span className="text-foreground/80 font-semibold">{balanceLabel}</span></>}
+                                        {utilizationPct !== null && (
+                                            <> · <span className={utilizationPct >= 80 ? 'text-rose-400 font-semibold' : 'text-amber-300 font-semibold'}>{utilizationPct}% used</span></>
+                                        )}
                                     </p>
+                                    {utilizationPct !== null && a.credit_limit !== null && (
+                                        <div className="mt-1.5 h-1 rounded-full bg-white/5 overflow-hidden">
+                                            <div
+                                                className="h-full rounded-full transition-all"
+                                                style={{
+                                                    width: `${utilizationPct}%`,
+                                                    backgroundColor: utilizationPct >= 80 ? '#F43F5E' : utilizationPct >= 50 ? '#F59E0B' : a.color,
+                                                }}
+                                            />
+                                        </div>
+                                    )}
                                 </div>
                             </button>
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-muted-foreground hover:text-primary"
+                                onClick={() => setReconciling(a)}
+                                aria-label="Reconcile account"
+                                title="Reconcile"
+                            >
+                                <Scale className="w-4 h-4" />
+                            </Button>
                             {!a.is_primary && (
                                 <Button
                                     variant="ghost"
@@ -408,6 +475,13 @@ export function AccountsSection({ defaultCurrency, formatCurrency }: Props) {
                 </DialogContent>
             </Dialog>
 
+            <ReconcileDialog
+                account={reconciling}
+                computedBalance={reconciling ? balances[reconciling.id] : undefined}
+                formatCurrency={formatCurrency}
+                onOpenChange={(o) => { if (!o) setReconciling(null); }}
+            />
+
             <AlertDialog open={!!confirmDelete} onOpenChange={(o) => { if (!o) setConfirmDelete(null); }}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
@@ -429,5 +503,100 @@ export function AccountsSection({ defaultCurrency, formatCurrency }: Props) {
                 </AlertDialogContent>
             </AlertDialog>
         </div>
+    );
+}
+
+interface ReconcileDialogProps {
+    account: Account | null;
+    computedBalance: number | undefined;
+    formatCurrency: (amount: number, currency?: string) => string;
+    onOpenChange: (open: boolean) => void;
+}
+
+function ReconcileDialog({ account, computedBalance, formatCurrency, onOpenChange }: ReconcileDialogProps) {
+    const [actualStr, setActualStr] = useState('');
+
+    useEffect(() => {
+        if (account) setActualStr('');
+    }, [account]);
+
+    if (!account) return null;
+
+    const isCard = account.type === 'credit_card';
+    const computedDisplay = computedBalance === undefined
+        ? '—'
+        : isCard
+            ? (computedBalance >= 0
+                ? `${formatCurrency(computedBalance, account.currency)} available`
+                : `${formatCurrency(-computedBalance, account.currency)} owed`)
+            : formatCurrency(computedBalance, account.currency);
+
+    const actual = parseFloat(actualStr);
+    const actualValid = Number.isFinite(actual);
+    // For credit cards, the user enters the amount they OWE (a positive number),
+    // which corresponds to a negative computed balance.
+    const normalizedActual = isCard && actualValid ? -actual : actual;
+    const delta = (actualValid && computedBalance !== undefined)
+        ? normalizedActual - computedBalance
+        : null;
+    const inAgreement = delta !== null && Math.abs(delta) < 0.005;
+
+    return (
+        <Dialog open={!!account} onOpenChange={onOpenChange}>
+            <DialogContent className="max-w-md p-0 gap-0 overflow-hidden">
+                <DialogHeader className="px-5 py-4 border-b border-white/5">
+                    <DialogTitle className="text-base">Reconcile {account.name}</DialogTitle>
+                </DialogHeader>
+                <div className="px-5 py-4 space-y-4">
+                    <div className="rounded-xl border border-white/5 bg-secondary/10 px-3 py-2.5">
+                        <p className="text-[10.5px] uppercase tracking-wider text-muted-foreground/60">Novira computes</p>
+                        <p className="text-[15px] font-semibold tabular-nums mt-0.5">{computedDisplay}</p>
+                    </div>
+                    <div>
+                        <Label htmlFor="reconcile-actual" className="text-xs">
+                            Your actual balance{isCard ? ' (amount owed)' : ''}
+                        </Label>
+                        <Input
+                            id="reconcile-actual"
+                            type="text"
+                            inputMode="decimal"
+                            value={actualStr}
+                            onChange={(e) => setActualStr(e.target.value)}
+                            placeholder="0.00"
+                            className="h-10 text-base tabular-nums"
+                            autoFocus
+                        />
+                    </div>
+                    {actualValid && computedBalance !== undefined && (
+                        <div className={`rounded-xl border px-3 py-3 ${
+                            inAgreement
+                                ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
+                                : 'border-amber-500/30 bg-amber-500/10 text-amber-300'
+                        }`}>
+                            {inAgreement ? (
+                                <p className="text-[13px] font-semibold">In agreement — Novira matches your bank.</p>
+                            ) : (
+                                <>
+                                    <p className="text-[13px] font-semibold">
+                                        Off by {formatCurrency(Math.abs(delta as number), account.currency)}
+                                    </p>
+                                    <p className="text-[10.5px] mt-1 opacity-80">
+                                        {(delta as number) > 0
+                                            ? 'Bank shows more than Novira — you likely have an unrecorded deposit or transfer in.'
+                                            : 'Bank shows less than Novira — you likely have an unrecorded expense, fee, or transfer out.'}
+                                    </p>
+                                </>
+                            )}
+                        </div>
+                    )}
+                    <p className="text-[10.5px] text-muted-foreground/60 leading-relaxed">
+                        This is a read-only check. To fix a mismatch, add the missing transaction(s) — Novira will recompute.
+                    </p>
+                </div>
+                <DialogFooter className="px-5 py-3 border-t border-white/5 bg-secondary/5">
+                    <Button variant="ghost" onClick={() => onOpenChange(false)}>Close</Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
     );
 }
