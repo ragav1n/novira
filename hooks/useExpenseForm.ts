@@ -472,6 +472,21 @@ export function useExpenseForm(
         return () => clearTimeout(timer);
     }, [description, placeName, categorizationRules]);
 
+    // Stale-suggestion clearing: once selectedCategory matches suggestedCategory
+    // (e.g. a rule just filled it, or the user picked it manually), the
+    // "Try category X" chip is misleading. Same for bucket.
+    useEffect(() => {
+        if (suggestedCategory && suggestedCategory === selectedCategory) {
+            setSuggestedCategory(null);
+        }
+    }, [suggestedCategory, selectedCategory]);
+
+    useEffect(() => {
+        if (suggestedBucket && suggestedBucket === selectedBucketId) {
+            setSuggestedBucket(null);
+        }
+    }, [suggestedBucket, selectedBucketId]);
+
     const resetForm = () => {
         setAmount('');
         setDescription('');
