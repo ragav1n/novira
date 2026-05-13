@@ -560,9 +560,19 @@ export function AccountsSection({ defaultCurrency, formatCurrency }: Props) {
 
             <ReconcileDialog
                 account={reconciling}
-                computedBalance={reconciling && activity[reconciling.id] !== undefined
-                    ? convertAmount(reconciling.opening_balance, reconciling.currency, baseCurrency) + activity[reconciling.id]
-                    : undefined}
+                breakdown={reconciling ? (() => {
+                    const accountNative = perCurrency[reconciling.id] ?? {};
+                    const map = new Map<string, number>();
+                    for (const [curr, amt] of Object.entries(accountNative)) {
+                        const total = (curr === reconciling.currency ? reconciling.opening_balance : 0) + amt;
+                        if (Math.abs(total) >= 0.005) map.set(curr, total);
+                    }
+                    if (!map.has(reconciling.currency) && Math.abs(reconciling.opening_balance) >= 0.005) {
+                        map.set(reconciling.currency, reconciling.opening_balance);
+                    }
+                    if (map.size === 0) map.set(reconciling.currency, 0);
+                    return [...map.entries()].map(([currency, amount]) => ({ currency, amount }));
+                })() : []}
                 baseCurrency={baseCurrency}
                 formatCurrency={formatCurrency}
                 onOpenChange={(o) => { if (!o) setReconciling(null); }}
@@ -594,39 +604,32 @@ export function AccountsSection({ defaultCurrency, formatCurrency }: Props) {
 
 interface ReconcileDialogProps {
     account: Account | null;
-    computedBalance: number | undefined;
+    /** Per-currency native balances on the account. Always at least one entry. */
+    breakdown: { currency: string; amount: number }[];
     baseCurrency: string;
     formatCurrency: (amount: number, currency?: string) => string;
     onOpenChange: (open: boolean) => void;
 }
 
-function ReconcileDialog({ account, computedBalance, baseCurrency, formatCurrency, onOpenChange }: ReconcileDialogProps) {
-    const [actualStr, setActualStr] = useState('');
+function ReconcileDialog({ account, breakdown, formatCurrency, onOpenChange }: ReconcileDialogProps) {
+    const [actuals, setActuals] = useState<Record<string, string>>({});
 
     useEffect(() => {
-        if (account) setActualStr('');
+        if (account) setActuals({});
     }, [account]);
 
     if (!account) return null;
 
     const isCard = account.type === 'credit_card';
-    const computedDisplay = computedBalance === undefined
-        ? '—'
-        : isCard
-            ? (computedBalance >= 0
-                ? `${formatCurrency(computedBalance)} available`
-                : `${formatCurrency(-computedBalance)} owed`)
-            : formatCurrency(computedBalance);
 
-    const actual = parseFloat(actualStr);
-    const actualValid = Number.isFinite(actual);
-    // For credit cards, the user enters the amount they OWE (a positive number),
-    // which corresponds to a negative computed balance.
-    const normalizedActual = isCard && actualValid ? -actual : actual;
-    const delta = (actualValid && computedBalance !== undefined)
-        ? normalizedActual - computedBalance
-        : null;
-    const inAgreement = delta !== null && Math.abs(delta) < 0.005;
+    const formatComputed = (amount: number, currency: string) => {
+        if (isCard) {
+            return amount >= 0
+                ? `${formatCurrency(amount, currency)} available`
+                : `${formatCurrency(-amount, currency)} owed`;
+        }
+        return formatCurrency(amount, currency);
+    };
 
     return (
         <Dialog open={!!account} onOpenChange={onOpenChange}>
@@ -634,50 +637,65 @@ function ReconcileDialog({ account, computedBalance, baseCurrency, formatCurrenc
                 <DialogHeader className="px-5 py-4 border-b border-white/5">
                     <DialogTitle className="text-base">Reconcile {account.name}</DialogTitle>
                 </DialogHeader>
-                <div className="px-5 py-4 space-y-4">
-                    <div className="rounded-xl border border-white/5 bg-secondary/10 px-3 py-2.5">
-                        <p className="text-[10.5px] uppercase tracking-wider text-muted-foreground/60">Novira computes</p>
-                        <p className="text-[15px] font-semibold tabular-nums mt-0.5">{computedDisplay}</p>
-                    </div>
-                    <div>
-                        <Label htmlFor="reconcile-actual" className="text-xs">
-                            Your actual balance in {baseCurrency}{isCard ? ' (amount owed)' : ''}
-                        </Label>
-                        <Input
-                            id="reconcile-actual"
-                            type="text"
-                            inputMode="decimal"
-                            value={actualStr}
-                            onChange={(e) => setActualStr(e.target.value)}
-                            placeholder="0.00"
-                            className="h-10 text-base tabular-nums"
-                            autoFocus
-                        />
-                    </div>
-                    {actualValid && computedBalance !== undefined && (
-                        <div className={`rounded-xl border px-3 py-3 ${
-                            inAgreement
-                                ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
-                                : 'border-amber-500/30 bg-amber-500/10 text-amber-300'
-                        }`}>
-                            {inAgreement ? (
-                                <p className="text-[13px] font-semibold">In agreement — Novira matches your bank.</p>
-                            ) : (
-                                <>
-                                    <p className="text-[13px] font-semibold">
-                                        Off by {formatCurrency(Math.abs(delta as number))}
-                                    </p>
-                                    <p className="text-[10.5px] mt-1 opacity-80">
-                                        {(delta as number) > 0
-                                            ? 'Bank shows more than Novira — you likely have an unrecorded deposit or transfer in.'
-                                            : 'Bank shows less than Novira — you likely have an unrecorded expense, fee, or transfer out.'}
-                                    </p>
-                                </>
-                            )}
-                        </div>
+                <div className="px-5 py-4 space-y-3 max-h-[70vh] overflow-y-auto">
+                    {breakdown.length > 1 && (
+                        <p className="text-[11px] text-muted-foreground/80 leading-relaxed">
+                            This account holds balances in multiple currencies. Enter what your bank or
+                            wallet actually shows for each — Novira will report any mismatch per currency.
+                        </p>
                     )}
+                    {breakdown.map(b => {
+                        const actualStr = actuals[b.currency] ?? '';
+                        const parsed = parseFloat(actualStr);
+                        const actualValid = Number.isFinite(parsed);
+                        const normalizedActual = isCard && actualValid ? -parsed : parsed;
+                        const delta = actualValid ? normalizedActual - b.amount : null;
+                        const inAgreement = delta !== null && Math.abs(delta) < 0.005;
+                        return (
+                            <div key={b.currency} className="space-y-2 rounded-xl border border-white/5 bg-secondary/5 p-3">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-[10.5px] uppercase tracking-wider text-muted-foreground/60 font-bold">{b.currency}</span>
+                                    <span className="text-[14px] font-semibold tabular-nums">{formatComputed(b.amount, b.currency)}</span>
+                                </div>
+                                <div>
+                                    <Label htmlFor={`reconcile-${b.currency}`} className="text-[10.5px] text-muted-foreground/80">
+                                        Your actual{isCard ? ' (amount owed)' : ''}
+                                    </Label>
+                                    <Input
+                                        id={`reconcile-${b.currency}`}
+                                        type="text"
+                                        inputMode="decimal"
+                                        value={actualStr}
+                                        onChange={(e) => setActuals(prev => ({ ...prev, [b.currency]: e.target.value }))}
+                                        placeholder="0.00"
+                                        className="h-9 tabular-nums"
+                                    />
+                                </div>
+                                {actualValid && (
+                                    <div className={`text-[11.5px] rounded-lg px-2 py-1.5 ${
+                                        inAgreement
+                                            ? 'bg-emerald-500/10 text-emerald-300'
+                                            : 'bg-amber-500/10 text-amber-300'
+                                    }`}>
+                                        {inAgreement ? (
+                                            <span className="font-semibold">In agreement.</span>
+                                        ) : (
+                                            <>
+                                                <span className="font-semibold">Off by {formatCurrency(Math.abs(delta as number), b.currency)}</span>
+                                                <span className="opacity-80 ml-1">
+                                                    — {(delta as number) > 0
+                                                        ? 'unrecorded deposit / transfer in'
+                                                        : 'unrecorded expense / fee / transfer out'}
+                                                </span>
+                                            </>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })}
                     <p className="text-[10.5px] text-muted-foreground/60 leading-relaxed">
-                        This is a read-only check. To fix a mismatch, add the missing transaction(s) — Novira will recompute.
+                        Read-only check. To fix a mismatch, add the missing transaction(s) and Novira will recompute.
                     </p>
                 </div>
                 <DialogFooter className="px-5 py-3 border-t border-white/5 bg-secondary/5">

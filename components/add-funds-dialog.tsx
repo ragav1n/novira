@@ -17,6 +17,7 @@ import { format } from 'date-fns';
 import { toast } from '@/utils/haptics';
 import { CurrencyDropdown } from '@/components/ui/currency-dropdown';
 import { useUserPreferences, CURRENCY_DETAILS, type Currency } from '@/components/providers/user-preferences-provider';
+import { useAccounts } from '@/components/providers/accounts-provider';
 
 type AddFundsDialogProps = {
     isOpen: boolean;
@@ -32,6 +33,7 @@ export function AddFundsDialog({ isOpen, onClose, userId, defaultBucketId, onSuc
     const [loading, setLoading] = useState(false);
     const [errors, setErrors] = useState<{ amount?: string; description?: string }>({});
     const { currency, CURRENCY_SYMBOLS, convertAmount } = useUserPreferences();
+    const { primaryAccount } = useAccounts();
     const [txCurrency, setTxCurrency] = useState(currency);
 
     React.useEffect(() => {
@@ -90,6 +92,9 @@ export function AddFundsDialog({ isOpen, onClose, userId, defaultBucketId, onSuc
                 base_currency: currency,
                 converted_amount: convertedAmount,
                 bucket_id: defaultBucketId || null,
+                // Explicit primary account — don't rely solely on the
+                // BEFORE-INSERT trigger from migration 202605131700.
+                account_id: primaryAccount?.id ?? null,
                 exclude_from_allowance: !!defaultBucketId // Exclude from allowance if adding to a specific bucket!
             });
 

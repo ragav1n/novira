@@ -35,6 +35,11 @@ export function BulkAssignByPaymentDialog({ open, onOpenChange, onApplied }: Bul
     const [mapping, setMapping] = useState<Record<string, string>>({});
     const [sourceAccountId, setSourceAccountId] = useState<string>('any');
 
+    // Map of display key (trimmed) → set of exact DB values that map to it.
+    // Lets the UI group whitespace-variant rows together (" Cash " vs "Cash")
+    // while the UPDATE later targets each exact value so all matching rows move.
+    const [rawByKey, setRawByKey] = useState<Record<string, string[]>>({});
+
     const fetchCounts = useCallback(async () => {
         if (!userId) return;
         setLoading(true);
@@ -48,12 +53,21 @@ export function BulkAssignByPaymentDialog({ open, onOpenChange, onApplied }: Bul
             }
             const { data, error } = await query;
             if (error) throw error;
-            const next: Record<string, number> = {};
+            const counts: Record<string, number> = {};
+            const raws: Record<string, Set<string>> = {};
             for (const row of (data ?? []) as { payment_method: string | null }[]) {
-                const pm = row.payment_method?.trim() || '(none)';
-                next[pm] = (next[pm] ?? 0) + 1;
+                const trimmed = row.payment_method?.trim();
+                const key = trimmed && trimmed.length > 0 ? trimmed : '(none)';
+                counts[key] = (counts[key] ?? 0) + 1;
+                if (!raws[key]) raws[key] = new Set();
+                raws[key].add(row.payment_method ?? '');
             }
-            setCounts(next);
+            const rawMap: Record<string, string[]> = {};
+            for (const [k, set] of Object.entries(raws)) {
+                rawMap[k] = [...set];
+            }
+            setCounts(counts);
+            setRawByKey(rawMap);
         } catch (e) {
             console.error('[BulkAssignByPayment] counts failed', e);
             toast.error('Failed to load payment-method breakdown');
@@ -89,20 +103,31 @@ export function BulkAssignByPaymentDialog({ open, onOpenChange, onApplied }: Bul
             for (const [method, count] of sortedMethods) {
                 const target = mapping[method];
                 if (!target || target === KEEP) continue;
-                let query = supabase
-                    .from('transactions')
-                    .update({ account_id: target })
-                    .eq('user_id', userId);
-                if (method === '(none)') {
-                    query = query.is('payment_method', null);
-                } else {
-                    query = query.eq('payment_method', method);
+                // Hit every exact DB value that mapped to this display key —
+                // covers whitespace variants like " Cash " in one pass.
+                const rawValues = rawByKey[method] ?? [];
+                const nullValues = rawValues.filter(v => v === '');
+                const stringValues = rawValues.filter(v => v !== '');
+                if (nullValues.length > 0) {
+                    let q = supabase
+                        .from('transactions')
+                        .update({ account_id: target })
+                        .eq('user_id', userId)
+                        .is('payment_method', null);
+                    if (sourceAccountId !== 'any') q = q.eq('account_id', sourceAccountId);
+                    const { error } = await q;
+                    if (error) throw error;
                 }
-                if (sourceAccountId !== 'any') {
-                    query = query.eq('account_id', sourceAccountId);
+                if (stringValues.length > 0) {
+                    let q = supabase
+                        .from('transactions')
+                        .update({ account_id: target })
+                        .eq('user_id', userId)
+                        .in('payment_method', stringValues);
+                    if (sourceAccountId !== 'any') q = q.eq('account_id', sourceAccountId);
+                    const { error } = await q;
+                    if (error) throw error;
                 }
-                const { error } = await query;
-                if (error) throw error;
                 totalMoved += count;
             }
             invalidateTransactionCaches();
