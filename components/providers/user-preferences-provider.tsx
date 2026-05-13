@@ -592,7 +592,10 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
             formatterCache.current.set(targetCurrency, formatter);
         }
 
-        return `${symbol}${formatter.format(amount)}`;
+        // Render negatives as "-€100" rather than "€-100" — the minus belongs
+        // before the unit, not between symbol and digits.
+        const absFormatted = formatter.format(Math.abs(amount));
+        return `${amount < 0 ? '-' : ''}${symbol}${absFormatted}`;
     }, [currency, isPrivacyHidden]);
 
     const convertAmount = useCallback((amount: number, fromCurrency: string, toCurrency?: string): number => {

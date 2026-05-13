@@ -224,6 +224,10 @@ export function AccountsSection({ defaultCurrency, formatCurrency }: Props) {
                     const utilizationPct = (isCard && a.credit_limit && a.credit_limit > 0 && computed !== undefined && computed < 0)
                         ? Math.min(100, Math.round((-computed / a.credit_limit) * 100))
                         : null;
+                    // Non-credit accounts shouldn't have a negative computed balance;
+                    // when they do, it's almost always backfill noise or an
+                    // unset opening balance. Surface a one-line nudge.
+                    const showOpeningHint = !isCard && computed !== undefined && computed < 0 && a.opening_balance === 0;
                     return (
                         <div key={a.id} className="flex items-center justify-between gap-2 p-3">
                             <button
@@ -259,6 +263,11 @@ export function AccountsSection({ defaultCurrency, formatCurrency }: Props) {
                                                 }}
                                             />
                                         </div>
+                                    )}
+                                    {showOpeningHint && (
+                                        <p className="text-[10px] text-amber-300/80 mt-1 leading-snug">
+                                            Negative — set the opening balance, or reassign these to other accounts.
+                                        </p>
                                     )}
                                 </div>
                             </button>
