@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { format } from 'date-fns';
 import { ArrowRight, ArrowRightLeft, Wallet, Landmark, PiggyBank, CreditCard as CardIcon, Smartphone, CircleDollarSign } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -16,6 +16,7 @@ import { supabase } from '@/lib/supabase';
 import { toast } from '@/utils/haptics';
 import { invalidateTransactionCaches } from '@/lib/sw-cache';
 import { useAccounts } from '@/components/providers/accounts-provider';
+import { useUserPreferences } from '@/components/providers/user-preferences-provider';
 import { ACCOUNT_TYPE_LABELS, type AccountType } from '@/types/account';
 
 const TYPE_ICONS: Record<AccountType, React.ComponentType<{ className?: string; style?: React.CSSProperties }>> = {
@@ -34,14 +35,19 @@ interface TransferDialogProps {
 
 export function TransferDialog({ open, onOpenChange }: TransferDialogProps) {
     const { accounts } = useAccounts();
+    const { convertAmount } = useUserPreferences();
     const active = useMemo(() => accounts.filter(a => !a.archived_at), [accounts]);
 
     const [fromId, setFromId] = useState<string>('');
     const [toId, setToId] = useState<string>('');
     const [amount, setAmount] = useState<string>('');
+    const [toAmount, setToAmount] = useState<string>('');
     const [date, setDate] = useState<string>(() => format(new Date(), 'yyyy-MM-dd'));
     const [description, setDescription] = useState<string>('');
     const [submitting, setSubmitting] = useState(false);
+    // Touched flag so the auto-conversion suggestion doesn't keep overwriting
+    // a value the user has manually edited on the destination side.
+    const toAmountTouchedRef = useRef(false);
 
     // Pick sensible defaults when the dialog opens — primary as source,
     // first other account as destination.
@@ -52,6 +58,8 @@ export function TransferDialog({ open, onOpenChange }: TransferDialogProps) {
         const dest = active.find(a => a.id !== primary.id);
         setToId(dest?.id ?? '');
         setAmount('');
+        setToAmount('');
+        toAmountTouchedRef.current = false;
         setDescription('');
         setDate(format(new Date(), 'yyyy-MM-dd'));
     }, [open, active]);
@@ -59,18 +67,40 @@ export function TransferDialog({ open, onOpenChange }: TransferDialogProps) {
     const fromAccount = active.find(a => a.id === fromId);
     const toAccount = active.find(a => a.id === toId);
     const sameAccount = fromId === toId && fromId !== '';
-    const currencyMismatch = !!fromAccount && !!toAccount && fromAccount.currency !== toAccount.currency;
+    const crossCurrency = !!fromAccount && !!toAccount && fromAccount.currency !== toAccount.currency;
     const parsedAmount = parseFloat(amount);
     const amountValid = Number.isFinite(parsedAmount) && parsedAmount > 0;
+    const parsedToAmount = parseFloat(toAmount);
+    const toAmountValid = Number.isFinite(parsedToAmount) && parsedToAmount > 0;
+
+    // Auto-suggest the destination amount using the app's exchange-rate cache
+    // when currencies differ. Won't override a user-touched value.
+    useEffect(() => {
+        if (!crossCurrency || !fromAccount || !toAccount) return;
+        if (toAmountTouchedRef.current) return;
+        if (!amountValid) {
+            setToAmount('');
+            return;
+        }
+        try {
+            const converted = convertAmount(parsedAmount, fromAccount.currency, toAccount.currency);
+            if (Number.isFinite(converted) && converted > 0) {
+                // Two decimals for currency display; user can edit.
+                setToAmount(converted.toFixed(2));
+            }
+        } catch {
+            /* rate not available — leave blank */
+        }
+    }, [crossCurrency, amountValid, parsedAmount, fromAccount, toAccount, convertAmount]);
 
     const disabled =
         submitting
         || !fromAccount
         || !toAccount
         || sameAccount
-        || currencyMismatch
         || !amountValid
-        || !date;
+        || !date
+        || (crossCurrency && !toAmountValid);
 
     const handleSubmit = async () => {
         if (disabled || !fromAccount) return;
@@ -83,6 +113,7 @@ export function TransferDialog({ open, onOpenChange }: TransferDialogProps) {
                 p_amount: parsedAmount,
                 p_date: date,
                 p_description: description.trim() || null,
+                p_to_amount: crossCurrency ? parsedToAmount : null,
             });
             if (error) throw error;
             const result = data as { success: boolean; error?: string } | null;
@@ -153,27 +184,48 @@ export function TransferDialog({ open, onOpenChange }: TransferDialogProps) {
                     {sameAccount && (
                         <p className="text-[11px] text-amber-300/80">Source and destination must be different.</p>
                     )}
-                    {currencyMismatch && (
-                        <p className="text-[11px] text-amber-300/80">
-                            Cross-currency transfers aren&apos;t supported yet ({fromAccount?.currency} → {toAccount?.currency}).
+
+                    <div className={crossCurrency ? 'grid grid-cols-2 gap-3' : ''}>
+                        <div>
+                            <Label htmlFor="transfer-amount" className="text-xs">
+                                {crossCurrency ? 'You send' : 'Amount'}{fromAccount && ` (${fromAccount.currency})`}
+                            </Label>
+                            <Input
+                                id="transfer-amount"
+                                type="text"
+                                inputMode="decimal"
+                                value={amount}
+                                onChange={(e) => setAmount(e.target.value)}
+                                placeholder="0.00"
+                                className="h-10 text-base tabular-nums"
+                                autoFocus
+                            />
+                        </div>
+                        {crossCurrency && (
+                            <div>
+                                <Label htmlFor="transfer-to-amount" className="text-xs">
+                                    They receive{toAccount && ` (${toAccount.currency})`}
+                                </Label>
+                                <Input
+                                    id="transfer-to-amount"
+                                    type="text"
+                                    inputMode="decimal"
+                                    value={toAmount}
+                                    onChange={(e) => {
+                                        toAmountTouchedRef.current = true;
+                                        setToAmount(e.target.value);
+                                    }}
+                                    placeholder="0.00"
+                                    className="h-10 text-base tabular-nums"
+                                />
+                            </div>
+                        )}
+                    </div>
+                    {crossCurrency && amountValid && toAmountValid && (
+                        <p className="text-[10.5px] text-muted-foreground/70">
+                            Rate: 1 {fromAccount?.currency} ≈ {(parsedToAmount / parsedAmount).toFixed(4)} {toAccount?.currency} · adjust if your bank uses a different rate
                         </p>
                     )}
-
-                    <div>
-                        <Label htmlFor="transfer-amount" className="text-xs">
-                            Amount{fromAccount && ` (${fromAccount.currency})`}
-                        </Label>
-                        <Input
-                            id="transfer-amount"
-                            type="text"
-                            inputMode="decimal"
-                            value={amount}
-                            onChange={(e) => setAmount(e.target.value)}
-                            placeholder="0.00"
-                            className="h-10 text-base tabular-nums"
-                            autoFocus
-                        />
-                    </div>
 
                     <div className="grid grid-cols-2 gap-3">
                         <div>
