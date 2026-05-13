@@ -2,9 +2,12 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-    Plus, Pencil, Archive, ArchiveRestore, Trash2, Star, StarOff, Scale, Wand2,
+    Plus, Pencil, Archive, ArchiveRestore, Trash2, Star, StarOff, Scale, Wand2, MoreVertical,
     Wallet, Landmark, PiggyBank, CreditCard, Smartphone, CircleDollarSign,
 } from 'lucide-react';
+import {
+    DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { BulkAssignByPaymentDialog } from './bulk-assign-by-payment-dialog';
 import { supabase } from '@/lib/supabase';
 import { useUserPreferences } from '@/components/providers/user-preferences-provider';
@@ -94,6 +97,8 @@ export function AccountsSection({ defaultCurrency, formatCurrency }: Props) {
     // Activity (signed Σ converted_amount) in the user's base currency, per account.
     // Opening balance is added client-side after a currency conversion.
     const [activity, setActivity] = useState<Record<string, number>>({});
+    // Total spent (gross outflow) per account in base currency.
+    const [spent, setSpent] = useState<Record<string, number>>({});
     // Per-currency native activity per account, so forex / multi-currency
     // wallets can show their actual holdings instead of one collapsed total.
     const [perCurrency, setPerCurrency] = useState<Record<string, Record<string, number>>>({});
@@ -116,16 +121,21 @@ export function AccountsSection({ defaultCurrency, formatCurrency }: Props) {
         // converted_amount is intentionally bypassed so historical base-currency
         // changes don't poison the math.
         const totals: Record<string, number> = {};
+        const spentTotals: Record<string, number> = {};
         const native: Record<string, Record<string, number>> = {};
-        for (const row of (data ?? []) as { account_id: string; tx_currency: string; activity_native: number }[]) {
+        for (const row of (data ?? []) as { account_id: string; tx_currency: string; activity_native: number; spent_native: number }[]) {
             const amount = Number(row.activity_native);
+            const spentNative = Number(row.spent_native ?? 0);
             const currency = row.tx_currency || baseCurrency;
             const inBase = convertAmount(amount, currency, baseCurrency);
+            const spentInBase = convertAmount(spentNative, currency, baseCurrency);
             totals[row.account_id] = (totals[row.account_id] ?? 0) + inBase;
+            spentTotals[row.account_id] = (spentTotals[row.account_id] ?? 0) + spentInBase;
             if (!native[row.account_id]) native[row.account_id] = {};
             native[row.account_id][currency] = (native[row.account_id][currency] ?? 0) + amount;
         }
         setActivity(totals);
+        setSpent(spentTotals);
         setPerCurrency(native);
     }, [userId, baseCurrency, convertAmount]);
 
@@ -256,37 +266,15 @@ export function AccountsSection({ defaultCurrency, formatCurrency }: Props) {
                 )}
                 {!loading && active.map(a => {
                     const Icon = TYPE_ICONS[a.type] || CircleDollarSign;
-                    // Balance in base currency: opening (account.currency → base)
-                    // + activity (already in base from the RPC).
-                    const activityVal = activity[a.id];
-                    const openingInBase = convertAmount(a.opening_balance, a.currency, baseCurrency);
-                    const computed = activityVal === undefined ? undefined : openingInBase + activityVal;
                     const isCard = a.type === 'credit_card';
-                    // For credit cards, "balance" goes negative as you charge.
-                    // Surface the amount owed as a positive number plus utilization.
-                    const balanceLabel = computed === undefined
-                        ? null
-                        : isCard
-                            ? (computed >= 0
-                                ? `${formatCurrency(computed)} available`
-                                : `${formatCurrency(-computed)} owed`)
-                            : formatCurrency(computed);
-                    // Credit limit utilization needs to be compared in the same
-                    // currency: convert the limit to base for the math.
-                    const limitInBase = (a.credit_limit ?? null) !== null
-                        ? convertAmount(a.credit_limit as number, a.currency, baseCurrency)
-                        : null;
-                    const utilizationPct = (isCard && limitInBase && limitInBase > 0 && computed !== undefined && computed < 0)
-                        ? Math.min(100, Math.round((-computed / limitInBase) * 100))
-                        : null;
-                    // Non-credit accounts shouldn't have a negative computed balance;
-                    // when they do, it's almost always backfill noise or an
-                    // unset opening balance. Surface a one-line nudge.
-                    const showOpeningHint = !isCard && computed !== undefined && computed < 0 && a.opening_balance === 0;
+                    const isWallet = a.type === 'digital_wallet';
+                    // For "simple" account types we surface gross spending only —
+                    // opening_balance and the balance frame are overhead the user
+                    // didn't ask for. Credit cards and digital wallets keep their
+                    // balance framing because that's the actual point there.
+                    const usesBalanceFraming = isCard || isWallet;
+
                     // Per-currency breakdown for forex / multi-currency wallets.
-                    // Use opening_balances map when populated; fall back to the
-                    // legacy single-currency opening_balance for accounts that
-                    // pre-date the per-currency feature.
                     const accountNative = perCurrency[a.id] ?? {};
                     const openings: Record<string, number> = (a.opening_balances && Object.keys(a.opening_balances).length > 0)
                         ? a.opening_balances
@@ -297,7 +285,35 @@ export function AccountsSection({ defaultCurrency, formatCurrency }: Props) {
                         const total = (openings[curr] ?? 0) + (accountNative[curr] ?? 0);
                         if (Math.abs(total) >= 0.005) breakdown.push({ currency: curr, amount: total });
                     }
-                    const isMultiCurrency = breakdown.length > 1;
+                    const isMultiCurrency = usesBalanceFraming && breakdown.length > 1;
+
+                    // Balance (signed) in base currency. Used by credit-card +
+                    // wallet flows for "Owed / Available" and utilization.
+                    const activityVal = activity[a.id];
+                    const openingInBase = Object.entries(openings)
+                        .reduce((acc, [curr, val]) => acc + convertAmount(val, curr, baseCurrency), 0);
+                    const computedBalance = activityVal === undefined ? undefined : openingInBase + activityVal;
+
+                    // Primary label per type:
+                    //   credit_card: "₹X owed" / "₹Y available"
+                    //   digital_wallet: per-currency breakdown (rendered separately)
+                    //   everything else: "₹X spent"
+                    let primaryLabel: string | null = null;
+                    if (isCard && computedBalance !== undefined) {
+                        primaryLabel = computedBalance >= 0
+                            ? `${formatCurrency(computedBalance)} available`
+                            : `${formatCurrency(-computedBalance)} owed`;
+                    } else if (!isWallet && spent[a.id] !== undefined) {
+                        primaryLabel = `${formatCurrency(spent[a.id])} spent`;
+                    }
+
+                    // Credit limit utilization (credit cards only).
+                    const limitInBase = (a.credit_limit ?? null) !== null
+                        ? convertAmount(a.credit_limit as number, a.currency, baseCurrency)
+                        : null;
+                    const utilizationPct = (isCard && limitInBase && limitInBase > 0 && computedBalance !== undefined && computedBalance < 0)
+                        ? Math.min(100, Math.round((-computedBalance / limitInBase) * 100))
+                        : null;
                     return (
                         <div key={a.id} className="flex items-center justify-between gap-2 p-3">
                             <button
@@ -318,7 +334,7 @@ export function AccountsSection({ defaultCurrency, formatCurrency }: Props) {
                                     </div>
                                     <p className="text-[10.5px] text-muted-foreground/60 truncate">
                                         {ACCOUNT_TYPE_LABELS[a.type]}
-                                        {!isMultiCurrency && balanceLabel && <> · <span className="text-foreground/80 font-semibold">{balanceLabel}</span></>}
+                                        {!isMultiCurrency && primaryLabel && <> · <span className="text-foreground/80 font-semibold">{primaryLabel}</span></>}
                                         {utilizationPct !== null && !isMultiCurrency && (
                                             <> · <span className={utilizationPct >= 80 ? 'text-rose-400 font-semibold' : 'text-amber-300 font-semibold'}>{utilizationPct}% used</span></>
                                         )}
@@ -330,9 +346,9 @@ export function AccountsSection({ defaultCurrency, formatCurrency }: Props) {
                                                     <span className="text-foreground/85 font-semibold">{formatCurrency(b.amount, b.currency)}</span>
                                                 </span>
                                             ))}
-                                            {computed !== undefined && Math.abs(computed) >= 0.005 && (
+                                            {computedBalance !== undefined && Math.abs(computedBalance) >= 0.005 && (
                                                 <span className="text-[10px] text-muted-foreground/60">
-                                                    ≈ {formatCurrency(computed)} {baseCurrency}
+                                                    ≈ {formatCurrency(computedBalance)} {baseCurrency}
                                                 </span>
                                             )}
                                         </div>
@@ -348,54 +364,48 @@ export function AccountsSection({ defaultCurrency, formatCurrency }: Props) {
                                             />
                                         </div>
                                     )}
-                                    {showOpeningHint && (
-                                        <p className="text-[10px] text-amber-300/80 mt-1 leading-snug">
-                                            Negative — set the opening balance, or reassign these to other accounts.
-                                        </p>
-                                    )}
                                 </div>
                             </button>
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 text-muted-foreground hover:text-primary"
-                                onClick={() => setReconciling(a)}
-                                aria-label="Reconcile account"
-                                title="Reconcile"
-                            >
-                                <Scale className="w-4 h-4" />
-                            </Button>
-                            {!a.is_primary && (
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8 text-muted-foreground hover:text-amber-400"
-                                    onClick={() => setPrimary(a.id).catch(() => toast.error('Failed to set primary'))}
-                                    aria-label="Set as primary"
-                                    title="Set as primary"
-                                >
-                                    <StarOff className="w-4 h-4" />
-                                </Button>
-                            )}
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 text-muted-foreground hover:text-primary"
-                                onClick={() => openEdit(a)}
-                                aria-label="Edit account"
-                            >
-                                <Pencil className="w-4 h-4" />
-                            </Button>
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 text-muted-foreground hover:text-muted-foreground/90"
-                                onClick={() => archiveAccount(a.id, true).catch(() => toast.error('Failed to archive'))}
-                                aria-label="Archive account"
-                                title="Archive"
-                            >
-                                <Archive className="w-4 h-4" />
-                            </Button>
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                                        aria-label="Account actions"
+                                    >
+                                        <MoreVertical className="w-4 h-4" />
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                    <DropdownMenuItem onClick={() => openEdit(a)} className="gap-2">
+                                        <Pencil className="w-3.5 h-3.5" />
+                                        Edit
+                                    </DropdownMenuItem>
+                                    {!a.is_primary && (
+                                        <DropdownMenuItem
+                                            onClick={() => setPrimary(a.id).catch(() => toast.error('Failed to set primary'))}
+                                            className="gap-2"
+                                        >
+                                            <StarOff className="w-3.5 h-3.5" />
+                                            Set as primary
+                                        </DropdownMenuItem>
+                                    )}
+                                    {usesBalanceFraming && (
+                                        <DropdownMenuItem onClick={() => setReconciling(a)} className="gap-2">
+                                            <Scale className="w-3.5 h-3.5" />
+                                            Reconcile
+                                        </DropdownMenuItem>
+                                    )}
+                                    <DropdownMenuItem
+                                        onClick={() => archiveAccount(a.id, true).catch(() => toast.error('Failed to archive'))}
+                                        className="gap-2"
+                                    >
+                                        <Archive className="w-3.5 h-3.5" />
+                                        Archive
+                                    </DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
                         </div>
                     );
                 })}
@@ -520,91 +530,123 @@ export function AccountsSection({ defaultCurrency, formatCurrency }: Props) {
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                    <Label htmlFor="account-opening" className="text-xs">Opening ({editing.currency})</Label>
-                                    <Input
-                                        id="account-opening"
-                                        type="text"
-                                        inputMode="decimal"
-                                        value={editing.opening_balance}
-                                        onChange={(e) => setEditing({ ...editing, opening_balance: e.target.value })}
-                                        placeholder="0.00"
-                                        className="h-9 tabular-nums"
-                                    />
-                                </div>
-                                {editing.type === 'credit_card' && (
-                                    <div>
-                                        <Label htmlFor="account-limit" className="text-xs">Credit limit</Label>
-                                        <Input
-                                            id="account-limit"
-                                            type="text"
-                                            inputMode="decimal"
-                                            value={editing.credit_limit}
-                                            onChange={(e) => setEditing({ ...editing, credit_limit: e.target.value })}
-                                            placeholder="Optional"
-                                            className="h-9 tabular-nums"
-                                        />
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Per-currency openings for forex / multi-currency wallets */}
-                            {Object.keys(editing.opening_extras).length > 0 && (
-                                <div className="space-y-2 rounded-xl border border-white/5 bg-secondary/5 p-3">
-                                    <p className="text-[10.5px] uppercase tracking-wider text-muted-foreground/70 font-bold">Other-currency openings</p>
-                                    {Object.entries(editing.opening_extras).map(([curr, amt]) => (
-                                        <div key={curr} className="grid grid-cols-[80px_1fr_auto] gap-2 items-center">
-                                            <div className="text-[12px] font-semibold tabular-nums px-2 py-1 rounded bg-secondary/30 text-center">{curr}</div>
-                                            <Input
-                                                type="text"
-                                                inputMode="decimal"
-                                                value={amt}
-                                                onChange={(e) => setEditing({
-                                                    ...editing,
-                                                    opening_extras: { ...editing.opening_extras, [curr]: e.target.value },
-                                                })}
-                                                placeholder="0.00"
-                                                className="h-8 tabular-nums"
-                                            />
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                                                onClick={() => {
-                                                    const next = { ...editing.opening_extras };
-                                                    delete next[curr];
-                                                    setEditing({ ...editing, opening_extras: next });
-                                                }}
-                                                aria-label={`Remove ${curr} opening`}
-                                            >
-                                                <Trash2 className="w-3.5 h-3.5" />
-                                            </Button>
+                            {/* Opening balance + credit limit. For cash / checking /
+                                savings, opening_balance is overhead the user doesn't need
+                                — wrap in an "Advanced" disclosure. For credit cards
+                                (tracking debt) and digital wallets (multi-currency holdings)
+                                it stays prominent. */}
+                            {(() => {
+                                const showOpeningPrimary = editing.type === 'credit_card' || editing.type === 'digital_wallet';
+                                const isCardForm = editing.type === 'credit_card';
+                                const openingLabel = isCardForm ? `Starting debt (${editing.currency})` : `Opening (${editing.currency})`;
+                                const openingFields = (
+                                    <>
+                                        <div className={editing.type === 'credit_card' ? 'grid grid-cols-2 gap-3' : ''}>
+                                            <div>
+                                                <Label htmlFor="account-opening" className="text-xs">{openingLabel}</Label>
+                                                <Input
+                                                    id="account-opening"
+                                                    type="text"
+                                                    inputMode="decimal"
+                                                    value={editing.opening_balance}
+                                                    onChange={(e) => setEditing({ ...editing, opening_balance: e.target.value })}
+                                                    placeholder="0.00"
+                                                    className="h-9 tabular-nums"
+                                                />
+                                                {isCardForm && (
+                                                    <p className="text-[10px] text-muted-foreground/60 mt-1">Owed at sign-up (enter as positive).</p>
+                                                )}
+                                            </div>
+                                            {isCardForm && (
+                                                <div>
+                                                    <Label htmlFor="account-limit" className="text-xs">Credit limit</Label>
+                                                    <Input
+                                                        id="account-limit"
+                                                        type="text"
+                                                        inputMode="decimal"
+                                                        value={editing.credit_limit}
+                                                        onChange={(e) => setEditing({ ...editing, credit_limit: e.target.value })}
+                                                        placeholder="Optional"
+                                                        className="h-9 tabular-nums"
+                                                    />
+                                                </div>
+                                            )}
                                         </div>
-                                    ))}
-                                </div>
-                            )}
-                            <details className="text-[11px]">
-                                <summary className="cursor-pointer text-muted-foreground/70 hover:text-muted-foreground">
-                                    + Add another currency opening
-                                </summary>
-                                <div className="flex gap-2 mt-2">
-                                    <div className="flex-1">
-                                        <CurrencyDropdown
-                                            value={editing.currency}
-                                            onValueChange={(c) => {
-                                                if (c === editing.currency) return;
-                                                if (editing.opening_extras[c] !== undefined) return;
-                                                setEditing({
-                                                    ...editing,
-                                                    opening_extras: { ...editing.opening_extras, [c]: '0' },
-                                                });
-                                            }}
-                                        />
-                                    </div>
-                                </div>
-                                <p className="text-[10px] text-muted-foreground/60 mt-1">Pick a currency to add a row above.</p>
-                            </details>
+                                        {Object.keys(editing.opening_extras).length > 0 && (
+                                            <div className="space-y-2 rounded-xl border border-white/5 bg-secondary/5 p-3 mt-3">
+                                                <p className="text-[10.5px] uppercase tracking-wider text-muted-foreground/70 font-bold">Other-currency openings</p>
+                                                {Object.entries(editing.opening_extras).map(([curr, amt]) => (
+                                                    <div key={curr} className="grid grid-cols-[80px_1fr_auto] gap-2 items-center">
+                                                        <div className="text-[12px] font-semibold tabular-nums px-2 py-1 rounded bg-secondary/30 text-center">{curr}</div>
+                                                        <Input
+                                                            type="text"
+                                                            inputMode="decimal"
+                                                            value={amt}
+                                                            onChange={(e) => setEditing({
+                                                                ...editing,
+                                                                opening_extras: { ...editing.opening_extras, [curr]: e.target.value },
+                                                            })}
+                                                            placeholder="0.00"
+                                                            className="h-8 tabular-nums"
+                                                        />
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                                                            onClick={() => {
+                                                                const next = { ...editing.opening_extras };
+                                                                delete next[curr];
+                                                                setEditing({ ...editing, opening_extras: next });
+                                                            }}
+                                                            aria-label={`Remove ${curr} opening`}
+                                                        >
+                                                            <Trash2 className="w-3.5 h-3.5" />
+                                                        </Button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                        <details className="text-[11px] mt-2">
+                                            <summary className="cursor-pointer text-muted-foreground/70 hover:text-muted-foreground">
+                                                + Add another currency opening
+                                            </summary>
+                                            <div className="flex gap-2 mt-2">
+                                                <div className="flex-1">
+                                                    <CurrencyDropdown
+                                                        value={editing.currency}
+                                                        onValueChange={(c) => {
+                                                            if (c === editing.currency) return;
+                                                            if (editing.opening_extras[c] !== undefined) return;
+                                                            setEditing({
+                                                                ...editing,
+                                                                opening_extras: { ...editing.opening_extras, [c]: '0' },
+                                                            });
+                                                        }}
+                                                    />
+                                                </div>
+                                            </div>
+                                            <p className="text-[10px] text-muted-foreground/60 mt-1">Pick a currency to add a row above.</p>
+                                        </details>
+                                    </>
+                                );
+
+                                if (showOpeningPrimary) {
+                                    return <div>{openingFields}</div>;
+                                }
+                                return (
+                                    <details className="rounded-xl border border-white/5 bg-secondary/5">
+                                        <summary className="cursor-pointer px-3 py-2 text-[11.5px] font-semibold text-muted-foreground/70 hover:text-muted-foreground">
+                                            Advanced — opening balance &amp; reconciliation
+                                        </summary>
+                                        <div className="px-3 pb-3 pt-1">
+                                            <p className="text-[10.5px] text-muted-foreground/60 mb-2 leading-relaxed">
+                                                Set this to track real cash on hand and use the reconcile tool. Most users can leave it at 0.
+                                            </p>
+                                            {openingFields}
+                                        </div>
+                                    </details>
+                                );
+                            })()}
 
                             <div>
                                 <Label className="text-xs">Color</Label>
