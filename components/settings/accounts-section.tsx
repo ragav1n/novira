@@ -88,6 +88,9 @@ export function AccountsSection({ defaultCurrency, formatCurrency }: Props) {
     // Activity (signed Σ converted_amount) in the user's base currency, per account.
     // Opening balance is added client-side after a currency conversion.
     const [activity, setActivity] = useState<Record<string, number>>({});
+    // Per-currency native activity per account, so forex / multi-currency
+    // wallets can show their actual holdings instead of one collapsed total.
+    const [perCurrency, setPerCurrency] = useState<Record<string, Record<string, number>>>({});
     const [reconciling, setReconciling] = useState<Account | null>(null);
     const [bulkAssignOpen, setBulkAssignOpen] = useState(false);
 
@@ -101,17 +104,23 @@ export function AccountsSection({ defaultCurrency, formatCurrency }: Props) {
             console.error('[AccountsSection] balances failed', error);
             return;
         }
-        // SQL returns per-currency activity rows. Convert each to current base
-        // currency client-side and sum. This is what makes the math survive a
-        // historical base_currency change: we ignore stored converted_amount
-        // (which was frozen in the old base) and rely on amounts + current rates.
-        const map: Record<string, number> = {};
+        // SQL returns per-currency activity rows. Keep the native per-currency
+        // breakdown (for multi-currency display) AND build a converted total
+        // in current base (for single-currency display + utilization math).
+        // converted_amount is intentionally bypassed so historical base-currency
+        // changes don't poison the math.
+        const totals: Record<string, number> = {};
+        const native: Record<string, Record<string, number>> = {};
         for (const row of (data ?? []) as { account_id: string; tx_currency: string; activity_native: number }[]) {
-            const native = Number(row.activity_native);
-            const inBase = convertAmount(native, row.tx_currency || baseCurrency, baseCurrency);
-            map[row.account_id] = (map[row.account_id] ?? 0) + inBase;
+            const amount = Number(row.activity_native);
+            const currency = row.tx_currency || baseCurrency;
+            const inBase = convertAmount(amount, currency, baseCurrency);
+            totals[row.account_id] = (totals[row.account_id] ?? 0) + inBase;
+            if (!native[row.account_id]) native[row.account_id] = {};
+            native[row.account_id][currency] = (native[row.account_id][currency] ?? 0) + amount;
         }
-        setActivity(map);
+        setActivity(totals);
+        setPerCurrency(native);
     }, [userId, baseCurrency, convertAmount]);
 
     useEffect(() => { fetchBalances(); }, [fetchBalances, accounts]);
@@ -246,6 +255,21 @@ export function AccountsSection({ defaultCurrency, formatCurrency }: Props) {
                     // when they do, it's almost always backfill noise or an
                     // unset opening balance. Surface a one-line nudge.
                     const showOpeningHint = !isCard && computed !== undefined && computed < 0 && a.opening_balance === 0;
+                    // Per-currency breakdown for forex / multi-currency wallets.
+                    // Include the account's default-currency line via opening_balance,
+                    // and surface every other currency the account has touched.
+                    const accountNative = perCurrency[a.id] ?? {};
+                    const breakdown: { currency: string; amount: number }[] = [];
+                    const seen = new Set<string>();
+                    for (const [curr, amt] of Object.entries(accountNative)) {
+                        const total = (curr === a.currency ? a.opening_balance : 0) + amt;
+                        if (Math.abs(total) >= 0.005) breakdown.push({ currency: curr, amount: total });
+                        seen.add(curr);
+                    }
+                    if (!seen.has(a.currency) && Math.abs(a.opening_balance) >= 0.005) {
+                        breakdown.push({ currency: a.currency, amount: a.opening_balance });
+                    }
+                    const isMultiCurrency = breakdown.length > 1;
                     return (
                         <div key={a.id} className="flex items-center justify-between gap-2 p-3">
                             <button
@@ -266,11 +290,25 @@ export function AccountsSection({ defaultCurrency, formatCurrency }: Props) {
                                     </div>
                                     <p className="text-[10.5px] text-muted-foreground/60 truncate">
                                         {ACCOUNT_TYPE_LABELS[a.type]}
-                                        {balanceLabel && <> · <span className="text-foreground/80 font-semibold">{balanceLabel}</span></>}
-                                        {utilizationPct !== null && (
+                                        {!isMultiCurrency && balanceLabel && <> · <span className="text-foreground/80 font-semibold">{balanceLabel}</span></>}
+                                        {utilizationPct !== null && !isMultiCurrency && (
                                             <> · <span className={utilizationPct >= 80 ? 'text-rose-400 font-semibold' : 'text-amber-300 font-semibold'}>{utilizationPct}% used</span></>
                                         )}
                                     </p>
+                                    {isMultiCurrency && (
+                                        <div className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5">
+                                            {breakdown.map(b => (
+                                                <span key={b.currency} className="text-[11px] tabular-nums">
+                                                    <span className="text-foreground/85 font-semibold">{formatCurrency(b.amount, b.currency)}</span>
+                                                </span>
+                                            ))}
+                                            {computed !== undefined && Math.abs(computed) >= 0.005 && (
+                                                <span className="text-[10px] text-muted-foreground/60">
+                                                    ≈ {formatCurrency(computed)} {baseCurrency}
+                                                </span>
+                                            )}
+                                        </div>
+                                    )}
                                     {utilizationPct !== null && a.credit_limit !== null && (
                                         <div className="mt-1.5 h-1 rounded-full bg-white/5 overflow-hidden">
                                             <div
