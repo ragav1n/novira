@@ -551,21 +551,36 @@ export function AddExpenseView() {
                         <p id="expense-description-error" className="text-xs text-destructive font-medium">{errors.description}</p>
                     )}
                     {formState.suggestedCategory && (
-                        <button
-                            type="button"
-                            onClick={() => {
-                                if (isNative) Haptics.impact({ style: ImpactStyle.Light }).catch(() => { });
-                                formState.setSelectedCategory(formState.suggestedCategory!);
-                                formState.setSuggestedCategory(null);
-                            }}
-                            className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-primary transition-colors pl-1 -mt-0.5"
-                            aria-label={`Use suggested category: ${formState.suggestedCategory}`}
-                        >
-                            <Sparkles className="w-3 h-3 text-primary/70" aria-hidden="true" />
-                            <span>Suggested category</span>
-                            <span className="font-bold text-primary capitalize">{formState.suggestedCategory}</span>
-                            <span className="text-muted-foreground/60">— tap to apply</span>
-                        </button>
+                        <div className="flex items-center justify-between gap-3 px-3 py-2 rounded-2xl border border-primary/20 bg-primary/10">
+                            <div className="flex items-center gap-2 min-w-0">
+                                <Sparkles className="w-3.5 h-3.5 text-primary shrink-0" aria-hidden="true" />
+                                <p className="text-[11px] text-primary/90 font-medium truncate">
+                                    Try category <span className="font-bold text-primary capitalize">{formState.suggestedCategory}</span>
+                                </p>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        if (isNative) Haptics.impact({ style: ImpactStyle.Light }).catch(() => { });
+                                        formState.setSelectedCategory(formState.suggestedCategory!);
+                                        formState.setSuggestedCategory(null);
+                                    }}
+                                    aria-label={`Apply suggested category: ${formState.suggestedCategory}`}
+                                    className="text-[11px] font-bold text-primary hover:text-primary/80 px-2 py-1 rounded-full bg-primary/15 border border-primary/30 transition-colors"
+                                >
+                                    Apply
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => formState.setSuggestedCategory(null)}
+                                    aria-label="Dismiss category suggestion"
+                                    className="text-[11px] text-primary/70 hover:text-primary/90 px-1"
+                                >
+                                    ×
+                                </button>
+                            </div>
+                        </div>
                     )}
 
                     {formState.descriptionSuggestions.length > 0 && (
@@ -793,21 +808,36 @@ export function AddExpenseView() {
                     const sb = buckets.find(b => b.id === formState.suggestedBucket && !b.is_archived);
                     if (!sb) return null;
                     return (
-                        <button
-                            type="button"
-                            onClick={() => {
-                                if (isNative) Haptics.impact({ style: ImpactStyle.Light }).catch(() => { });
-                                formState.setSelectedBucketId(sb.id);
-                                formState.setSuggestedBucket(null);
-                            }}
-                            className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-cyan-400 transition-colors pl-1 -mb-1"
-                            aria-label={`Use suggested bucket: ${sb.name}`}
-                        >
-                            <Sparkles className="w-3 h-3 text-cyan-400/70" aria-hidden="true" />
-                            <span>Suggested bucket</span>
-                            <span className="font-bold text-cyan-400">{sb.name}</span>
-                            <span className="text-muted-foreground/60">— tap to apply</span>
-                        </button>
+                        <div className="flex items-center justify-between gap-3 px-3 py-2 rounded-2xl border border-cyan-500/20 bg-cyan-500/10">
+                            <div className="flex items-center gap-2 min-w-0">
+                                <Sparkles className="w-3.5 h-3.5 text-cyan-400 shrink-0" aria-hidden="true" />
+                                <p className="text-[11px] text-cyan-200/90 font-medium truncate">
+                                    Try bucket <span className="font-bold text-cyan-300">{sb.name}</span>
+                                </p>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        if (isNative) Haptics.impact({ style: ImpactStyle.Light }).catch(() => { });
+                                        formState.setSelectedBucketId(sb.id);
+                                        formState.setSuggestedBucket(null);
+                                    }}
+                                    aria-label={`Apply suggested bucket: ${sb.name}`}
+                                    className="text-[11px] font-bold text-cyan-300 hover:text-cyan-200 px-2 py-1 rounded-full bg-cyan-400/15 border border-cyan-400/30 transition-colors"
+                                >
+                                    Apply
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => formState.setSuggestedBucket(null)}
+                                    aria-label="Dismiss bucket suggestion"
+                                    className="text-[11px] text-cyan-300/70 hover:text-cyan-200 px-1"
+                                >
+                                    ×
+                                </button>
+                            </div>
+                        </div>
                     );
                 })()}
                 <BucketSelector
