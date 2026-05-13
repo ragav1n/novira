@@ -2,9 +2,16 @@
 
 import { motion } from 'framer-motion';
 import Link from 'next/link';
-import { ArrowRight, BookOpen, Compass, Search as SearchIcon, Sparkles } from 'lucide-react';
+import { ArrowRight, BookOpen, Compass, Search as SearchIcon, Sparkles, Smartphone, Hand, Bell, BarChart2 } from 'lucide-react';
 import { version as APP_VERSION } from '@/package.json';
 import { GUIDE_SECTIONS, GUIDE_GROUPS } from './sections-config';
+
+const RECENTLY_SHIPPED: { icon: typeof Smartphone; label: string; href: string }[] = [
+  { icon: Smartphone, label: 'Install anywhere', href: '#getting-started' },
+  { icon: Hand, label: 'Swipe gestures', href: '#gestures' },
+  { icon: Bell, label: 'Push & quiet hours', href: '#notifications' },
+  { icon: BarChart2, label: 'Custom date ranges', href: '#analytics' },
+];
 
 export function GuideHero() {
   return (
@@ -33,6 +40,33 @@ export function GuideHero() {
           <p className="mt-4 max-w-xl text-base leading-relaxed text-foreground/85 sm:text-lg">
             A friendly, complete walkthrough — from your first transaction to splitting a trip, detecting subscriptions, and exporting your bills to your calendar. Skim with the table of contents or read top-to-bottom.
           </p>
+
+          {/* Recently shipped — small badge row that links into the relevant section */}
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.05, ease: [0.22, 1, 0.36, 1] }}
+            className="mt-5 flex flex-wrap items-center gap-1.5"
+          >
+            <span className="mr-1 inline-flex items-center gap-1.5 rounded-full bg-primary/15 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-primary">
+              <Sparkles className="h-3 w-3" />
+              Recently shipped
+            </span>
+            {RECENTLY_SHIPPED.map(({ icon: Icon, label, href }, i) => (
+              <motion.a
+                key={label}
+                href={href}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, delay: 0.1 + i * 0.05, ease: [0.22, 1, 0.36, 1] }}
+                whileHover={{ y: -2 }}
+                className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1 text-[12px] text-foreground/85 transition-colors hover:border-primary/40 hover:bg-primary/10 hover:text-primary"
+              >
+                <Icon className="h-3 w-3" />
+                {label}
+              </motion.a>
+            ))}
+          </motion.div>
 
           <div className="mt-7 flex flex-wrap gap-3">
             <Link

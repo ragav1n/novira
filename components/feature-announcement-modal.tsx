@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Zap, Tag, PieChart, Users, QrCode, Upload, Bell, Globe, FileDown, RefreshCcw, Shield, Search, Sparkles, Moon, CreditCard, Wallet, Lock, SlidersHorizontal, Star, Fingerprint, BarChart2, Receipt, Layers, MessageSquare, Link, Smartphone, MapPin, Home, Target, Calendar } from 'lucide-react';
+import { X, Zap, Tag, PieChart, Users, QrCode, Upload, Bell, Globe, FileDown, RefreshCcw, Shield, Search, Sparkles, Moon, CreditCard, Wallet, Lock, SlidersHorizontal, Star, Fingerprint, BarChart2, Receipt, Layers, MessageSquare, Link, Smartphone, MapPin, Home, Target, Calendar, Hand } from 'lucide-react';
 import { LATEST_FEATURE_ANNOUNCEMENT } from '@/lib/feature-flags';
 import { Button } from '@/components/ui/button';
 
@@ -152,7 +152,9 @@ export function FeatureAnnouncementModal({ showAnnouncement = false, userId, onC
                                             ) : feature.icon === 'dark-mode' ? (
                                                 <Moon className="w-6 h-6 text-slate-300 fill-slate-300/20" />
                                             ) : feature.icon === 'mobile' ? (
-                                                <Smartphone className="w-6 h-6 text-rose-400" />
+                                                <Smartphone className="w-6 h-6 text-sky-400" />
+                                            ) : feature.icon === 'gestures' ? (
+                                                <Hand className="w-6 h-6 text-fuchsia-400 fill-fuchsia-400/20" />
                                             ) : feature.icon === 'star' ? (
                                                 <Star className="w-6 h-6 text-yellow-400 fill-yellow-400/20" />
                                                 /* ── Security / Auth ── */

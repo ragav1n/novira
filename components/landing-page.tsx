@@ -7,8 +7,8 @@ import Image from 'next/image';
 import { AdvancedButton } from '@/components/ui/gradient-button';
 import { ShinyButton } from '@/components/ui/shiny-button';
 import {
-  ArrowRight, CheckCircle2, BarChart3, Globe, MessageSquare,
-  FileText, Calendar, Zap, Menu, X,
+  ArrowRight, CheckCircle2, BarChart3, Globe, Repeat,
+  FileText, Calendar, Zap, Menu, X, Smartphone, Hand, Bell, Target, Sparkles,
 } from 'lucide-react';
 
 // ─── Constants ──────────────────────────────────────────────────────────────
@@ -25,12 +25,15 @@ const SECTIONS = [
 ];
 
 const FEATURES = [
-  { icon: BarChart3, title: 'Rich analytics', desc: 'Beautiful charts that reveal spending patterns at a glance — by category, place, time, or person.' },
-  { icon: Globe, title: 'Any currency', desc: 'Track rupees, euros, pesos — 20 supported currencies with live exchange rates and per-transaction conversion.' },
-  { icon: MessageSquare, title: 'Recurring detection', desc: 'Novira spots subscriptions and recurring bills automatically, so your monthly picture is always accurate.' },
-  { icon: Calendar, title: 'Smart budgets', desc: 'Set monthly allowances per bucket. Get nudged before you overspend — not after your card declines.' },
+  { icon: BarChart3, title: 'Rich analytics', desc: 'Beautiful charts and a What-If simulator that quantifies cuts against your goals — by category, place, time, or person.' },
+  { icon: Globe, title: 'Any currency', desc: '20 supported currencies with live exchange rates, per-transaction conversion, and a base-currency that holds steady over time.' },
+  { icon: Repeat, title: 'Recurring detection', desc: 'Spots subscriptions automatically — and quietly flags silent price hikes before they pile up.' },
+  { icon: Calendar, title: 'Smart budgets', desc: 'Weighted-pace forecasting (last-7-day rate mixed with month-to-date) nudges you before you overspend.' },
   { icon: Zap, title: 'Bank imports', desc: 'Drop an HDFC or SBI statement and Novira parses it in seconds — smart duplicate detection included.' },
-  { icon: FileText, title: 'Clean exports', desc: 'CSV and PDF reports that your accountant, your tax software, and your future self will thank you for.' },
+  { icon: FileText, title: 'Clean exports', desc: 'Multi-page PDFs, CSV, and an ICS bill schedule — your accountant, tax software, and calendar will thank you.' },
+  { icon: Smartphone, title: 'Install anywhere', desc: 'One-tap install on iPhone, Android, Mac, and Windows. Own home-screen icon, runs offline, no app store.' },
+  { icon: Hand, title: 'Gesture-first', desc: 'Swipe to edit or delete, pull to refresh, drag to reorder your dashboard — Novira gets faster the more you use it.' },
+  { icon: Bell, title: 'Bills & nudges', desc: 'Opt-in push for bills, budget warnings, bucket deadlines, and daily or weekly digests — with quiet hours.' },
 ];
 
 const TXNS = [
@@ -704,7 +707,7 @@ export function LandingPage() {
                   className="inline-flex items-center gap-2.5 px-3 py-[7px] rounded-full text-[12.5px]"
                   style={{ background: 'rgba(85,80,110,0.4)', border: '1px solid rgba(164,132,215,0.5)', backdropFilter: 'blur(14px)', boxShadow: '0 0 20px rgba(123,57,252,0.15), inset 0 1px 0 rgba(255,255,255,0.08)', marginBottom: 22, whiteSpace: 'nowrap' }}>
                   <span style={{ background: '#8A2BE2', color: '#fff', fontSize: 10.5, fontWeight: 700, padding: '3px 9px', borderRadius: 999, letterSpacing: '0.04em', textTransform: 'uppercase', boxShadow: '0 0 8px rgba(123,57,252,0.4)' }}>New</span>
-                  <span style={{ color: 'rgba(255,255,255,0.8)', fontWeight: 500 }}>AI receipt scanning — live now</span>
+                  <span style={{ color: 'rgba(255,255,255,0.8)', fontWeight: 500 }}>Push reminders, swipe gestures, custom date ranges</span>
                 </motion.div>
 
                 <motion.h1 initial="hidden" animate="visible" variants={fadeUp(0.2)}
@@ -857,19 +860,32 @@ export function LandingPage() {
             <h2 style={{ fontSize: 'clamp(34px, 5.5vw, 64px)', lineHeight: 1.03, letterSpacing: '-0.03em', fontWeight: 700, margin: '16px 0 0' }}>Details, dialed in.</h2>
             <p style={{ color: 'rgba(255,255,255,0.78)', fontSize: 'clamp(15px, 1.4vw, 17px)', lineHeight: 1.55, margin: '14px auto 0', maxWidth: 560 }}>Everything you need, nothing you don't. Built obsessively for people who actually care where their money goes.</p>
           </motion.div>
-          <div style={{ maxWidth: 1200, width: '100%', margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, padding: '0 28px' }}>
-            {FEATURES.map((f, i) => (
-              <motion.div key={f.title} initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp(i * 0.05)}
-                className="group"
-                style={{ padding: 26, borderRadius: 20, border: '1px solid rgba(164,132,215,0.22)', background: 'linear-gradient(180deg, rgba(28,14,55,0.55), rgba(20,10,40,0.75))', backdropFilter: 'blur(12px)', transition: 'all 0.35s cubic-bezier(0.22,1,0.36,1)', cursor: 'default' }}
-                whileHover={{ borderColor: 'rgba(164,132,215,0.4)', y: -4, boxShadow: '0 20px 50px rgba(138,43,226,0.15)' }}>
-                <div style={{ width: 42, height: 42, borderRadius: 12, display: 'grid', placeItems: 'center', background: 'rgba(138,43,226,0.15)', border: '1px solid rgba(138,43,226,0.3)', marginBottom: 14 }}>
-                  <f.icon style={{ width: 20, height: 20, color: '#C084FC', strokeWidth: 2.2 }} />
-                </div>
-                <h4 style={{ margin: '0 0 6px', fontSize: 15.5, fontWeight: 600, letterSpacing: '-0.01em' }}>{f.title}</h4>
-                <p style={{ margin: 0, fontSize: 13.5, color: 'rgba(255,255,255,0.78)', lineHeight: 1.55 }}>{f.desc}</p>
-              </motion.div>
-            ))}
+          <div style={{ maxWidth: 1200, width: '100%', margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, padding: '0 28px' }} className="features-grid">
+            {FEATURES.map((f, i) => {
+              const isNew = i >= FEATURES.length - 3;
+              return (
+                <motion.div key={f.title} initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp(i * 0.05)}
+                  className="group landing-feature-card"
+                  style={{ position: 'relative', padding: 26, borderRadius: 20, border: '1px solid rgba(164,132,215,0.22)', background: 'linear-gradient(180deg, rgba(28,14,55,0.55), rgba(20,10,40,0.75))', backdropFilter: 'blur(12px)', transition: 'all 0.35s cubic-bezier(0.22,1,0.36,1)', cursor: 'default', overflow: 'hidden' }}
+                  whileHover={{ borderColor: 'rgba(164,132,215,0.45)', y: -4, boxShadow: '0 20px 50px rgba(138,43,226,0.18)' }}>
+                  {isNew && (
+                    <span style={{ position: 'absolute', top: 14, right: 14, display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 8px', borderRadius: 999, fontSize: 9.5, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', background: 'rgba(138,43,226,0.18)', border: '1px solid rgba(192,132,252,0.35)', color: '#E9D5FF', boxShadow: '0 0 12px rgba(138,43,226,0.25)' }}>
+                      <Sparkles style={{ width: 10, height: 10 }} />
+                      New
+                    </span>
+                  )}
+                  <motion.div
+                    whileHover={{ scale: 1.08, rotate: 4 }}
+                    transition={{ type: 'spring', stiffness: 320, damping: 18 }}
+                    style={{ width: 42, height: 42, borderRadius: 12, display: 'grid', placeItems: 'center', background: 'rgba(138,43,226,0.15)', border: '1px solid rgba(138,43,226,0.3)', marginBottom: 14 }}
+                  >
+                    <f.icon style={{ width: 20, height: 20, color: '#C084FC', strokeWidth: 2.2 }} />
+                  </motion.div>
+                  <h4 style={{ margin: '0 0 6px', fontSize: 15.5, fontWeight: 600, letterSpacing: '-0.01em' }}>{f.title}</h4>
+                  <p style={{ margin: 0, fontSize: 13.5, color: 'rgba(255,255,255,0.78)', lineHeight: 1.55 }}>{f.desc}</p>
+                </motion.div>
+              );
+            })}
           </div>
         </section>
 
@@ -901,8 +917,11 @@ export function LandingPage() {
           .hero-grid-cols { grid-template-columns: 1fr !important; text-align: center; }
           .two-col-grid { grid-template-columns: 1fr !important; gap: 32px !important; }
         }
-        @media (max-width: 768px) {
-          #sec-features > div:last-child { grid-template-columns: 1fr !important; }
+        @media (max-width: 980px) {
+          .features-grid { grid-template-columns: repeat(2, 1fr) !important; }
+        }
+        @media (max-width: 640px) {
+          .features-grid { grid-template-columns: 1fr !important; }
         }
         @media (max-width: 640px) {
           section[id^="sec-"] { padding-left: 18px !important; padding-right: 18px !important; }

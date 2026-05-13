@@ -1,26 +1,26 @@
 export const LATEST_FEATURE_ANNOUNCEMENT = {
-    id: 'receipt-map-desktop-v9',
+    id: 'pwa-gestures-push-v10',
     title: "What's New ✦",
     features: [
         {
-            title: 'Receipt Scanner',
-            description: 'Point your camera at any receipt and Novira reads the amount and merchant automatically — no manual entry from paper slips.',
-            icon: 'receipt'
+            title: 'Install Anywhere',
+            description: 'One-tap install on iPhone, Android, Mac, and Windows. Novira gets its own icon, opens in a clean window, and unlocks offline + push.',
+            icon: 'mobile'
         },
         {
-            title: 'Drop a Pin Anywhere',
-            description: 'In the Expense Map, drag and drop a custom pin to tag any location on earth — not just places detected automatically.',
-            icon: 'map'
+            title: 'Swipe to Edit or Delete',
+            description: 'Swipe-left on any transaction row to reveal Edit and Delete with a satisfying spring. Pull-to-refresh on the dashboard.',
+            icon: 'gestures'
         },
         {
-            title: 'New Desktop Nav',
-            description: 'The sidebar is replaced by a floating pill nav at the top. It collapses to a burger icon as you scroll and snaps back on click.',
-            icon: 'layers'
+            title: 'Bills, Pace & Digests',
+            description: 'Opt into push notifications for bill reminders, 80% pace warnings, and daily or weekly recaps — with quiet hours that respect your local time.',
+            icon: 'bell'
         },
         {
-            title: 'Smart Settle',
-            description: 'Settle all your debts at once or mark incoming payments as received in a single tap — no more settling one by one.',
-            icon: 'zap'
+            title: 'Custom Date Ranges',
+            description: 'Analytics now ships This-Week / Last-7 / YTD shortcuts plus full custom-range selection. The What-If simulator links every cut back to your goals.',
+            icon: 'chart'
         },
     ],
     buttonText: "Let's go!",

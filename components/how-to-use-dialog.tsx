@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
-import { Compass, Users, Tag, PieChart, Plus, Wallet, X, CheckCircle2, MapPin, RefreshCcw, Search, Home, Target, CalendarClock, BookOpen, ArrowRight } from 'lucide-react';
+import { Compass, Users, Tag, PieChart, Plus, Wallet, X, CheckCircle2, MapPin, RefreshCcw, Search, Home, Target, CalendarClock, BookOpen, ArrowRight, Hand, Smartphone, Bell, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 type HowToUseDialogProps = {
@@ -22,10 +22,11 @@ export function HowToUseDialog({ isOpen, onClose }: HowToUseDialogProps) {
     const steps = [
         {
             icon: <Plus className="w-6 h-6 text-emerald-400" />,
+            accent: 'from-emerald-500/30 to-teal-500/10',
             title: "Smart Expense Capture",
-            desc: "Tap (+) to log a spend in seconds. Take Photo to scan a receipt with the camera, or pick one from files — Novira auto-fills amount, merchant, and date. Type expressions like 12.5+3.20 right in the amount field and they're calculated for you. Description pills suggest your past expenses for one-tap fill.",
+            desc: "Tap (+) to log a spend in seconds. Take Photo to scan a receipt with the camera, or pick one from files — Novira auto-fills amount, merchant, date, and category. Type expressions like 12.5+3.20 right in the amount field and they're calculated for you. Description pills suggest past expenses for one-tap fill.",
             subPoints: [
-                "Take Photo or Scan Receipt — auto-fill amount, merchant, date",
+                "AI receipt scan — amount, merchant, date, category in <2s",
                 "Inline calculator in amount and split fields",
                 "Description autocomplete pills with full prefill",
                 "Real-time FX across 20 supported currencies"
@@ -33,103 +34,153 @@ export function HowToUseDialog({ isOpen, onClose }: HowToUseDialogProps) {
         },
         {
             icon: <Wallet className="w-6 h-6 text-primary" />,
+            accent: 'from-primary/30 to-violet-500/10',
             title: "Living Dashboard",
-            desc: "Your home screen reads your money at a glance. The big Spent card shows month-to-date with a vs-last-month delta and today's spend pill. The Month Forecasting widget projects where you'll land using a weighted recent run-rate, and the Cashflow Forecast chart plots your month's trajectory.",
+            desc: "Your home screen reads your money at a glance. The big Spent card shows month-to-date with a vs-last-month delta and today's spend pill. Month Forecasting uses a weighted recent run-rate (60% last-7-day pace + 40% month-to-date) and the Cashflow Forecast chart plots your trajectory.",
             subPoints: [
                 "vs-last-month delta and Today's spend pill",
-                "Month Forecasting + Cashflow Forecast chart",
-                "Coming-Up-This-Week strip for upcoming recurring charges",
-                "Mid-bucket threshold alerts and digest pushes"
+                "Weighted-pace forecast + Cashflow chart",
+                "Paginated history — 100 rows at a time, smooth on 10k+",
+                "Coming-Up-This-Week strip for upcoming charges"
+            ]
+        },
+        {
+            icon: <Hand className="w-6 h-6 text-fuchsia-400" />,
+            accent: 'from-fuchsia-500/30 to-pink-500/10',
+            title: "Gestures Built In",
+            desc: "Novira is gesture-first. Swipe-left on any transaction to reveal Edit and Delete with a satisfying spring. Pull-to-refresh anywhere on the dashboard. Drag panels in Settings → Dashboard layout to reorder. Long-press in Search to enter bulk-select mode.",
+            subPoints: [
+                "Swipe-left → Edit / Delete on every row",
+                "Pull-to-refresh on dashboard & lists",
+                "Drag-to-reorder dashboard panels per device",
+                "Soft haptics on installed iPhone version"
+            ]
+        },
+        {
+            icon: <Smartphone className="w-6 h-6 text-sky-400" />,
+            accent: 'from-sky-500/30 to-cyan-500/10',
+            title: "Install Anywhere",
+            desc: "Novira runs in your browser today, on your home screen tomorrow. One tap on iPhone (Share → Add to Home Screen), Android (three dots → Install app), or desktop Chrome / Edge (install icon in the address bar) — Novira gets its own icon, opens in a clean window, and unlocks offline + push.",
+            subPoints: [
+                "Install banner appears automatically after 3s",
+                "Service worker keeps offline data and assets fresh",
+                "Background Sync flushes the queue when you reconnect",
+                "Tap Settings → About to see your installed version"
             ]
         },
         {
             icon: <Users className="w-6 h-6 text-blue-400" />,
+            accent: 'from-blue-500/30 to-indigo-500/10',
             title: "Splits & Friends",
-            desc: "Money shouldn't be awkward. Add friends by scanning a QR code or by email. Create Groups for trips, rent, or dinners. Split evenly or by custom amounts (each split field accepts expressions too). Smart Settle clears multiple debts in one tap.",
+            desc: "Money shouldn't be awkward. Add friends by scanning a QR code or by email. Create Groups for trips, rent, or dinners. Split evenly or by custom amounts (each split field accepts expressions too). Smart Settle clears multiple debts in one tap with the fewest transfers possible.",
             subPoints: [
                 "Even or custom-amount splits with calculator support",
                 "Scan-to-add friend QR codes",
-                "Smart Settle — clear all debts in one tap"
+                "Smart Settle — minimum-transfer settlement",
+                "Per-group running balances in any currency"
             ]
         },
         {
             icon: <Home className="w-6 h-6 text-indigo-400" />,
+            accent: 'from-indigo-500/30 to-purple-500/10',
             title: "Dedicated Workspaces",
-            desc: "Keep personal and shared finances apart. Switch into a Couple or Household workspace from the top of the dashboard — budgets, transactions, and analytics isolate to that group instantly.",
+            desc: "Keep personal and shared finances apart. Switch into a Couple, Household, or Trip workspace from the dashboard header — budgets, transactions, and analytics isolate to that group instantly, with their own joint monthly budget.",
             subPoints: [
-                "Isolated shared dashboards",
+                "Isolated dashboards per workspace",
                 "Custom joint monthly budgets",
-                "Per-workspace transaction history"
+                "Per-workspace transaction history & analytics"
             ]
         },
         {
-            icon: <Tag className="w-6 h-6 text-cyan-500" />,
+            icon: <Tag className="w-6 h-6 text-cyan-400" />,
+            accent: 'from-cyan-500/30 to-teal-500/10',
             title: "Mission Buckets",
             desc: "Create a Mission Bucket for trips or big purchases — each bucket has its own budget, currency, and date range. Use the Focus pill on the dashboard to isolate everything to one mission. Tags add a second dimension you can filter by anywhere.",
             subPoints: [
                 "Localized currency and budget per mission",
-                "Focus mode to isolate the dashboard",
+                "Focus mode isolates the entire dashboard",
                 "Transaction tags for cross-cutting filters"
             ]
         },
         {
             icon: <Target className="w-6 h-6 text-emerald-400" />,
+            accent: 'from-emerald-500/30 to-green-500/10',
             title: "Savings Goals",
-            desc: "Set targets like 'New Car' or 'Emergency Fund' and log periodic deposits. The Goals tab tracks progress, deposit history, and milestones over time.",
+            desc: "Set targets like 'New Car' or 'Emergency Fund' and log periodic deposits. The Goals tab tracks progress, deposit history, and milestones. The What-If simulator on Analytics tells you how many months sooner you'd hit a goal if you cut a category.",
             subPoints: [
-                "Visual progress tracking",
+                "Visual progress with milestone markers",
                 "Deposit log history",
-                "Long-term milestones"
+                "What-If simulator links cuts to goal dates"
             ]
         },
         {
             icon: <RefreshCcw className="w-6 h-6 text-orange-400" />,
+            accent: 'from-orange-500/30 to-amber-500/10',
             title: "Recurring & Subscriptions",
-            desc: "Track everything that hits monthly in the Subscriptions tab. Novira detects silent price changes on your subs and surfaces them. Bulk edit lets you fix many transactions at once. Privacy mode hides amounts when you're not alone.",
+            desc: "Track everything that hits monthly in the Subscriptions tab. Novira watches your last three months and auto-detects subscriptions you forgot to add. It flags silent price drifts (e.g. Spotify ₹199 → ₹229) so you're never surprised. Bulk edit and Pause-Until make spring cleaning painless.",
             subPoints: [
-                "Subscription calendar with price-change detection",
-                "Bulk edit and privacy mode",
-                "Daily / weekly digest push notifications"
+                "Auto-detect subscriptions from 3 months of activity",
+                "Price-drift alerts on quiet price hikes",
+                "Pause, pin, bulk-edit",
+                "Export bill schedule as a calendar file"
+            ]
+        },
+        {
+            icon: <Bell className="w-6 h-6 text-yellow-400" />,
+            accent: 'from-yellow-500/30 to-orange-500/10',
+            title: "Bills & Nudges",
+            desc: "Opt into push notifications in Settings → Notifications and Novira can quietly buzz you for things that matter: a bill due tomorrow, a spending pace warning at 80% of allowance, a bucket deadline, or a daily / weekly recap. Quiet hours respect your local time.",
+            subPoints: [
+                "Bill reminders — off, 1 day, 3 days, or a week",
+                "Spending-pace nudges at 80% of allowance",
+                "Daily / weekly digest pushes",
+                "Quiet hours (default 22:00 → 07:00)"
             ]
         },
         {
             icon: <CalendarClock className="w-6 h-6 text-amber-400" />,
+            accent: 'from-amber-500/30 to-yellow-500/10',
             title: "Calendar & Cashflow",
-            desc: "The cash flow calendar visualises your day-by-day spending so you can spot heavy weeks at a glance. Tap any day to drill in. Combined with Cashflow Forecast on the dashboard, you always know what's behind and what's ahead.",
+            desc: "The cash flow calendar visualises day-by-day spending so heavy weeks pop out. Tap any day to drill in. Combined with the dashboard's Cashflow Forecast, you always know what's behind and what's ahead.",
             subPoints: [
-                "Day-by-day cash flow calendar",
+                "Day-by-day cash flow heatmap",
                 "Drill into any day's transactions",
-                "Forecast trajectory through end of month"
+                "End-of-month trajectory line"
             ]
         },
         {
             icon: <MapPin className="w-6 h-6 text-rose-400" />,
+            accent: 'from-rose-500/30 to-pink-500/10',
             title: "Expense Map",
-            desc: "Every geo-tagged spend appears on the Expense Map. Drag a pin anywhere, switch to Heatmap for density, or Trip Trails to see flows. The map remembers merchants so suggestions get sharper over time.",
+            desc: "Every geo-tagged spend appears on the Expense Map. Drag a pin anywhere, switch to Heatmap for density, or Trip Trails to see day-by-day flows. The map remembers merchants so suggestions get sharper over time.",
             subPoints: [
                 "Drag-drop pins, Heatmap & Trip Trails",
                 "Smart Quick Pins from your visit history",
-                "Place-aware smart default suggestions"
+                "Place-aware default suggestions"
             ]
         },
         {
             icon: <Search className="w-6 h-6 text-violet-400" />,
+            accent: 'from-violet-500/30 to-purple-500/10',
             title: "Search & Analytics",
-            desc: "Find anything by description, category, bucket, payment method, or date range — server-side, so it's fast even on 10k+ rows. The Analytics tab breaks down spending with interactive charts and exports professional multi-page PDF reports.",
+            desc: "Find anything by description, category, bucket, payment method, or date range — server-side, so it stays fast on 10k+ rows. Analytics now includes Custom Range with This-Week / Last-7 / YTD shortcuts and the What-If simulator that quantifies cuts against your goals.",
             subPoints: [
-                "Multi-criteria search with totals",
-                "Interactive pie & trend analytics",
+                "Server-side multi-criteria search",
+                "Custom date range + presets in Analytics",
+                "What-If simulator — monthly & yearly savings",
                 "PDF reports and CSV exports"
             ]
         },
         {
             icon: <PieChart className="w-6 h-6 text-pink-400" />,
+            accent: 'from-pink-500/30 to-fuchsia-500/10',
             title: "Allowance & Guardrails",
-            desc: "Set a Monthly Allowance to see your Safe-to-Spend at all times. Smart alerts fire at 80% and again as you near the limit. Use Add Funds for income, refunds, or bonuses without polluting your expense reports.",
+            desc: "Set a Monthly Allowance to see Safe-to-Spend at all times. Smart alerts fire at 80% and again near the limit. Use Add Funds for income, refunds, or bonuses without polluting expense reports. Privacy mode in the dashboard header blurs every amount on demand.",
             subPoints: [
-                "Monthly allowance with pacing",
-                "Overspend safety alerts",
-                "Add Funds for income & refunds"
+                "Monthly allowance with weighted pacing",
+                "Overspend safety alerts (80% / near-limit)",
+                "Add Funds for income & refunds",
+                "One-tap privacy blur"
             ]
         }
     ];
@@ -175,8 +226,9 @@ export function HowToUseDialog({ isOpen, onClose }: HowToUseDialogProps) {
                                     <h1 className="text-base sm:text-lg font-extrabold text-white tracking-tight leading-tight truncate">
                                         Master Your <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-purple-400">Financial Flow</span>
                                     </h1>
-                                    <p className="text-white/70 text-[11px] sm:text-xs leading-snug mt-0.5 line-clamp-2">
-                                        A quick tour of the 11 core mechanics that make Novira tick.
+                                    <p className="text-white/70 text-[11px] sm:text-xs leading-snug mt-0.5 line-clamp-2 inline-flex items-center gap-1.5">
+                                        <Sparkles className="w-3 h-3 text-primary shrink-0" />
+                                        A guided tour of the {steps.length} mechanics that make Novira tick.
                                     </p>
                                 </div>
                                 <button
@@ -194,17 +246,30 @@ export function HowToUseDialog({ isOpen, onClose }: HowToUseDialogProps) {
                                     {steps.map((step, i) => (
                                         <motion.div
                                             key={i}
-                                            initial={{ opacity: 0, y: 10 }}
+                                            initial={{ opacity: 0, y: 14 }}
                                             animate={{ opacity: 1, y: 0 }}
-                                            transition={{ delay: 0.1 + i * 0.05 }}
-                                            className="group relative p-5 sm:p-6 rounded-3xl bg-white/[0.03] border border-white/5 hover:bg-white/[0.06] hover:border-white/10 transition-all duration-500"
+                                            transition={{ delay: 0.08 + i * 0.04, duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+                                            className="group relative p-5 sm:p-6 rounded-3xl bg-white/[0.03] border border-white/5 hover:bg-white/[0.06] hover:border-white/15 transition-all duration-500 overflow-hidden"
                                         >
-                                            <div className="flex flex-col sm:flex-row gap-5 sm:gap-6">
-                                                <div className="shrink-0 w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center group-hover:border-primary/50 group-hover:bg-primary/10 transition-all duration-500 shadow-sm group-hover:scale-110 group-hover:rotate-3 self-start">
+                                            {/* Per-card accent glow — fades in on hover */}
+                                            <div
+                                                aria-hidden
+                                                className={`pointer-events-none absolute -top-24 -right-24 w-56 h-56 rounded-full blur-3xl opacity-0 group-hover:opacity-60 transition-opacity duration-700 bg-gradient-to-br ${step.accent}`}
+                                            />
+                                            {/* Step index — subtle counter */}
+                                            <span className="absolute top-3 right-4 text-[10px] font-mono uppercase tracking-widest text-white/30 group-hover:text-white/55 transition-colors">
+                                                {String(i + 1).padStart(2, '0')} / {String(steps.length).padStart(2, '0')}
+                                            </span>
+                                            <div className="relative flex flex-col sm:flex-row gap-5 sm:gap-6">
+                                                <motion.div
+                                                    whileHover={{ scale: 1.08, rotate: 4 }}
+                                                    transition={{ type: 'spring', stiffness: 320, damping: 18 }}
+                                                    className="shrink-0 w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center group-hover:border-primary/50 group-hover:bg-primary/10 transition-colors duration-500 shadow-sm self-start"
+                                                >
                                                     {step.icon}
-                                                </div>
-                                                <div className="space-y-3 flex-1">
-                                                    <h3 className="text-base sm:text-lg font-extrabold text-white group-hover:text-primary transition-colors">
+                                                </motion.div>
+                                                <div className="space-y-3 flex-1 min-w-0">
+                                                    <h3 className="text-base sm:text-lg font-extrabold text-white group-hover:text-primary transition-colors pr-16">
                                                         {step.title}
                                                     </h3>
                                                     <p className="text-[12px] sm:text-[13px] text-white/80 leading-relaxed transition-colors">
@@ -212,10 +277,16 @@ export function HowToUseDialog({ isOpen, onClose }: HowToUseDialogProps) {
                                                     </p>
                                                     <div className="pt-3 grid grid-cols-1 gap-2">
                                                         {step.subPoints.map((point, idx) => (
-                                                            <div key={idx} className="flex items-start gap-2.5 text-[11px] sm:text-[11px] font-semibold text-white/75 transition-colors">
+                                                            <motion.div
+                                                                key={idx}
+                                                                initial={{ opacity: 0, x: -6 }}
+                                                                animate={{ opacity: 1, x: 0 }}
+                                                                transition={{ delay: 0.14 + i * 0.04 + idx * 0.04, duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+                                                                className="flex items-start gap-2.5 text-[11px] sm:text-[11px] font-semibold text-white/75"
+                                                            >
                                                                 <CheckCircle2 className="w-3.5 h-3.5 text-primary mt-0.5 shrink-0" />
                                                                 <span className="leading-tight">{point}</span>
-                                                            </div>
+                                                            </motion.div>
                                                         ))}
                                                     </div>
                                                 </div>
