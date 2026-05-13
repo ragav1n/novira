@@ -550,13 +550,15 @@ export function AccountsSection({ defaultCurrency, formatCurrency }: Props) {
                                 </div>
                             </div>
 
-                            {/* Opening balance + credit limit. For cash / checking /
-                                savings, opening_balance is overhead the user doesn't need
-                                — wrap in an "Advanced" disclosure. For credit cards
-                                (tracking debt) and digital wallets (multi-currency holdings)
-                                it stays prominent. */}
+                            {/* Opening balance + credit limit. Only surface for account
+                                types that actually use balance framing on the row
+                                (credit cards, digital wallets). Cash / checking / savings /
+                                other just track spending, so opening_balance has no
+                                user-visible effect — and exposing it via a disclosure
+                                would be a half-functional dead end. */}
                             {(() => {
                                 const showOpeningPrimary = editing.type === 'credit_card' || editing.type === 'digital_wallet';
+                                if (!showOpeningPrimary) return null;
                                 const isCardForm = editing.type === 'credit_card';
                                 const openingLabel = isCardForm ? `Starting debt (${editing.currency})` : `Opening (${editing.currency})`;
                                 const openingFields = (
@@ -650,22 +652,7 @@ export function AccountsSection({ defaultCurrency, formatCurrency }: Props) {
                                     </>
                                 );
 
-                                if (showOpeningPrimary) {
-                                    return <div>{openingFields}</div>;
-                                }
-                                return (
-                                    <details className="rounded-xl border border-white/5 bg-secondary/5">
-                                        <summary className="cursor-pointer px-3 py-2 text-[11.5px] font-semibold text-muted-foreground/70 hover:text-muted-foreground">
-                                            Advanced — opening balance &amp; reconciliation
-                                        </summary>
-                                        <div className="px-3 pb-3 pt-1">
-                                            <p className="text-[10.5px] text-muted-foreground/60 mb-2 leading-relaxed">
-                                                Set this to track real cash on hand and use the reconcile tool. Most users can leave it at 0.
-                                            </p>
-                                            {openingFields}
-                                        </div>
-                                    </details>
-                                );
+                                return <div>{openingFields}</div>;
                             })()}
 
                             <div>
