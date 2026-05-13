@@ -7,6 +7,7 @@ import { User, Session } from '@supabase/supabase-js';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { useAppBadge } from '@/hooks/useAppBadge';
 import { setQueueUser, attemptSync } from '@/lib/sync-manager';
+import { invalidateTransactionCaches } from '@/lib/sw-cache';
 
 export type Currency = 'USD' | 'EUR' | 'INR' | 'GBP' | 'CHF' | 'SGD' | 'VND' | 'TWD' | 'JPY' | 'KRW' | 'HKD' | 'MYR' | 'PHP' | 'THB' | 'CAD' | 'AUD' | 'MXN' | 'BRL' | 'IDR' | 'AED';
 
@@ -173,6 +174,15 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
             });
             if (error) {
                 console.error('Error processing recurring expenses:', error);
+                return;
+            }
+            // RPC may have inserted transactions server-side. Mirror the user-add
+            // path so dashboard/buckets/groups refetch instead of waiting for a
+            // manual refresh or the next mutation. Realtime is unreliable here
+            // because the RPC races with initial channel subscription.
+            invalidateTransactionCaches();
+            if (typeof window !== 'undefined') {
+                window.dispatchEvent(new Event('novira:expense-added'));
             }
         } catch (error) {
             console.error('Error calling recurring expense RPC:', error);

@@ -189,6 +189,11 @@ export function useDashboardData(
         const myGen = ++fetchGenRef.current;
         setLoadLimit(PAGE_SIZE);
         loadLimitRef.current = PAGE_SIZE;
+        // Clear the previous workspace's rows so a failed/slow fetch can't leave
+        // them visible under the new workspace.
+        setServerTransactions([]);
+        setPendingTransactions([]);
+        setHasMore(false);
 
         const fetchInitialData = async () => {
             setLoading(true);

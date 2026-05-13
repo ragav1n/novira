@@ -12,6 +12,16 @@ import { useMapData, getGridOffsetCoords } from '@/hooks/useMapData';
 import { MapHeader } from './map-header';
 import { MapControls } from './map-controls';
 
+function parseSparkline(raw: unknown): number[] {
+    if (!raw || typeof raw !== 'string') return [];
+    try {
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed.filter((n): n is number => typeof n === 'number') : [];
+    } catch {
+        return [];
+    }
+}
+
 export interface Transaction {
     id: string;
     description: string;
@@ -371,7 +381,7 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency, 
                             amount: props.amount,
                             topMerchant: props.topMerchant || 'Multiple',
                             count: props.count || 1,
-                            sparkline: props.sparkline ? JSON.parse(props.sparkline) : [],
+                            sparkline: parseSparkline(props.sparkline),
                             txIds: props.txIds || ''
                         });
                     }

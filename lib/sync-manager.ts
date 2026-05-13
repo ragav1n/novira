@@ -100,7 +100,15 @@ export async function setQueueUser(userId: string | null): Promise<void> {
 async function readQueue(): Promise<SyncPayload[]> {
     const key = queueKey();
     if (!key) return [];
-    return (await get<SyncPayload[]>(key)) || [];
+    try {
+        return (await get<SyncPayload[]>(key)) || [];
+    } catch (error) {
+        // IDB can throw on quota, corruption, or in private browsing modes. Treat
+        // as empty so the rest of the sync layer keeps functioning instead of
+        // crashing every read path.
+        console.error('[sync-manager] readQueue failed:', error);
+        return [];
+    }
 }
 
 /** Public read for UI hooks that want to hydrate on mount. */
