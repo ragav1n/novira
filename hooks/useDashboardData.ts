@@ -643,8 +643,12 @@ export function useDashboardData(
                 }
             }
             toast.success(`Deleted ${ids.length} transaction${ids.length === 1 ? '' : 's'}`);
-            // Wake buckets / groups providers so their aggregates refetch.
-            window.dispatchEvent(new Event('novira:expense-added'));
+            // Intentionally NOT dispatching `novira:expense-added` here. That
+            // event makes the dashboard refetch everything, racing Postgres
+            // replication and re-introducing the just-deleted rows for a
+            // split second before realtime DELETE catches up. Buckets and
+            // groups providers already have their own realtime subs on
+            // `transactions`, so they refresh on their own.
             return { count: ids.length };
         } catch (error: any) {
             setServerTransactions(previousServerTransactions);
@@ -698,7 +702,10 @@ export function useDashboardData(
             }
             invalidateTransactionCaches();
             toast.success(`Updated ${ids.length} transaction${ids.length === 1 ? '' : 's'}`);
-            window.dispatchEvent(new Event('novira:expense-added'));
+            // See handleBulkDelete: skipping the novira:expense-added dispatch
+            // on purpose. Realtime UPDATE events propagate to dashboard /
+            // buckets / groups; the dispatch would force a refetch that races
+            // replication and momentarily reverts the optimistic state.
             return { count: ids.length };
         } catch (error: any) {
             setServerTransactions(previousServerTransactions);
