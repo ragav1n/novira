@@ -29,6 +29,7 @@ interface Props {
     rules: CategorizationRule[];
     loading: boolean;
     buckets: Bucket[];
+    setRules: React.Dispatch<React.SetStateAction<CategorizationRule[]>>;
 }
 
 type DraftRule = {
@@ -68,7 +69,7 @@ function describeRule(rule: CategorizationRule, buckets: Bucket[]): string {
     return `${where} ${verb} "${rule.pattern}" → ${actions.join(', ') || '(no action)'}`;
 }
 
-export function CategorizationRulesSection({ userId, rules, loading, buckets }: Props) {
+export function CategorizationRulesSection({ userId, rules, loading, buckets, setRules }: Props) {
     const [editing, setEditing] = useState<DraftRule | null>(null);
     const [confirmDelete, setConfirmDelete] = useState<CategorizationRule | null>(null);
     const [saving, setSaving] = useState(false);
@@ -87,26 +88,34 @@ export function CategorizationRulesSection({ userId, rules, loading, buckets }: 
     });
 
     const handleToggleActive = async (rule: CategorizationRule, next: boolean) => {
+        // Optimistic — realtime may or may not be enabled on the table; either
+        // way the user sees the toggle land immediately.
+        setRules(prev => prev.map(r => r.id === rule.id ? { ...r, is_active: next } : r));
         const { error } = await supabase
             .from('categorization_rules')
             .update({ is_active: next })
             .eq('id', rule.id);
         if (error) {
+            setRules(prev => prev.map(r => r.id === rule.id ? { ...r, is_active: !next } : r));
             toast.error('Failed to toggle rule');
         }
     };
 
     const handleDelete = async (rule: CategorizationRule) => {
+        // Optimistic remove.
+        const snapshot = rules;
+        setRules(prev => prev.filter(r => r.id !== rule.id));
+        setConfirmDelete(null);
         const { error } = await supabase
             .from('categorization_rules')
             .delete()
             .eq('id', rule.id);
         if (error) {
+            setRules(snapshot);
             toast.error('Failed to delete rule');
             return;
         }
         toast.success('Rule deleted');
-        setConfirmDelete(null);
     };
 
     const handleSave = async () => {
@@ -134,17 +143,34 @@ export function CategorizationRulesSection({ userId, rules, loading, buckets }: 
                 is_active: editing.is_active,
             };
             if (editing.id) {
-                const { error } = await supabase
+                const editingId = editing.id;
+                const { data, error } = await supabase
                     .from('categorization_rules')
                     .update(payload)
-                    .eq('id', editing.id);
+                    .eq('id', editingId)
+                    .select()
+                    .single();
                 if (error) throw error;
+                // Optimistic apply with server-returned row (gets fresh updated_at).
+                setRules(prev => prev.map(r => r.id === editingId ? (data as CategorizationRule) : r));
                 toast.success('Rule updated');
             } else {
-                const { error } = await supabase
+                const { data, error } = await supabase
                     .from('categorization_rules')
-                    .insert(payload);
+                    .insert(payload)
+                    .select()
+                    .single();
                 if (error) throw error;
+                // Insert in priority-desc order so the new row lands where the
+                // realtime refetch would have placed it.
+                setRules(prev => {
+                    const next = [...prev, data as CategorizationRule];
+                    next.sort((a, b) => {
+                        if (b.priority !== a.priority) return b.priority - a.priority;
+                        return b.created_at.localeCompare(a.created_at);
+                    });
+                    return next;
+                });
                 toast.success('Rule added');
             }
             setEditing(null);

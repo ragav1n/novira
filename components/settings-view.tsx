@@ -99,7 +99,7 @@ export function SettingsView() {
     const { buckets } = useBucketsList();
     const { groups } = useGroups();
     const push = usePushNotifications();
-    const { rules: categorizationRules, loading: loadingRules } = useCategorizationRules(userId);
+    const { rules: categorizationRules, loading: loadingRules, setRules: setCategorizationRules } = useCategorizationRules(userId);
 
     // Local state for budget input to allow typing before saving
     const [localBudget, setLocalBudget] = useState(monthlyBudget.toString());
@@ -610,6 +610,7 @@ export function SettingsView() {
                                 rules={categorizationRules}
                                 loading={loadingRules}
                                 buckets={buckets}
+                                setRules={setCategorizationRules}
                             />
                         </AccordionContent>
                     </AccordionItem>

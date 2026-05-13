@@ -56,5 +56,9 @@ export function useCategorizationRules(userId: string | null | undefined) {
         };
     }, [userId]);
 
-    return { rules, loading };
+    // Exposed so the settings UI can apply optimistic updates without waiting
+    // for the realtime round-trip (and to keep working if realtime is disabled
+    // on the table). Realtime, when it fires, refetches and overwrites with
+    // server truth — order doesn't matter.
+    return { rules, loading, setRules };
 }
