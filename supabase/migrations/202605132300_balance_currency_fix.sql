@@ -13,7 +13,11 @@
 -- (converting from account.currency → base currency where needed) since
 -- exchange rates live in the client cache, not the database.
 
-create or replace function public.compute_account_balances(p_user_id uuid)
+-- Return shape is changing (balance → activity_base), so CREATE OR REPLACE
+-- isn't enough — Postgres rejects return-type changes. Drop first.
+drop function if exists public.compute_account_balances(uuid);
+
+create function public.compute_account_balances(p_user_id uuid)
 returns table (
     account_id uuid,
     activity_base numeric
