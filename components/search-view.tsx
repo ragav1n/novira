@@ -295,7 +295,7 @@ export function SearchView() {
         try {
             let query = supabase
                 .from('transactions')
-                .select('id, description, amount, category, date, payment_method, created_at, user_id, group_id, currency, exchange_rate, base_currency, is_recurring, is_settlement, exclude_from_allowance, bucket_id, place_name, place_address, place_lat, place_lng, tags, notes, profile:profiles(full_name, avatar_url), splits(user_id, amount, is_paid)');
+                .select('id, description, amount, category, date, payment_method, created_at, user_id, group_id, currency, exchange_rate, base_currency, is_recurring, is_settlement, exclude_from_allowance, bucket_id, place_name, place_address, place_lat, place_lng, tags, notes, receipt_path, profile:profiles(full_name, avatar_url), splits(user_id, amount, is_paid)');
 
             // Workspace filter — when null, RLS limits results to rows the user can see.
             if (activeWorkspaceId) {
