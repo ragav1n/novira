@@ -99,12 +99,18 @@ export function AccountsSection({ defaultCurrency, formatCurrency }: Props) {
             console.error('[AccountsSection] balances failed', error);
             return;
         }
+        // SQL returns per-currency activity rows. Convert each to current base
+        // currency client-side and sum. This is what makes the math survive a
+        // historical base_currency change: we ignore stored converted_amount
+        // (which was frozen in the old base) and rely on amounts + current rates.
         const map: Record<string, number> = {};
-        for (const row of (data ?? []) as { account_id: string; activity_base: number }[]) {
-            map[row.account_id] = Number(row.activity_base);
+        for (const row of (data ?? []) as { account_id: string; tx_currency: string; activity_native: number }[]) {
+            const native = Number(row.activity_native);
+            const inBase = convertAmount(native, row.tx_currency || baseCurrency, baseCurrency);
+            map[row.account_id] = (map[row.account_id] ?? 0) + inBase;
         }
         setActivity(map);
-    }, [userId]);
+    }, [userId, baseCurrency, convertAmount]);
 
     useEffect(() => { fetchBalances(); }, [fetchBalances, accounts]);
 
