@@ -18,6 +18,7 @@ import { SpendingOverview } from './dashboard/spending-overview';
 import { TransactionListSection } from './dashboard/transaction-list-section';
 import { DashboardDialogs } from './dashboard/dashboard-dialogs';
 import { DashboardSkeleton } from './dashboard/dashboard-skeleton';
+import { AccountFilterChips } from './dashboard/account-filter-chips';
 import { AddFriendDialog } from './groups/add-friend-dialog';
 import { ReceiptViewerDialog } from './receipt-viewer-dialog';
 import { useReceiptViewer } from '@/hooks/useReceiptViewer';
@@ -235,6 +236,9 @@ export function DashboardView() {
                     isCoupleWorkspace={isCoupleWorkspace}
                     isHomeWorkspace={isHomeWorkspace}
                 />
+
+                {/* Personal workspace only — accounts are per-user. */}
+                {!activeWorkspaceId && <AccountFilterChips />}
 
                 {/* Empty State */}
                 {(!loading && groups.length === 0 && friends.length === 0 && transactions.length === 0) && (

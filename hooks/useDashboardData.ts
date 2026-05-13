@@ -6,6 +6,7 @@ import type { SyncPayload } from '@/lib/offline-sync-queue';
 import { discardFailedItem, enqueueMutation, getCurrentQueue } from '@/lib/sync-manager';
 import { invalidateTransactionCaches } from '@/lib/sw-cache';
 import { deleteReceipt } from '@/lib/receipt-storage';
+import { useAccounts } from '@/components/providers/accounts-provider';
 import { reportNetworkError } from '@/lib/network-error-bus';
 import { applyWorkspaceFilter } from '@/lib/workspace-filter';
 import { useTransactionInvalidationListener } from './useTransactionInvalidationListener';
@@ -65,6 +66,10 @@ export function useDashboardData(
     const [hasMore, setHasMore] = useState(false);
     const [loadLimit, setLoadLimit] = useState(PAGE_SIZE);
 
+    const { activeAccountId } = useAccounts();
+    const activeAccountIdRef = useRef<string | null>(activeAccountId);
+    activeAccountIdRef.current = activeAccountId;
+
     const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
     const [isEditOpen, setIsEditOpen] = useState(false);
 
@@ -94,7 +99,14 @@ export function useDashboardData(
                 .order('date', { ascending: false })
                 .order('created_at', { ascending: false })
                 .limit(limit + 1);
-            const query = applyWorkspaceFilter(baseQuery, currentUserId, workspaceId);
+            let query = applyWorkspaceFilter(baseQuery, currentUserId, workspaceId);
+            // Account filter is a personal-workspace concept — in a shared
+            // workspace each member's tx is on their own account, filtering
+            // by one account_id would exclude partners' rows confusingly.
+            const accountFilter = activeAccountIdRef.current;
+            if (!workspaceId && accountFilter) {
+                query = query.eq('account_id', accountFilter);
+            }
 
             const { data: txs } = await query;
 
@@ -184,7 +196,7 @@ export function useDashboardData(
         };
     }, []);
 
-    // Reset pagination and re-fetch when user or workspace changes
+    // Reset pagination and re-fetch when user, workspace, or account filter changes
     useEffect(() => {
         if (!userId) return;
         const myGen = ++fetchGenRef.current;
@@ -209,7 +221,7 @@ export function useDashboardData(
         };
 
         fetchInitialData();
-    }, [userId, activeWorkspaceId, loadPendingFromQueue]);
+    }, [userId, activeWorkspaceId, activeAccountId, loadPendingFromQueue]);
 
     // Keep pending list in sync with queue events
     useEffect(() => {
