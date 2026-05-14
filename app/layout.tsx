@@ -10,6 +10,7 @@ import { UserPreferencesProvider } from '@/components/providers/user-preferences
 import { GroupsProvider } from '@/components/providers/groups-provider'
 import { BucketsProvider } from '@/components/providers/buckets-provider'
 import { AccountsProvider } from '@/components/providers/accounts-provider'
+import { ActiveTripProvider } from '@/components/providers/active-trip-provider'
 import { SyncIndicator } from '@/components/pwa-sync-indicator'
 import { WorkspaceThemeProvider } from '@/components/providers/workspace-theme-provider'
 import { ErrorBoundary } from '@/components/error-boundary'
@@ -96,10 +97,12 @@ export default async function RootLayout({
                 <SyncIndicator />
                 <AccountsProvider>
                   <BucketsProvider>
-                    <MobileLayout defaultIsDesktop={defaultIsDesktop}>
-                      {children}
-                    </MobileLayout>
-                    <MonthlyRecapModal />
+                    <ActiveTripProvider>
+                      <MobileLayout defaultIsDesktop={defaultIsDesktop}>
+                        {children}
+                      </MobileLayout>
+                      <MonthlyRecapModal />
+                    </ActiveTripProvider>
                   </BucketsProvider>
                 </AccountsProvider>
               </GroupsProvider>

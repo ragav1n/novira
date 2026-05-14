@@ -3,9 +3,12 @@ import { format } from 'date-fns';
 import { toast } from '@/utils/haptics';
 import { Haptics, NotificationType } from '@capacitor/haptics';
 import { TransactionService } from '@/lib/services/transaction-service';
+import { TripService } from '@/lib/services/trip-service';
 import { invalidateTransactionCaches } from '@/lib/sw-cache';
 import { uploadReceipt, validateReceiptFile } from '@/lib/receipt-storage';
 import { supabase } from '@/lib/supabase';
+import { useActiveTrip } from '@/components/providers/active-trip-provider';
+import { useUserPreferences } from '@/components/providers/user-preferences-provider';
 import type { AppRouterInstance } from 'next/dist/shared/lib/app-router-context.shared-runtime';
 import type { Transaction, TransactionRecord, SplitRecord, RecurringRecord } from '@/types/transaction';
 
@@ -189,6 +192,8 @@ function buildRecurringRecord(
 
 export function useExpenseSubmission() {
     const [loading, setLoading] = useState(false);
+    const { activeTrip } = useActiveTrip();
+    const { activeWorkspaceId } = useUserPreferences();
 
     const handleSubmit = async (params: ExpenseSubmissionParams) => {
         const {
@@ -222,8 +227,22 @@ export function useExpenseSubmission() {
             const exchangeRate = await TransactionService.getExchangeRate(txCurrency, currency, date!);
             const convertedAmount = parseFloat(amount) * exchangeRate;
 
+            // Auto-append active-trip tag when the transaction date falls within
+            // an active trip. The cached `activeTrip` is scoped to the current
+            // workspace, so only trust it when this transaction is being filed
+            // there AND the date is today; otherwise re-fetch with the right scope.
+            let mergedTags = [...tags];
+            const isToday = date && format(date, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
+            const sameWorkspace = (selectedGroupId ?? null) === (activeWorkspaceId ?? null);
+            const tripForDate = isToday && sameWorkspace
+                ? (activeTrip?.auto_tag_enabled ? activeTrip : null)
+                : await TripService.getActiveTripForDate(userId, date!, selectedGroupId);
+            if (tripForDate?.auto_tag_enabled && !mergedTags.includes(tripForDate.slug)) {
+                mergedTags.push(tripForDate.slug);
+            }
+
             const cleanTags = Array.from(new Set(
-                tags.map(t => t.trim()).filter(t => t.length > 0 && t.length <= 32)
+                mergedTags.map(t => t.trim()).filter(t => t.length > 0 && t.length <= 32)
             )).slice(0, 12);
 
             const transactionRecord: TransactionRecord = {

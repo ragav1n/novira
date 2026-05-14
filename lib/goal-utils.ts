@@ -62,3 +62,11 @@ export function currentMilestone(progressPct: number): Milestone {
     if (progressPct >= 25) return 25;
     return 0;
 }
+
+export function monthsDeltaVsDeadline(
+    projected: Date | null,
+    deadline: string | null | undefined
+): number | null {
+    if (!projected || !deadline) return null;
+    return differenceInCalendarDays(projected, parseISO(deadline)) / AVG_DAYS_PER_MONTH;
+}

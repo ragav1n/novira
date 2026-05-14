@@ -70,6 +70,13 @@ export function useDashboardData(
     const activeAccountIdRef = useRef<string | null>(activeAccountId);
     activeAccountIdRef.current = activeAccountId;
 
+    // Read profile through a ref so the pending-queue loader doesn't recreate
+    // when the user edits their avatar/name. Without this, every profile edit
+    // bumps loadPendingFromQueue's identity, which cascades into the fetch
+    // effect below and triggers a full transaction refetch.
+    const currentUserProfileRef = useRef(currentUserProfile);
+    currentUserProfileRef.current = currentUserProfile;
+
     const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
     const [isEditOpen, setIsEditOpen] = useState(false);
 
@@ -158,7 +165,7 @@ export function useDashboardData(
                 return t.user_id === userId;
             });
             const pending = filtered
-                .map(item => pendingItemToTransaction(item, currentUserProfile))
+                .map(item => pendingItemToTransaction(item, currentUserProfileRef.current))
                 .filter((t): t is Transaction => t !== null);
             setPendingTransactions(pending);
         } catch (error) {
@@ -166,7 +173,7 @@ export function useDashboardData(
                 console.error('Error loading pending queue items:', error);
             }
         }
-    }, [userId, activeWorkspaceId, currentUserProfile?.full_name, currentUserProfile?.avatar_url]);
+    }, [userId, activeWorkspaceId]);
 
     const loadMore = useCallback(async () => {
         if (!userId || loadingMore || !hasMore) return;
@@ -222,6 +229,17 @@ export function useDashboardData(
 
         fetchInitialData();
     }, [userId, activeWorkspaceId, activeAccountId, loadPendingFromQueue]);
+
+    // Reset edit/audit dialog state when the user or workspace changes — otherwise
+    // an open edit dialog after a workspace switch points at a transaction the
+    // current workspace can't see, and submitting would update a row belonging to
+    // the previous workspace.
+    useEffect(() => {
+        setEditingTransaction(null);
+        setIsEditOpen(false);
+        setSelectedAuditTx(null);
+        setAuditLogs([]);
+    }, [userId, activeWorkspaceId]);
 
     // Keep pending list in sync with queue events
     useEffect(() => {

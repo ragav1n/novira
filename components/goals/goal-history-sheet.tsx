@@ -2,14 +2,15 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { format, parseISO, startOfMonth, subMonths } from 'date-fns';
-import { Trash2, TrendingUp, Coins, ListChecks } from 'lucide-react';
+import { Trash2, TrendingUp, Coins, ListChecks, Wand2 } from 'lucide-react';
 import { LineChart, Line, ResponsiveContainer, Tooltip } from 'recharts';
 import {
     Dialog, DialogContent, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
+import { Slider } from '@/components/ui/slider';
 import { cn } from '@/lib/utils';
 import { resolveGoalIcon, resolveGoalColor } from '@/lib/goal-styles';
-import { monthlyVelocity } from '@/lib/goal-utils';
+import { monthlyVelocity, projectedCompletionDate, requiredMonthlyContribution } from '@/lib/goal-utils';
 import { GoalService } from '@/lib/services/goal-service';
 import type { SavingsGoal, SavingsDeposit } from '@/types/goal';
 
@@ -26,6 +27,7 @@ export function GoalHistorySheet({ goal, userId, open, onOpenChange, formatCurre
     const [deposits, setDeposits] = useState<SavingsDeposit[]>([]);
     const [loading, setLoading] = useState(false);
     const [removingId, setRemovingId] = useState<string | null>(null);
+    const [scenarioRate, setScenarioRate] = useState<number | null>(null);
 
     const tokens = resolveGoalColor(goal?.color);
     const Icon = resolveGoalIcon(goal?.icon);
@@ -75,6 +77,23 @@ export function GoalHistorySheet({ goal, userId, open, onOpenChange, formatCurre
             setRemovingId(null);
         }
     };
+
+    const scenario = useMemo(() => {
+        if (!goal) return null;
+        const required = requiredMonthlyContribution(goal) ?? 0;
+        const remaining = Math.max(0, Number(goal.target_amount) - Number(goal.current_amount));
+        const baseline = stats.velocity > 0 ? stats.velocity : required > 0 ? required : 0;
+        const fallback = remaining > 0 ? Math.max(remaining / 12, 10) : 10;
+        const initial = baseline > 0 ? baseline : fallback;
+        const sliderMax = Math.max(initial * 2, required * 2, fallback * 2, 10);
+        const rate = scenarioRate ?? initial;
+        const eta = projectedCompletionDate(goal, rate);
+        return { initial, rate, sliderMax, eta, remaining };
+    }, [goal, stats.velocity, scenarioRate]);
+
+    useEffect(() => {
+        setScenarioRate(null);
+    }, [goal?.id]);
 
     if (!goal) return null;
 
@@ -142,6 +161,39 @@ export function GoalHistorySheet({ goal, userId, open, onOpenChange, formatCurre
                         <div className="flex justify-between text-[10px] text-muted-foreground mt-1">
                             {monthlyChartData.map(m => <span key={m.key}>{m.label}</span>)}
                         </div>
+                    </div>
+                )}
+
+                {scenario && scenario.remaining > 0 && (
+                    <div className="mt-3 rounded-2xl bg-secondary/10 border border-white/5 p-3">
+                        <div className="flex items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground font-bold mb-2">
+                            <Wand2 className={cn('w-3 h-3', tokens.text)} aria-hidden="true" />
+                            <span>What if</span>
+                        </div>
+                        <div className="flex items-baseline justify-between gap-2 mb-2">
+                            <span className="text-xs text-muted-foreground">Save</span>
+                            <span className={cn('text-sm font-bold tabular-nums', tokens.text)}>
+                                {formatCurrency(scenario.rate, goal.currency)}<span className="text-muted-foreground font-normal">/mo</span>
+                            </span>
+                        </div>
+                        <Slider
+                            value={[scenario.rate]}
+                            min={0}
+                            max={scenario.sliderMax}
+                            step={Math.max(1, Math.round(scenario.sliderMax / 100))}
+                            onValueChange={(v) => setScenarioRate(v[0])}
+                            aria-label="Monthly savings scenario"
+                        />
+                        <p className="text-[11px] text-muted-foreground mt-2">
+                            {scenario.eta ? (
+                                <>
+                                    → Reaches target on{' '}
+                                    <span className="text-foreground font-bold">{format(scenario.eta, 'MMM d, yyyy')}</span>
+                                </>
+                            ) : (
+                                <>→ Won&apos;t reach target at this rate</>
+                            )}
+                        </p>
                     </div>
                 )}
 

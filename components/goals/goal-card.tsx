@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { format } from 'date-fns';
-import { Calendar, CheckCircle2, MoreVertical, Plus, Edit2, Trash2, History, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { Calendar, CalendarClock, CheckCircle2, MoreVertical, Plus, Edit2, Trash2, History, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import {
@@ -11,7 +11,7 @@ import {
 import { cn } from '@/lib/utils';
 import {
     daysUntilDeadline, requiredMonthlyContribution, monthlyVelocity,
-    projectedCompletionDate, onTrackStatus,
+    projectedCompletionDate, onTrackStatus, monthsDeltaVsDeadline,
 } from '@/lib/goal-utils';
 import { resolveGoalIcon, resolveGoalColor } from '@/lib/goal-styles';
 import type { SavingsGoal, SavingsDeposit } from '@/types/goal';
@@ -65,6 +65,23 @@ export function GoalCard({ goal, deposits, formatCurrency, onAddDeposit, onEdit,
     })();
 
     const StatusIcon = statusPill?.icon;
+
+    const etaPill = (() => {
+        if (isCompleted || !projected) return null;
+        const dateLabel = `Est. ${format(projected, 'MMM yyyy')}`;
+        const delta = monthsDeltaVsDeadline(projected, goal.deadline);
+        if (delta === null) {
+            return { label: dateLabel, className: 'bg-secondary/30 border-white/10 text-muted-foreground' };
+        }
+        const rounded = Math.round(delta);
+        if (delta > 0.5) {
+            return { label: `${dateLabel} (+${rounded} mo)`, className: 'bg-rose-500/15 border-rose-500/30 text-rose-300' };
+        }
+        if (delta < -0.5) {
+            return { label: `${dateLabel} (−${Math.abs(rounded)} mo)`, className: 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300' };
+        }
+        return { label: dateLabel, className: 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300' };
+    })();
 
     const stopBubble = (e: React.MouseEvent) => e.stopPropagation();
 
@@ -126,6 +143,15 @@ export function GoalCard({ goal, deposits, formatCurrency, onAddDeposit, onEdit,
                                     )}>
                                         <StatusIcon className="w-2.5 h-2.5" aria-hidden="true" />
                                         {statusPill.label}
+                                    </span>
+                                )}
+                                {etaPill && (
+                                    <span className={cn(
+                                        'text-[10px] px-1.5 py-0.5 rounded-full border font-bold inline-flex items-center gap-1',
+                                        etaPill.className
+                                    )}>
+                                        <CalendarClock className="w-2.5 h-2.5" aria-hidden="true" />
+                                        {etaPill.label}
                                     </span>
                                 )}
                             </div>
@@ -193,17 +219,13 @@ export function GoalCard({ goal, deposits, formatCurrency, onAddDeposit, onEdit,
                             {isCompleted ? 'Goal Reached! 🎉' : `${formatCurrency(remaining, goal.currency)} to go`}
                         </span>
                     </div>
-                    {!isCompleted && (required !== null || velocity > 0) && (
-                        <div className="flex justify-between text-[11px] text-muted-foreground pt-1 border-t border-white/5 mt-1">
-                            {required !== null && required > 0 ? (
+                    {!isCompleted && ((required !== null && required > 0) || velocity > 0) && (
+                        <div className="flex flex-wrap justify-between gap-x-3 gap-y-1 text-[11px] text-muted-foreground pt-1 border-t border-white/5 mt-1">
+                            {required !== null && required > 0 && (
                                 <span>
                                     Need <span className="text-foreground font-bold">{formatCurrency(required, goal.currency)}</span>/mo
                                 </span>
-                            ) : projected ? (
-                                <span>
-                                    Est. <span className="text-foreground font-bold">{format(projected, 'MMM yyyy')}</span>
-                                </span>
-                            ) : <span />}
+                            )}
                             {velocity > 0 && (
                                 <span>
                                     Saving <span className="text-foreground font-bold">{formatCurrency(velocity, goal.currency)}</span>/mo
