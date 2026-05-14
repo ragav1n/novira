@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { UserPlus, Copy } from 'lucide-react';
 import { NoviraQrCode } from '@/components/ui/qr-code';
 import { QrScanner } from '@/components/ui/qr-scanner';
-import { useGroups } from '@/components/providers/groups-provider';
+import { useGroupsActions } from '@/components/providers/groups-provider';
 import { toast } from '@/utils/haptics';
 
 interface AddFriendDialogProps {
@@ -17,7 +17,7 @@ interface AddFriendDialogProps {
 }
 
 export function AddFriendDialog({ userId, open, onOpenChange }: AddFriendDialogProps) {
-    const { addFriendByEmail, addFriendById } = useGroups();
+    const { addFriendByEmail, addFriendById } = useGroupsActions();
     const isControlled = open !== undefined;
     const [internalOpen, setInternalOpen] = useState(false);
     const isOpen = isControlled ? open! : internalOpen;

@@ -64,13 +64,7 @@ export interface UpdateGroupPatch {
     end_date?: string | null;
 }
 
-interface GroupsContextType {
-    groups: Group[];
-    friends: Friend[];
-    friendRequests: Friend[]; // Incoming requests
-    balances: Balances;
-    pendingSplits: Split[];
-    loading: boolean;
+interface GroupsActionsContextType {
     refreshData: () => Promise<void>;
     createGroup: (name: string, type?: GroupType, startDate?: Date, endDate?: Date) => Promise<string | null>;
     addFriendByEmail: (email: string) => Promise<boolean>;
@@ -85,6 +79,15 @@ interface GroupsContextType {
     updateGroup: (groupId: string, patch: UpdateGroupPatch) => Promise<void>;
     deleteGroup: (groupId: string) => Promise<void>;
     removeGroupMember: (groupId: string, memberId: string) => Promise<void>;
+}
+
+interface GroupsContextType extends GroupsActionsContextType {
+    groups: Group[];
+    friends: Friend[];
+    friendRequests: Friend[]; // Incoming requests
+    balances: Balances;
+    pendingSplits: Split[];
+    loading: boolean;
     simplifiedDebts: SimplifiedPayment[];
 }
 
@@ -98,6 +101,9 @@ interface RawGroupMember {
 }
 
 const GroupsContext = createContext<GroupsContextType | undefined>(undefined);
+// Separate context for action-only consumers (dialogs that just need mutators)
+// so they don't re-render whenever data fields change.
+const GroupsActionsContext = createContext<GroupsActionsContextType | undefined>(undefined);
 
 export function GroupsProvider({ children }: { children: React.ReactNode }) {
     const [groups, setGroups] = useState<Group[]>([]);
@@ -154,7 +160,7 @@ export function GroupsProvider({ children }: { children: React.ReactNode }) {
                 supabase
                     .from('splits')
                     .select(`
-                        *,
+                        id, transaction_id, user_id, amount, is_paid, created_at,
                         profile:profiles(full_name, avatar_url),
                         transaction:transactions(description, date, user_id, currency, exchange_rate, base_currency, group_id, profile:profiles(full_name, avatar_url))
                     `)
@@ -164,7 +170,7 @@ export function GroupsProvider({ children }: { children: React.ReactNode }) {
                 supabase
                     .from('splits')
                     .select(`
-                        *,
+                        id, transaction_id, user_id, amount, is_paid, created_at,
                         profile:profiles(full_name, avatar_url),
                         transaction:transactions!inner(description, date, user_id, currency, exchange_rate, base_currency, group_id, profile:profiles(full_name, avatar_url))
                     `)
@@ -226,7 +232,12 @@ export function GroupsProvider({ children }: { children: React.ReactNode }) {
             if (myDebtsResult.error) throw myDebtsResult.error;
             if (myCreditsResult.error) throw myCreditsResult.error;
 
-            const totalOwed = (myDebtsResult.data || []).reduce((acc: number, s: Split) => {
+            // Supabase types nested joins as arrays when columns are explicit, but the
+            // foreign-key relationships here return a single row at runtime.
+            const myDebts = (myDebtsResult.data ?? []) as unknown as Split[];
+            const myCredits = (myCreditsResult.data ?? []) as unknown as Split[];
+
+            const totalOwed = myDebts.reduce((acc: number, s: Split) => {
                 const amount = Number(s.amount);
                 const tx = s.transaction;
                 if (!tx) return acc + amount;
@@ -234,7 +245,7 @@ export function GroupsProvider({ children }: { children: React.ReactNode }) {
                 return acc + convertAmount(amount, tx.currency ?? userCurrency);
             }, 0);
 
-            const totalOwedToMe = (myCreditsResult.data || []).reduce((acc: number, s: Split) => {
+            const totalOwedToMe = myCredits.reduce((acc: number, s: Split) => {
                 const amount = Number(s.amount);
                 const tx = s.transaction;
                 if (!tx) return acc + amount;
@@ -245,7 +256,7 @@ export function GroupsProvider({ children }: { children: React.ReactNode }) {
             setBalances({ totalOwed, totalOwedToMe });
 
             // Process Pending Splits
-            const allPending = [...(myDebtsResult.data || []), ...(myCreditsResult.data || [])];
+            const allPending = [...myDebts, ...myCredits];
             const uniquePending = Array.from(new Map(allPending.map(item => [item.id, item])).values());
 
             if (uniquePending.length > 0) {
@@ -664,25 +675,40 @@ export function GroupsProvider({ children }: { children: React.ReactNode }) {
         };
     }, [computedSimplifiedDebts, userId]);
 
-    const contextValue = useMemo(() => ({
-        groups, friends, friendRequests, balances: computedBalances, pendingSplits, loading,
-        refreshData, createGroup, addFriendByEmail, addFriendById, addMemberToGroup, settleSplit, settleSplitsBatch,
-        acceptFriendRequest, declineFriendRequest, leaveGroup, removeFriend,
-        updateGroup, deleteGroup, removeGroupMember,
-        simplifiedDebts: computedSimplifiedDebts
+    const actionsValue = useMemo<GroupsActionsContextType>(() => ({
+        refreshData, createGroup, addFriendByEmail, addFriendById, addMemberToGroup,
+        settleSplit, settleSplitsBatch, acceptFriendRequest, declineFriendRequest,
+        leaveGroup, removeFriend, updateGroup, deleteGroup, removeGroupMember,
     }), [
-        groups, friends, friendRequests, computedBalances, pendingSplits, loading,
-        refreshData, createGroup, addFriendByEmail, addFriendById, addMemberToGroup, settleSplit, settleSplitsBatch,
-        acceptFriendRequest, declineFriendRequest, leaveGroup, removeFriend,
-        updateGroup, deleteGroup, removeGroupMember,
-        computedSimplifiedDebts
+        refreshData, createGroup, addFriendByEmail, addFriendById, addMemberToGroup,
+        settleSplit, settleSplitsBatch, acceptFriendRequest, declineFriendRequest,
+        leaveGroup, removeFriend, updateGroup, deleteGroup, removeGroupMember,
     ]);
 
+    const contextValue = useMemo<GroupsContextType>(() => ({
+        ...actionsValue,
+        groups, friends, friendRequests, balances: computedBalances, pendingSplits, loading,
+        simplifiedDebts: computedSimplifiedDebts,
+    }), [actionsValue, groups, friends, friendRequests, computedBalances, pendingSplits, loading, computedSimplifiedDebts]);
+
     return (
-        <GroupsContext.Provider value={contextValue}>
-            {children}
-        </GroupsContext.Provider>
+        <GroupsActionsContext.Provider value={actionsValue}>
+            <GroupsContext.Provider value={contextValue}>
+                {children}
+            </GroupsContext.Provider>
+        </GroupsActionsContext.Provider>
     );
+}
+
+/**
+ * Subscribe only to group mutations (createGroup, settleSplit, etc.). Components
+ * that don't read any data fields should prefer this hook to avoid re-rendering
+ * on every realtime refresh.
+ */
+export function useGroupsActions() {
+    const context = useContext(GroupsActionsContext);
+    if (context === undefined) { throw new Error('useGroupsActions must be used within a GroupsProvider'); }
+    return context;
 }
 
 export function useGroups() {

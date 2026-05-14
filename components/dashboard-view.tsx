@@ -160,16 +160,14 @@ export function DashboardView() {
 
     const isAnyModalOpen = isViewAllOpen || activeModal !== null || isAddFundsOpen || isHowToUseOpen || isEditOpen || isBudgetEditOpen;
 
-    const currentMonthForEditPrefix = useMemo(() => {
-        const d = new Date();
-        const month = String(d.getMonth() + 1).padStart(2, '0');
-        return `${d.getFullYear()}-${month}`;
-    }, []);
-
+    // Recompute the prefix per call so a dashboard left open past month-end
+    // doesn't keep treating last-month rows as editable.
     const canEditTransaction = useCallback((tx: Transaction) => {
         if (tx.user_id !== userId) return false;
-        return tx.date.startsWith(currentMonthForEditPrefix);
-    }, [userId, currentMonthForEditPrefix]);
+        const d = new Date();
+        const prefix = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        return tx.date.startsWith(prefix);
+    }, [userId]);
 
     const getBucketIcon = useCallback((iconName?: string) => {
         const icons: Record<string, any> = {

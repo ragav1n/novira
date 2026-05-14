@@ -9,7 +9,7 @@ import { DateRange } from 'react-day-picker';
 import { Home, Plane, Heart, FileText, Trash2, UserMinus, UserPlus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from '@/utils/haptics';
-import { useGroups, type Group, type GroupType, type Friend, type Split } from '@/components/providers/groups-provider';
+import { useGroupsActions, type Group, type GroupType, type Friend, type Split } from '@/components/providers/groups-provider';
 
 interface GroupSettingsDialogProps {
     group: Group;
@@ -28,7 +28,7 @@ const TYPE_OPTIONS: { id: GroupType; label: string; icon: React.ElementType; col
 ];
 
 export function GroupSettingsDialog({ group, friends, currentUserId, pendingSplits, open, onOpenChange }: GroupSettingsDialogProps) {
-    const { updateGroup, deleteGroup, addMemberToGroup, removeGroupMember } = useGroups();
+    const { updateGroup, deleteGroup, addMemberToGroup, removeGroupMember } = useGroupsActions();
 
     const memberHasOpenSplits = (memberId: string) =>
         pendingSplits.some(s =>

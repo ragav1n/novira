@@ -27,8 +27,12 @@ export const TransactionService = {
         const baseQuery = supabase
             .from('transactions')
             .select(`
-                *,
-                splits (*),
+                id, description, amount, category, date, created_at, user_id, currency,
+                exchange_rate, base_currency, converted_amount, is_settlement, is_recurring,
+                is_income, bucket_id, exclude_from_allowance, payment_method,
+                place_name, place_address, place_lat, place_lng, tags, notes,
+                receipt_path, account_id, is_transfer, transfer_pair_id, group_id,
+                splits (user_id, amount, is_paid),
                 profile:profiles(full_name, avatar_url)
             `)
             .order('date', { ascending: false })
@@ -64,7 +68,7 @@ export const TransactionService = {
             throw error;
         }
 
-        return data as Transaction[];
+        return data as unknown as Transaction[];
     },
 
     async getExchangeRate(from: string, to: string, date: Date = new Date()): Promise<number> {

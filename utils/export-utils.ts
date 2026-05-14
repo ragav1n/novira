@@ -1,5 +1,4 @@
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import type jsPDF from 'jspdf';
 import { format, differenceInDays, parseISO, subDays } from 'date-fns';
 import { DateRange } from 'react-day-picker';
 
@@ -753,7 +752,11 @@ export const generatePDF = async (
     ownerInfo?: { email?: string; avatarUrl?: string | null; workspaceName?: string; monthlyBudget?: number },
     recurringTemplates: ExportRecurringTemplate[] = []
 ) => {
-    const doc = new jsPDF({ putOnlyUsedFonts: true, compress: true });
+    const [{ default: jsPDFCtor }, { default: autoTable }] = await Promise.all([
+        import('jspdf'),
+        import('jspdf-autotable'),
+    ]);
+    const doc = new jsPDFCtor({ putOnlyUsedFonts: true, compress: true });
     const pageWidth = doc.internal.pageSize.width;
     const pageHeight = doc.internal.pageSize.height;
 

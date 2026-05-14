@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Plus, Home, Plane, Heart, FileText } from 'lucide-react';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
 import { DateRange } from 'react-day-picker';
-import { useGroups } from '@/components/providers/groups-provider';
+import { useGroupsActions } from '@/components/providers/groups-provider';
 import { toast } from '@/utils/haptics';
 import { cn } from '@/lib/utils';
 
@@ -16,7 +16,7 @@ interface GroupCreationDialogProps {
 }
 
 export function GroupCreationDialog({ open, onOpenChange }: GroupCreationDialogProps = {}) {
-    const { createGroup } = useGroups();
+    const { createGroup } = useGroupsActions();
     const isControlled = open !== undefined;
     const [internalOpen, setInternalOpen] = useState(false);
     const isOpen = isControlled ? open! : internalOpen;
