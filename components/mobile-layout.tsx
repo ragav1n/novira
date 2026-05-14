@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { Home, Plus, BarChart2, Search, Settings, Users, Calendar, CalendarDays, Target, Plane, Menu } from 'lucide-react';
+import { Home, Plus, BarChart2, Search, Settings, Users, Calendar, CalendarDays, Target, Menu } from 'lucide-react';
 import Image from 'next/image';
 import { ExpandableTabs } from '@/components/ui/expandable-tabs';
 import { Toaster } from 'sonner';
@@ -29,7 +29,6 @@ const DESKTOP_NAV = [
     { title: 'Subs',     icon: Calendar, route: '/subscriptions' },
     { title: 'Cash Flow',icon: CalendarDays, route: '/cashflow' },
     { title: 'Goals',    icon: Target,   route: '/goals' },
-    { title: 'Trips',    icon: Plane,    route: '/trips' },
     { title: 'Search',   icon: Search,   route: '/search' },
     { title: 'Settings', icon: Settings, route: '/settings' },
 ];

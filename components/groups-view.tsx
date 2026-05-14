@@ -2,8 +2,8 @@
 
 import { motion } from 'framer-motion';
 
-import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useCallback, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { ChevronLeft, ArrowUpRight, ArrowDownLeft, Plus, UserPlus } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -20,10 +20,15 @@ import { BucketsTabContent } from './groups/buckets-tab-content';
 import { GroupsTabContent } from './groups/groups-tab-content';
 import { FriendsTabContent } from './groups/friends-tab-content';
 import { SettlementsTabContent } from './groups/settlements-tab-content';
+import { TripsTabContent } from './groups/trips-tab-content';
 import { GroupsSkeleton } from './groups/groups-skeleton';
+
+const VALID_TABS = ['groups', 'personal', 'friends', 'trips', 'settlements'] as const;
+type GroupsTab = typeof VALID_TABS[number];
 
 export function GroupsView() {
     const router = useRouter();
+    const searchParams = useSearchParams();
     const {
         groups, friends, friendRequests, balances, pendingSplits, simplifiedDebts, loading,
         addMemberToGroup, settleSplit, settleSplitsBatch, acceptFriendRequest, declineFriendRequest, leaveGroup, removeFriend
@@ -34,6 +39,21 @@ export function GroupsView() {
 
     const [createGroupOpen, setCreateGroupOpen] = useState(false);
     const [addFriendOpen, setAddFriendOpen] = useState(false);
+
+    const tabFromUrl = searchParams?.get('tab');
+    const activeTab: GroupsTab = (VALID_TABS as readonly string[]).includes(tabFromUrl ?? '')
+        ? (tabFromUrl as GroupsTab)
+        : 'groups';
+
+    const handleTabChange = useCallback((value: string) => {
+        const url = value === 'groups' ? '/groups' : `/groups?tab=${value}`;
+        router.replace(url, { scroll: false });
+    }, [router]);
+
+    // Only the Groups and Friends tabs use the header AddFriend / CreateGroup
+    // actions. Other tabs (Personal, Trips, Settlements) have their own
+    // in-body actions, so we hide the header buttons to avoid misleading users.
+    const showGroupHeaderActions = activeTab === 'groups' || activeTab === 'friends';
 
     const showSkeleton = loading && groups.length === 0 && friends.length === 0;
     const isFirstTime = !loading && groups.length === 0 && friends.length === 0 && friendRequests.length === 0;
@@ -61,21 +81,25 @@ export function GroupsView() {
                 </div>
                 <div className="flex gap-2 shrink-0 z-10">
                     <AddFriendDialog userId={userId} open={addFriendOpen} onOpenChange={setAddFriendOpen} />
-                    <button
-                        onClick={() => setAddFriendOpen(true)}
-                        aria-label="Add friend"
-                        className="p-2 rounded-full bg-primary/20 hover:bg-primary/30 text-primary transition-colors border border-primary/20"
-                    >
-                        <UserPlus className="w-5 h-5" />
-                    </button>
                     <GroupCreationDialog open={createGroupOpen} onOpenChange={setCreateGroupOpen} />
-                    <button
-                        onClick={() => setCreateGroupOpen(true)}
-                        aria-label="Create group"
-                        className="p-2 rounded-full bg-primary/20 hover:bg-primary/30 text-primary transition-colors border border-primary/20"
-                    >
-                        <Plus className="w-5 h-5" />
-                    </button>
+                    {showGroupHeaderActions && (
+                        <>
+                            <button
+                                onClick={() => setAddFriendOpen(true)}
+                                aria-label="Add friend"
+                                className="p-2 rounded-full bg-primary/20 hover:bg-primary/30 text-primary transition-colors border border-primary/20"
+                            >
+                                <UserPlus className="w-5 h-5" />
+                            </button>
+                            <button
+                                onClick={() => setCreateGroupOpen(true)}
+                                aria-label="Create group"
+                                className="p-2 rounded-full bg-primary/20 hover:bg-primary/30 text-primary transition-colors border border-primary/20"
+                            >
+                                <Plus className="w-5 h-5" />
+                            </button>
+                        </>
+                    )}
                 </div>
             </div>
 
@@ -130,12 +154,13 @@ export function GroupsView() {
                 </Card>
             </div>
 
-            <Tabs defaultValue="groups" className="w-full">
-                <TabsList className="w-full grid grid-cols-4 bg-secondary/40 p-1 rounded-2xl h-12 backdrop-blur-md">
-                    <TabsTrigger value="groups" className="rounded-xl data-[state=active]:bg-primary data-[state=active]:text-white data-[state=inactive]:text-white/40 border border-transparent data-[state=active]:border-white/20 transition-all font-bold">Groups</TabsTrigger>
-                    <TabsTrigger value="personal" className="rounded-xl data-[state=active]:bg-cyan-500 data-[state=active]:text-white data-[state=inactive]:text-white/40 border border-transparent data-[state=active]:border-white/20 transition-all font-bold">Personal</TabsTrigger>
-                    <TabsTrigger value="friends" className="rounded-xl data-[state=active]:bg-primary data-[state=active]:text-white data-[state=inactive]:text-white/40 border border-transparent data-[state=active]:border-white/20 transition-all font-bold">Friends</TabsTrigger>
-                    <TabsTrigger value="settlements" className="rounded-xl data-[state=active]:bg-primary data-[state=active]:text-white data-[state=inactive]:text-white/40 border border-transparent data-[state=active]:border-white/20 transition-all font-bold">Settlements</TabsTrigger>
+            <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
+                <TabsList className="w-full grid grid-cols-5 bg-secondary/40 p-1 rounded-2xl h-12 backdrop-blur-md">
+                    <TabsTrigger value="groups" className="rounded-xl text-xs sm:text-sm data-[state=active]:bg-primary data-[state=active]:text-white data-[state=inactive]:text-white/40 border border-transparent data-[state=active]:border-white/20 transition-all font-bold">Groups</TabsTrigger>
+                    <TabsTrigger value="personal" className="rounded-xl text-xs sm:text-sm data-[state=active]:bg-cyan-500 data-[state=active]:text-white data-[state=inactive]:text-white/40 border border-transparent data-[state=active]:border-white/20 transition-all font-bold">Personal</TabsTrigger>
+                    <TabsTrigger value="friends" className="rounded-xl text-xs sm:text-sm data-[state=active]:bg-primary data-[state=active]:text-white data-[state=inactive]:text-white/40 border border-transparent data-[state=active]:border-white/20 transition-all font-bold">Friends</TabsTrigger>
+                    <TabsTrigger value="trips" className="rounded-xl text-xs sm:text-sm data-[state=active]:bg-sky-500 data-[state=active]:text-white data-[state=inactive]:text-white/40 border border-transparent data-[state=active]:border-white/20 transition-all font-bold">Trips</TabsTrigger>
+                    <TabsTrigger value="settlements" className="rounded-xl text-xs sm:text-sm data-[state=active]:bg-primary data-[state=active]:text-white data-[state=inactive]:text-white/40 border border-transparent data-[state=active]:border-white/20 transition-all font-bold">Settle</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="personal" className="mt-6 space-y-6">
@@ -162,6 +187,10 @@ export function GroupsView() {
                         leaveGroup={leaveGroup}
                         onStartGroup={() => setCreateGroupOpen(true)}
                     />
+                </TabsContent>
+
+                <TabsContent value="trips" className="mt-6 space-y-4">
+                    <TripsTabContent />
                 </TabsContent>
 
                 <TabsContent value="friends" className="mt-6 space-y-4">

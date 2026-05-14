@@ -38,6 +38,17 @@ export function TripDetailView({ tripId }: { tripId: string }) {
     const [editOpen, setEditOpen] = useState(false);
     const [notFound, setNotFound] = useState(false);
 
+    // Back nav: prefer browser history (returns to whatever opened the trip —
+    // Groups → Trips tab, /trips, dashboard, etc.). Fall back to /groups?tab=trips
+    // for deep links (push notifications, bookmarks) where no in-app history exists.
+    const handleBack = useCallback(() => {
+        if (typeof window !== 'undefined' && window.history.length > 1) {
+            router.back();
+        } else {
+            router.push('/groups?tab=trips');
+        }
+    }, [router]);
+
     const load = useCallback(async () => {
         if (!userId) return;
         setLoading(true);
@@ -114,7 +125,7 @@ export function TripDetailView({ tripId }: { tripId: string }) {
             <div className="flex flex-col min-h-screen p-5 max-w-md mx-auto items-center justify-center text-center gap-3">
                 <Plane className="w-10 h-10 text-muted-foreground" aria-hidden="true" />
                 <h2 className="text-lg font-bold">Trip not found</h2>
-                <Button variant="ghost" onClick={() => router.push('/trips')}>Back to trips</Button>
+                <Button variant="ghost" onClick={handleBack}>Back to trips</Button>
             </div>
         );
     }
@@ -138,7 +149,7 @@ export function TripDetailView({ tripId }: { tripId: string }) {
                 <Button
                     variant="ghost"
                     size="icon"
-                    onClick={() => router.push('/trips')}
+                    onClick={handleBack}
                     aria-label="Back to trips"
                     className="rounded-full w-10 h-10"
                 >

@@ -10,13 +10,22 @@ So I built Novira.
 
 ## Features
 
-- **Groups & Friends:** Easily split bills for trips, projects, or just hanging out.
-- **Dashboard:** See where your money is going without the clutter.
-- **Recurring Expenses:** Automate your financial life with scheduled transactions and smart duplicate detection.
-- **Analytics:** Deep dive into your spending with beautiful pie charts.
-- **Bank Integration:** Import your bank statements directly (supports HDFC & SBI).
-- **Exportable Reports:** Download clean CSV or PDF reports for your records.
-- **Smart Settlements:** Keeps track of debts so you don't have to.
+- **Groups & Friends:** Split bills for trips, projects, or just hanging out — with smart settlements that track who owes what.
+- **Dashboard:** See where your money is going without the clutter, with a weighted run-rate projection that adapts to your spending trend mid-month.
+- **Buckets & Budgets:** Group categories into spending buckets with alerts when you're close to the limit.
+- **Goals:** Save toward targets with an ETA forecast based on your contribution pace.
+- **Trips & Travel Mode:** Switch into a trip workspace to track expenses for a specific journey separately from your everyday spending.
+- **Subscriptions:** Track recurring payments in one place and catch silent price hikes.
+- **Recurring Expenses:** Automate scheduled transactions with smart duplicate detection.
+- **Analytics:** Pie charts, category breakdowns, and custom date ranges — including a map view that plots where you spent.
+- **Monthly Recap:** A clean end-of-month summary of where the money went.
+- **Multi-currency:** Mix currencies freely; everything reconciles using live exchange rates with historical accuracy.
+- **Bank Integration:** Import statements directly (HDFC & SBI).
+- **Exportable Reports:** Clean CSV, Excel, or PDF reports for any date range.
 - **Real-time:** Updates instantly for everyone in the group.
-- **Offline-First:** Add expenses without an internet connection. Novira uses robust IndexedDB background sync with idempotency keys to safely retry transactions when you come back online.
-- **Resilient PWA:** Native-feeling app installation with automatic cache invalidation, fallback offline screens, and optimized UI boundaries.
+- **Offline-First:** Add expenses without internet. IndexedDB-backed background sync with idempotency keys safely retries when you're back online.
+- **Installable PWA:** Native-feeling install prompt, swipe-to-edit/delete gestures, push notifications, and automatic cache invalidation on each release.
+
+## Stack
+
+Next.js 16 · React 19 · TypeScript · Tailwind CSS · Framer Motion · Radix UI · Recharts · Mapbox GL · Supabase (Postgres + Auth + Realtime) · Capacitor · deployed on Vercel.
