@@ -93,19 +93,15 @@ export function SyncIndicator() {
             const detail = (e as CustomEvent<{ done: number; total: number }>).detail;
             if (detail) setProgress(detail);
         };
+        // Eviction & expiration are data-loss events — let the user dismiss
+        // them explicitly instead of auto-hiding after a few seconds.
         const onEvicted = (e: Event) => {
             const count = (e as CustomEvent<{ count: number }>).detail?.count ?? 0;
-            if (count > 0) {
-                setEvictionNotice({ count });
-                setTimeout(() => setEvictionNotice(null), 6000);
-            }
+            if (count > 0) setEvictionNotice({ count });
         };
         const onExpired = (e: Event) => {
             const count = (e as CustomEvent<{ count: number }>).detail?.count ?? 0;
-            if (count > 0) {
-                setExpiredNotice({ count });
-                setTimeout(() => setExpiredNotice(null), 6000);
-            }
+            if (count > 0) setExpiredNotice({ count });
         };
 
         window.addEventListener('novira-sync-started', onSyncStart);
@@ -209,14 +205,21 @@ export function SyncIndicator() {
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.8 }}
                         transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
-                        className="fixed top-12 lg:top-[120px] left-1/2 -translate-x-1/2 z-[60] pointer-events-none px-2"
+                        className="fixed top-12 lg:top-[120px] left-1/2 -translate-x-1/2 z-[60] pointer-events-auto px-2"
                         style={{ willChange: "transform, opacity" }}
                     >
-                        <div className="bg-amber-500/15 backdrop-blur-md border border-amber-500/30 shadow-lg rounded-full px-3 py-1.5 flex items-center gap-2 max-w-[90vw]">
+                        <div className="bg-amber-500/15 backdrop-blur-md border border-amber-500/30 shadow-lg rounded-full pl-3 pr-1 py-1 flex items-center gap-2 max-w-[90vw]">
                             <AlertCircle className="w-3.5 h-3.5 text-amber-400 shrink-0" />
                             <span className="text-xs font-medium text-amber-300 truncate">
                                 Offline queue full — {evictionNotice.count} oldest {evictionNotice.count === 1 ? 'change' : 'changes'} dropped
                             </span>
+                            <button
+                                onClick={() => setEvictionNotice(null)}
+                                aria-label="Dismiss notice"
+                                className="p-1 rounded-full hover:bg-amber-500/20 transition-colors shrink-0"
+                            >
+                                <X className="w-3 h-3 text-amber-300" />
+                            </button>
                         </div>
                     </motion.div>
                 )}
@@ -229,14 +232,21 @@ export function SyncIndicator() {
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.8 }}
                         transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
-                        className="fixed top-12 lg:top-[120px] left-1/2 -translate-x-1/2 z-[60] pointer-events-none px-2"
+                        className="fixed top-12 lg:top-[120px] left-1/2 -translate-x-1/2 z-[60] pointer-events-auto px-2"
                         style={{ willChange: "transform, opacity" }}
                     >
-                        <div className="bg-amber-500/15 backdrop-blur-md border border-amber-500/30 shadow-lg rounded-full px-3 py-1.5 flex items-center gap-2 max-w-[90vw]">
+                        <div className="bg-amber-500/15 backdrop-blur-md border border-amber-500/30 shadow-lg rounded-full pl-3 pr-1 py-1 flex items-center gap-2 max-w-[90vw]">
                             <Clock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
                             <span className="text-xs font-medium text-amber-300 truncate">
                                 {expiredNotice.count} {expiredNotice.count === 1 ? 'change' : 'changes'} abandoned (older than 7 days)
                             </span>
+                            <button
+                                onClick={() => setExpiredNotice(null)}
+                                aria-label="Dismiss notice"
+                                className="p-1 rounded-full hover:bg-amber-500/20 transition-colors shrink-0"
+                            >
+                                <X className="w-3 h-3 text-amber-300" />
+                            </button>
                         </div>
                     </motion.div>
                 )}

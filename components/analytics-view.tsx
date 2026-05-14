@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ChevronLeft, ChartLine } from 'lucide-react';
+import { ChevronLeft, ChartLine, Plus } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
@@ -505,7 +505,7 @@ export function AnalyticsView() {
 
                 {transactions.length === 0 ? (
                     <Card className="bg-card/40 border-white/5 shadow-none">
-                        <CardContent className="p-8 flex flex-col items-center justify-center text-center space-y-2">
+                        <CardContent className="p-8 flex flex-col items-center justify-center text-center space-y-3">
                             <div className="w-12 h-12 rounded-2xl bg-secondary/30 flex items-center justify-center mb-1">
                                 <ChartLine className="w-5 h-5 text-muted-foreground/70" />
                             </div>
@@ -513,6 +513,13 @@ export function AnalyticsView() {
                             <p className="text-[12px] text-muted-foreground max-w-[260px]">
                                 Try a wider period from the picker above, or add an expense to start seeing trends.
                             </p>
+                            <button
+                                onClick={() => router.push('/add')}
+                                className="mt-1 inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-primary text-white text-xs font-bold hover:bg-primary/90 transition-colors"
+                            >
+                                <Plus className="w-3.5 h-3.5" />
+                                Add expense
+                            </button>
                         </CardContent>
                     </Card>
                 ) : (
