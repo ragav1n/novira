@@ -7,6 +7,7 @@ import { useAccounts } from './accounts-provider';
 import { toast } from '@/utils/haptics';
 import { BucketService, type BucketSpendingRow } from '@/lib/services/bucket-service';
 import { reportNetworkError } from '@/lib/network-error-bus';
+import { getErrorMessage } from '@/lib/error-utils';
 
 export interface Bucket {
     id: string;
@@ -228,8 +229,8 @@ export function BucketsProvider({ children }: { children: React.ReactNode }) {
             toast.success('Bucket created successfully');
             await fetchBuckets();
             return bucket.id;
-        } catch (error: any) {
-            toast.error(error.message || 'Failed to create bucket');
+        } catch (error) {
+            toast.error(getErrorMessage(error, 'Failed to create bucket'));
             return null;
         }
     }, [userId, activeWorkspaceId, fetchBuckets]);
@@ -239,8 +240,8 @@ export function BucketsProvider({ children }: { children: React.ReactNode }) {
             await BucketService.updateBucket(id, data);
             toast.success('Bucket updated');
             await fetchBuckets();
-        } catch (error: any) {
-            toast.error(error.message || 'Failed to update bucket');
+        } catch (error) {
+            toast.error(getErrorMessage(error, 'Failed to update bucket'));
         }
     }, [fetchBuckets]);
 
@@ -249,8 +250,8 @@ export function BucketsProvider({ children }: { children: React.ReactNode }) {
             await BucketService.deleteBucket(id);
             toast.success('Bucket deleted');
             await fetchBuckets();
-        } catch (error: any) {
-            toast.error(error.message || 'Failed to delete bucket');
+        } catch (error) {
+            toast.error(getErrorMessage(error, 'Failed to delete bucket'));
         }
     }, [fetchBuckets]);
 

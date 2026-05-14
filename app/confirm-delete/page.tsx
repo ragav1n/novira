@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { deleteAccount } from '@/app/actions/delete-account'
 import { toast } from '@/utils/haptics'
+import { getErrorMessage } from '@/lib/error-utils'
 import { WaveLoader } from '@/components/ui/wave-loader'
 
 export default function ConfirmDeletePage() {
@@ -58,11 +59,12 @@ export default function ConfirmDeletePage() {
                 
                 router.push('/signin?message=Account+deleted')
 
-            } catch (error: any) {
+            } catch (error) {
                 console.error('Deletion flow error:', error)
                 if (!isCancelled) {
-                    setStatus(`Error: ${error.message || 'Failed to delete account'}`)
-                    toast.error(error.message || 'Failed to delete account')
+                    const msg = getErrorMessage(error, 'Failed to delete account')
+                    setStatus(`Error: ${msg}`)
+                    toast.error(msg)
                     // Delay redirect so user can see the error
                     setTimeout(() => {
                         if (!isCancelled) router.push('/settings')

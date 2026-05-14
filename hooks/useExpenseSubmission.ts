@@ -11,6 +11,7 @@ import { useActiveTrip } from '@/components/providers/active-trip-provider';
 import { useUserPreferences } from '@/components/providers/user-preferences-provider';
 import type { AppRouterInstance } from 'next/dist/shared/lib/app-router-context.shared-runtime';
 import type { Transaction, TransactionRecord, SplitRecord, RecurringRecord } from '@/types/transaction';
+import { getErrorMessage, getErrorName } from '@/lib/error-utils';
 
 interface ExpenseSubmissionParams {
     userId: string | null | undefined;
@@ -384,14 +385,15 @@ export function useExpenseSubmission() {
                 router.push('/');
             }
 
-        } catch (error: any) {
+        } catch (error) {
             if (isNative) {
                 Haptics.notification({ type: NotificationType.Error }).catch(() => { });
             }
-            if (error?.name === 'QueueFullError') {
-                toast.error(error.message);
+            const msg = getErrorMessage(error);
+            if (getErrorName(error) === 'QueueFullError') {
+                toast.error(msg);
             } else {
-                toast.error('Failed to add expense: ' + error.message);
+                toast.error('Failed to add expense: ' + msg);
             }
         } finally {
             setLoading(false);

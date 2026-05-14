@@ -6,6 +6,7 @@ import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { MapPin, X, Search, Navigation, LocateFixed, Globe, Crosshair } from 'lucide-react';
 import { getDistance } from '@/lib/location';
+import { getErrorName } from '@/lib/error-utils';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { toast } from '@/utils/haptics';
@@ -461,8 +462,8 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                 setPredictions(results);
                 setActiveSource('photon');
                 setActiveIndex(-1);
-            } catch (err: any) {
-                if (err?.name !== 'AbortError') setPredictions([]);
+            } catch (err) {
+                if (getErrorName(err) !== 'AbortError') setPredictions([]);
             } finally {
                 if (!abortControllerRef.current?.signal.aborted) setIsSearching(false);
             }
@@ -522,8 +523,8 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                 setActiveIndex(-1);
                 prefetchCoords(results);
                 setIsSearching(false);
-            } catch (err: any) {
-                if (err?.name !== 'AbortError') { searchWithPhoton(searchQuery); }
+            } catch (err) {
+                if (getErrorName(err) !== 'AbortError') { searchWithPhoton(searchQuery); }
             }
         }, 300);
     }, [mapboxToken, searchWithPhoton, prefetchCoords, lastPosition]);

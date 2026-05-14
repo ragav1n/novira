@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, AlertTriangle, Eye, EyeClosed, Lock } from 'lucide-react';
 import { toast } from '@/utils/haptics';
+import { getErrorMessage } from '@/lib/error-utils';
 import { cn } from "@/lib/utils";
 import { Dialog, DialogContent, DialogTrigger, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import * as VisuallyHidden from '@radix-ui/react-visually-hidden';
@@ -80,8 +81,8 @@ export function DeleteAccountDialog({ trigger }: DeleteAccountDialogProps) {
                 await supabase.auth.signOut();
                 window.location.href = '/signin?message=Account+deleted';
             }
-        } catch (error: any) {
-            toast.error(error.message || 'Failed to initiate deletion');
+        } catch (error) {
+            toast.error(getErrorMessage(error, 'Failed to initiate deletion'));
             setIsLoading(false);
         }
     };

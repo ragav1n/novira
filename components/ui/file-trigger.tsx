@@ -16,11 +16,11 @@ export function FileTriggerButton({ onSelect, className }: FileTriggerButtonProp
     return (
         <FileTrigger
             acceptedFileTypes={['image/png', 'image/jpeg', 'image/jpg', 'image/webp']}
-            onSelect={(e: any) => {
-                if (!e) return
-                const files = Array.from(e) as File[]
-                if (files.length > 0) {
-                    onSelect(files[0])
+            onSelect={(files) => {
+                if (!files) return
+                const list = Array.from(files)
+                if (list.length > 0) {
+                    onSelect(list[0])
                 }
             }}
         >

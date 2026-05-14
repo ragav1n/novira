@@ -8,6 +8,7 @@ import { NoviraQrCode } from '@/components/ui/qr-code';
 import { QrScanner } from '@/components/ui/qr-scanner';
 import { useGroupsActions } from '@/components/providers/groups-provider';
 import { toast } from '@/utils/haptics';
+import { getErrorMessage } from '@/lib/error-utils';
 
 interface AddFriendDialogProps {
     userId: string | null;
@@ -42,8 +43,8 @@ export function AddFriendDialog({ userId, open, onOpenChange }: AddFriendDialogP
             setFriendEmail('');
             setIsOpen(false);
             toast.success('Friend request sent!');
-        } catch (error: any) {
-            toast.error(error.message || 'Failed to add friend');
+        } catch (error) {
+            toast.error(getErrorMessage(error, 'Failed to add friend'));
         } finally {
             setIsProcessing(false);
         }
@@ -103,9 +104,10 @@ export function AddFriendDialog({ userId, open, onOpenChange }: AddFriendDialogP
                                             await addFriendById(scannedId);
                                             setIsOpen(false);
                                             toast.success('Friend request sent!');
-                                        } catch (error: any) {
-                                            if (error.message !== 'You are already friends (or have a pending request) with this user') {
-                                                toast.error(error.message || 'Failed to add friend');
+                                        } catch (error) {
+                                            const msg = getErrorMessage(error, 'Failed to add friend');
+                                            if (msg !== 'You are already friends (or have a pending request) with this user') {
+                                                toast.error(msg);
                                             } else {
                                                 toast.info('Request already sent');
                                                 setIsOpen(false);

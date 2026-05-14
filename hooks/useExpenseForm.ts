@@ -226,7 +226,7 @@ export function useExpenseForm(
 
         const fetchSuggestions = async () => {
             try {
-                const suggestions: any[] = [];
+                const suggestions: { name: string; address: string; lat: number; lng: number; type: 'last' | 'frequent' | 'category' }[] = [];
                 const seenNames = new Set<string>();
 
                 // 1. Description Match (Highest relevance)

@@ -67,7 +67,8 @@ export function useMapData(
 
     // 2. Data Transformation: 3D Geometry
     const towerFeatures = useMemo(() => {
-        const features: any[] = [];
+        type TowerProps = { amount: number; category: string; topMerchant: string; count: number; sparkline: string; txIds: string };
+        const features: GeoJSON.Feature<GeoJSON.Polygon, TowerProps>[] = [];
         locationGroups.forEach(group => {
             const cats = Array.from(group.categories.entries()).sort((a, b) => a[1] - b[1]);
             const totalCategories = cats.length;

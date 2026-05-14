@@ -94,7 +94,7 @@ export function FeatureAnnouncementModal({ showAnnouncement = false, userId, onC
 
                             {/* Features List */}
                             <div className="w-full space-y-4 text-left">
-                                {(LATEST_FEATURE_ANNOUNCEMENT as any).features.map((feature: any, index: number) => (
+                                {LATEST_FEATURE_ANNOUNCEMENT.features.map((feature, index) => (
                                     <motion.div
                                         key={feature.title}
                                         initial={{ x: -20, opacity: 0 }}

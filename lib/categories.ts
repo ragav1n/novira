@@ -75,7 +75,7 @@ export const CHART_CONFIG = {
 };
 
 
-export const getIconForCategory = (category: string, className: string = "w-5 h-5 text-white", props: any = {}) => {
+export const getIconForCategory = (category: string, className: string = "w-5 h-5 text-white", props: React.SVGAttributes<SVGSVGElement> = {}) => {
     const iconProps = { className, ...props };
     const id = category.toLowerCase();
     switch (id) {

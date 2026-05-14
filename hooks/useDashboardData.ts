@@ -8,6 +8,7 @@ import { invalidateTransactionCaches } from '@/lib/sw-cache';
 import { deleteReceipt } from '@/lib/receipt-storage';
 import { useAccounts } from '@/components/providers/accounts-provider';
 import { reportNetworkError } from '@/lib/network-error-bus';
+import { getErrorMessage, getErrorName } from '@/lib/error-utils';
 import { applyWorkspaceFilter } from '@/lib/workspace-filter';
 import { useTransactionInvalidationListener } from './useTransactionInvalidationListener';
 
@@ -484,12 +485,13 @@ export function useDashboardData(
         if (typeof navigator !== 'undefined' && !navigator.onLine) {
             try {
                 await enqueueMutation('DELETE_TRANSACTION', { id: tx.id });
-            } catch (error: any) {
+            } catch (error) {
                 setServerTransactions(previousServerTransactions);
-                if (error?.name === 'QueueFullError') {
-                    toast.error(error.message);
+                const msg = getErrorMessage(error);
+                if (getErrorName(error) === 'QueueFullError') {
+                    toast.error(msg);
                 } else {
-                    toast.error('Failed to queue delete: ' + error.message);
+                    toast.error('Failed to queue delete: ' + msg);
                 }
             } finally {
                 mutatingRef.current = false;
@@ -546,18 +548,18 @@ export function useDashboardData(
 
                                     if (error) throw error;
                                     toast.success('Recurring series stopped');
-                                } catch (err: any) {
-                                    toast.error('Failed to stop series: ' + err.message);
+                                } catch (err) {
+                                    toast.error('Failed to stop series: ' + getErrorMessage(err));
                                 }
                             }
                         }
                     });
                 }, 1000);
             }
-        } catch (error: any) {
+        } catch (error) {
             // Rollback on failure
             setServerTransactions(previousServerTransactions);
-            toast.error('Failed to delete: ' + error.message);
+            toast.error('Failed to delete: ' + getErrorMessage(error));
         } finally {
             mutatingRef.current = false;
         }
@@ -598,12 +600,13 @@ export function useDashboardData(
         if (typeof navigator !== 'undefined' && !navigator.onLine) {
             try {
                 await enqueueMutation('UPDATE_TRANSACTION', { id: savedEditingTx.id, patch });
-            } catch (error: any) {
+            } catch (error) {
                 setServerTransactions(previousServerTransactions);
-                if (error?.name === 'QueueFullError') {
-                    toast.error(error.message);
+                const msg = getErrorMessage(error);
+                if (getErrorName(error) === 'QueueFullError') {
+                    toast.error(msg);
                 } else {
-                    toast.error('Failed to queue update: ' + error.message);
+                    toast.error('Failed to queue update: ' + msg);
                 }
             } finally {
                 mutatingRef.current = false;
@@ -619,10 +622,10 @@ export function useDashboardData(
 
             if (error) throw error;
             invalidateTransactionCaches();
-        } catch (error: any) {
+        } catch (error) {
             // Rollback on failure
             setServerTransactions(previousServerTransactions);
-            toast.error('Failed to update: ' + error.message);
+            toast.error('Failed to update: ' + getErrorMessage(error));
         } finally {
             mutatingRef.current = false;
         }
@@ -650,9 +653,9 @@ export function useDashboardData(
                 toast.success(`Queued ${ids.length} for deletion`);
                 mutatingRef.current = false;
                 return { count: ids.length };
-            } catch (err: any) {
+            } catch (err) {
                 setServerTransactions(previousServerTransactions);
-                toast.error(err?.name === 'QueueFullError' ? err.message : 'Failed to queue deletes');
+                toast.error(getErrorName(err) === 'QueueFullError' ? getErrorMessage(err) : 'Failed to queue deletes');
                 mutatingRef.current = false;
                 return { count: 0 };
             }
@@ -681,9 +684,9 @@ export function useDashboardData(
             // groups providers already have their own realtime subs on
             // `transactions`, so they refresh on their own.
             return { count: ids.length };
-        } catch (error: any) {
+        } catch (error) {
             setServerTransactions(previousServerTransactions);
-            toast.error('Bulk delete failed: ' + (error?.message ?? 'unknown error'));
+            toast.error('Bulk delete failed: ' + getErrorMessage(error, 'unknown error'));
             return { count: 0 };
         } finally {
             mutatingRef.current = false;
@@ -718,9 +721,9 @@ export function useDashboardData(
                 toast.success(`Queued ${ids.length} updates`);
                 mutatingRef.current = false;
                 return { count: ids.length };
-            } catch (err: any) {
+            } catch (err) {
                 setServerTransactions(previousServerTransactions);
-                toast.error(err?.name === 'QueueFullError' ? err.message : 'Failed to queue updates');
+                toast.error(getErrorName(err) === 'QueueFullError' ? getErrorMessage(err) : 'Failed to queue updates');
                 mutatingRef.current = false;
                 return { count: 0 };
             }
@@ -739,9 +742,9 @@ export function useDashboardData(
             // buckets / groups; the dispatch would force a refetch that races
             // replication and momentarily reverts the optimistic state.
             return { count: ids.length };
-        } catch (error: any) {
+        } catch (error) {
             setServerTransactions(previousServerTransactions);
-            toast.error('Bulk update failed: ' + (error?.message ?? 'unknown error'));
+            toast.error('Bulk update failed: ' + getErrorMessage(error, 'unknown error'));
             return { count: 0 };
         } finally {
             mutatingRef.current = false;
@@ -760,7 +763,7 @@ export function useDashboardData(
 
             if (error) throw error;
             setAuditLogs(data || []);
-        } catch (error: any) {
+        } catch (error) {
             if (process.env.NODE_ENV === 'development') {
                 console.error("Error loading audit logs:", error);
             }

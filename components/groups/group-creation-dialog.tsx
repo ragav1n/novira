@@ -7,6 +7,7 @@ import { DateRangePicker } from '@/components/ui/date-range-picker';
 import { DateRange } from 'react-day-picker';
 import { useGroupsActions } from '@/components/providers/groups-provider';
 import { toast } from '@/utils/haptics';
+import { getErrorMessage } from '@/lib/error-utils';
 import { cn } from '@/lib/utils';
 
 interface GroupCreationDialogProps {
@@ -44,8 +45,8 @@ export function GroupCreationDialog({ open, onOpenChange }: GroupCreationDialogP
             setCreationStep('type');
             setIsOpen(false);
             toast.success('Group created successfully!');
-        } catch (error: any) {
-            toast.error(error.message || 'Failed to create group');
+        } catch (error) {
+            toast.error(getErrorMessage(error, 'Failed to create group'));
         }
     };
 

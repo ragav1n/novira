@@ -169,7 +169,7 @@ export const TransactionService = {
                 data: data.data,
                 idempotent: data.idempotent 
             };
-        } catch (error: any) {
+        } catch (error) {
             console.error('Error in createTransaction:', error);
             throw error;
         }

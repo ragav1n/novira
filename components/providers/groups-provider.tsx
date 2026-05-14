@@ -290,7 +290,7 @@ export function GroupsProvider({ children }: { children: React.ReactNode }) {
                 setPendingSplits([]);
             }
 
-        } catch (error: any) {
+        } catch (error) {
             console.error('CRITICAL: Groups/Friends fetch failed!', error);
             toast.error('Failed to sync financial data. Please check your connection.');
         } finally {
