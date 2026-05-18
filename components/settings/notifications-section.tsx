@@ -1,6 +1,6 @@
 'use client';
 
-import { Bell, BellRing, CalendarClock, Moon, Newspaper, RefreshCcw, Sparkles, TrendingUp } from 'lucide-react';
+import { Bell, BellRing, CalendarClock, Moon, Newspaper, RefreshCcw, Sparkles, TrendingUp, Users } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/utils/haptics';
@@ -23,6 +23,8 @@ interface Props {
     setQuietHours: (start: number | null, end: number | null) => Promise<void> | void;
     smartDigestsEnabled: boolean;
     setSmartDigestsEnabled: (enabled: boolean) => Promise<void> | void;
+    settlementNotificationsEnabled: boolean;
+    setSettlementNotificationsEnabled: (enabled: boolean) => Promise<void> | void;
 }
 
 const HOUR_OPTIONS = Array.from({ length: 24 }, (_, i) => i);
@@ -47,6 +49,8 @@ export function NotificationsSection({
     setQuietHours,
     smartDigestsEnabled,
     setSmartDigestsEnabled,
+    settlementNotificationsEnabled,
+    setSettlementNotificationsEnabled,
 }: Props) {
     const quietEnabled = quietHoursStart != null && quietHoursEnd != null;
 
@@ -194,6 +198,22 @@ export function NotificationsSection({
                         <Switch
                             checked={spendingPaceAlerts}
                             onCheckedChange={(checked) => setSpendingPaceAlerts(checked)}
+                        />
+                    </div>
+
+                    <div className="flex items-center justify-between p-3">
+                        <div className="flex items-center gap-3 min-w-0">
+                            <Users className="w-4 h-4 text-muted-foreground shrink-0" />
+                            <div className="min-w-0">
+                                <p className="text-sm font-medium">Settlement Reminders</p>
+                                <p className="text-[11px] text-muted-foreground">
+                                    New splits and weekly nudges for unpaid balances
+                                </p>
+                            </div>
+                        </div>
+                        <Switch
+                            checked={settlementNotificationsEnabled}
+                            onCheckedChange={(checked) => setSettlementNotificationsEnabled(checked)}
                         />
                     </div>
 

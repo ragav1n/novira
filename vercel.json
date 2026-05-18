@@ -2,6 +2,7 @@
     "crons": [
         { "path": "/api/cron/daily",     "schedule": "30 2 * * *" },
         { "path": "/api/cron/periodic",  "schedule": "30 3 * * *" },
+        { "path": "/api/cron/settlement-rollup", "schedule": "0 17 * * *" },
         { "path": "/api/cron/slot-tick", "schedule": "0 0 * * *" },
         { "path": "/api/cron/slot-tick", "schedule": "0 1 * * *" },
         { "path": "/api/cron/slot-tick", "schedule": "0 2 * * *" },

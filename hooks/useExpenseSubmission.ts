@@ -416,6 +416,20 @@ export function useExpenseSubmission() {
                             }
                         });
                     }
+
+                    // The broadcast above only reaches debtors whose app is open.
+                    // Fire a Web Push fan-out so closed apps still get a notification.
+                    // Fire-and-forget — push delivery failure must never block the
+                    // happy path of recording the expense.
+                    const createdId = (result as { data?: { id?: string } }).data?.id;
+                    if (createdId) {
+                        fetch('/api/push/notify-split', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ transaction_id: createdId }),
+                            credentials: 'same-origin',
+                        }).catch(() => { /* best-effort */ });
+                    }
                 }
 
                 router.push('/');

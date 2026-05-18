@@ -85,6 +85,8 @@ export function SettingsView() {
         setQuietHours,
         smartDigestsEnabled,
         setSmartDigestsEnabled,
+        settlementNotificationsEnabled,
+        setSettlementNotificationsEnabled,
         firstDayOfWeek,
         setFirstDayOfWeek,
         dateFormat,
@@ -673,6 +675,8 @@ export function SettingsView() {
                                 setQuietHours={setQuietHours}
                                 smartDigestsEnabled={smartDigestsEnabled}
                                 setSmartDigestsEnabled={setSmartDigestsEnabled}
+                                settlementNotificationsEnabled={settlementNotificationsEnabled}
+                                setSettlementNotificationsEnabled={setSettlementNotificationsEnabled}
                             />
                         </AccordionContent>
                     </AccordionItem>
