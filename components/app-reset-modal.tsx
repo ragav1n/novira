@@ -17,29 +17,84 @@ export function AppResetModal() {
         setMounted(true);
         if (typeof window === 'undefined') return;
         if (localStorage.getItem(STORAGE_KEY)) return;
-        setIsOpen(true);
+
+        // Skip the migration modal when there's nothing to migrate from — a fresh
+        // origin (e.g. first visit to novira.one in incognito) has no caches and
+        // no active SW, so the "we've moved" prompt is pointless and just blocks
+        // the UI. A freshly-registered SW that's still installing doesn't count;
+        // we only care about an already-`active` worker from a prior session.
+        (async () => {
+            const withTimeout = <T,>(p: Promise<T>, ms: number) =>
+                Promise.race([
+                    p.catch(() => null),
+                    new Promise<null>(resolve => setTimeout(() => resolve(null), ms)),
+                ]);
+
+            try {
+                const cacheKeys = 'caches' in window
+                    ? await withTimeout(caches.keys(), 1000)
+                    : [];
+                const regs = 'serviceWorker' in navigator
+                    ? await withTimeout(navigator.serviceWorker.getRegistrations(), 1000)
+                    : [];
+                const hasActiveSW = !!regs && regs.some(r => r.active);
+                const hasCaches = !!cacheKeys && cacheKeys.length > 0;
+
+                if (!hasActiveSW && !hasCaches) {
+                    try { localStorage.setItem(STORAGE_KEY, '1'); } catch { /* ignore */ }
+                    return;
+                }
+            } catch (e) {
+                console.error('[app-reset-modal] init check', e);
+            }
+
+            setIsOpen(true);
+        })();
     }, []);
 
     const handleReset = async () => {
         setResetting(true);
+
+        // Race each step against a short timeout. `serviceWorker.unregister()`
+        // can block on a SW that's still installing (the install handler
+        // pre-fetches several routes + chunks to warm caches), so without a
+        // ceiling the spinner sits forever. Whatever doesn't finish gets
+        // dropped — the page reload below is the actual recovery action.
+        const withTimeout = <T,>(p: Promise<T>, ms: number) =>
+            Promise.race([
+                p.catch(() => null),
+                new Promise<null>(resolve => setTimeout(() => resolve(null), ms)),
+            ]);
+
         try {
             if ('serviceWorker' in navigator) {
-                const regs = await navigator.serviceWorker.getRegistrations();
-                await Promise.all(regs.map(r => r.unregister()));
-            }
-            if ('caches' in window) {
-                const keys = await caches.keys();
-                await Promise.all(keys.map(k => caches.delete(k)));
-            }
-            try {
-                localStorage.clear();
-                localStorage.setItem(STORAGE_KEY, '1');
-            } catch (e) {
-                console.error('[app-reset-modal] localStorage.clear', e);
+                const regs = await withTimeout(navigator.serviceWorker.getRegistrations(), 1500);
+                if (regs && regs.length) {
+                    await withTimeout(Promise.all(regs.map(r => r.unregister())), 1500);
+                }
             }
         } catch (e) {
-            console.error('[app-reset-modal] reset', e);
+            console.error('[app-reset-modal] sw', e);
         }
+
+        try {
+            if ('caches' in window) {
+                const keys = await withTimeout(caches.keys(), 1500);
+                if (keys && keys.length) {
+                    await withTimeout(Promise.all(keys.map(k => caches.delete(k))), 1500);
+                }
+            }
+        } catch (e) {
+            console.error('[app-reset-modal] caches', e);
+        }
+
+        try {
+            localStorage.clear();
+            localStorage.setItem(STORAGE_KEY, '1');
+        } catch (e) {
+            console.error('[app-reset-modal] localStorage.clear', e);
+        }
+
         window.location.replace('/');
     };
 

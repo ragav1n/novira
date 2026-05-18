@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Wrench, AlertTriangle } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
-type Stage = 'confirm' | 'running' | 'done' | 'error';
+type Stage = 'confirm' | 'running' | 'done';
 
 async function clearIndexedDB() {
     if (!('indexedDB' in window)) return;
@@ -38,35 +38,49 @@ async function clearIndexedDB() {
 
 export default function SWResetPage() {
     const [stage, setStage] = useState<Stage>('confirm');
-    const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
     const runReset = async () => {
         setStage('running');
+
+        // Race each step against a short timeout. SW unregister can block on
+        // an installing worker; signOut and IDB ops can stall on flaky network
+        // or locked DBs. Whatever doesn't finish gets dropped — the reload
+        // below is the real recovery action and must always run.
+        const withTimeout = <T,>(p: Promise<T>, ms: number) =>
+            Promise.race([
+                p.catch(() => null),
+                new Promise<null>(resolve => setTimeout(() => resolve(null), ms)),
+            ]);
+
+        // Sign out first so the server invalidates the session before we
+        // wipe local tokens.
+        try { await withTimeout(supabase.auth.signOut(), 2000); } catch (e) { console.warn('[sw-reset] signOut', e); }
+
         try {
-            // Sign out first so the server invalidates the session before we
-            // wipe local tokens.
-            try { await supabase.auth.signOut(); } catch (e) { console.warn('[sw-reset] signOut', e); }
-
             if ('serviceWorker' in navigator) {
-                const regs = await navigator.serviceWorker.getRegistrations();
-                await Promise.all(regs.map(r => r.unregister()));
+                const regs = await withTimeout(navigator.serviceWorker.getRegistrations(), 1500);
+                if (regs && regs.length) {
+                    await withTimeout(Promise.all(regs.map(r => r.unregister())), 1500);
+                }
             }
-            if ('caches' in window) {
-                const keys = await caches.keys();
-                await Promise.all(keys.map(k => caches.delete(k)));
-            }
-            await clearIndexedDB();
-            try { sessionStorage.clear(); } catch { /* ignore */ }
-            try { localStorage.clear(); } catch { /* ignore */ }
+        } catch (e) { console.warn('[sw-reset] sw', e); }
 
-            setStage('done');
-            // Brief pause so the user can see the success state before redirect.
-            setTimeout(() => { window.location.replace('/'); }, 800);
-        } catch (e) {
-            const msg = e instanceof Error ? e.message : String(e);
-            setErrorMsg(msg);
-            setStage('error');
-        }
+        try {
+            if ('caches' in window) {
+                const keys = await withTimeout(caches.keys(), 1500);
+                if (keys && keys.length) {
+                    await withTimeout(Promise.all(keys.map(k => caches.delete(k))), 1500);
+                }
+            }
+        } catch (e) { console.warn('[sw-reset] caches', e); }
+
+        try { await withTimeout(clearIndexedDB(), 2000); } catch (e) { console.warn('[sw-reset] idb', e); }
+        try { sessionStorage.clear(); } catch { /* ignore */ }
+        try { localStorage.clear(); } catch { /* ignore */ }
+
+        setStage('done');
+        // Brief pause so the user can see the success state before redirect.
+        setTimeout(() => { window.location.replace('/'); }, 600);
     };
 
     return (
@@ -114,24 +128,6 @@ export default function SWResetPage() {
                     </div>
                     <p className="text-sm text-muted-foreground font-medium">Done — reloading</p>
                 </>
-            )}
-
-            {stage === 'error' && (
-                <div className="max-w-sm w-full space-y-4 text-center">
-                    <div className="w-12 h-12 mx-auto rounded-2xl bg-destructive/10 border border-destructive/30 flex items-center justify-center">
-                        <AlertTriangle className="w-6 h-6 text-destructive" />
-                    </div>
-                    <div className="space-y-1">
-                        <h1 className="text-base font-semibold">Reset failed</h1>
-                        <p className="text-xs text-muted-foreground break-words">{errorMsg}</p>
-                    </div>
-                    <button
-                        onClick={() => window.location.replace('/')}
-                        className="w-full h-11 rounded-xl bg-secondary/20 hover:bg-secondary/30 text-sm font-medium border border-white/5 transition-colors"
-                    >
-                        Back to app
-                    </button>
-                </div>
             )}
         </div>
     );
