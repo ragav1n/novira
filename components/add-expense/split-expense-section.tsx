@@ -1,10 +1,90 @@
-import React from 'react';
+import React, { useRef, useState } from 'react';
 import { Users, CheckCircle2, User, Home, Plane, Heart } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import type { Group, Friend } from '@/components/providers/groups-provider';
 import { evaluateExpression } from '@/lib/expression-eval';
+import { ExpressionKeypad } from '@/components/ui/expression-keypad';
+
+interface SplitFriendRowProps {
+    friend: Friend;
+    value: string;
+    onChange: (next: string) => void;
+    currency: string;
+    CURRENCY_SYMBOLS: Record<string, string>;
+}
+
+function SplitFriendRow({ friend, value, onChange, currency, CURRENCY_SYMBOLS }: SplitFriendRowProps) {
+    const inputRef = useRef<HTMLInputElement>(null);
+    const [focused, setFocused] = useState(false);
+    const preview = evaluateExpression(value);
+
+    const commit = () => {
+        const r = evaluateExpression(value);
+        if (r !== null) onChange(String(r));
+    };
+
+    return (
+        <div className="space-y-1">
+            <div className="flex items-end gap-3">
+                <div className="flex items-center gap-2 min-w-[100px] h-9">
+                    <div className="w-7 h-7 rounded-full overflow-hidden border border-white/5 shrink-0">
+                        {friend.avatar_url ? (
+                            <img src={friend.avatar_url} alt={friend.full_name} width={28} height={28} className="w-full h-full object-cover" />
+                        ) : (
+                            <div className="w-full h-full flex items-center justify-center bg-secondary/30">
+                                <User className="w-3.5 h-3.5" />
+                            </div>
+                        )}
+                    </div>
+                    <span className="text-xs font-medium truncate">{friend.full_name.split(' ')[0]}</span>
+                </div>
+                <div className="flex-1 flex flex-col gap-1.5">
+                    {focused && (
+                        <ExpressionKeypad
+                            inputRef={inputRef}
+                            value={value}
+                            onChange={onChange}
+                            size="sm"
+                        />
+                    )}
+                    <div className="relative">
+                        <Input
+                            ref={inputRef}
+                            type="text"
+                            inputMode="decimal"
+                            placeholder="0.00"
+                            value={value}
+                            onChange={(e) => onChange(e.target.value)}
+                            onFocus={() => setFocused(true)}
+                            onBlur={() => { setFocused(false); commit(); }}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                    const r = evaluateExpression(value);
+                                    if (r !== null) {
+                                        e.preventDefault();
+                                        onChange(String(r));
+                                    }
+                                }
+                            }}
+                            className="h-9 text-sm pl-8 bg-secondary/10 border-white/10 rounded-lg"
+                        />
+                        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+                            {CURRENCY_SYMBOLS[currency] || '$'}
+                        </span>
+                    </div>
+                </div>
+            </div>
+            {preview !== null && (
+                <p className="text-[10px] text-muted-foreground font-medium pl-[112px]">
+                    = <span className="font-bold text-primary">{CURRENCY_SYMBOLS[currency] || '$'}{preview.toFixed(2)}</span>
+                    <span className="text-muted-foreground/60"> · tap away or press Enter to apply</span>
+                </p>
+            )}
+        </div>
+    );
+}
 
 interface SplitExpenseSectionProps {
     isSplitEnabled: boolean;
@@ -179,57 +259,15 @@ export function SplitExpenseSection({
                                 selectedFriendIds.map((friendId) => {
                                     const friend = friends.find(f => f.id === friendId);
                                     if (!friend) return null;
-                                    const raw = customAmounts[friendId] || '';
-                                    const preview = evaluateExpression(raw);
                                     return (
-                                        <div key={friendId} className="space-y-1">
-                                            <div className="flex items-center gap-3">
-                                                <div className="flex items-center gap-2 min-w-[100px]">
-                                                    <div className="w-7 h-7 rounded-full overflow-hidden border border-white/5 shrink-0">
-                                                        {friend.avatar_url ? (
-                                                            <img src={friend.avatar_url} alt={friend.full_name} width={28} height={28} className="w-full h-full object-cover" />
-                                                        ) : (
-                                                            <div className="w-full h-full flex items-center justify-center bg-secondary/30">
-                                                                <User className="w-3.5 h-3.5" />
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                    <span className="text-xs font-medium truncate">{friend.full_name.split(' ')[0]}</span>
-                                                </div>
-                                                <div className="relative flex-1">
-                                                    <Input
-                                                        type="text"
-                                                        inputMode="decimal"
-                                                        placeholder="0.00"
-                                                        value={raw}
-                                                        onChange={(e) => setCustomAmounts(prev => ({ ...prev, [friendId]: e.target.value }))}
-                                                        onBlur={() => {
-                                                            const r = evaluateExpression(customAmounts[friendId] || '');
-                                                            if (r !== null) setCustomAmounts(prev => ({ ...prev, [friendId]: String(r) }));
-                                                        }}
-                                                        onKeyDown={(e) => {
-                                                            if (e.key === 'Enter') {
-                                                                const r = evaluateExpression(customAmounts[friendId] || '');
-                                                                if (r !== null) {
-                                                                    e.preventDefault();
-                                                                    setCustomAmounts(prev => ({ ...prev, [friendId]: String(r) }));
-                                                                }
-                                                            }
-                                                        }}
-                                                        className="h-9 text-sm pl-8 bg-secondary/10 border-white/10 rounded-lg"
-                                                    />
-                                                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
-                                                        {CURRENCY_SYMBOLS[currency] || '$'}
-                                                    </span>
-                                                </div>
-                                            </div>
-                                            {preview !== null && (
-                                                <p className="text-[10px] text-muted-foreground font-medium pl-[112px]">
-                                                    = <span className="font-bold text-primary">{CURRENCY_SYMBOLS[currency] || '$'}{preview.toFixed(2)}</span>
-                                                    <span className="text-muted-foreground/60"> · tap away or press Enter to apply</span>
-                                                </p>
-                                            )}
-                                        </div>
+                                        <SplitFriendRow
+                                            key={friendId}
+                                            friend={friend}
+                                            value={customAmounts[friendId] || ''}
+                                            onChange={(next) => setCustomAmounts(prev => ({ ...prev, [friendId]: next }))}
+                                            currency={currency}
+                                            CURRENCY_SYMBOLS={CURRENCY_SYMBOLS}
+                                        />
                                     );
                                 })
                             )}

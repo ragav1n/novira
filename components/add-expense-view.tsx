@@ -59,6 +59,7 @@ import { toast } from '@/utils/haptics';
 
 import { CATEGORY_COLORS, getIconForCategory, CATEGORIES as SYSTEM_CATEGORIES } from '@/lib/categories';
 import { evaluateExpression } from '@/lib/expression-eval';
+import { ExpressionKeypad } from '@/components/ui/expression-keypad';
 
 const dropdownCategories = SYSTEM_CATEGORIES.map(cat => ({
     id: cat.id,
@@ -119,6 +120,7 @@ export function AddExpenseView() {
     const { handleSubmit, loading } = useExpenseSubmission();
     const fileInputRef = useRef<HTMLInputElement>(null);
     const cameraInputRef = useRef<HTMLInputElement>(null);
+    const amountInputRef = useRef<HTMLInputElement>(null);
     const scanAbortRef = useRef<AbortController | null>(null);
     const [scanning, setScanning] = React.useState(false);
     const [errors, setErrors] = React.useState<ExpenseFormErrors>({});
@@ -480,16 +482,21 @@ export function AddExpenseView() {
 
                 {/* Amount Input */}
                 <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                        <label htmlFor="expense-amount" className="text-sm font-medium">Amount *</label>
-                        <span className="text-[10px] text-muted-foreground/60 font-medium uppercase tracking-wider">
-                            Tip: type <span className="text-primary/80 font-mono">12+3.5</span> to add
-                        </span>
-                    </div>
+                    <label htmlFor="expense-amount" className="text-sm font-medium block">Amount *</label>
+                    <ExpressionKeypad
+                        inputRef={amountInputRef}
+                        value={formState.amount}
+                        onChange={(next) => {
+                            formState.setAmount(next);
+                            if (errors.amount) setErrors(prev => ({ ...prev, amount: undefined }));
+                        }}
+                        size="md"
+                    />
                     <div className="relative">
                         <Input
                             id="expense-amount"
                             name="amount"
+                            ref={amountInputRef}
                             value={formState.amount}
                             type="text"
                             inputMode="decimal"
