@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { Home, Plus, BarChart2, Search, Settings, Users, Calendar, CalendarDays, Target, Menu } from 'lucide-react';
 import Image from 'next/image';
@@ -72,13 +72,14 @@ const expandedChildVariants = {
 
 const burgerVariants = {
     expanded: { opacity: 0, scale: 0.7, transition: { duration: 0.22, ease: [0.4, 0, 0.2, 1] as const } },
-    collapsed: { opacity: 1, scale: 1, transition: { type: 'spring' as const, damping: 16, stiffness: 260, mass: 0.85, delay: 0.18 } },
+    collapsed: { opacity: 1, scale: 1, transition: { type: 'spring' as const, damping: 16, stiffness: 260, mass: 0.85, delay: 0.08 } },
 };
 
 // Minimum gap between expand/collapse flips. Prevents rapid up/down scrolling
 // from interrupting an in-flight stagger animation and leaving the nav stuck
-// halfway between states.
-const NAV_TOGGLE_COOLDOWN_MS = 380;
+// halfway between states. Must cover the full collapse: ~9 children ×
+// staggerChildren (0.035) + child collapse (0.22s) ≈ 535ms.
+const NAV_TOGGLE_COOLDOWN_MS = 600;
 
 // ─── Mobile Bottom Nav Wrapper ───────────────────────────────────────────────
 // Hide the floating bottom nav on scroll-down past 150px, show on scroll-up by 80px.
@@ -96,8 +97,19 @@ function MobileBottomNavScroller({
     const lastScrollY = useRef(0);
     const scrollPositionOnHide = useRef(0);
     const lastToggleAt = useRef(0);
+    const pathname = usePathname();
 
     const { scrollY } = useScroll({ container: scrollContainerRef as React.RefObject<HTMLElement> });
+
+    // Reset scroll-tracking state on route change so a stale `lastScrollY` from
+    // the previous page can't trigger a wrong hide/show on the first scroll
+    // event of the new page.
+    useEffect(() => {
+        lastScrollY.current = 0;
+        scrollPositionOnHide.current = 0;
+        lastToggleAt.current = 0;
+        setVisible(true);
+    }, [pathname]);
 
     useMotionValueEvent(scrollY, 'change', (latest) => {
         const previous = lastScrollY.current;
@@ -118,13 +130,17 @@ function MobileBottomNavScroller({
     return (
         <motion.div
             initial={false}
-            animate={isVisible ? { y: 0, opacity: 1 } : { y: 96, opacity: 0 }}
+            // y: '120%' scales with the nav's own height so the hide offset
+            // covers the safe-area inset on native shells (where the nav sits
+            // higher off the bottom edge) without us having to read it.
+            animate={isVisible ? { y: 0, opacity: 1 } : { y: '120%', opacity: 0 }}
             transition={{ type: 'spring', damping: 26, stiffness: 220, mass: 0.85 }}
             className={cn(
                 "fixed bottom-6 left-0 right-0 z-50 flex justify-center px-4",
                 isNative && "bottom-[calc(1.5rem+env(safe-area-inset-bottom))]"
             )}
             style={{ pointerEvents: isVisible ? 'auto' : 'none' }}
+            inert={!isVisible}
         >
             {children}
         </motion.div>
@@ -154,6 +170,21 @@ function DesktopTopNav({
 
     const { scrollY } = useScroll({ container: scrollContainerRef as React.RefObject<HTMLElement> });
 
+    // Sync state to the scroll container on mount + after each navigation:
+    // - Reset stale refs so the previous page's scroll history can't fire a
+    //   spurious collapse/expand on the first scroll event of the new page.
+    // - Initialise `isExpanded` from current scrollTop so a scroll-restored
+    //   deep page doesn't paint expanded then jolt to collapsed. Runs before
+    //   paint, so Framer animates straight from the `hidden` initial state
+    //   into the correct expanded/collapsed target.
+    useLayoutEffect(() => {
+        lastScrollY.current = 0;
+        scrollPositionOnCollapse.current = 0;
+        lastToggleAt.current = 0;
+        const el = scrollContainerRef.current;
+        setExpanded(!el || el.scrollTop <= 150);
+    }, [pathname, scrollContainerRef]);
+
     useMotionValueEvent(scrollY, 'change', (latest) => {
         const previous = lastScrollY.current;
         const now = performance.now();
@@ -174,79 +205,75 @@ function DesktopTopNav({
     });
 
     return (
-        // MotionConfig override: the outer layout wraps everything in reducedMotion="user"
-        // which would kill these animations — we opt the nav out of that.
-        <MotionConfig reducedMotion="never">
-            <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50">
-                <motion.nav
-                    initial="hidden"
-                    animate={isExpanded ? 'expanded' : 'collapsed'}
-                    variants={containerVariants}
-                    whileHover={!isExpanded ? { scale: 1.06 } : {}}
-                    whileTap={!isExpanded ? { scale: 0.96 } : {}}
-                    onClick={() => !isExpanded && setExpanded(true)}
-                    style={{ borderRadius: 999 }}
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50">
+            <motion.nav
+                initial="hidden"
+                animate={isExpanded ? 'expanded' : 'collapsed'}
+                variants={containerVariants}
+                whileHover={!isExpanded ? { scale: 1.06 } : {}}
+                whileTap={!isExpanded ? { scale: 0.96 } : {}}
+                onClick={() => !isExpanded && setExpanded(true)}
+                style={{ borderRadius: 999 }}
+                className={cn(
+                    'relative flex items-center border border-white/10 bg-background/80 shadow-lg shadow-black/20 backdrop-blur-md h-11 overflow-hidden',
+                    !isExpanded && 'cursor-pointer justify-center'
+                )}
+            >
+                {/* Logo */}
+                <motion.div
+                    variants={expandedChildVariants}
+                    className="flex-shrink-0 flex items-center gap-2 pl-4 pr-3"
+                >
+                    <Image
+                        src="/Novira.png"
+                        alt="Novira"
+                        width={18}
+                        height={18}
+                        className="drop-shadow-[0_0_6px_rgba(138,43,226,0.6)]"
+                    />
+                    <span className="font-bold text-sm tracking-tight">Novira</span>
+                </motion.div>
+
+                <motion.div variants={expandedChildVariants} className="h-4 w-px bg-white/10 flex-shrink-0" />
+
+                {/* Nav items */}
+                <motion.div
                     className={cn(
-                        'relative flex items-center border border-white/10 bg-background/80 shadow-lg shadow-black/20 backdrop-blur-md h-11 overflow-hidden',
-                        !isExpanded && 'cursor-pointer justify-center'
+                        'flex items-center gap-0.5 px-2',
+                        !isExpanded && 'pointer-events-none'
                     )}
                 >
-                    {/* Logo */}
-                    <motion.div
-                        variants={expandedChildVariants}
-                        className="flex-shrink-0 flex items-center gap-2 pl-4 pr-3"
-                    >
-                        <Image
-                            src="/Novira.png"
-                            alt="Novira"
-                            width={18}
-                            height={18}
-                            className="drop-shadow-[0_0_6px_rgba(138,43,226,0.6)]"
-                        />
-                        <span className="font-bold text-sm tracking-tight">Novira</span>
+                    {DESKTOP_NAV.map(({ title, icon: Icon, route }) => {
+                        const isActive = pathname === route;
+                        return (
+                            <motion.button
+                                key={route}
+                                variants={expandedChildVariants}
+                                onClick={(e) => { e.stopPropagation(); onNavigate(route); }}
+                                className={cn(
+                                    'flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-medium transition-colors whitespace-nowrap',
+                                    isActive
+                                        ? cn(activeBg, activeText)
+                                        : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
+                                )}
+                            >
+                                <Icon className="w-3.5 h-3.5 shrink-0" />
+                                <span>{title}</span>
+                            </motion.button>
+                        );
+                    })}
+                </motion.div>
+
+                <motion.div variants={expandedChildVariants} className="w-2 flex-shrink-0" />
+
+                {/* Burger icon — fades in when collapsed */}
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <motion.div variants={burgerVariants} animate={isExpanded ? 'expanded' : 'collapsed'}>
+                        <Menu className="h-5 w-5" />
                     </motion.div>
-
-                    <motion.div variants={expandedChildVariants} className="h-4 w-px bg-white/10 flex-shrink-0" />
-
-                    {/* Nav items */}
-                    <motion.div
-                        className={cn(
-                            'flex items-center gap-0.5 px-2',
-                            !isExpanded && 'pointer-events-none'
-                        )}
-                    >
-                        {DESKTOP_NAV.map(({ title, icon: Icon, route }) => {
-                            const isActive = pathname === route;
-                            return (
-                                <motion.button
-                                    key={route}
-                                    variants={expandedChildVariants}
-                                    onClick={(e) => { e.stopPropagation(); onNavigate(route); }}
-                                    className={cn(
-                                        'flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-medium transition-colors whitespace-nowrap',
-                                        isActive
-                                            ? cn(activeBg, activeText)
-                                            : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
-                                    )}
-                                >
-                                    <Icon className="w-3.5 h-3.5 shrink-0" />
-                                    <span>{title}</span>
-                                </motion.button>
-                            );
-                        })}
-                    </motion.div>
-
-                    <motion.div variants={expandedChildVariants} className="w-2 flex-shrink-0" />
-
-                    {/* Burger icon — fades in when collapsed */}
-                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                        <motion.div variants={burgerVariants} animate={isExpanded ? 'expanded' : 'collapsed'}>
-                            <Menu className="h-5 w-5" />
-                        </motion.div>
-                    </div>
-                </motion.nav>
-            </div>
-        </MotionConfig>
+                </div>
+            </motion.nav>
+        </div>
     );
 }
 
@@ -571,6 +598,10 @@ export function MobileLayout({ children, defaultIsDesktop = false }: { children:
                             className="bg-background/80 backdrop-blur-xl border-white/10 shadow-2xl shadow-primary/20"
                             activeColor="text-primary bg-primary/10"
                             onChange={handleTabChange}
+                            activeIndex={(() => {
+                                const idx = routes.indexOf(pathname);
+                                return idx === -1 ? null : idx;
+                            })()}
                         />
                     </MobileBottomNavScroller>
                 </>

@@ -25,6 +25,7 @@ interface ExpandableTabsProps {
     className?: string;
     activeColor?: string;
     onChange?: (index: number | null) => void;
+    activeIndex?: number | null;
 }
 
 const buttonVariants = {
@@ -53,8 +54,12 @@ export function ExpandableTabs({
     className,
     activeColor = "text-primary",
     onChange,
+    activeIndex = null,
 }: ExpandableTabsProps) {
     const [selected, setSelected] = React.useState<number | null>(null);
+    // Bumped on every tap so re-tapping the already-selected tab still
+    // refreshes the 5s auto-collapse timer (setSelected(same) is a no-op).
+    const [selectionTick, setSelectionTick] = React.useState(0);
     const outsideClickRef = React.useRef<HTMLDivElement>(null);
     const tabRefs = React.useRef<(HTMLButtonElement | null)[]>([]);
 
@@ -79,10 +84,11 @@ export function ExpandableTabs({
 
             return () => clearTimeout(timer);
         }
-    }, [selected]);
+    }, [selected, selectionTick]);
 
     const handleSelect = (index: number) => {
         setSelected(index);
+        setSelectionTick((n) => n + 1);
         onChange?.(index);
     };
 
@@ -106,6 +112,8 @@ export function ExpandableTabs({
                 }
 
                 const Icon = tab.icon;
+                const isActiveRoute = activeIndex === index;
+                const isHighlighted = selected === index || isActiveRoute;
                 return (
                     <motion.button
                         key={tab.title}
@@ -118,9 +126,10 @@ export function ExpandableTabs({
                         custom={{ isSelected: selected === index, hasSelected: selected !== null }}
                         onClick={() => handleSelect(index)}
                         transition={transition}
+                        aria-current={isActiveRoute ? 'page' : undefined}
                         className={cn(
                             "relative flex items-center rounded-xl py-1.5 sm:py-2 text-xs sm:text-sm font-medium transition-colors duration-300 shrink-0",
-                            selected === index
+                            isHighlighted
                                 ? cn("bg-muted", activeColor)
                                 : "text-muted-foreground hover:bg-muted hover:text-foreground"
                         )}
