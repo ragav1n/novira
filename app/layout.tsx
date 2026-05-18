@@ -67,6 +67,9 @@ export const viewport = {
   themeColor: '#0c081e',
   width: 'device-width',
   initialScale: 1,
+  // Page-level pinch-zoom stays on so low-vision users can scale text (WCAG 1.4.4).
+  // Image surfaces that need bounded zoom (receipts) handle pinch within their
+  // own bounds via the ZoomableImage component.
   viewportFit: 'cover',
 }
 

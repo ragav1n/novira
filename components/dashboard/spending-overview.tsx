@@ -267,17 +267,17 @@ export const SpendingOverview = React.memo(function SpendingOverview({
                 </AnimatePresence>
             </div>
 
-            {/* Total Spent Card */}
-            <div className={cn(
-                "relative overflow-hidden rounded-3xl p-6 shadow-xl transition-all duration-500",
-                isBucketFocused 
-                    ? "bg-gradient-to-br from-cyan-500 to-teal-600 shadow-cyan-500/20"
-                    : isCoupleWorkspace 
-                        ? "bg-gradient-to-br from-rose-500 to-rose-700 shadow-rose-500/20"
-                        : isHomeWorkspace
-                            ? "bg-gradient-to-br from-yellow-500 to-amber-600 shadow-yellow-500/20"
-                            : "bg-gradient-to-br from-primary to-primary/60 shadow-primary/20"
-            )}>
+            {/* Total Spent Card — gradient stops and glow are driven by CSS variables
+                (`--focus-card-from`, `--focus-card-to`, `--focus-card-glow`) so the
+                color transition tweens smoothly when bucket focus or workspace
+                theme changes. See globals.css for the per-state values. */}
+            <div
+                className="relative overflow-hidden rounded-3xl p-6 shadow-xl"
+                style={{
+                    background: 'linear-gradient(135deg, var(--focus-card-from), var(--focus-card-to))',
+                    boxShadow: '0 0 25px var(--focus-card-glow), 0 20px 25px -5px rgb(0 0 0 / 0.15)',
+                }}
+            >
                 <div className="absolute top-0 right-0 p-6 opacity-10">
                     <span className="text-9xl font-bold text-white leading-none translate-x-4 -translate-y-4">
                         {CURRENCY_SYMBOLS[bucketCurrency] || '$'}

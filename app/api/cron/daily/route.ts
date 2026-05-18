@@ -34,6 +34,7 @@ export async function GET(request: NextRequest) {
         '/api/cron/goal-deadline',
         '/api/cron/cash-flow-shortfall',
         '/api/cron/transaction-anomaly',
+        '/api/cron/unusual-spending',
         '/api/cron/re-engagement',
         '/api/cron/group-activity',
         '/api/cron/no-spend-streak',

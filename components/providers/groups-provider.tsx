@@ -333,10 +333,30 @@ export function GroupsProvider({ children }: { children: React.ReactNode }) {
         const handleExpenseAdded = () => refreshData();
         window.addEventListener('novira:expense-added', handleExpenseAdded);
 
-        // Listen for settlement broadcasts from other users
+        // Network blip recovery: a friend's split-added broadcast that fires while
+        // we're offline never reaches us. On reconnect, do a one-shot refresh so
+        // balances catch up without waiting for the next page mount or user action.
+        const handleOnline = () => refreshData();
+        window.addEventListener('online', handleOnline);
+
+        // Listen for settlement broadcasts from other users.
+        // Channel name MUST match the sender's (`settlement-notify-${creditorId}`) —
+        // we previously suffixed `-${myGen}` here, which silently broke delivery.
         const settlementChannel = supabase
-            .channel(`settlement-notify-${userId}-${myGen}`)
+            .channel(`settlement-notify-${userId}`)
             .on('broadcast', { event: 'settled' }, guarded(() => {
+                debouncedRefresh();
+                window.dispatchEvent(new Event('novira:expense-added'));
+            }))
+            .subscribe();
+
+        // Listen for split-added broadcasts — fired by whoever creates a transaction
+        // with a split that includes us. Postgres-changes on `splits` is unreliable
+        // when the new row was inserted by another user; the broadcast bypasses any
+        // RLS / publication quirks and guarantees the "You owe / owed" tiles update.
+        const splitNotifyChannel = supabase
+            .channel(`split-notify-${userId}`)
+            .on('broadcast', { event: 'split-added' }, guarded(() => {
                 debouncedRefresh();
                 window.dispatchEvent(new Event('novira:expense-added'));
             }))
@@ -381,7 +401,9 @@ export function GroupsProvider({ children }: { children: React.ReactNode }) {
 
         return () => {
             window.removeEventListener('novira:expense-added', handleExpenseAdded);
+            window.removeEventListener('online', handleOnline);
             supabase.removeChannel(settlementChannel);
+            supabase.removeChannel(splitNotifyChannel);
             clearTimeout(timer);
             if (channel) supabase.removeChannel(channel);
         };
@@ -595,11 +617,21 @@ export function GroupsProvider({ children }: { children: React.ReactNode }) {
         // Notify the creditor's screen via broadcast so they don't need to refresh
         if (creditorId) {
             const notifyChannel = supabase.channel(`settlement-notify-${creditorId}`);
+            let disposed = false;
+            const dispose = () => {
+                if (disposed) return;
+                disposed = true;
+                clearTimeout(safety);
+                supabase.removeChannel(notifyChannel);
+            };
+            const safety = setTimeout(dispose, 5000);
             notifyChannel.subscribe((status) => {
                 if (status === 'SUBSCRIBED') {
                     notifyChannel
                         .send({ type: 'broadcast', event: 'settled', payload: { splitId } })
-                        .finally(() => supabase.removeChannel(notifyChannel));
+                        .finally(dispose);
+                } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+                    dispose();
                 }
             });
         }
@@ -644,11 +676,21 @@ export function GroupsProvider({ children }: { children: React.ReactNode }) {
 
         if (creditorId) {
             const notifyChannel = supabase.channel(`settlement-notify-${creditorId}`);
+            let disposed = false;
+            const dispose = () => {
+                if (disposed) return;
+                disposed = true;
+                clearTimeout(safety);
+                supabase.removeChannel(notifyChannel);
+            };
+            const safety = setTimeout(dispose, 5000);
             notifyChannel.subscribe((status) => {
                 if (status === 'SUBSCRIBED') {
                     notifyChannel
                         .send({ type: 'broadcast', event: 'settled', payload: { splitIds } })
-                        .finally(() => supabase.removeChannel(notifyChannel));
+                        .finally(dispose);
+                } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+                    dispose();
                 }
             });
         }

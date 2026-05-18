@@ -1,7 +1,8 @@
 'use client';
 
-import { Download, FileSpreadsheet, CalendarDays } from 'lucide-react';
+import { Download, FileSpreadsheet, CalendarDays, Paperclip } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useRouter } from 'next/navigation';
 
 interface Props {
     loading: boolean;
@@ -13,6 +14,7 @@ interface Props {
 }
 
 export function DataManagementSection({ loading, onImport, onExportCSV, onExportPDF, onExportICS, icsLoading }: Props) {
+    const router = useRouter();
     return (
         <div className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
@@ -53,8 +55,17 @@ export function DataManagementSection({ loading, onImport, onExportCSV, onExport
                     <span className="text-xs font-medium">{icsLoading ? 'Building calendar...' : 'Export to Calendar (.ics)'}</span>
                     <span className="text-[10px] text-muted-foreground">Bills, goals & bucket deadlines</span>
                 </Button>
+                <Button
+                    variant="outline"
+                    onClick={() => router.push('/receipts')}
+                    className="h-16 flex flex-col items-center justify-center gap-1 bg-secondary/5 border-primary/20 hover:bg-primary/10 hover:border-primary/50 transition-all group col-span-2"
+                >
+                    <Paperclip className="w-5 h-5 text-primary group-hover:scale-110 transition-transform" />
+                    <span className="text-xs font-medium">Browse Receipts</span>
+                    <span className="text-[10px] text-muted-foreground">Gallery of scanned receipts</span>
+                </Button>
             </div>
-            <p className="text-[11px] text-muted-foreground">Import bank statements, export your expense data, or sync upcoming events to your calendar.</p>
+            <p className="text-[11px] text-muted-foreground">Import bank statements, export your expense data, browse receipts, or sync upcoming events to your calendar.</p>
         </div>
     );
 }

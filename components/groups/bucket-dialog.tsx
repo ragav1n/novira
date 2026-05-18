@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
-import { Tag, Plane, Home, Gift, Car, Utensils, ShoppingCart, Heart, Gamepad2, Music, Laptop, School, Filter } from 'lucide-react';
+import { Tag, Plane, Home, Gift, Car, Utensils, ShoppingCart, Heart, Gamepad2, Music, Laptop, School, Filter, Sparkles } from 'lucide-react';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
 import { DateRange } from 'react-day-picker';
 import { useBucketsList, Bucket } from '@/components/providers/buckets-provider';
@@ -11,6 +11,8 @@ import { useUserPreferences, CURRENCY_DETAILS, type Currency } from '@/component
 import { toast } from '@/utils/haptics';
 import { cn } from '@/lib/utils';
 import { CATEGORIES as SYSTEM_CATEGORIES, CATEGORY_COLORS, getIconForCategory } from '@/lib/categories';
+import { supabase } from '@/lib/supabase';
+import { subMonths, subYears, format, startOfMonth, endOfMonth } from 'date-fns';
 
 interface BucketDialogProps {
     isOpen: boolean;
@@ -20,7 +22,7 @@ interface BucketDialogProps {
 
 export function BucketDialog({ isOpen, onClose, editingBucket }: BucketDialogProps) {
     const { createBucket, updateBucket } = useBucketsList();
-    const { currency } = useUserPreferences();
+    const { currency, formatCurrency, userId } = useUserPreferences();
 
     const [isProcessing, setIsProcessing] = useState(false);
     const [newBucketName, setNewBucketName] = useState('');
@@ -29,6 +31,7 @@ export function BucketDialog({ isOpen, onClose, editingBucket }: BucketDialogPro
     const [bucketDateRange, setBucketDateRange] = useState<DateRange | undefined>();
     const [newBucketCurrency, setNewBucketCurrency] = useState<Currency | string>(currency || 'USD');
     const [allowedCategories, setAllowedCategories] = useState<string[]>([]);
+    const [budgetSuggestions, setBudgetSuggestions] = useState<{ avg3mo: number; sameMonthLastYear: number } | null>(null);
 
     useEffect(() => {
         if (isOpen) {
@@ -50,8 +53,65 @@ export function BucketDialog({ isOpen, onClose, editingBucket }: BucketDialogPro
                 setNewBucketCurrency(currency || 'USD');
                 setAllowedCategories([]);
             }
+            setBudgetSuggestions(null);
         }
     }, [isOpen, editingBucket, currency]);
+
+    // Fetch avg-last-3-months and same-month-last-year spending for the bucket
+    // being edited so the user can tap-to-fill instead of guessing.
+    useEffect(() => {
+        if (!isOpen || !editingBucket || !userId) {
+            setBudgetSuggestions(null);
+            return;
+        }
+        let cancelled = false;
+        (async () => {
+            try {
+                const now = new Date();
+                const threeMonthsAgo = startOfMonth(subMonths(now, 3));
+                const sameMonthLastYearStart = startOfMonth(subYears(now, 1));
+                const sameMonthLastYearEnd = endOfMonth(subYears(now, 1));
+
+                const [recent, lastYear] = await Promise.all([
+                    supabase
+                        .from('transactions')
+                        .select('amount, date')
+                        .eq('user_id', userId)
+                        .eq('bucket_id', editingBucket.id)
+                        .gte('date', format(threeMonthsAgo, 'yyyy-MM-dd'))
+                        .lt('date', format(startOfMonth(now), 'yyyy-MM-dd')),
+                    supabase
+                        .from('transactions')
+                        .select('amount, date')
+                        .eq('user_id', userId)
+                        .eq('bucket_id', editingBucket.id)
+                        .gte('date', format(sameMonthLastYearStart, 'yyyy-MM-dd'))
+                        .lte('date', format(sameMonthLastYearEnd, 'yyyy-MM-dd')),
+                ]);
+
+                if (cancelled) return;
+
+                let recentSum = 0;
+                for (const row of recent.data || []) {
+                    recentSum += Number(row.amount);
+                }
+                // Divide by the full window length (3 months). Using the count of
+                // months that *had* spending inflates sparse buckets — 1 active
+                // month with $300 would render as "Avg 3mo · $300" instead of $100.
+                const avg3mo = recentSum / 3;
+                const sameMonthLastYear = (lastYear.data || []).reduce((s, r) => s + Number(r.amount), 0);
+
+                if (avg3mo > 0 || sameMonthLastYear > 0) {
+                    setBudgetSuggestions({ avg3mo, sameMonthLastYear });
+                } else {
+                    setBudgetSuggestions(null);
+                }
+            } catch (err) {
+                console.error('Failed to compute bucket budget suggestions:', err);
+            }
+        })();
+        return () => { cancelled = true; };
+    }, [isOpen, editingBucket, userId]);
 
     const handleAction = async () => {
         if (!newBucketName.trim()) {
@@ -199,6 +259,32 @@ export function BucketDialog({ isOpen, onClose, editingBucket }: BucketDialogPro
                                             {CURRENCY_DETAILS[newBucketCurrency as keyof typeof CURRENCY_DETAILS]?.symbol || '$'}
                                         </span>
                                     </div>
+                                    {budgetSuggestions && (
+                                        <div className="flex flex-wrap gap-1.5 pt-1">
+                                            <span className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground/60 inline-flex items-center gap-1">
+                                                <Sparkles className="w-3 h-3" aria-hidden="true" />
+                                                Try
+                                            </span>
+                                            {budgetSuggestions.avg3mo > 0 && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setNewBucketTarget(Math.round(budgetSuggestions.avg3mo).toString())}
+                                                    className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/25 text-cyan-300 hover:bg-cyan-500/15 transition-colors tabular-nums"
+                                                >
+                                                    Avg 3mo · {formatCurrency(budgetSuggestions.avg3mo)}
+                                                </button>
+                                            )}
+                                            {budgetSuggestions.sameMonthLastYear > 0 && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setNewBucketTarget(Math.round(budgetSuggestions.sameMonthLastYear).toString())}
+                                                    className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/25 text-cyan-300 hover:bg-cyan-500/15 transition-colors tabular-nums"
+                                                >
+                                                    Last year · {formatCurrency(budgetSuggestions.sameMonthLastYear)}
+                                                </button>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 

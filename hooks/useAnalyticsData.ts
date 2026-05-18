@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { format, startOfMonth, endOfMonth, subMonths, parseISO, getDay, differenceInCalendarDays } from 'date-fns';
+import { format, startOfMonth, endOfMonth, subMonths, subDays, parseISO, getDay, differenceInCalendarDays } from 'date-fns';
 import { CATEGORY_COLORS, getCategoryLabel } from '@/lib/categories';
 import type { Transaction } from '@/types/transaction';
 
@@ -133,6 +133,7 @@ export function useAnalyticsData(opts: {
             dailyTotals: {} as Record<string, number>,
             locationClusters: [] as LocationCluster[],
             geoTxCount: 0,
+            recentSpent7d: 0,
         };
         if (!transactions.length || !userId) return empty;
 
@@ -212,6 +213,11 @@ export function useAnalyticsData(opts: {
         let recurringTotal = 0;
         let discretionaryTotal = 0;
         let geoTxCount = 0;
+        let recentSpent7d = 0;
+        // Last-7-day window anchored to "now" — used only by the burn-rate projection on the
+        // current month view. Stored as YYYY-MM-DD so it compares against tx.date string slices.
+        const recentWindowStart = format(subDays(now, 6), 'yyyy-MM-dd');
+        const recentWindowEnd = format(now, 'yyyy-MM-dd');
         const recurringByCategory: Record<string, number> = {};
         const discretionaryByCategory: Record<string, number> = {};
         const recurringByItem: Record<string, { amount: number; count: number }> = {};
@@ -277,6 +283,10 @@ export function useAnalyticsData(opts: {
             // Daily totals for calendar heatmap.
             const dayKey = tx.date.slice(0, 10);
             dailyTotals[dayKey] = (dailyTotals[dayKey] || 0) + amount;
+
+            if (dayKey >= recentWindowStart && dayKey <= recentWindowEnd) {
+                recentSpent7d += amount;
+            }
 
             // Recurring vs discretionary split + top contributors per side.
             const itemLabel = (tx.description || place || tx.category || 'Unknown').trim() || 'Unknown';
@@ -496,6 +506,7 @@ export function useAnalyticsData(opts: {
             dailyTotals,
             locationClusters,
             geoTxCount,
+            recentSpent7d,
         };
     }, [transactions, priorTransactions, priorStart, dateRange, currency, userId, convertAmount, activeTags]);
 }

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { memo, useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { parseISO } from 'date-fns';
 import { useFormattedDate } from '@/utils/format-date';
 import { History, MoreVertical, Users, RefreshCcw, Ban, MapPin, Pencil, Trash2, Globe, ArrowLeftRight, Cloud, AlertTriangle, StickyNote, Paperclip, Check } from 'lucide-react';
@@ -46,6 +47,24 @@ let _swipeHintLock = false;
 const SWIPE_THRESHOLD = 72;  // minimum drag distance to trigger snap
 const SNAP_DISTANCE = 130;   // full reveal: 2 × w-16 (64px) buttons + gap
 
+// Deterministic hue per tag so the same tag always renders in the same color.
+// Hash → hue keeps the palette stable across reloads without needing storage.
+function hashTag(tag: string): number {
+    let hash = 0;
+    for (let i = 0; i < tag.length; i++) {
+        hash = (hash * 31 + tag.charCodeAt(i)) | 0;
+    }
+    return Math.abs(hash);
+}
+function tagColors(tag: string): { bg: string; border: string; text: string } {
+    const hue = hashTag(tag) % 360;
+    return {
+        bg: `hsla(${hue}, 80%, 60%, 0.14)`,
+        border: `hsla(${hue}, 80%, 60%, 0.32)`,
+        text: `hsl(${hue}, 80%, 78%)`,
+    };
+}
+
 export const TransactionRow = memo(function TransactionRow({
   tx,
   userId,
@@ -69,6 +88,7 @@ export const TransactionRow = memo(function TransactionRow({
   const hasSplits = tx.splits && tx.splits.length > 0;
   const isSettlement = tx.is_settlement;
   const formatDate = useFormattedDate();
+  const router = useRouter();
 
   const x = useMotionValue(0);
   const [swiped, setSwiped] = useState(false);
@@ -330,12 +350,29 @@ export const TransactionRow = memo(function TransactionRow({
                 </span>
               )}
               {tx.tags && tx.tags.length > 0 && (
-                <span className="shrink-0 flex items-center gap-1 ml-0.5 truncate" aria-label={`Tags: ${tx.tags.join(', ')}`}>
+                <span className="shrink-0 flex items-center gap-1 ml-0.5" aria-label={`Tags: ${tx.tags.join(', ')}`}>
                   <span className="text-white/20 text-[10px]">·</span>
-                  <span className="text-[10.5px] text-primary font-semibold leading-none truncate">
-                    {tx.tags.slice(0, 3).map(t => `#${t}`).join(' ')}
-                    {tx.tags.length > 3 && <span className="text-white/40"> +{tx.tags.length - 3}</span>}
-                  </span>
+                  {tx.tags.slice(0, 2).map(t => {
+                    const c = tagColors(t);
+                    return (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          router.push(`/search?tag=${encodeURIComponent(t)}`);
+                          window.dispatchEvent(new CustomEvent('novira:apply-tag-filter', { detail: { tag: t } }));
+                        }}
+                        className="shrink-0 text-[10px] font-bold leading-none px-1.5 py-[2px] rounded border tabular-nums hover:brightness-110 transition-[filter]"
+                        style={{ backgroundColor: c.bg, borderColor: c.border, color: c.text }}
+                      >
+                        #{t}
+                      </button>
+                    );
+                  })}
+                  {tx.tags.length > 2 && (
+                    <span className="shrink-0 text-[10px] text-white/40 font-semibold">+{tx.tags.length - 2}</span>
+                  )}
                 </span>
               )}
             </div>

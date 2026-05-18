@@ -8,7 +8,7 @@ import { useWorkspaceTheme } from '@/hooks/useWorkspaceTheme';
 import { supabase } from '@/lib/supabase';
 import { Calendar, RotateCw, ArrowLeft, BookOpen } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { parseISO } from 'date-fns';
+import { differenceInCalendarDays, parseISO } from 'date-fns';
 import { useRouter } from 'next/navigation';
 import { toast } from '@/utils/haptics';
 import type { SubscriptionMetadata } from '@/types/transaction';
@@ -269,10 +269,23 @@ export function SubscriptionsView() {
                 return bucketState === 'with' ? has : !has;
             });
         }
+        // Bump trial-ending-within-7-days to the top regardless of user sort so the
+        // user can act before the charge lands. Pinned still wins overall.
+        const now = new Date();
+        const isTrialEndingSoon = (t: Tpl): boolean => {
+            const ends = getMeta(t).trial_ends_at;
+            if (!ends) return false;
+            const dt = parseISO(ends);
+            if (dt <= now) return false;
+            return differenceInCalendarDays(dt, now) <= 7;
+        };
         return active.sort((a, b) => {
             const aPin = getMeta(a).pinned ? 1 : 0;
             const bPin = getMeta(b).pinned ? 1 : 0;
             if (aPin !== bPin) return bPin - aPin;
+            const aTrial = isTrialEndingSoon(a) ? 1 : 0;
+            const bTrial = isTrialEndingSoon(b) ? 1 : 0;
+            if (aTrial !== bTrial) return bTrial - aTrial;
             switch (sortBy) {
                 case 'amount': return Number(b.amount) - Number(a.amount);
                 case 'name': return a.description.localeCompare(b.description);

@@ -39,12 +39,12 @@ export function HowToUseDialog({ isOpen, onClose }: HowToUseDialogProps) {
             icon: <Plus className="w-6 h-6 text-emerald-400" />,
             accent: 'from-emerald-500/30 to-teal-500/10',
             title: "Smart Expense Capture",
-            desc: "Tap (+) to log a spend in seconds. Take Photo to scan a receipt with the camera, or pick one from files — Novira auto-fills amount, merchant, date, and category. Type expressions like 12.5+3.20 right in the amount field and they're calculated for you. Description pills suggest past expenses for one-tap fill.",
+            desc: "Tap (+) to log a spend in seconds. Take Photo to scan a receipt with the camera, or pick one from files — Novira auto-fills amount, merchant, date, and category. Speak your description hands-free with the mic, or type expressions like 12.5+3.20 right in the amount field. Description pills suggest past expenses for one-tap fill.",
             subPoints: [
                 "AI receipt scan — amount, merchant, date, category in <2s",
+                "Voice-to-description with live transcript preview",
                 "Inline calculator in amount and split fields",
-                "Description autocomplete pills with full prefill",
-                "Real-time FX across 20 supported currencies"
+                "Description autocomplete pills with full prefill"
             ]
         },
         {
@@ -66,10 +66,10 @@ export function HowToUseDialog({ isOpen, onClose }: HowToUseDialogProps) {
             icon: <Wallet className="w-6 h-6 text-primary" />,
             accent: 'from-primary/30 to-violet-500/10',
             title: "Living Dashboard",
-            desc: "Your home screen reads your money at a glance. The big Spent card shows month-to-date with a vs-last-month delta and today's spend pill. Month Forecasting uses a weighted recent run-rate (60% last-7-day pace + 40% month-to-date) and the Cashflow Forecast chart plots your trajectory.",
+            desc: "Your home screen reads your money at a glance. The big Spent card shows month-to-date with a vs-last-month delta and today's spend pill. Month Forecasting uses a weighted recent run-rate (60% last-7-day pace + 40% month-to-date), and analytics now shows the same projection vs your budget with a colored chip — green on pace, amber near the line, red over.",
             subPoints: [
+                "Burn-rate projection chip with %-of-budget vs over-budget colors",
                 "vs-last-month delta and Today's spend pill",
-                "Weighted-pace forecast + Cashflow chart",
                 "Paginated history — 100 rows at a time, smooth on 10k+",
                 "Coming-Up-This-Week strip for upcoming charges"
             ]
@@ -129,12 +129,12 @@ export function HowToUseDialog({ isOpen, onClose }: HowToUseDialogProps) {
             icon: <Users className="w-6 h-6 text-blue-400" />,
             accent: 'from-blue-500/30 to-indigo-500/10',
             title: "Splits & Friends",
-            desc: "Money shouldn't be awkward. Add friends by scanning a QR code or by email. Create Groups for trips, rent, or dinners. Split evenly or by custom amounts (each split field accepts expressions too). Smart Settle clears multiple debts in one tap with the fewest transfers possible.",
+            desc: "Money shouldn't be awkward. Add friends by scanning a QR code or by email. Create Groups for trips, rent, or dinners. Split evenly or by custom amounts (each split field accepts expressions too). Smart Settle clears multiple debts in one tap with the fewest transfers possible. When a friend adds a split with you, your balances update in real time.",
             subPoints: [
+                "Real-time balance updates when friends add splits with you",
+                "One-tap Quick Split 50/50 with your most-frequent partner",
                 "Even or custom-amount splits with calculator support",
-                "Scan-to-add friend QR codes",
-                "Smart Settle — minimum-transfer settlement",
-                "Per-group running balances in any currency"
+                "Smart Settle — minimum-transfer settlement"
             ]
         },
         {

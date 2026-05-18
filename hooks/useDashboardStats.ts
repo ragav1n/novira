@@ -4,6 +4,7 @@ import type { Transaction } from '@/types/transaction';
 import { CATEGORY_COLORS } from '@/lib/categories';
 import type { Currency } from '@/components/providers/user-preferences-provider';
 import type { Bucket } from '@/components/providers/buckets-provider';
+import { computeWeightedRunRate } from '@/lib/utils/run-rate';
 
 type SpendingCategory = {
     name: string;
@@ -305,7 +306,7 @@ export function useDashboardStats({
     }, [transactions, isBucketFocused, displayTransactions, userId]);
 
     // Run Rate Calculation — weighted toward recent 7 days to reflect current spending trend.
-    // recentSpent is computed in the single aggregate pass above.
+    // Math lives in `lib/utils/run-rate.ts` so dashboard and analytics views can't drift apart.
     const runRateData = useMemo(() => {
         if (isBucketFocused) return null;
 
@@ -315,21 +316,22 @@ export function useDashboardStats({
         const daysInMonth = differenceInDays(lastDay, firstDay) + 1;
         const currentDayOfMonth = today.getDate();
 
-        const recentDays = Math.min(7, currentDayOfMonth);
-        const recentDailyRate = recentDays > 0 ? aggregates.recentSpent / recentDays : 0;
-        const mtdDailyRate = currentDayOfMonth > 0 ? totalSpent / currentDayOfMonth : 0;
-        const dailyAverage = 0.6 * recentDailyRate + 0.4 * mtdDailyRate;
-        const remainingDays = Math.max(0, daysInMonth - currentDayOfMonth);
-        const projectedSpend = totalSpent + remainingDays * dailyAverage;
+        const rr = computeWeightedRunRate({
+            totalSpent,
+            recentSpent: aggregates.recentSpent,
+            daysIntoMonth: currentDayOfMonth,
+            daysInMonth,
+            budget: displayBudget,
+        });
 
         return {
-            dailyAverage,
-            last7DayRate: recentDailyRate,
-            mtdRate: mtdDailyRate,
-            projectedSpend,
-            isExceeding: displayBudget > 0 && projectedSpend > displayBudget,
+            dailyAverage: rr.dailyAverage,
+            last7DayRate: rr.last7DayRate,
+            mtdRate: rr.mtdRate,
+            projectedSpend: rr.projectedSpend,
+            isExceeding: rr.isExceeding,
             daysInMonth,
-            currentDayOfMonth
+            currentDayOfMonth,
         };
     }, [isBucketFocused, totalSpent, displayBudget, aggregates.recentSpent]);
 

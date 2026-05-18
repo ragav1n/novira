@@ -1,25 +1,25 @@
 export const LATEST_FEATURE_ANNOUNCEMENT = {
-    id: 'pwa-gestures-push-v10',
+    id: 'realtime-voice-receipts-v11',
     title: "What's New ✦",
     features: [
         {
-            title: 'Install Anywhere',
-            description: 'One-tap install on iPhone, Android, Mac, and Windows. Novira gets its own icon, opens in a clean window, and unlocks offline + push.',
+            title: 'Splits in Real Time',
+            description: 'When a friend adds a transaction that splits with you, your "You owe / owed" tiles update instantly — no refresh, no waiting.',
+            icon: 'users'
+        },
+        {
+            title: 'Voice Expense Entry',
+            description: 'Tap the mic next to the description field and dictate. A live preview shows the words as you speak; finalised text drops into the form when you stop.',
             icon: 'mobile'
         },
         {
-            title: 'Swipe to Edit or Delete',
-            description: 'Swipe-left on any transaction row to reveal Edit and Delete with a satisfying spring. Pull-to-refresh on the dashboard.',
-            icon: 'gestures'
+            title: 'Receipts Gallery',
+            description: 'Every scanned receipt now lives in one place. Settings → Data Management → Browse Receipts. Tap any thumbnail to view full-screen.',
+            icon: 'receipt'
         },
         {
-            title: 'Bills, Pace & Digests',
-            description: 'Opt into push notifications for bill reminders, 80% pace warnings, and daily or weekly recaps — with quiet hours that respect your local time.',
-            icon: 'bell'
-        },
-        {
-            title: 'Custom Date Ranges',
-            description: 'Analytics now ships This-Week / Last-7 / YTD shortcuts plus full custom-range selection. The What-If simulator links every cut back to your goals.',
+            title: 'Smarter Analytics',
+            description: 'Burn-rate projection shows where your month is heading vs your budget. Tap any tag on a row to filter the search. Pull-to-refresh now works on /search too.',
             icon: 'chart'
         },
     ],
@@ -39,7 +39,7 @@ export const WELCOME_FEATURES = [
     },
     {
         title: 'Smart Bill Splitting',
-        description: 'Even, custom, or share-weighted splits. Smart Settle clears all debts in the fewest transfers.',
+        description: 'Even, custom, or share-weighted splits. Smart Settle clears all debts in the fewest transfers. Live updates when a friend adds you to a split.',
         icon: 'users'
     },
     {

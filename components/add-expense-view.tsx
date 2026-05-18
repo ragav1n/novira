@@ -60,6 +60,9 @@ import { toast } from '@/utils/haptics';
 import { CATEGORY_COLORS, getIconForCategory, CATEGORIES as SYSTEM_CATEGORIES } from '@/lib/categories';
 import { evaluateExpression } from '@/lib/expression-eval';
 import { ExpressionKeypad } from '@/components/ui/expression-keypad';
+import { isSpeechSupported, startDictation, type DictationHandle } from '@/lib/speech-to-text';
+import { Mic, MicOff, Users } from 'lucide-react';
+import { useRecentSplitPartner } from '@/hooks/useRecentSplitPartner';
 
 const dropdownCategories = SYSTEM_CATEGORIES.map(cat => ({
     id: cat.id,
@@ -89,6 +92,7 @@ export function AddExpenseView() {
     const activeGroup = groups.find(g => g.id === activeWorkspaceId);
     const isSharedWorkspace = activeGroup?.type === 'couple' || activeGroup?.type === 'home';
     const defaultSplitEnabled = activeWorkspaceId ? !isSharedWorkspace : false;
+    const recentSplitPartner = useRecentSplitPartner(userId);
 
     const formState = useExpenseForm(userId, currency, activeWorkspaceId, defaultSplitEnabled, {
         category: defaultCategory,
@@ -124,6 +128,24 @@ export function AddExpenseView() {
     const scanAbortRef = useRef<AbortController | null>(null);
     const [scanning, setScanning] = React.useState(false);
     const [errors, setErrors] = React.useState<ExpenseFormErrors>({});
+    const [isDictating, setIsDictating] = React.useState(false);
+    const [interimTranscript, setInterimTranscript] = React.useState('');
+    const dictationHandleRef = useRef<DictationHandle | null>(null);
+    // Mirrors the latest description so the dictation onResult callback reads the
+    // *current* form value at commit time — otherwise a word typed between phrases
+    // is silently overwritten by the next final transcript.
+    const descriptionRef = useRef<string>(formState.description);
+    descriptionRef.current = formState.description;
+    const speechSupported = React.useMemo(() => isSpeechSupported(), []);
+    // Guards state-setters in dictation callbacks against firing after unmount —
+    // recognition.stop() during cleanup runs onEnd asynchronously.
+    const mountedRef = useRef(true);
+    useEffect(() => {
+        return () => {
+            mountedRef.current = false;
+            dictationHandleRef.current?.stop();
+        };
+    }, []);
 
     const stashAsReceipt = React.useCallback((file: File | Blob) => {
         const v = validateReceiptFile(file);
@@ -551,23 +573,141 @@ export function AddExpenseView() {
 
                 {/* Description */}
                 <div className="space-y-2">
-                    <FloatingLabelInput
-                        id="description"
-                        label="Description *"
-                        value={formState.description}
-                        required
-                        aria-required="true"
-                        aria-invalid={!!errors.description}
-                        aria-describedby={errors.description ? 'expense-description-error' : undefined}
-                        onChange={(e) => {
-                            formState.setDescription(e.target.value);
-                            if (errors.description) setErrors(prev => ({ ...prev, description: undefined }));
-                        }}
-                        className={cn(
-                            "bg-secondary/10 h-14",
-                            errors.description ? "border-destructive" : "border-white/10"
+                    <div className="flex items-stretch gap-2">
+                        <div className="flex-1">
+                            <FloatingLabelInput
+                                id="description"
+                                label="Description *"
+                                value={formState.description}
+                                required
+                                aria-required="true"
+                                aria-invalid={!!errors.description}
+                                aria-describedby={errors.description ? 'expense-description-error' : undefined}
+                                onChange={(e) => {
+                                    formState.setDescription(e.target.value);
+                                    if (errors.description) setErrors(prev => ({ ...prev, description: undefined }));
+                                }}
+                                className={cn(
+                                    "bg-secondary/10 h-14 transition-colors",
+                                    errors.description
+                                        ? "border-destructive"
+                                        : isDictating
+                                        ? "border-rose-500/40"
+                                        : "border-white/10"
+                                )}
+                            />
+                        </div>
+                        {speechSupported && (
+                            <button
+                                type="button"
+                                onClick={async () => {
+                                    if (isNative) Haptics.impact({ style: ImpactStyle.Light }).catch(() => { });
+                                    if (isDictating) {
+                                        dictationHandleRef.current?.stop();
+                                        return;
+                                    }
+                                    setInterimTranscript('');
+                                    const handle = await startDictation({
+                                        onResult: (transcript, isFinal) => {
+                                            if (!mountedRef.current) return;
+                                            if (isFinal) {
+                                                // Always re-read the current description so manual edits
+                                                // between phrases survive the next final result.
+                                                const base = descriptionRef.current;
+                                                const joiner = base && !base.endsWith(' ') ? ' ' : '';
+                                                const next = `${base}${joiner}${transcript}`;
+                                                formState.setDescription(next);
+                                                descriptionRef.current = next;
+                                                setInterimTranscript('');
+                                            } else {
+                                                setInterimTranscript(transcript);
+                                            }
+                                        },
+                                        onError: (err) => {
+                                            if (err === 'aborted' || err === 'no-speech') return;
+                                            if (err === 'not-allowed') {
+                                                toast.error('Microphone access denied — enable it for this site in browser settings.');
+                                            } else if (err === 'no-microphone') {
+                                                toast.error('No microphone detected.');
+                                            } else {
+                                                console.error('Dictation error:', err);
+                                                toast.error('Voice input unavailable');
+                                            }
+                                        },
+                                        onEnd: () => {
+                                            dictationHandleRef.current = null;
+                                            if (!mountedRef.current) return;
+                                            setIsDictating(false);
+                                            setInterimTranscript('');
+                                        },
+                                    });
+                                    if (handle) {
+                                        dictationHandleRef.current = handle;
+                                        if (mountedRef.current) setIsDictating(true);
+                                    }
+                                }}
+                                aria-label={isDictating ? 'Stop voice input' : 'Voice input'}
+                                aria-pressed={isDictating}
+                                className={cn(
+                                    "shrink-0 w-14 h-14 rounded-2xl border flex items-center justify-center transition-colors",
+                                    isDictating
+                                        ? "bg-rose-500/15 border-rose-500/40 text-rose-300"
+                                        : "bg-secondary/10 border-white/10 text-muted-foreground hover:text-foreground"
+                                )}
+                            >
+                                {isDictating ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+                            </button>
                         )}
-                    />
+                    </div>
+                    <AnimatePresence>
+                        {isDictating && (
+                            <motion.div
+                                initial={{ opacity: 0, y: -6, height: 0 }}
+                                animate={{ opacity: 1, y: 0, height: 'auto' }}
+                                exit={{ opacity: 0, y: -6, height: 0 }}
+                                transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+                                className="overflow-hidden"
+                            >
+                                <div className="flex items-center gap-2.5 px-3 py-2 rounded-2xl border border-rose-500/25 bg-rose-500/[0.06] backdrop-blur-sm">
+                                    {/* Soundwave indicator — 4 bars scaling vertically out of phase */}
+                                    <div className="flex items-center gap-[2px] shrink-0 h-4" aria-hidden="true">
+                                        {[0, 0.12, 0.24, 0.36].map((delay, i) => (
+                                            <motion.span
+                                                key={i}
+                                                className="w-[2px] bg-rose-400 rounded-full origin-center"
+                                                style={{ height: 12 }}
+                                                animate={{ scaleY: [0.3, 1, 0.3] }}
+                                                transition={{ duration: 0.9, repeat: Infinity, ease: 'easeInOut', delay }}
+                                            />
+                                        ))}
+                                    </div>
+                                    <p
+                                        className={cn(
+                                            "flex-1 min-w-0 text-[12.5px] leading-snug line-clamp-2",
+                                            interimTranscript ? "text-rose-100/85 italic" : "text-rose-300/60"
+                                        )}
+                                    >
+                                        {interimTranscript || 'Listening — speak now'}
+                                        {interimTranscript && (
+                                            <motion.span
+                                                className="inline-block ml-0.5 w-[1.5px] h-[10px] bg-rose-300/80 align-middle"
+                                                animate={{ opacity: [1, 0.2, 1] }}
+                                                transition={{ duration: 0.8, repeat: Infinity, ease: 'linear' }}
+                                            />
+                                        )}
+                                    </p>
+                                    <button
+                                        type="button"
+                                        onClick={() => dictationHandleRef.current?.stop()}
+                                        className="shrink-0 text-[10px] font-bold uppercase tracking-wider text-rose-300 hover:text-rose-200 px-2 py-0.5 rounded-md border border-rose-500/30 hover:border-rose-500/50 transition-colors"
+                                        aria-label="Stop voice input"
+                                    >
+                                        Stop
+                                    </button>
+                                </div>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
                     {errors.description && (
                         <p id="expense-description-error" className="text-xs text-destructive font-medium">{errors.description}</p>
                     )}
@@ -1024,6 +1164,38 @@ export function AddExpenseView() {
                         />
                     </div>
                 </div>
+
+                {/* Quick split with most recent partner — only when not already splitting and a partner is known */}
+                {!activeWorkspaceId && !formState.isSplitEnabled && recentSplitPartner && (() => {
+                    const partner = friends.find(f => f.id === recentSplitPartner.userId);
+                    if (!partner) return null;
+                    const firstName = (partner.full_name || 'them').split(' ')[0];
+                    return (
+                        <button
+                            type="button"
+                            onClick={() => {
+                                if (isNative) Haptics.impact({ style: ImpactStyle.Light }).catch(() => { });
+                                formState.setIsSplitEnabled(true);
+                                formState.setSplitMode('even');
+                                formState.setSelectedGroupId(null);
+                                formState.setSelectedFriendIds([partner.id]);
+                            }}
+                            className="w-full flex items-center justify-between gap-3 px-4 py-3 rounded-2xl bg-primary/10 border border-primary/25 hover:bg-primary/15 transition-colors text-left"
+                            aria-label={`Quick split 50/50 with ${partner.full_name}`}
+                        >
+                            <div className="flex items-center gap-3 min-w-0">
+                                <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
+                                    <Users className="w-4 h-4 text-primary" aria-hidden="true" />
+                                </div>
+                                <div className="min-w-0">
+                                    <p className="text-sm font-bold text-primary">Quick split 50/50 with {firstName}</p>
+                                    <p className="text-[11px] text-primary/70">Tap to split this evenly</p>
+                                </div>
+                            </div>
+                            <Sparkles className="w-4 h-4 text-primary/70 shrink-0" aria-hidden="true" />
+                        </button>
+                    );
+                })()}
 
                 {/* Split Expense Section */}
                 <SplitExpenseSection

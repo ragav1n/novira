@@ -61,7 +61,7 @@ export function AnalyticsView() {
     const [customStart, setCustomStart] = useState<string>('');
     const [customEnd, setCustomEnd] = useState<string>('');
     const [activeTags, setActiveTags] = useState<string[]>([]);
-    const { formatCurrency, currency, convertAmount, userId, activeWorkspaceId, ratesLastUpdated, firstDayOfWeek } = useUserPreferences();
+    const { formatCurrency, currency, convertAmount, userId, activeWorkspaceId, ratesLastUpdated, firstDayOfWeek, monthlyBudget, convertedWorkspaceBudgets } = useUserPreferences();
     const { activeAccountId } = useAccounts();
     const { activeWorkspace, theme: themeConfig } = useWorkspaceTheme('cyan');
 
@@ -273,6 +273,7 @@ export function AnalyticsView() {
         dailyTotals,
         locationClusters,
         geoTxCount,
+        recentSpent7d,
     } = useAnalyticsData({
         transactions,
         priorTransactions,
@@ -559,6 +560,14 @@ export function AnalyticsView() {
                     categoryTrendData={categoryTrendData}
                     activeCategories={activeCategories}
                     totalSpentInRange={totalSpentInRange}
+                    recentSpent7d={recentSpent7d}
+                    monthlyBudget={
+                        selectedBucketId === 'all' && activeTags.length === 0
+                            ? (activeWorkspaceId
+                                ? (convertedWorkspaceBudgets[activeWorkspaceId] || 0)
+                                : monthlyBudget)
+                            : 0
+                    }
                     avgPerDay={avgPerDay}
                     txCount={txCount}
                     busiestLabel={busiestLabel}

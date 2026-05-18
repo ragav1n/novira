@@ -7,7 +7,10 @@ function Card({ className, ...props }: React.ComponentProps<'div'>) {
     <div
       data-slot="card"
       className={cn(
-        'bg-card text-card-foreground flex flex-col gap-6 rounded-xl border py-6 shadow-sm',
+        // transition-[background-color,color,border-color] keeps card chrome
+        // in sync with the workspace theme switch without affecting layout
+        // transitions or component-specific hover animations.
+        'bg-card text-card-foreground flex flex-col gap-6 rounded-xl border py-6 shadow-sm transition-[background-color,color,border-color] duration-300 ease-out',
         className,
       )}
       {...props}

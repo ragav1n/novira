@@ -2,7 +2,7 @@
 
 import { useUserPreferences, type Currency } from '@/components/providers/user-preferences-provider';
 import { BudgetAlertManager } from '@/components/budget-alert-manager';
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Tag, Plane, Home, Gift, Car, Utensils, ShoppingCart, Heart, Gamepad2, School, Laptop, Music, Users, Plus } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -22,6 +22,7 @@ import { AccountFilterChips } from './dashboard/account-filter-chips';
 import { AddFriendDialog } from './groups/add-friend-dialog';
 import { ReceiptViewerDialog } from './receipt-viewer-dialog';
 import { useReceiptViewer } from '@/hooks/useReceiptViewer';
+import { OnboardingModal } from './onboarding-modal';
 
 
 
@@ -39,6 +40,30 @@ import { useDashboardState } from '@/hooks/useDashboardState';
 import { useDashboardStats } from '@/hooks/useDashboardStats';
 import { useUpcomingRecurring } from '@/hooks/useUpcomingRecurring';
 import { useDashboardLayout } from '@/hooks/useDashboardLayout';
+
+// Accepts #RGB, #RRGGBB, or #RRGGBBAA and returns helpers for emitting a solid
+// `rgb(...)` or an arbitrary-alpha `rgb(... / a)`. Returns null for malformed
+// input so callers can fall back to a default.
+function parseHex(hex: string): { solid: string; alpha: (a: number) => string } | null {
+    const m = hex.trim().replace(/^#/, '');
+    let r: number, g: number, b: number;
+    if (m.length === 3) {
+        r = parseInt(m[0] + m[0], 16);
+        g = parseInt(m[1] + m[1], 16);
+        b = parseInt(m[2] + m[2], 16);
+    } else if (m.length === 6 || m.length === 8) {
+        r = parseInt(m.slice(0, 2), 16);
+        g = parseInt(m.slice(2, 4), 16);
+        b = parseInt(m.slice(4, 6), 16);
+    } else {
+        return null;
+    }
+    if ([r, g, b].some(v => Number.isNaN(v))) return null;
+    return {
+        solid: `rgb(${r} ${g} ${b})`,
+        alpha: (a: number) => `rgb(${r} ${g} ${b} / ${a})`,
+    };
+}
 
 
 
@@ -90,6 +115,40 @@ export function DashboardView() {
     const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
     const receiptViewer = useReceiptViewer();
 
+    // First-run onboarding modal. Tracked in localStorage scoped by userId so it
+    // doesn't depend on the user_preferences row being writable from the client.
+    // We only consider showing the modal after `loading` has gone true → false at
+    // least once *and* a short settle period has elapsed — otherwise a momentary
+    // empty-but-loaded state during a slow first fetch can flash the modal at
+    // returning users (and stamp the onboarded flag for them).
+    const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
+    const hasLoadedOnceRef = useRef(false);
+    useEffect(() => {
+        if (!loading) hasLoadedOnceRef.current = true;
+    }, [loading]);
+    useEffect(() => {
+        if (!userId || loading || activeWorkspaceId) return;
+        if (!hasLoadedOnceRef.current) return;
+        if (transactions.length > 0) return;
+        // Settle delay — gives realtime / pagination one more tick to populate
+        // before we conclude the account is genuinely empty.
+        const t = setTimeout(() => {
+            if (transactions.length > 0) return;
+            try {
+                const key = `novira:onboarded:${userId}`;
+                if (!localStorage.getItem(key)) setIsOnboardingOpen(true);
+            } catch (err) {
+                console.error('Failed to read onboarding flag:', err);
+            }
+        }, 600);
+        return () => clearTimeout(t);
+    }, [userId, loading, transactions.length, activeWorkspaceId]);
+    const closeOnboarding = useCallback(() => {
+        setIsOnboardingOpen(false);
+        if (!userId) return;
+        try { localStorage.setItem(`novira:onboarded:${userId}`, '1'); } catch (err) { console.error(err); }
+    }, [userId]);
+
     // Reset category filter when the user switches focus or workspace —
     // a stale "Groceries" filter shouldn't carry across buckets/workspaces.
     useEffect(() => {
@@ -106,6 +165,77 @@ export function DashboardView() {
 
     const isBucketFocused = dashboardFocus !== 'allowance' && dashboardFocus !== '';
     const bucketCurrencyTemp = isBucketFocused ? buckets.find(b => b.id === dashboardFocus)?.currency || currency : currency;
+
+    // Drive the bucket-focus gradient swap. Toggling `body.focus-bucket` causes
+    // the @property-registered gradient stops on the hero card AND the page
+    // background glows to interpolate smoothly. When the focused bucket has
+    // its own `color` field set, we use *that* color for the gradient stops
+    // (not a fixed cyan) so each bucket carries its own visual identity.
+    const focusedBucketColor = isBucketFocused
+        ? (buckets.find(b => b.id === dashboardFocus)?.color ?? null)
+        : null;
+    useEffect(() => {
+        if (typeof document === 'undefined') return;
+        const body = document.body;
+        if (isBucketFocused) {
+            body.classList.add('focus-bucket');
+            if (focusedBucketColor) {
+                // Buckets *usually* store a 6-char hex (e.g. "#10B981"), but legacy
+                // rows or hand-edited config can produce #RGB or #RRGGBBAA. Normalize
+                // to `rgb(r g b / a)` via parseHex so the derived shades always
+                // render as a valid color regardless of input shape.
+                const base = parseHex(focusedBucketColor);
+                if (base) {
+                    body.style.setProperty('--workspace-accent', base.solid);
+                    body.style.setProperty('--focus-card-from', base.solid);
+                    body.style.setProperty('--focus-card-to', base.alpha(0.6));
+                    body.style.setProperty('--focus-card-glow', base.alpha(0.25));
+                } else {
+                    body.style.removeProperty('--workspace-accent');
+                    body.style.removeProperty('--focus-card-from');
+                    body.style.removeProperty('--focus-card-to');
+                    body.style.removeProperty('--focus-card-glow');
+                }
+            } else {
+                body.style.removeProperty('--workspace-accent');
+                body.style.removeProperty('--focus-card-from');
+                body.style.removeProperty('--focus-card-to');
+                body.style.removeProperty('--focus-card-glow');
+            }
+        } else {
+            body.classList.remove('focus-bucket');
+            body.style.removeProperty('--workspace-accent');
+            body.style.removeProperty('--focus-card-from');
+            body.style.removeProperty('--focus-card-to');
+            body.style.removeProperty('--focus-card-glow');
+        }
+        return () => {
+            body.classList.remove('focus-bucket');
+            body.style.removeProperty('--workspace-accent');
+            body.style.removeProperty('--focus-card-from');
+            body.style.removeProperty('--focus-card-to');
+            body.style.removeProperty('--focus-card-glow');
+        };
+    }, [isBucketFocused, focusedBucketColor]);
+
+    // Brute-force chrome tween. Fire whenever bucket focus toggles so any
+    // surrounding color/border/text changes on the page also fade through
+    // the same 360ms window as the gradient.
+    const prevBucketFocusedRef = useRef<boolean | undefined>(undefined);
+    useEffect(() => {
+        if (typeof document === 'undefined') return;
+        if (prevBucketFocusedRef.current === undefined) {
+            prevBucketFocusedRef.current = isBucketFocused;
+            return;
+        }
+        if (prevBucketFocusedRef.current === isBucketFocused) return;
+        prevBucketFocusedRef.current = isBucketFocused;
+        document.body.classList.add('theme-transitioning');
+        const t = setTimeout(() => {
+            document.body.classList.remove('theme-transitioning');
+        }, 400);
+        return () => clearTimeout(t);
+    }, [isBucketFocused]);
     const bucketCurrency = bucketCurrencyTemp.toUpperCase() as Currency;
 
     const currentWorkspaceBudget = activeWorkspaceId ? (convertedWorkspaceBudgets[activeWorkspaceId] || 0) : monthlyBudget;
@@ -348,6 +478,8 @@ export function DashboardView() {
                     onOpenChange={receiptViewer.setOpen}
                     receiptPath={receiptViewer.path}
                 />
+
+                <OnboardingModal open={isOnboardingOpen} onComplete={closeOnboarding} />
 
                 <DashboardDialogs
                     userId={userId}

@@ -49,7 +49,7 @@ export const TransactionHistoryDialog = React.memo(function TransactionHistoryDi
                 </DialogHeader>
 
                 <div className="p-0">
-                    <ScrollArea className="h-[400px] w-full">
+                    <ScrollArea className="h-[380px] w-full">
                         <div className="p-6 space-y-6">
                             {isLoading ? (
                                 <div className="flex flex-col items-center justify-center py-20 gap-4">
@@ -114,6 +114,15 @@ export const TransactionHistoryDialog = React.memo(function TransactionHistoryDi
                             )}
                         </div>
                     </ScrollArea>
+                    {!isLoading && auditLogs.length > 0 && (() => {
+                        const oldest = auditLogs.reduce((a, b) => (a.created_at < b.created_at ? a : b));
+                        return (
+                            <div className="px-6 py-3 border-t border-white/5 bg-secondary/5 text-[10px] text-muted-foreground/70 font-medium uppercase tracking-widest flex items-center justify-between">
+                                <span>{auditLogs.length} entr{auditLogs.length === 1 ? 'y' : 'ies'} · retained indefinitely</span>
+                                <span className="tabular-nums normal-case tracking-normal">Oldest: {format(new Date(oldest.created_at), 'd MMM yyyy')}</span>
+                            </div>
+                        );
+                    })()}
                 </div>
             </DialogContent>
         </Dialog>

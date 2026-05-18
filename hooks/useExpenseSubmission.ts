@@ -382,6 +382,42 @@ export function useExpenseSubmission() {
                 }
                 sessionStorage.setItem('novira_expense_added', 'true');
                 window.dispatchEvent(new Event('novira:expense-added'));
+
+                // Notify each split participant in real time. Postgres-changes on
+                // `splits` isn't reliable for the receiving user (publication / RLS
+                // quirks), so a broadcast guarantees their "You owe / owed" tiles
+                // update without a refresh. Skip on offline submits — the row hasn't
+                // been written yet, and the broadcast wouldn't reach anyone anyway.
+                if (!result.offline && splitResult.records && splitResult.records.length > 0) {
+                    for (const split of splitResult.records) {
+                        if (!split.user_id || split.user_id === userId) continue;
+                        const ch = supabase.channel(`split-notify-${split.user_id}`);
+                        // Track terminal-state cleanup. SUBSCRIBED fires the broadcast and
+                        // disposes after `.send` settles; CHANNEL_ERROR / TIMED_OUT / CLOSED
+                        // dispose immediately. A 5s safety timer guarantees the channel is
+                        // freed even if no status callback fires (rare socket quirks).
+                        let disposed = false;
+                        const dispose = () => {
+                            if (disposed) return;
+                            disposed = true;
+                            clearTimeout(safety);
+                            supabase.removeChannel(ch);
+                        };
+                        const safety = setTimeout(dispose, 5000);
+                        ch.subscribe((status) => {
+                            if (status === 'SUBSCRIBED') {
+                                ch.send({
+                                    type: 'broadcast',
+                                    event: 'split-added',
+                                    payload: { fromUserId: userId },
+                                }).finally(dispose);
+                            } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+                                dispose();
+                            }
+                        });
+                    }
+                }
+
                 router.push('/');
             }
 

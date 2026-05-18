@@ -63,6 +63,24 @@ export async function getReceiptSignedUrl(path: string): Promise<string> {
     return data.signedUrl;
 }
 
+/**
+ * Batch variant — one round-trip per call vs N for the singular form. Returns
+ * a Map keyed by path. Missing/failed paths are silently omitted; callers
+ * should treat absence as "couldn't sign" and fall back accordingly.
+ */
+export async function getReceiptSignedUrls(paths: string[]): Promise<Map<string, string>> {
+    const out = new Map<string, string>();
+    if (paths.length === 0) return out;
+    const { data, error } = await supabase.storage
+        .from(BUCKET)
+        .createSignedUrls(paths, SIGNED_URL_TTL);
+    if (error) throw error;
+    for (const row of data || []) {
+        if (row.path && row.signedUrl) out.set(row.path, row.signedUrl);
+    }
+    return out;
+}
+
 /** Best-effort delete; callers may want to ignore failures (e.g. on tx delete). */
 export async function deleteReceipt(path: string): Promise<void> {
     const { error } = await supabase.storage.from(BUCKET).remove([path]);

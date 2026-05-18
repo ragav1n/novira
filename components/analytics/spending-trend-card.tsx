@@ -9,6 +9,7 @@ import { CATEGORY_COLORS, getCategoryLabel } from '@/lib/categories';
 import { supabase } from '@/lib/supabase';
 import { AnalyticsTooltip } from '@/components/analytics/analytics-tooltip';
 import type { DateRange } from '@/hooks/useAnalyticsData';
+import { computeWeightedRunRate } from '@/lib/utils/run-rate';
 
 type RecurringLite = {
     id: string;
@@ -33,6 +34,8 @@ interface Props {
     categoryTrendData: CategoryTrendBucket[];
     activeCategories: string[];
     totalSpentInRange: number;
+    recentSpent7d: number;
+    monthlyBudget: number;
     avgPerDay: number;
     txCount: number;
     busiestLabel: string | null;
@@ -49,6 +52,8 @@ function SpendingTrendCardInner({
     categoryTrendData,
     activeCategories,
     totalSpentInRange,
+    recentSpent7d,
+    monthlyBudget,
     avgPerDay,
     txCount,
     busiestLabel,
@@ -84,9 +89,21 @@ function SpendingTrendCardInner({
         const day = today.getDate();
         if (day < 3) return null;
         const daysInMonth = endOfMonth(today).getDate();
-        const projected = (totalSpentInRange / day) * daysInMonth;
-        return { projected };
-    }, [dateRange, totalSpentInRange]);
+        const rr = computeWeightedRunRate({
+            totalSpent: totalSpentInRange,
+            recentSpent: recentSpent7d,
+            daysIntoMonth: day,
+            daysInMonth,
+            budget: monthlyBudget,
+        });
+        return {
+            projected: rr.projectedSpend,
+            isExceeding: rr.isExceeding,
+            percentOfBudget: rr.percentOfBudget,
+            overshoot: rr.overshoot,
+            hasBudget: monthlyBudget > 0,
+        };
+    }, [dateRange, totalSpentInRange, recentSpent7d, monthlyBudget]);
 
     const forecastChartData = useMemo(() => {
         if (dateRange !== '1M') return categoryTrendData;
@@ -96,7 +113,13 @@ function SpendingTrendCardInner({
         const dim = monthEnd.getDate();
         if (dom < 3 || dom >= dim) return categoryTrendData;
 
-        const runRate = totalSpentInRange / dom;
+        const runRate = computeWeightedRunRate({
+            totalSpent: totalSpentInRange,
+            recentSpent: recentSpent7d,
+            daysIntoMonth: dom,
+            daysInMonth: dim,
+            budget: 0,
+        }).dailyAverage;
 
         // Recurring spikes only apply to whole-portfolio forecasting; for a bucket-scoped
         // view we'd need to filter recurring_templates by metadata.bucket_id, which the
@@ -128,7 +151,7 @@ function SpendingTrendCardInner({
             const spike = recurringMap.get(b.month) || 0;
             return { ...b, forecast_total: runRate + spike };
         });
-    }, [categoryTrendData, recurringForecast, dateRange, selectedBucketId, totalSpentInRange, convertAmount]);
+    }, [categoryTrendData, recurringForecast, dateRange, selectedBucketId, totalSpentInRange, recentSpent7d, convertAmount]);
 
     const hasForecast = useMemo(
         () => dateRange === '1M' && forecastChartData.some(b => typeof (b as { forecast_total?: number }).forecast_total === 'number'),
@@ -156,10 +179,25 @@ function SpendingTrendCardInner({
                     <div className="flex items-center gap-1.5">
                         {pacingChip && (
                             <span
-                                className="text-[10px] px-2 py-0.5 rounded-md font-bold border bg-emerald-500/15 border-emerald-500/30 text-emerald-300"
-                                title="Estimated end-of-month total at current pace"
+                                className={cn(
+                                    "text-[10px] px-2 py-0.5 rounded-md font-bold border tabular-nums",
+                                    pacingChip.isExceeding
+                                        ? "bg-rose-500/15 border-rose-500/30 text-rose-300"
+                                        : pacingChip.hasBudget && pacingChip.percentOfBudget !== null && pacingChip.percentOfBudget > 85
+                                        ? "bg-amber-500/15 border-amber-500/30 text-amber-300"
+                                        : "bg-emerald-500/15 border-emerald-500/30 text-emerald-300"
+                                )}
+                                title={
+                                    pacingChip.hasBudget
+                                        ? `Projected month-end total at current pace${pacingChip.isExceeding ? ' — over budget' : ''}`
+                                        : 'Estimated end-of-month total at current pace'
+                                }
                             >
-                                On pace · {formatCurrency(pacingChip.projected)}
+                                {pacingChip.isExceeding
+                                    ? `${formatCurrency(pacingChip.projected)} · +${formatCurrency(pacingChip.overshoot)} over`
+                                    : pacingChip.hasBudget && pacingChip.percentOfBudget !== null
+                                    ? `${formatCurrency(pacingChip.projected)} · ${Math.round(pacingChip.percentOfBudget)}% of budget`
+                                    : `On pace · ${formatCurrency(pacingChip.projected)}`}
                             </span>
                         )}
                         {hasForecast && (

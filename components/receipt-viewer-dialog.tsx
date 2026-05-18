@@ -2,8 +2,9 @@
 
 import React, { useEffect, useState } from 'react';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
-import { FileWarning, Loader2, Maximize2 } from 'lucide-react';
+import { FileWarning, Loader2 } from 'lucide-react';
 import { getReceiptSignedUrl } from '@/lib/receipt-storage';
+import { ZoomableImage } from '@/components/ui/zoomable-image';
 
 interface ReceiptViewerDialogProps {
     open: boolean;
@@ -65,25 +66,18 @@ export function ReceiptViewerDialog({ open, onOpenChange, receiptPath }: Receipt
                                 className="w-full h-[70vh] bg-white"
                             />
                         ) : (
-                            <a
-                                href={url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="relative group block max-h-[75vh]"
-                                aria-label="Open receipt full-screen for zoom"
-                            >
-                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img
-                                    src={url}
-                                    alt="Receipt"
-                                    className="max-w-full max-h-[75vh] object-contain"
-                                />
-                                <span className="pointer-events-none absolute bottom-3 right-3 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-black/70 backdrop-blur-sm text-white text-[11px] font-semibold opacity-90 group-hover:opacity-100 transition-opacity">
-                                    <Maximize2 className="w-3 h-3" />
-                                    Tap to zoom
-                                </span>
-                            </a>
+                            <ZoomableImage
+                                src={url}
+                                alt="Receipt"
+                                containerClassName="w-full h-[75vh] flex items-center justify-center bg-black/40"
+                                className="max-w-full max-h-[75vh] object-contain"
+                            />
                         )
+                    )}
+                    {url && !loading && !error && !isPdf && (
+                        <span className="pointer-events-none absolute bottom-3 right-3 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-black/70 backdrop-blur-sm text-white text-[10px] font-semibold opacity-80">
+                            Pinch · double-tap · scroll to zoom
+                        </span>
                     )}
                 </div>
             </DialogContent>

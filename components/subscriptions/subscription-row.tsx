@@ -44,6 +44,8 @@ export function SubscriptionRow({
     const trialEnds = meta.trial_ends_at ? parseISO(meta.trial_ends_at) : null;
     const trialActive = trialEnds && trialEnds > new Date();
     const trialEnded = trialEnds && trialEnds <= new Date();
+    const trialDaysLeft = trialEnds ? differenceInCalendarDays(trialEnds, new Date()) : null;
+    const trialEndingSoon = trialActive && trialDaysLeft !== null && trialDaysLeft <= 7;
     const showConvertedHint = template.currency && template.currency.toUpperCase() !== currency.toUpperCase();
 
     return (
@@ -149,8 +151,16 @@ export function SubscriptionRow({
                             </span>
                         )}
                         {trialActive && trialEnds && (
-                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold border bg-rose-500/10 border-rose-500/25 text-rose-300">
-                                Trial ends in {Math.max(0, differenceInCalendarDays(trialEnds, new Date()))}d
+                            <span
+                                className={cn(
+                                    "inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold border",
+                                    trialEndingSoon
+                                        ? "bg-amber-500/15 border-amber-500/35 text-amber-300"
+                                        : "bg-secondary/30 border-white/10 text-muted-foreground"
+                                )}
+                                title={`Trial ends ${format(trialEnds, 'MMM d')}`}
+                            >
+                                Trial ends in {Math.max(0, trialDaysLeft ?? 0)}d
                             </span>
                         )}
                         {trialEnded && (

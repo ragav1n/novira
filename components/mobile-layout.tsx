@@ -443,9 +443,9 @@ export function MobileLayout({ children, defaultIsDesktop = false }: { children:
     // inter-page transitions a smooth crossfade instead of a flash.
     const showMarketingBg = isPublicPage || isAuthPage || (pathname === '/' && !isAuthenticated);
 
-    // Pull-to-refresh is mobile-only (touch). Only enable on the dashboard route
-    // — other routes have their own scroll containers / refresh affordances.
-    const ptrEnabled = showNav && !showDesktop && pathname === '/';
+    // Pull-to-refresh is mobile-only (touch). Enabled on routes that share the
+    // main scroll container and have a `novira-refresh-requested` listener.
+    const ptrEnabled = showNav && !showDesktop && (pathname === '/' || pathname === '/search');
     const { pull, refreshing, threshold } = usePullToRefresh(mainRef, {
         enabled: ptrEnabled,
         onRefresh: async () => {
@@ -468,29 +468,27 @@ export function MobileLayout({ children, defaultIsDesktop = false }: { children:
             isCoupleWorkspace && "theme-couple",
             isHomeWorkspace && "theme-home"
         )}>
-            {/* Global Background Glows. On public marketing pages the
-                MarketingBackground (smoke + overlay + grain) paints over these
-                so they're effectively hidden, but we keep them in the DOM
-                unconditionally to avoid a hydration mismatch. */}
-            <div className="fixed inset-0 pointer-events-none overflow-hidden z-0 transition-colors duration-500 gpu">
-                <div className={cn(
-                    "absolute top-[20%] -right-[10%] w-[50%] h-[50%] rounded-full opacity-10 gpu transition-colors duration-500 glow-optimized",
-                    isCoupleWorkspace ? "bg-rose-500" : isHomeWorkspace ? "bg-yellow-500" : "bg-primary"
-                )} />
-                <div className={cn(
-                    "absolute bottom-[20%] -left-[10%] w-[40%] h-[40%] rounded-full opacity-5 gpu transition-colors duration-500 glow-optimized",
-                    isCoupleWorkspace ? "bg-rose-500" : isHomeWorkspace ? "bg-amber-500" : "bg-primary/40"
-                )} />
+            {/* Global Background Glows. Two soft corner halos tinted by the
+                `--workspace-accent` CSS variable that the dashboard hero card
+                also consumes — workspace switches and bucket-focus changes
+                tint the page background subtly without washing out content. */}
+            <div className="fixed inset-0 pointer-events-none overflow-hidden z-0 gpu">
+                <div
+                    className="absolute top-[15%] -right-[10%] w-[65%] h-[65%] rounded-full opacity-[0.26] blur-3xl gpu glow-optimized"
+                    style={{ backgroundColor: 'var(--workspace-accent)' }}
+                />
+                <div
+                    className="absolute bottom-[15%] -left-[10%] w-[55%] h-[55%] rounded-full opacity-[0.18] blur-3xl gpu glow-optimized"
+                    style={{ backgroundColor: 'var(--workspace-accent)' }}
+                />
             </div>
 
-            <div className={cn(
-                "fixed inset-0 pointer-events-none z-0 transition-colors duration-500",
-                isCoupleWorkspace
-                    ? "bg-gradient-to-br from-rose-950/10 via-transparent to-transparent"
-                    : isHomeWorkspace
-                        ? "bg-gradient-to-br from-amber-950/10 via-transparent to-transparent"
-                        : "bg-gradient-to-br from-primary/10 via-transparent to-transparent"
-            )} />
+            <div
+                className="fixed inset-0 pointer-events-none z-0"
+                style={{
+                    background: 'linear-gradient(to bottom right, color-mix(in oklch, var(--workspace-accent) 18%, transparent), transparent 70%)',
+                }}
+            />
 
             {/* Persistent marketing background. Always mounted so the smoke
                 canvas stays alive across navigation; opacity-faded in/out per

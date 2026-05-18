@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import {
     ChevronLeft, Search, Tag, Plane, Home, Gift,
     Car, Utensils, ShoppingCart, Heart, Gamepad2, School, Laptop, Music,
-    X, RefreshCcw, Ban, CheckSquare, Bookmark, BookmarkPlus,
+    X, RefreshCcw, Ban, CheckSquare, Bookmark, BookmarkPlus, Clock,
 } from 'lucide-react';
 import { CATEGORY_COLORS, getIconForCategory, getCategoryLabel } from '@/lib/categories';
 import { ReceiptViewerDialog } from '@/components/receipt-viewer-dialog';
@@ -103,6 +103,49 @@ export function SearchView() {
     const [presets, setPresets] = useState<SearchPreset[]>([]);
     const [presetNameDraft, setPresetNameDraft] = useState('');
     const [showPresetInput, setShowPresetInput] = useState(false);
+
+    // Search history (localStorage, max 5, dedupe, most-recent first).
+    const HISTORY_KEY = 'novira:search-history';
+    const HISTORY_MAX = 5;
+    const [history, setHistory] = useState<string[]>([]);
+    const [inputFocused, setInputFocused] = useState(false);
+
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        try {
+            const raw = localStorage.getItem(HISTORY_KEY);
+            if (raw) setHistory((JSON.parse(raw) as string[]).slice(0, HISTORY_MAX));
+        } catch (err) {
+            console.error('Failed to load search history:', err);
+        }
+    }, []);
+
+    const pushHistory = useCallback((q: string) => {
+        const trimmed = q.trim();
+        if (!trimmed) return;
+        setHistory(prev => {
+            const next = [trimmed, ...prev.filter(h => h.toLowerCase() !== trimmed.toLowerCase())].slice(0, HISTORY_MAX);
+            try { localStorage.setItem(HISTORY_KEY, JSON.stringify(next)); } catch (err) { console.error(err); }
+            return next;
+        });
+    }, []);
+
+    const clearHistory = useCallback(() => {
+        setHistory([]);
+        try { localStorage.removeItem(HISTORY_KEY); } catch (err) { console.error(err); }
+    }, []);
+
+    // Record successful searches (debounced query that actually ran). Skip the
+    // first run so a shared link like /search?q=foo doesn't auto-pollute history
+    // without the user actually typing the query themselves.
+    const historyFirstRunRef = useRef(true);
+    useEffect(() => {
+        if (historyFirstRunRef.current) {
+            historyFirstRunRef.current = false;
+            return;
+        }
+        if (debouncedSearchQuery) pushHistory(debouncedSearchQuery);
+    }, [debouncedSearchQuery, pushHistory]);
 
     // Bulk-edit mode state
     const [bulkMode, setBulkMode] = useState(false);
@@ -280,6 +323,13 @@ export function SearchView() {
 
     useTransactionInvalidationListener(fetchAndFilter);
 
+    // Pull-to-refresh trigger from mobile-layout — same handler the dashboard uses.
+    useEffect(() => {
+        const onRefresh = () => { fetchAndFilter(); };
+        window.addEventListener('novira-refresh-requested', onRefresh);
+        return () => window.removeEventListener('novira-refresh-requested', onRefresh);
+    }, [fetchAndFilter]);
+
     // Realtime subscription — re-fetch when transactions or splits change
     const fetchRef = useRef(fetchAndFilter);
     fetchRef.current = fetchAndFilter;
@@ -314,6 +364,18 @@ export function SearchView() {
         if (!userId) return;
         setPresets(loadPresets(userId));
     }, [userId]);
+
+    // Tag tap from anywhere else in the app (e.g. transaction-row badges) — sync the
+    // selected-tag state so the filter actually applies when we're already on /search.
+    useEffect(() => {
+        const onApply = (e: Event) => {
+            const tag = (e as CustomEvent<{ tag: string }>).detail?.tag;
+            if (!tag) return;
+            setSelectedTags([tag]);
+        };
+        window.addEventListener('novira:apply-tag-filter', onApply);
+        return () => window.removeEventListener('novira:apply-tag-filter', onApply);
+    }, []);
 
     // Persist filter state to URL so refresh / back-nav / shared links work.
     const urlWriteRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -509,10 +571,41 @@ export function SearchView() {
                                 setSearchQuery(e.target.value);
                                 if (e.target.value.length === 0) toast.haptic(ImpactStyle.Light);
                             }}
+                            onFocus={() => setInputFocused(true)}
+                            // Delay so a tap on a history row registers before blur closes the dropdown.
+                            onBlur={() => setTimeout(() => setInputFocused(false), 150)}
                             className={`pl-9 pr-9 bg-secondary/10 border-white/10 h-10 rounded-xl ${themeConfig.ring}`}
                         />
                         {(searchQuery !== debouncedSearchQuery || (loading && !!searchQuery)) && (
                             <div className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full border-2 border-primary border-t-transparent animate-spin" aria-hidden="true" />
+                        )}
+                        {inputFocused && searchQuery === '' && history.length > 0 && (
+                            <div className="absolute top-full left-0 right-0 mt-1 z-40 rounded-xl bg-card/95 backdrop-blur-xl border border-white/10 shadow-2xl overflow-hidden">
+                                <div className="px-3 py-2 text-[9px] uppercase tracking-widest font-bold text-muted-foreground/70 border-b border-white/5">Recent searches</div>
+                                {history.map(h => (
+                                    <button
+                                        key={h}
+                                        type="button"
+                                        onMouseDown={(e) => e.preventDefault()}
+                                        onClick={() => {
+                                            setSearchQuery(h);
+                                            setInputFocused(false);
+                                        }}
+                                        className="w-full flex items-center gap-2 px-3 py-2 text-left text-[12px] hover:bg-white/5 transition-colors"
+                                    >
+                                        <Clock className="w-3 h-3 text-muted-foreground/60 shrink-0" />
+                                        <span className="truncate">{h}</span>
+                                    </button>
+                                ))}
+                                <button
+                                    type="button"
+                                    onMouseDown={(e) => e.preventDefault()}
+                                    onClick={clearHistory}
+                                    className="w-full px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70 hover:text-foreground hover:bg-white/5 transition-colors border-t border-white/5"
+                                >
+                                    Clear history
+                                </button>
+                            </div>
                         )}
                     </div>
 

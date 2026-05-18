@@ -3,6 +3,102 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Register the theme color CSS variables as <color> tokens so the browser can
+   interpolate them when a workspace class is added/removed. Without these
+   @property declarations the variables are typed as strings — they snap-change
+   on theme switch and no `transition` rule can tween them. With them, the
+   transition declared on `:root` below cross-fades the entire palette smoothly. */
+/* Gradient stops for the dashboard's "spent" hero card, and the page-level
+   accent that tints the corner glows. Driven by class state (bucket focus
+   vs workspace type) and interpolated via @property so the gradient + glows
+   smoothly tween — background-image doesn't transition natively between
+   two literal linear-gradient values. */
+@property --focus-card-from { syntax: '<color>'; inherits: true; initial-value: rgb(138 43 226); }
+@property --focus-card-to { syntax: '<color>'; inherits: true; initial-value: rgb(138 43 226 / 0.6); }
+@property --focus-card-glow { syntax: '<color>'; inherits: true; initial-value: rgb(138 43 226 / 0.2); }
+@property --workspace-accent { syntax: '<color>'; inherits: true; initial-value: rgb(138 43 226); }
+
+@property --background { syntax: '<color>'; inherits: true; initial-value: oklch(0.1 0.05 280); }
+@property --foreground { syntax: '<color>'; inherits: true; initial-value: oklch(0.98 0.01 280); }
+@property --card { syntax: '<color>'; inherits: true; initial-value: oklch(0.18 0.06 280); }
+@property --card-foreground { syntax: '<color>'; inherits: true; initial-value: oklch(0.98 0.01 280); }
+@property --popover { syntax: '<color>'; inherits: true; initial-value: oklch(0.18 0.06 280); }
+@property --popover-foreground { syntax: '<color>'; inherits: true; initial-value: oklch(0.98 0.01 280); }
+@property --primary { syntax: '<color>'; inherits: true; initial-value: oklch(0.55 0.25 280); }
+@property --primary-foreground { syntax: '<color>'; inherits: true; initial-value: oklch(0.98 0.01 280); }
+@property --secondary { syntax: '<color>'; inherits: true; initial-value: oklch(0.3 0.08 280); }
+@property --secondary-foreground { syntax: '<color>'; inherits: true; initial-value: oklch(0.98 0.01 280); }
+@property --muted { syntax: '<color>'; inherits: true; initial-value: oklch(0.25 0.04 280); }
+@property --muted-foreground { syntax: '<color>'; inherits: true; initial-value: oklch(0.7 0.05 280); }
+@property --accent { syntax: '<color>'; inherits: true; initial-value: oklch(0.3 0.08 280); }
+@property --accent-foreground { syntax: '<color>'; inherits: true; initial-value: oklch(0.98 0.01 280); }
+@property --border { syntax: '<color>'; inherits: true; initial-value: oklch(0.25 0.05 280); }
+@property --input { syntax: '<color>'; inherits: true; initial-value: oklch(0.3 0.05 280); }
+@property --ring { syntax: '<color>'; inherits: true; initial-value: oklch(0.55 0.25 280); }
+
+/* The transition itself. Applied to every selector that participates in the
+   workspace palette so toggling the theme classes interpolates each variable
+   over the same window. 360ms with an ease-out-quart curve reads as smooth
+   without feeling sluggish. */
+:root,
+.theme-couple,
+.theme-home,
+body,
+body.focus-bucket {
+  transition:
+    --focus-card-from 360ms cubic-bezier(0.22, 1, 0.36, 1),
+    --focus-card-to 360ms cubic-bezier(0.22, 1, 0.36, 1),
+    --focus-card-glow 360ms cubic-bezier(0.22, 1, 0.36, 1),
+    --workspace-accent 360ms cubic-bezier(0.22, 1, 0.36, 1),
+    --background 360ms cubic-bezier(0.22, 1, 0.36, 1),
+    --foreground 360ms cubic-bezier(0.22, 1, 0.36, 1),
+    --card 360ms cubic-bezier(0.22, 1, 0.36, 1),
+    --card-foreground 360ms cubic-bezier(0.22, 1, 0.36, 1),
+    --popover 360ms cubic-bezier(0.22, 1, 0.36, 1),
+    --popover-foreground 360ms cubic-bezier(0.22, 1, 0.36, 1),
+    --primary 360ms cubic-bezier(0.22, 1, 0.36, 1),
+    --primary-foreground 360ms cubic-bezier(0.22, 1, 0.36, 1),
+    --secondary 360ms cubic-bezier(0.22, 1, 0.36, 1),
+    --secondary-foreground 360ms cubic-bezier(0.22, 1, 0.36, 1),
+    --muted 360ms cubic-bezier(0.22, 1, 0.36, 1),
+    --muted-foreground 360ms cubic-bezier(0.22, 1, 0.36, 1),
+    --accent 360ms cubic-bezier(0.22, 1, 0.36, 1),
+    --accent-foreground 360ms cubic-bezier(0.22, 1, 0.36, 1),
+    --border 360ms cubic-bezier(0.22, 1, 0.36, 1),
+    --input 360ms cubic-bezier(0.22, 1, 0.36, 1),
+    --ring 360ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Chrome surfaces — body / html — also need to tween their resolved color
+   so the page background fades instead of snapping when the variable changes. */
+html, body {
+  transition:
+    background-color 360ms cubic-bezier(0.22, 1, 0.36, 1),
+    color 360ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Brute-force tween during workspace switches. WorkspaceThemeProvider toggles
+   this class on `<body>` for ~500ms around any theme change, applying a
+   transition to every element's color properties. This catches the Tailwind
+   palette utility classes (text-rose-500, bg-amber-500/20, etc.) used by the
+   workspace themeConfig — they're literal palette colors, not CSS vars, so
+   the @property interpolation above can't reach them. The class only sticks
+   during the transition window so hover/focus states keep their normal speed
+   the rest of the time. */
+body.theme-transitioning,
+body.theme-transitioning *,
+body.theme-transitioning *::before,
+body.theme-transitioning *::after {
+  transition:
+    background-color 360ms cubic-bezier(0.22, 1, 0.36, 1),
+    color 360ms cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 360ms cubic-bezier(0.22, 1, 0.36, 1),
+    fill 360ms cubic-bezier(0.22, 1, 0.36, 1),
+    stroke 360ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 360ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 360ms cubic-bezier(0.22, 1, 0.36, 1) !important;
+}
+
 :root {
   /* Deep Purple/Black Theme based on screenshots */
   --background: oklch(0.1 0.05 280); /* Deep Purple/Black */
@@ -45,7 +141,23 @@
   --normal-border: var(--border);
 }
 
+/* Bucket-focus overrides the workspace gradient on the spent hero card. Lives
+   on `body` (not root) so descendant cascade beats whatever theme-couple /
+   theme-home put on `html`. dashboard-view sets per-bucket overrides via
+   inline style when the focused bucket carries its own color — fall back to
+   cyan only when no per-bucket color is provided. */
+body.focus-bucket {
+  --workspace-accent: rgb(6 182 212);
+  --focus-card-from: rgb(6 182 212);   /* cyan-500 */
+  --focus-card-to: rgb(13 148 136);    /* teal-600 */
+  --focus-card-glow: rgb(6 182 212 / 0.25);
+}
+
 .theme-couple {
+  --workspace-accent: rgb(244 63 94);
+  --focus-card-from: rgb(244 63 94);   /* rose-500 */
+  --focus-card-to: rgb(190 18 60);     /* rose-700 */
+  --focus-card-glow: rgb(244 63 94 / 0.25);
   --background: oklch(0.1 0.05 10);
   --foreground: oklch(0.98 0.01 10);
   --card: oklch(0.18 0.06 10);
@@ -68,6 +180,10 @@
 }
 
 .theme-home {
+  --workspace-accent: rgb(234 179 8);
+  --focus-card-from: rgb(234 179 8);   /* yellow-500 */
+  --focus-card-to: rgb(217 119 6);     /* amber-600 */
+  --focus-card-glow: rgb(234 179 8 / 0.25);
   --background: oklch(0.1 0.05 70);
   --foreground: oklch(0.98 0.01 70);
   --card: oklch(0.18 0.06 70);
