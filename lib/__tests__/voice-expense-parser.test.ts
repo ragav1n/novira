@@ -10,6 +10,7 @@ describe('parseVoiceExpense', () => {
         expect(r.paymentMethod).toBeNull();
         expect(r.tags).toEqual([]);
         expect(r.notes).toBeNull();
+        expect(r.location).toBeNull();
         expect(r.description).toBe('');
     });
 
@@ -93,7 +94,40 @@ describe('parseVoiceExpense', () => {
         expect(r.currency).toBeNull();
         expect(r.category).toBeNull();
         expect(r.paymentMethod).toBeNull();
+        expect(r.location).toBeNull();
         expect(r.description).toBe('lunch with friends');
+    });
+
+    it('captures a location after an "at" anchor', () => {
+        const r = parseVoiceExpense('coffee at starbucks');
+        expect(r.location).toBe('starbucks');
+        expect(r.description).toBe('coffee');
+    });
+
+    it('captures a multi-word location and trims a leading article', () => {
+        const r = parseVoiceExpense('forty dollars at the cafe paid with credit card');
+        expect(r.location).toBe('cafe');
+        expect(r.amount).toBe('40');
+        expect(r.paymentMethod).toBe('Credit Card');
+    });
+
+    it('does not leak trimmed location connector words into the description', () => {
+        const r = parseVoiceExpense('lunch at the cafe with john');
+        expect(r.location).toBe('cafe');
+        expect(r.description).toBe('lunch with john');
+    });
+
+    it('honours an explicit "location" anchor', () => {
+        const r = parseVoiceExpense('lunch location trader joes');
+        expect(r.location).toBe('trader joes');
+        expect(r.description).toBe('lunch');
+    });
+
+    it('stops the location capture at the next field keyword', () => {
+        const r = parseVoiceExpense('groceries at whole foods tag weekly');
+        expect(r.location).toBe('whole foods');
+        expect(r.tags).toEqual(['weekly']);
+        expect(r.description).toBe('groceries');
     });
 
     it('keeps the raw transcript', () => {

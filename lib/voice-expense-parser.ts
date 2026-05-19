@@ -17,6 +17,9 @@ export interface ParsedVoiceExpense {
     paymentMethod: VoicePaymentMethod | null;
     tags: string[];
     notes: string | null;
+    // Raw place phrase spoken after an "at"/"location" anchor — still needs
+    // geocoding to become real coordinates. Null when no location was dictated.
+    location: string | null;
     description: string;
     raw: string;
 }
@@ -97,6 +100,12 @@ const AMOUNT_FILLER = new Set(['for', 'amount', 'spent', 'spend', 'cost', 'costs
 const PAYMENT_FILLER = new Set(['paid', 'with', 'using', 'used', 'by', 'via', 'on', 'in']);
 // Connector words trimmed off the ends of the leftover description.
 const EDGE_STOPWORDS = new Set(['and', 'for', 'of', 'with', 'at', 'the', 'a', 'an', 'on', 'to', 'paid', 'spent', 'i', 'it', 'was', 'is', 'about', 'in']);
+// Words that end an open-ended location capture — other field anchors plus
+// sentence connectors that a place name almost never spans.
+const LOCATION_STOP = new Set([
+    'tag', 'tagged', 'hashtag', 'note', 'notes', 'category', 'description', 'desc',
+    'location', 'at', 'for', 'and', 'with', 'to', 'paid',
+]);
 
 const MAX_TAGS = 12;
 const MAX_TAG_LEN = 32;
@@ -195,7 +204,7 @@ export function parseVoiceExpense(transcript: string): ParsedVoiceExpense {
     const raw = (transcript || '').trim();
     const empty: ParsedVoiceExpense = {
         amount: null, currency: null, category: null, paymentMethod: null,
-        tags: [], notes: null, description: '', raw,
+        tags: [], notes: null, location: null, description: '', raw,
     };
     if (!raw) return empty;
 
@@ -369,6 +378,47 @@ export function parseVoiceExpense(transcript: string): ParsedVoiceExpense {
         }
     }
 
+    // --- Location ("location X" preferred, else "at X") ---
+    // Captures the place phrase after an anchor. Open-ended, so it runs after
+    // every other field is consumed and stops at the next structural keyword or
+    // sentence connector — whatever's left is handed off for geocoding.
+    let location: string | null = null;
+    {
+        const findAnchor = (anchor: string): number => {
+            for (let i = 0; i < w.length; i++) {
+                if (!consumed.has(i) && w[i] === anchor) return i;
+            }
+            return -1;
+        };
+        let anchorIdx = findAnchor('location');
+        if (anchorIdx < 0) anchorIdx = findAnchor('at');
+        if (anchorIdx >= 0) {
+            const captured: number[] = [];
+            for (let j = anchorIdx + 1; j < w.length; j++) {
+                if (consumed.has(j) || LOCATION_STOP.has(w[j])) break;
+                captured.push(j);
+            }
+            if (captured.length) {
+                // Build the place string from the captured span, trimming
+                // connector words off both ends ("at the cafe" → "cafe").
+                let lo = 0;
+                let hi = captured.length - 1;
+                while (lo <= hi && EDGE_STOPWORDS.has(w[captured[lo]])) lo++;
+                while (hi >= lo && EDGE_STOPWORDS.has(w[captured[hi]])) hi--;
+                const phrase = captured.slice(lo, hi + 1)
+                    .map(idx => original[idx]).join(' ').replace(/\s+/g, ' ').trim();
+                if (phrase) {
+                    location = phrase;
+                    // Consume the whole captured span — including the trimmed
+                    // articles — plus the anchor, so no part of the location
+                    // region leaks into the leftover description.
+                    consumed.add(anchorIdx);
+                    captured.forEach(idx => consumed.add(idx));
+                }
+            }
+        }
+    }
+
     // --- Description anchor: a spoken "description" / "desc" keyword. The
     // description is already whatever's left over, so the keyword itself just
     // needs stripping out rather than routing anything. ---
@@ -392,5 +442,5 @@ export function parseVoiceExpense(transcript: string): ParsedVoiceExpense {
         amount = String(rounded);
     }
 
-    return { amount, currency, category, paymentMethod, tags, notes, description, raw };
+    return { amount, currency, category, paymentMethod, tags, notes, location, description, raw };
 }

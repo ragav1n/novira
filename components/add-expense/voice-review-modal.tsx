@@ -3,19 +3,24 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { AnimatePresence, motion } from 'framer-motion';
-import { AudioLines, Check, X, Banknote, CreditCard, Smartphone, Landmark } from 'lucide-react';
+import { AudioLines, Check, X, Banknote, CreditCard, Smartphone, Landmark, MapPin } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { CATEGORIES, CATEGORY_COLORS, getIconForCategory } from '@/lib/categories';
 import { CURRENCY_SYMBOLS } from '@/components/providers/user-preferences-provider';
 import { CurrencyDropdown } from '@/components/ui/currency-dropdown';
+import { geocodePlace, type GeocodedPlace } from '@/lib/geocode-place';
 import type { ParsedVoiceExpense, VoicePaymentMethod } from '@/lib/voice-expense-parser';
 
 interface VoiceReviewModalProps {
     parsed: ParsedVoiceExpense | null;
     currentCurrency: string;
-    onApply: (parsed: ParsedVoiceExpense) => void;
+    // Current GPS position — biases the location geocode toward nearby places.
+    proximity?: { lat: number; lng: number } | null;
+    onApply: (parsed: ParsedVoiceExpense, location: GeocodedPlace | null) => void;
     onDiscard: () => void;
 }
+
+type GeoState = 'idle' | 'loading' | 'done' | 'notfound';
 
 const PAYMENT_OPTIONS: { value: VoicePaymentMethod; icon: React.ComponentType<{ className?: string }> }[] = [
     { value: 'Cash', icon: Banknote },
@@ -53,7 +58,7 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
 const inputClass =
     'w-full rounded-2xl border border-white/10 bg-secondary/10 px-3.5 py-3 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/40 focus:border-rose-400/40';
 
-export function VoiceReviewModal({ parsed, currentCurrency, onApply, onDiscard }: VoiceReviewModalProps) {
+export function VoiceReviewModal({ parsed, currentCurrency, proximity, onApply, onDiscard }: VoiceReviewModalProps) {
     const [amount, setAmount] = useState('');
     const [currency, setCurrency] = useState('USD');
     const [category, setCategory] = useState<string | null>(null);
@@ -62,14 +67,19 @@ export function VoiceReviewModal({ parsed, currentCurrency, onApply, onDiscard }
     const [tagDraft, setTagDraft] = useState('');
     const [description, setDescription] = useState('');
     const [notes, setNotes] = useState('');
+    const [geoState, setGeoState] = useState<GeoState>('idle');
+    const [resolvedLoc, setResolvedLoc] = useState<GeocodedPlace | null>(null);
     const [applying, setApplying] = useState(false);
     const applyRef = useRef<HTMLButtonElement>(null);
     const applyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    // Read latest form currency without re-running the init effect mid-edit.
+    // Read latest form currency / position without re-running the init effect mid-edit.
     const currentCurrencyRef = useRef(currentCurrency);
     currentCurrencyRef.current = currentCurrency;
+    const proximityRef = useRef(proximity);
+    proximityRef.current = proximity;
 
-    // Seed the editable draft each time a fresh dictation opens the modal.
+    // Seed the editable draft each time a fresh dictation opens the modal, and
+    // kick off geocoding for any place phrase the parser pulled out.
     useEffect(() => {
         if (!parsed) return;
         setAmount(parsed.amount ?? '');
@@ -81,6 +91,26 @@ export function VoiceReviewModal({ parsed, currentCurrency, onApply, onDiscard }
         setDescription(parsed.description);
         setNotes(parsed.notes ?? '');
         setApplying(false);
+        setResolvedLoc(null);
+
+        if (!parsed.location) {
+            setGeoState('idle');
+            return;
+        }
+        setGeoState('loading');
+        let cancelled = false;
+        const ac = new AbortController();
+        geocodePlace(parsed.location, { proximity: proximityRef.current, signal: ac.signal })
+            .then(r => {
+                if (cancelled) return;
+                setResolvedLoc(r);
+                setGeoState(r ? 'done' : 'notfound');
+            })
+            .catch(err => {
+                if (cancelled || (err as { name?: string })?.name === 'AbortError') return;
+                setGeoState('notfound');
+            });
+        return () => { cancelled = true; ac.abort(); };
     }, [parsed]);
 
     useEffect(() => () => {
@@ -105,10 +135,11 @@ export function VoiceReviewModal({ parsed, currentCurrency, onApply, onDiscard }
             paymentMethod: payment,
             tags,
             notes: notes.trim() || null,
+            location: parsed.location,
             description: description.trim(),
         };
         // Let the confirm animation play before committing + closing.
-        applyTimerRef.current = setTimeout(() => onApply(edited), 300);
+        applyTimerRef.current = setTimeout(() => onApply(edited, resolvedLoc), 300);
     };
 
     const symbol = CURRENCY_SYMBOLS[currency as keyof typeof CURRENCY_SYMBOLS] || '$';
@@ -263,6 +294,54 @@ export function VoiceReviewModal({ parsed, currentCurrency, onApply, onDiscard }
                                             })}
                                         </div>
                                     </Field>
+
+                                    {/* Location — geocoded from the spoken "at …" phrase */}
+                                    {parsed.location && (
+                                        <Field label="Location" hint="from voice">
+                                            {geoState === 'loading' && (
+                                                <div className="flex items-center gap-2.5 rounded-2xl border border-white/10 bg-secondary/10 px-3.5 py-3">
+                                                    <div className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-rose-400/30 border-t-rose-400" />
+                                                    <span className="truncate text-sm text-muted-foreground">
+                                                        Finding <span className="text-foreground">“{parsed.location}”</span>…
+                                                    </span>
+                                                </div>
+                                            )}
+                                            {geoState === 'done' && resolvedLoc && (
+                                                <div className="flex items-start gap-2.5 rounded-2xl border border-emerald-500/25 bg-emerald-500/5 px-3.5 py-3">
+                                                    <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-emerald-500/25 bg-emerald-500/15">
+                                                        <MapPin className="h-3.5 w-3.5 text-emerald-400" aria-hidden />
+                                                    </div>
+                                                    <div className="min-w-0 flex-1">
+                                                        <p className="truncate text-sm font-semibold text-emerald-300">{resolvedLoc.place_name}</p>
+                                                        {resolvedLoc.place_address && (
+                                                            <p className="truncate text-[11px] text-muted-foreground">{resolvedLoc.place_address}</p>
+                                                        )}
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => { setResolvedLoc(null); setGeoState('idle'); }}
+                                                        aria-label="Remove location"
+                                                        className="shrink-0 rounded-full p-1 text-muted-foreground transition-colors hover:bg-white/10 hover:text-foreground"
+                                                    >
+                                                        <X className="h-3.5 w-3.5" />
+                                                    </button>
+                                                </div>
+                                            )}
+                                            {geoState === 'notfound' && (
+                                                <div className="rounded-2xl border border-white/10 bg-secondary/10 px-3.5 py-3">
+                                                    <p className="text-sm text-muted-foreground">
+                                                        Couldn't find <span className="text-foreground">“{parsed.location}”</span>
+                                                    </p>
+                                                    <p className="mt-0.5 text-[11px] text-muted-foreground/60">Add a location on the form after applying.</p>
+                                                </div>
+                                            )}
+                                            {geoState === 'idle' && (
+                                                <p className="px-1 text-[11px] text-muted-foreground/50">
+                                                    Location skipped — add one on the form if you need it.
+                                                </p>
+                                            )}
+                                        </Field>
+                                    )}
 
                                     {/* Tags */}
                                     <Field label="Tags" hint="optional">

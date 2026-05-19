@@ -62,6 +62,7 @@ import { evaluateExpression } from '@/lib/expression-eval';
 import { ExpressionKeypad } from '@/components/ui/expression-keypad';
 import { isSpeechSupported, startDictation, type DictationHandle } from '@/lib/speech-to-text';
 import { parseVoiceExpense, type ParsedVoiceExpense } from '@/lib/voice-expense-parser';
+import type { GeocodedPlace } from '@/lib/geocode-place';
 import { VoiceReviewModal } from './add-expense/voice-review-modal';
 import { Mic, MicOff, Users } from 'lucide-react';
 import { useRecentSplitPartner } from '@/hooks/useRecentSplitPartner';
@@ -360,7 +361,7 @@ export function AddExpenseView() {
     // Route a parsed voice dictation into the form. Amount/currency/category/
     // payment overwrite (the user dictated them deliberately); tags and free text
     // merge with anything already entered so a manual edit isn't clobbered.
-    const applyParsedVoice = (parsed: ParsedVoiceExpense) => {
+    const applyParsedVoice = (parsed: ParsedVoiceExpense, location: GeocodedPlace | null) => {
         if (parsed.amount !== null) formState.setAmount(parsed.amount);
         if (parsed.currency) {
             const code = parsed.currency.toUpperCase();
@@ -383,6 +384,12 @@ export function AddExpenseView() {
             const base = formState.description;
             const joiner = base && !base.endsWith(' ') ? ' ' : '';
             formState.setDescription(`${base}${joiner}${parsed.description}`);
+        }
+        if (location) {
+            formState.setPlaceName(location.place_name);
+            formState.setPlaceAddress(location.place_address);
+            formState.setPlaceLat(location.place_lat);
+            formState.setPlaceLng(location.place_lng);
         }
         setParsedExpense(null);
     };
@@ -1357,6 +1364,7 @@ export function AddExpenseView() {
         <VoiceReviewModal
             parsed={parsedExpense}
             currentCurrency={formState.txCurrency}
+            proximity={currentPos}
             onApply={applyParsedVoice}
             onDiscard={() => setParsedExpense(null)}
         />
