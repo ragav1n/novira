@@ -1356,6 +1356,7 @@ export function AddExpenseView() {
         </motion.div>
         <VoiceReviewModal
             parsed={parsedExpense}
+            currentCurrency={formState.txCurrency}
             onApply={applyParsedVoice}
             onDiscard={() => setParsedExpense(null)}
         />
