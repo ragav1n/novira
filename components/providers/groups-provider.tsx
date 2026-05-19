@@ -646,7 +646,15 @@ export function GroupsProvider({ children }: { children: React.ReactNode }) {
         // Try the atomic RPC first; fall back to per-split loop if it doesn't exist yet.
         const { error: rpcError } = await supabase.rpc('settle_splits_batch', { split_ids: splitIds });
 
-        const fnMissing = rpcError && (rpcError.code === '42883' || /function .* does not exist/i.test(rpcError.message));
+        // Treat the function as missing whether Postgres (42883) or PostgREST
+        // (PGRST202 — "Could not find the function ... in the schema cache")
+        // reports it, so the per-split fallback kicks in before the migration
+        // that adds settle_splits_batch is applied.
+        const fnMissing = !!rpcError && (
+            rpcError.code === '42883' ||
+            rpcError.code === 'PGRST202' ||
+            /could not find the function|function .* does not exist|schema cache/i.test(rpcError.message ?? '')
+        );
 
         if (rpcError && !fnMissing) {
             throw rpcError;

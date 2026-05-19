@@ -7,6 +7,19 @@ import { toast } from '@/utils/haptics';
 import type { Split } from '@/components/providers/groups-provider';
 import type { SimplifiedPayment } from '@/utils/simplify-debts';
 
+// Supabase RPC errors are plain objects ({ code, message, ... }), not Error
+// instances — and a non-JSON error body yields { message: '' }. Pull a usable
+// string out of anything, and never return blank so the toast always reads.
+function settleErrorMessage(error: unknown, fallback: string): string {
+    const raw =
+        error instanceof Error ? error.message
+        : typeof error === 'string' ? error
+        : error && typeof error === 'object' && 'message' in error
+            ? (error as { message?: unknown }).message
+            : undefined;
+    return typeof raw === 'string' && raw.trim() ? raw : fallback;
+}
+
 interface SettlementsTabContentProps {
     simplifiedDebts: SimplifiedPayment[];
     pendingSplits: Split[];
@@ -84,7 +97,7 @@ export function SettlementsTabContent({
                                                         toast.error(`Settled ${settled} of ${total} — please retry`);
                                                     }
                                                 } catch (error) {
-                                                    toast.error(error instanceof Error ? error.message : 'Failed');
+                                                    toast.error(settleErrorMessage(error, 'Failed to settle'));
                                                 } finally {
                                                     setSettlingPaymentIndex(null);
                                                 }
@@ -123,7 +136,7 @@ export function SettlementsTabContent({
                                         toast.error(`Settled ${settled} of ${total} — please retry`);
                                     }
                                 } catch (error) {
-                                    toast.error(error instanceof Error ? error.message : 'Failed to settle all');
+                                    toast.error(settleErrorMessage(error, 'Failed to settle all'));
                                 } finally {
                                     setIsSettlingAll(false);
                                 }
@@ -180,7 +193,7 @@ export function SettlementsTabContent({
                                                 await settleSplit(split.id, split.transaction?.user_id);
                                                 toast.success('Split settled!');
                                             } catch (error) {
-                                                toast.error(error instanceof Error ? error.message : 'Failed to settle split');
+                                                toast.error(settleErrorMessage(error, 'Failed to settle split'));
                                             }
                                         }}
                                     >
