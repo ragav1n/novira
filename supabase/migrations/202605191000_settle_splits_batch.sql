@@ -10,6 +10,12 @@
 --
 -- Create the function so the happy path works. It is atomic: a failure on any
 -- split rolls the whole call back, so the user never ends up half-settled.
+--
+-- Drop any pre-existing version first: an earlier hand-written copy may have a
+-- different return type (blocks create-or-replace) or a parameter not named
+-- `split_ids` (which is why PostgREST could not match the client's call).
+
+drop function if exists public.settle_splits_batch(uuid[]);
 
 create or replace function public.settle_splits_batch(split_ids uuid[])
 returns integer
