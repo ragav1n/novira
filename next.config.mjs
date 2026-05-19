@@ -60,8 +60,11 @@ const nextConfig = {
         source: '/(.*)',
         headers: [
           {
+            // Must match the Permissions-Policy set in proxy.ts — a value here
+            // that omits `microphone`/`camera` can shadow the middleware header
+            // and leave voice input / receipt scanning without permission.
             key: 'Permissions-Policy',
-            value: 'geolocation=*',
+            value: 'camera=(self), microphone=(self), geolocation=*',
           },
           {
             key: 'Content-Security-Policy',

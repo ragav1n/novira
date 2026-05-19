@@ -61,6 +61,8 @@ import { CATEGORY_COLORS, getIconForCategory, CATEGORIES as SYSTEM_CATEGORIES } 
 import { evaluateExpression } from '@/lib/expression-eval';
 import { ExpressionKeypad } from '@/components/ui/expression-keypad';
 import { isSpeechSupported, startDictation, type DictationHandle } from '@/lib/speech-to-text';
+import { parseVoiceExpense, type ParsedVoiceExpense } from '@/lib/voice-expense-parser';
+import { VoiceReviewModal } from './add-expense/voice-review-modal';
 import { Mic, MicOff, Users } from 'lucide-react';
 import { useRecentSplitPartner } from '@/hooks/useRecentSplitPartner';
 
@@ -131,20 +133,56 @@ export function AddExpenseView() {
     const [isDictating, setIsDictating] = React.useState(false);
     const [interimTranscript, setInterimTranscript] = React.useState('');
     const dictationHandleRef = useRef<DictationHandle | null>(null);
-    // Mirrors the latest description so the dictation onResult callback reads the
-    // *current* form value at commit time — otherwise a word typed between phrases
-    // is silently overwritten by the next final transcript.
-    const descriptionRef = useRef<string>(formState.description);
-    descriptionRef.current = formState.description;
+    // Accumulates the final transcript chunks across one dictation session — the
+    // whole utterance is parsed into structured fields when recognition ends.
+    const fullTranscriptRef = useRef<string>('');
+    // Fallback timer: force-finishes dictation if onEnd never fires after a stop.
+    const dictationStopTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    // Watchdog: if recognition produces no audio within a few seconds, surface a
+    // hint — usually a missed mic-permission prompt or an Incognito restriction.
+    const dictationWatchdogRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const dictationGotSpeechRef = useRef(false);
+    const [parsedExpense, setParsedExpense] = React.useState<ParsedVoiceExpense | null>(null);
     const speechSupported = React.useMemo(() => isSpeechSupported(), []);
     // Guards state-setters in dictation callbacks against firing after unmount —
     // recognition.stop() during cleanup runs onEnd asynchronously.
     const mountedRef = useRef(true);
     useEffect(() => {
+        // Re-arm on (re)mount. React Strict Mode runs the cleanup once during the
+        // initial mount in dev — without this the ref stays stuck at false and
+        // every dictation callback (onResult/onEnd) silently no-ops.
+        mountedRef.current = true;
         return () => {
             mountedRef.current = false;
-            dictationHandleRef.current?.stop();
+            if (dictationStopTimerRef.current) clearTimeout(dictationStopTimerRef.current);
+            if (dictationWatchdogRef.current) clearTimeout(dictationWatchdogRef.current);
+            dictationHandleRef.current?.abort();
         };
+    }, []);
+
+    // Stops dictation. Closes the listening UI immediately so the user is never
+    // stuck, even if the recogniser is wedged — onEnd normally finishes the parse,
+    // and a fallback timer covers the case where it never fires.
+    const stopDictation = React.useCallback(() => {
+        setIsDictating(false);
+        setInterimTranscript('');
+        if (dictationWatchdogRef.current) {
+            clearTimeout(dictationWatchdogRef.current);
+            dictationWatchdogRef.current = null;
+        }
+        const handle = dictationHandleRef.current;
+        if (!handle) return;
+        handle.stop();
+        if (dictationStopTimerRef.current) clearTimeout(dictationStopTimerRef.current);
+        dictationStopTimerRef.current = setTimeout(() => {
+            dictationStopTimerRef.current = null;
+            if (!mountedRef.current) return;
+            handle.abort();
+            dictationHandleRef.current = null;
+            const spoken = fullTranscriptRef.current.trim();
+            fullTranscriptRef.current = '';
+            if (spoken) setParsedExpense(parseVoiceExpense(spoken));
+        }, 1500);
     }, []);
 
     const stashAsReceipt = React.useCallback((file: File | Blob) => {
@@ -318,7 +356,37 @@ export function AddExpenseView() {
             selectedAccountId: formState.selectedAccountId,
         });
     };
-    
+
+    // Route a parsed voice dictation into the form. Amount/currency/category/
+    // payment overwrite (the user dictated them deliberately); tags and free text
+    // merge with anything already entered so a manual edit isn't clobbered.
+    const applyParsedVoice = (parsed: ParsedVoiceExpense) => {
+        if (parsed.amount !== null) formState.setAmount(parsed.amount);
+        if (parsed.currency) {
+            const code = parsed.currency.toUpperCase();
+            if (code in CURRENCY_SYMBOLS) formState.setTxCurrency(code);
+        }
+        if (parsed.category) formState.setSelectedCategory(parsed.category);
+        if (parsed.paymentMethod) formState.setPaymentMethod(parsed.paymentMethod);
+        if (parsed.notes) {
+            const base = formState.notes.trim();
+            formState.setNotes(base ? `${base} ${parsed.notes}` : parsed.notes);
+        }
+        if (parsed.tags.length) {
+            const merged = [...formState.tags];
+            for (const t of parsed.tags) {
+                if (!merged.includes(t) && merged.length < 12) merged.push(t);
+            }
+            formState.setTags(merged);
+        }
+        if (parsed.description) {
+            const base = formState.description;
+            const joiner = base && !base.endsWith(' ') ? ' ' : '';
+            formState.setDescription(`${base}${joiner}${parsed.description}`);
+        }
+        setParsedExpense(null);
+    };
+
     // Detect location once for suggestion sorting
     useEffect(() => {
         if (navigator.geolocation) {
@@ -600,50 +668,79 @@ export function AddExpenseView() {
                         {speechSupported && (
                             <button
                                 type="button"
-                                onClick={async () => {
+                                onClick={() => {
                                     if (isNative) Haptics.impact({ style: ImpactStyle.Light }).catch(() => { });
                                     if (isDictating) {
-                                        dictationHandleRef.current?.stop();
+                                        stopDictation();
                                         return;
                                     }
                                     setInterimTranscript('');
-                                    const handle = await startDictation({
+                                    fullTranscriptRef.current = '';
+                                    const handle = startDictation({
                                         onResult: (transcript, isFinal) => {
                                             if (!mountedRef.current) return;
+                                            dictationGotSpeechRef.current = true;
+                                            if (dictationWatchdogRef.current) {
+                                                clearTimeout(dictationWatchdogRef.current);
+                                                dictationWatchdogRef.current = null;
+                                            }
                                             if (isFinal) {
-                                                // Always re-read the current description so manual edits
-                                                // between phrases survive the next final result.
-                                                const base = descriptionRef.current;
-                                                const joiner = base && !base.endsWith(' ') ? ' ' : '';
-                                                const next = `${base}${joiner}${transcript}`;
-                                                formState.setDescription(next);
-                                                descriptionRef.current = next;
+                                                // Accumulate finals; the full utterance is parsed in onEnd.
+                                                const base = fullTranscriptRef.current;
+                                                fullTranscriptRef.current = base ? `${base} ${transcript}` : transcript;
                                                 setInterimTranscript('');
                                             } else {
                                                 setInterimTranscript(transcript);
                                             }
                                         },
                                         onError: (err) => {
-                                            if (err === 'aborted' || err === 'no-speech') return;
-                                            if (err === 'not-allowed') {
+                                            if (err === 'aborted') return;
+                                            if (err === 'no-speech') {
+                                                toast("Didn't catch that — tap the mic and speak", { icon: '🎤' });
+                                                return;
+                                            }
+                                            if (err === 'not-allowed' || err === 'service-not-allowed') {
                                                 toast.error('Microphone access denied — enable it for this site in browser settings.');
-                                            } else if (err === 'no-microphone') {
+                                            } else if (err === 'no-microphone' || err === 'audio-capture') {
                                                 toast.error('No microphone detected.');
+                                            } else if (err === 'network') {
+                                                toast.error('Voice input needs an internet connection.');
                                             } else {
                                                 console.error('Dictation error:', err);
                                                 toast.error('Voice input unavailable');
                                             }
                                         },
                                         onEnd: () => {
+                                            if (dictationStopTimerRef.current) {
+                                                clearTimeout(dictationStopTimerRef.current);
+                                                dictationStopTimerRef.current = null;
+                                            }
+                                            if (dictationWatchdogRef.current) {
+                                                clearTimeout(dictationWatchdogRef.current);
+                                                dictationWatchdogRef.current = null;
+                                            }
                                             dictationHandleRef.current = null;
                                             if (!mountedRef.current) return;
                                             setIsDictating(false);
                                             setInterimTranscript('');
+                                            const spoken = fullTranscriptRef.current.trim();
+                                            fullTranscriptRef.current = '';
+                                            if (spoken) setParsedExpense(parseVoiceExpense(spoken));
                                         },
                                     });
                                     if (handle) {
                                         dictationHandleRef.current = handle;
-                                        if (mountedRef.current) setIsDictating(true);
+                                        setIsDictating(true);
+                                        dictationGotSpeechRef.current = false;
+                                        if (dictationWatchdogRef.current) clearTimeout(dictationWatchdogRef.current);
+                                        dictationWatchdogRef.current = setTimeout(() => {
+                                            dictationWatchdogRef.current = null;
+                                            if (!mountedRef.current || dictationGotSpeechRef.current) return;
+                                            toast('No audio detected — check for a microphone prompt in the address bar. Incognito windows often block voice input; try a normal window.', { icon: '🎤', duration: 7000 });
+                                        }, 8000);
+                                    } else {
+                                        // Browser couldn't start recognition — onError already notified.
+                                        setIsDictating(false);
                                     }
                                 }}
                                 aria-label={isDictating ? 'Stop voice input' : 'Voice input'}
@@ -698,7 +795,7 @@ export function AddExpenseView() {
                                     </p>
                                     <button
                                         type="button"
-                                        onClick={() => dictationHandleRef.current?.stop()}
+                                        onClick={stopDictation}
                                         className="shrink-0 text-[10px] font-bold uppercase tracking-wider text-rose-300 hover:text-rose-200 px-2 py-0.5 rounded-md border border-rose-500/30 hover:border-rose-500/50 transition-colors"
                                         aria-label="Stop voice input"
                                     >
@@ -1257,6 +1354,11 @@ export function AddExpenseView() {
                 </Button>
             </div>
         </motion.div>
+        <VoiceReviewModal
+            parsed={parsedExpense}
+            onApply={applyParsedVoice}
+            onDiscard={() => setParsedExpense(null)}
+        />
         </>
     );
 }
