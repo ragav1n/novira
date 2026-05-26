@@ -250,6 +250,7 @@ export function BucketDialog({ isOpen, onClose, editingBucket }: BucketDialogPro
                                             id="bucket-budget"
                                             name="bucket-budget"
                                             type="number"
+                                            inputMode="decimal"
                                             placeholder="0.00"
                                             value={newBucketTarget}
                                             onChange={(e) => setNewBucketTarget(e.target.value)}

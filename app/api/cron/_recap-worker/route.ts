@@ -1,6 +1,7 @@
 import 'server-only';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient as createServiceClient } from '@supabase/supabase-js';
+import { authorizeCron } from '@/lib/server/push';
 import { generateRecap, VALID_PERIOD_RE } from '@/lib/recap-generator';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const webpush = require('web-push') as typeof import('web-push');
@@ -29,13 +30,8 @@ interface WorkerPayload {
 }
 
 export async function POST(request: NextRequest) {
-    const internal = request.headers.get('x-push-secret');
-    const auth = request.headers.get('authorization');
-    const internalOk = !!internal && internal === process.env.PUSH_SECRET;
-    const cronOk = !!process.env.CRON_SECRET && auth === `Bearer ${process.env.CRON_SECRET}`;
-    if (!internalOk && !cronOk) {
-        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
+    const denied = authorizeCron(request);
+    if (denied) return denied;
 
     const { userId, period, currency, push } = (await request.json()) as WorkerPayload;
     if (!userId || !period || !VALID_PERIOD_RE.test(period)) {

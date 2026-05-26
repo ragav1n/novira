@@ -154,6 +154,7 @@ export function DashboardDialogs({
                                 id="monthly-budget"
                                 name="monthly-budget"
                                 type="number"
+                                inputMode="decimal"
                                 value={tempBudgetInput}
                                 onChange={(e) => setTempBudgetInput(e.target.value)}
                                 placeholder="e.g. 5000"
@@ -198,6 +199,7 @@ export function DashboardDialogs({
                                 <Input
                                     id="edit-amount"
                                     type="number"
+                                    inputMode="decimal"
                                     step="0.01"
                                     value={editingTransaction.amount}
                                     onChange={(e) => setEditingTransaction({ ...editingTransaction, amount: parseFloat(e.target.value) })}

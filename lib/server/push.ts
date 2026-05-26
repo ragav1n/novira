@@ -1,6 +1,7 @@
 import 'server-only';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient as createServiceClient, SupabaseClient } from '@supabase/supabase-js';
+import { safeEqual } from './secrets';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const webpush = require('web-push') as typeof import('web-push');
 
@@ -38,11 +39,11 @@ export interface PushSubRow {
 }
 
 export function authorizeCron(request: NextRequest): NextResponse | null {
-    const cronSecret = process.env.CRON_SECRET;
     const auth = request.headers.get('authorization');
+    const bearer = auth?.startsWith('Bearer ') ? auth.slice(7) : null;
     const internal = request.headers.get('x-push-secret');
-    const cronOk = !!cronSecret && auth === `Bearer ${cronSecret}`;
-    const internalOk = !!internal && internal === process.env.PUSH_SECRET;
+    const cronOk = safeEqual(bearer, process.env.CRON_SECRET);
+    const internalOk = safeEqual(internal, process.env.PUSH_SECRET);
     if (!cronOk && !internalOk) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }

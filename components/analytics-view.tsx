@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import dynamic from 'next/dynamic';
 import { ChevronLeft, ChartLine, Plus } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -27,12 +28,21 @@ import { supabase } from '@/lib/supabase';
 import { toast, ImpactStyle } from '@/utils/haptics';
 import { AnalyticsSkeleton } from '@/components/analytics/analytics-skeleton';
 import { MonthlyRecapCard } from '@/components/analytics/monthly-recap-card';
-import { SpendingTrendCard } from '@/components/analytics/spending-trend-card';
+const SpendingTrendCard = dynamic(
+    () => import('@/components/analytics/spending-trend-card').then(m => m.SpendingTrendCard),
+    { ssr: false, loading: () => <div className="h-[320px] w-full animate-pulse rounded-2xl bg-card/40" /> }
+);
 import { WeekdayChartCard } from '@/components/analytics/weekday-chart-card';
 import { TopMerchantsCard } from '@/components/analytics/top-merchants-card';
 import { LargestTransactionsCard } from '@/components/analytics/largest-transactions-card';
-import { CategoryBreakdownCard } from '@/components/analytics/category-breakdown-card';
-import { PaymentBreakdownCard } from '@/components/analytics/payment-breakdown-card';
+const CategoryBreakdownCard = dynamic(
+    () => import('@/components/analytics/category-breakdown-card').then(m => m.CategoryBreakdownCard),
+    { ssr: false, loading: () => <div className="h-[200px] w-full animate-pulse rounded-2xl bg-card/40" /> }
+);
+const PaymentBreakdownCard = dynamic(
+    () => import('@/components/analytics/payment-breakdown-card').then(m => m.PaymentBreakdownCard),
+    { ssr: false, loading: () => <div className="h-[200px] w-full animate-pulse rounded-2xl bg-card/40" /> }
+);
 import { RecurringSplitCard } from '@/components/analytics/recurring-split-card';
 import { TagsFilterCard } from '@/components/analytics/tags-filter-card';
 import { CalendarHeatmapCard } from '@/components/analytics/calendar-heatmap-card';

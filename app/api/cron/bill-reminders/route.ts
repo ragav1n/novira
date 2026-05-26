@@ -2,7 +2,7 @@ import 'server-only';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient as createServiceClient } from '@supabase/supabase-js';
 import { isInQuietHours } from '@/lib/push-quiet-hours';
-import { processInBatches } from '@/lib/server/push';
+import { authorizeCron, processInBatches } from '@/lib/server/push';
 import { logSend } from '@/lib/server/send-log';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const webpush = require('web-push') as typeof import('web-push');
@@ -58,17 +58,10 @@ function formatBillNotification(t: RecurringTemplateRow, daysUntil: number) {
 }
 
 export async function GET(request: NextRequest) {
-    // Vercel Cron sends `Authorization: Bearer <CRON_SECRET>`. Allow either that
-    // or the existing internal x-push-secret header so the route can be invoked
-    // manually for testing.
-    const cronSecret = process.env.CRON_SECRET;
-    const auth = request.headers.get('authorization');
-    const internal = request.headers.get('x-push-secret');
-    const cronOk = cronSecret && auth === `Bearer ${cronSecret}`;
-    const internalOk = internal && internal === process.env.PUSH_SECRET;
-    if (!cronOk && !internalOk) {
-        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
+    // Vercel Cron sends `Authorization: Bearer <CRON_SECRET>`. The shared helper
+    // accepts either that or the internal x-push-secret header (for manual tests).
+    const denied = authorizeCron(request);
+    if (denied) return denied;
 
     if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
         return NextResponse.json({ error: 'Push not configured' }, { status: 503 });

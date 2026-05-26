@@ -1,16 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { timingSafeEqual } from 'node:crypto';
+import { safeEqual } from '@/lib/server/secrets';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const webpush = require('web-push') as typeof import('web-push');
 import { createClient as createServiceClient } from '@supabase/supabase-js';
-
-function safeEqual(a: string | null | undefined, b: string | null | undefined): boolean {
-    if (!a || !b) return false;
-    const ab = Buffer.from(a);
-    const bb = Buffer.from(b);
-    if (ab.length !== bb.length) return false;
-    return timingSafeEqual(ab, bb);
-}
 
 // VAPID keys must be set in environment variables.
 // Generate with: npx web-push generate-vapid-keys

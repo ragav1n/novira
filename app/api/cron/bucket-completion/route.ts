@@ -1,6 +1,7 @@
 import 'server-only';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient as createServiceClient } from '@supabase/supabase-js';
+import { authorizeCron } from '@/lib/server/push';
 import { logSend } from '@/lib/server/send-log';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const webpush = require('web-push') as typeof import('web-push');
@@ -31,14 +32,8 @@ interface PushSubRow {
 }
 
 export async function GET(request: NextRequest) {
-    const cronSecret = process.env.CRON_SECRET;
-    const auth = request.headers.get('authorization');
-    const internal = request.headers.get('x-push-secret');
-    const cronOk = cronSecret && auth === `Bearer ${cronSecret}`;
-    const internalOk = internal && internal === process.env.PUSH_SECRET;
-    if (!cronOk && !internalOk) {
-        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
+    const denied = authorizeCron(request);
+    if (denied) return denied;
 
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;

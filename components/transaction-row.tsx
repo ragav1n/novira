@@ -211,7 +211,7 @@ export const TransactionRow = memo(function TransactionRow({
         dragConstraints={{ left: -SNAP_DISTANCE, right: 0 }}
         dragElastic={0.07}
         onDragEnd={handleDragEnd}
-        style={{ x, borderLeft: `3px solid ${color}` }}
+        style={{ x, borderLeft: `3px solid ${color}`, touchAction: 'pan-y' }}
         onClick={(e) => {
           if (canBulkSelect && onToggleSelect) {
             e.stopPropagation();

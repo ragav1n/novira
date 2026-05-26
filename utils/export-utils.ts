@@ -1,6 +1,8 @@
 import type jsPDF from 'jspdf';
 import { format, differenceInDays, parseISO, subDays } from 'date-fns';
 import { DateRange } from 'react-day-picker';
+import type { Bucket } from '@/components/providers/buckets-provider';
+import type { Group } from '@/components/providers/groups-provider';
 
 // jsPDF + autoTable expose a few members the published types don't declare.
 // Narrow to just what we use so we get autocompletion and stop bypassing
@@ -98,7 +100,7 @@ function computeStats(
     transactions: ExportTransaction[],
     currency: string,
     convertAmount: (amount: number, fromCurrency: string) => number,
-    buckets: any[],
+    buckets: Bucket[],
     reportRange?: DateRange,
     monthlyBudget?: number,
 ): ReportStats {
@@ -445,8 +447,8 @@ export const generateCSV = (
     currency: string,
     convertAmount: (amount: number, fromCurrency: string) => number,
     formatCurrency: (amount: number, currency?: string) => string,
-    buckets: any[] = [],
-    groups: any[] = [],
+    buckets: Bucket[] = [],
+    groups: Group[] = [],
     reportRange?: DateRange,
     ownerInfo?: { email?: string; workspaceName?: string; monthlyBudget?: number },
     recurringTemplates: ExportRecurringTemplate[] = []
@@ -756,8 +758,8 @@ export const generatePDF = async (
     currency: string,
     convertAmount: (amount: number, fromCurrency: string) => number,
     formatCurrency: (amount: number, currency?: string) => string,
-    buckets: any[] = [],
-    groups: any[] = [],
+    buckets: Bucket[] = [],
+    groups: Group[] = [],
     reportRange?: DateRange,
     ownerInfo?: { email?: string; avatarUrl?: string | null; workspaceName?: string; monthlyBudget?: number },
     recurringTemplates: ExportRecurringTemplate[] = []

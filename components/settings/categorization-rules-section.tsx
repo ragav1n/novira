@@ -404,6 +404,7 @@ export function CategorizationRulesSection({ userId, rules, loading, buckets, se
                                             <Input
                                                 id="rule-priority"
                                                 type="number"
+                                                inputMode="numeric"
                                                 value={editing.priority}
                                                 onChange={(e) => setEditing({ ...editing, priority: Number(e.target.value) || 0 })}
                                                 className="h-8 w-[64px] text-[12px] tabular-nums"

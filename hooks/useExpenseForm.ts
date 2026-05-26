@@ -170,6 +170,17 @@ export function useExpenseForm(
         amount: number | null;
         currency: string | null;
     };
+    type PlaceRow = {
+        place_name: string | null;
+        place_address: string | null;
+        place_lat: number | null;
+        place_lng: number | null;
+    };
+    type SmartDefaultsRow = {
+        category: string | null;
+        payment_method: string | null;
+        bucket_id: string | null;
+    };
     const [descriptionSuggestions, setDescriptionSuggestions] = useState<DescriptionSuggestion[]>([]);
 
     // Smart defaults derived from a picked place — most common (category, payment, bucket) at this exact place.
@@ -239,7 +250,8 @@ export function useExpenseForm(
                         .ilike('description', `%${escapedDesc}%`)
                         .not('place_name', 'is', null)
                         .order('created_at', { ascending: false })
-                        .limit(1);
+                        .limit(1)
+                        .returns<PlaceRow[]>();
 
                     if (descMatches?.[0]) {
                         const loc = descMatches[0];
@@ -258,7 +270,8 @@ export function useExpenseForm(
                     .eq('category', selectedCategory)
                     .not('place_name', 'is', null)
                     .order('created_at', { ascending: false })
-                    .limit(20);
+                    .limit(20)
+                    .returns<PlaceRow[]>();
 
                 if (catMatches) {
                     catMatches.forEach(loc => {
@@ -276,7 +289,8 @@ export function useExpenseForm(
                         .select('place_name, place_address, place_lat, place_lng')
                         .eq('user_id', userId)
                         .not('place_name', 'is', null)
-                        .limit(60);
+                        .limit(60)
+                        .returns<PlaceRow[]>();
 
                     if (frequent) {
                         // Count how often each place appears to rank by true frequency
@@ -324,10 +338,11 @@ export function useExpenseForm(
                     .eq('user_id', userId)
                     .not('tags', 'is', null)
                     .order('created_at', { ascending: false })
-                    .limit(200);
+                    .limit(200)
+                    .returns<{ tags: string[] | null }[]>();
                 if (cancelled || !data) return;
                 const counts = new Map<string, number>();
-                for (const row of data as { tags: string[] | null }[]) {
+                for (const row of data) {
                     for (const t of row.tags || []) {
                         if (!t) continue;
                         counts.set(t, (counts.get(t) || 0) + 1);
@@ -370,7 +385,8 @@ export function useExpenseForm(
                     .eq('user_id', userId)
                     .ilike('description', `%${escaped}%`)
                     .order('created_at', { ascending: false })
-                    .limit(20);
+                    .limit(20)
+                    .returns<DescriptionSuggestion[]>();
                 if (cancelled) return;
 
                 if (!data || data.length === 0) {
@@ -382,7 +398,7 @@ export function useExpenseForm(
 
                 const catTally = new Map<string, number>();
                 const bucketTally = new Map<string, number>();
-                for (const r of data as { category: string; bucket_id: string | null }[]) {
+                for (const r of data) {
                     if (r.category) catTally.set(r.category, (catTally.get(r.category) || 0) + 1);
                     if (r.bucket_id) bucketTally.set(r.bucket_id, (bucketTally.get(r.bucket_id) || 0) + 1);
                 }
@@ -394,7 +410,7 @@ export function useExpenseForm(
                 // Top 3 distinct descriptions (case-insensitive)
                 const seen = new Set<string>();
                 const distinct: DescriptionSuggestion[] = [];
-                for (const r of data as DescriptionSuggestion[]) {
+                for (const r of data) {
                     const key = (r.description || '').trim().toLowerCase();
                     if (!key) continue;
                     if (seen.has(key)) continue;
@@ -428,7 +444,8 @@ export function useExpenseForm(
                     .eq('user_id', userId)
                     .eq('place_name', placeName)
                     .order('created_at', { ascending: false })
-                    .limit(20);
+                    .limit(20)
+                    .returns<SmartDefaultsRow[]>();
                 if (cancelled) return;
                 if (!data || data.length < 2) {
                     setSmartDefaults(null);
@@ -442,9 +459,9 @@ export function useExpenseForm(
                     }
                     return [...m.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
                 };
-                const cat = tallyOf(data.map(r => ({ v: r.category as string | null })));
+                const cat = tallyOf(data.map(r => ({ v: r.category })));
                 const pay = tallyOf(data.map(r => ({ v: r.payment_method as SmartDefaults['payment_method'] })));
-                const buck = tallyOf(data.map(r => ({ v: r.bucket_id as string | null })));
+                const buck = tallyOf(data.map(r => ({ v: r.bucket_id })));
 
                 // Only surface fields that differ from current form state.
                 const next: SmartDefaults = {

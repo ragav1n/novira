@@ -137,6 +137,7 @@ export function AddFundsDialog({ isOpen, onClose, userId, defaultBucketId, onSuc
                             <Input
                                 id="fund-amount"
                                 type="number"
+                                inputMode="decimal"
                                 step="0.01"
                                 value={amount}
                                 placeholder="e.g. 500"

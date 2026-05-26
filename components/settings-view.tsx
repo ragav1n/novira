@@ -588,6 +588,7 @@ export function SettingsView() {
                                     className="bg-secondary/10 border-white/5 h-10 rounded-xl"
                                     placeholder="e.g. 3000"
                                     type="number"
+                                    inputMode="decimal"
                                     autoComplete="off"
                                 />
                             </div>

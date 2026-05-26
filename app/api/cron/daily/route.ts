@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { authorizeCron } from '@/lib/server/push';
 
 /**
  * Wrapper cron: fans out to the 4 daily-cadence cron routes in one Vercel slot.
@@ -9,14 +10,9 @@ import { NextRequest, NextResponse } from 'next/server';
  * runs independently, so we just forward authenticated HTTP calls.
  */
 export async function GET(request: NextRequest) {
+    const denied = authorizeCron(request);
+    if (denied) return denied;
     const cronSecret = process.env.CRON_SECRET;
-    const auth = request.headers.get('authorization');
-    const internal = request.headers.get('x-push-secret');
-    const cronOk = !!cronSecret && auth === `Bearer ${cronSecret}`;
-    const internalOk = !!internal && internal === process.env.PUSH_SECRET;
-    if (!cronOk && !internalOk) {
-        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
     if (!cronSecret) {
         return NextResponse.json({ error: 'CRON_SECRET not configured' }, { status: 503 });
     }

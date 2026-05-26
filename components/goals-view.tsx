@@ -473,7 +473,7 @@ export function GoalsView() {
             <div
                 aria-hidden="true"
                 className={cn(
-                    'pointer-events-none absolute -top-32 left-1/2 -translate-x-1/2 w-[520px] h-[520px] rounded-full blur-[120px] opacity-30',
+                    'pointer-events-none absolute -top-32 left-1/2 -translate-x-1/2 w-[min(520px,90vw)] h-[min(520px,90vw)] rounded-full blur-[120px] opacity-30',
                     themeConfig.bgSolid
                 )}
             />
@@ -760,6 +760,7 @@ export function GoalsView() {
                             <div className="flex gap-2">
                                 <Input
                                     type="number"
+                                    inputMode="decimal"
                                     step="0.01"
                                     placeholder="1000.00"
                                     value={goalTarget}
@@ -890,6 +891,7 @@ export function GoalsView() {
                                             <Input
                                                 autoFocus
                                                 type="number"
+                                                inputMode="decimal"
                                                 step="0.01"
                                                 placeholder="0.00"
                                                 value={depositAmount}
