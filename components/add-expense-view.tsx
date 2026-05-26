@@ -280,6 +280,8 @@ export function AddExpenseView() {
         } catch (e) {
             if ((e as { name?: string })?.name === 'AbortError') return;
             console.error('[scan-receipt]', e);
+            const msg = e instanceof Error ? e.message : 'unknown error';
+            toast.error(`Couldn't scan receipt: ${msg}`);
         } finally {
             if (objectUrl) URL.revokeObjectURL(objectUrl);
             if (scanAbortRef.current === controller) {

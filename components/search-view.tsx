@@ -32,7 +32,7 @@ import {
 } from '@/lib/search-utils';
 import { SearchFilterSheet } from '@/components/search/search-filter-sheet';
 import { SearchResultsList } from '@/components/search/search-results-list';
-import { BulkActionBar } from '@/components/search/bulk-action-bar';
+import { SearchBulkActionBar } from '@/components/search/search-bulk-action-bar';
 import { RecategorizeSheet } from '@/components/search/recategorize-sheet';
 
 const bucketIcons: Record<string, React.ElementType> = {
@@ -114,9 +114,16 @@ export function SearchView() {
         if (typeof window === 'undefined') return;
         try {
             const raw = localStorage.getItem(HISTORY_KEY);
-            if (raw) setHistory((JSON.parse(raw) as string[]).slice(0, HISTORY_MAX));
+            if (!raw) return;
+            const parsed: unknown = JSON.parse(raw);
+            if (Array.isArray(parsed) && parsed.every((v): v is string => typeof v === 'string')) {
+                setHistory(parsed.slice(0, HISTORY_MAX));
+            } else {
+                localStorage.removeItem(HISTORY_KEY);
+            }
         } catch (err) {
             console.error('Failed to load search history:', err);
+            try { localStorage.removeItem(HISTORY_KEY); } catch { /* storage unavailable */ }
         }
     }, []);
 
@@ -165,8 +172,17 @@ export function SearchView() {
         });
     }, []);
 
+    // Guards against double-tap on Delete / Recategorize firing two enqueue
+    // batches before the first one finishes. Without this, a fast double-tap
+    // sends N items twice to the offline queue.
+    const bulkBusyRef = useRef(false);
+    const [bulkBusy, setBulkBusy] = useState(false);
+
     const bulkDelete = useCallback(async () => {
         if (selectedIds.size === 0) return;
+        if (bulkBusyRef.current) return;
+        bulkBusyRef.current = true;
+        setBulkBusy(true);
         const ids = [...selectedIds];
         try {
             await Promise.all(ids.map(id => enqueueMutation('DELETE_TRANSACTION', { id })));
@@ -176,11 +192,17 @@ export function SearchView() {
         } catch (error) {
             console.error('Bulk delete failed:', error);
             toast.error('Failed to delete some transactions');
+        } finally {
+            bulkBusyRef.current = false;
+            setBulkBusy(false);
         }
     }, [selectedIds, exitBulkMode]);
 
     const bulkRecategorize = useCallback(async (categoryId: string) => {
         if (selectedIds.size === 0) return;
+        if (bulkBusyRef.current) return;
+        bulkBusyRef.current = true;
+        setBulkBusy(true);
         const ids = [...selectedIds];
         try {
             await Promise.all(ids.map(id => enqueueMutation('UPDATE_TRANSACTION', { id, patch: { category: categoryId } })));
@@ -191,6 +213,9 @@ export function SearchView() {
         } catch (error) {
             console.error('Bulk recategorize failed:', error);
             toast.error('Failed to recategorize some transactions');
+        } finally {
+            bulkBusyRef.current = false;
+            setBulkBusy(false);
         }
     }, [selectedIds, exitBulkMode]);
 
@@ -899,10 +924,11 @@ export function SearchView() {
                 </div>
             </div>
 
-            <BulkActionBar
+            <SearchBulkActionBar
                 visible={bulkMode}
                 selectedCount={selectedIds.size}
                 totalCount={filteredTransactions.length}
+                busy={bulkBusy}
                 onToggleSelectAll={toggleSelectAll}
                 onOpenRecategorize={() => setIsRecategorizeOpen(true)}
                 onBulkDelete={bulkDelete}

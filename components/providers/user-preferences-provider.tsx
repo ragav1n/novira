@@ -11,6 +11,25 @@ import { invalidateTransactionCaches } from '@/lib/sw-cache';
 
 export type Currency = 'USD' | 'EUR' | 'INR' | 'GBP' | 'CHF' | 'SGD' | 'VND' | 'TWD' | 'JPY' | 'KRW' | 'HKD' | 'MYR' | 'PHP' | 'THB' | 'CAD' | 'AUD' | 'MXN' | 'BRL' | 'IDR' | 'AED';
 
+// Safely parse a cached profile blob. Returns an object (possibly empty) so
+// callers can spread without runtime surprises; never returns arrays, strings,
+// numbers, or null. Removes the stored value if it's malformed.
+function readCachedProfile(key: string): Record<string, unknown> {
+    try {
+        const raw = localStorage.getItem(key);
+        if (!raw) return {};
+        const parsed: unknown = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+            return parsed as Record<string, unknown>;
+        }
+        localStorage.removeItem(key);
+        return {};
+    } catch {
+        try { localStorage.removeItem(key); } catch { /* storage unavailable */ }
+        return {};
+    }
+}
+
 const DEFAULT_BUDGETS: Record<Currency, number> = {
     USD: 1500,
     EUR: 1200,
@@ -199,35 +218,30 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
             // can't lose-clobber a currency/budget update happening in parallel.
             const cacheKey = `novira_profile_${uid}`;
             const workspaceKey = `novira_active_workspace_${uid}`;
-            const cached = localStorage.getItem(cacheKey);
-            if (cached) {
-                try {
-                    const parsed = JSON.parse(cached);
-                    if (parsed.currency) setCurrencyState(parsed.currency);
-                    if (parsed.budget_alerts !== null) setBudgetAlertsEnabledState(parsed.budget_alerts);
-                    if (parsed.bill_reminder_lead_days !== undefined) setBillReminderLeadDaysState(parsed.bill_reminder_lead_days);
-                    if (parsed.digest_frequency) setDigestFrequencyState(parsed.digest_frequency);
-                    if (parsed.monthly_budget != null) setMonthlyBudgetState(parsed.monthly_budget);
-                    if (parsed.avatar_url) setAvatarUrl(parsed.avatar_url);
-                    if (parsed.budgets) setBudgets(parsed.budgets);
-                    if (parsed.bucket_deadline_alerts != null) setBucketDeadlineAlertsState(parsed.bucket_deadline_alerts);
-                    if (parsed.spending_pace_alerts != null) setSpendingPaceAlertsState(parsed.spending_pace_alerts);
-                    if (parsed.quiet_hours_start !== undefined) setQuietHoursStartState(parsed.quiet_hours_start);
-                    if (parsed.quiet_hours_end !== undefined) setQuietHoursEndState(parsed.quiet_hours_end);
-                    if (parsed.smart_digests_enabled != null) setSmartDigestsEnabledState(parsed.smart_digests_enabled);
-                    if (parsed.settlement_notifications_enabled != null) setSettlementNotificationsEnabledState(parsed.settlement_notifications_enabled);
-                    if (parsed.first_day_of_week === 0 || parsed.first_day_of_week === 1) setFirstDayOfWeekState(parsed.first_day_of_week);
-                    if (parsed.date_format === 'MDY' || parsed.date_format === 'DMY' || parsed.date_format === 'YMD') setDateFormatState(parsed.date_format);
-                    if (parsed.default_category !== undefined) setDefaultCategoryState(parsed.default_category);
-                    if (parsed.default_payment_method !== undefined) setDefaultPaymentMethodState(parsed.default_payment_method);
-                    if (parsed.default_bucket_id !== undefined) setDefaultBucketIdState(parsed.default_bucket_id);
-                    // Migration: if active_workspace_id was previously stored in the
-                    // consolidated blob, surface it so the new dedicated key takes over.
-                    if (parsed.active_workspace_id && !localStorage.getItem(workspaceKey)) {
-                        localStorage.setItem(workspaceKey, parsed.active_workspace_id);
-                    }
-                } catch {
-                    localStorage.removeItem(cacheKey);
+            const parsed = readCachedProfile(cacheKey);
+            if (Object.keys(parsed).length > 0) {
+                if (typeof parsed.currency === 'string') setCurrencyState(parsed.currency as Currency);
+                if (typeof parsed.budget_alerts === 'boolean') setBudgetAlertsEnabledState(parsed.budget_alerts);
+                if (parsed.bill_reminder_lead_days !== undefined) setBillReminderLeadDaysState(parsed.bill_reminder_lead_days as number | null);
+                if (typeof parsed.digest_frequency === 'string') setDigestFrequencyState(parsed.digest_frequency as 'off' | 'daily' | 'weekly');
+                if (typeof parsed.monthly_budget === 'number') setMonthlyBudgetState(parsed.monthly_budget);
+                if (typeof parsed.avatar_url === 'string') setAvatarUrl(parsed.avatar_url);
+                if (parsed.budgets && typeof parsed.budgets === 'object') setBudgets(parsed.budgets as Record<string, number>);
+                if (typeof parsed.bucket_deadline_alerts === 'boolean') setBucketDeadlineAlertsState(parsed.bucket_deadline_alerts);
+                if (typeof parsed.spending_pace_alerts === 'boolean') setSpendingPaceAlertsState(parsed.spending_pace_alerts);
+                if (parsed.quiet_hours_start !== undefined) setQuietHoursStartState(parsed.quiet_hours_start as number | null);
+                if (parsed.quiet_hours_end !== undefined) setQuietHoursEndState(parsed.quiet_hours_end as number | null);
+                if (typeof parsed.smart_digests_enabled === 'boolean') setSmartDigestsEnabledState(parsed.smart_digests_enabled);
+                if (typeof parsed.settlement_notifications_enabled === 'boolean') setSettlementNotificationsEnabledState(parsed.settlement_notifications_enabled);
+                if (parsed.first_day_of_week === 0 || parsed.first_day_of_week === 1) setFirstDayOfWeekState(parsed.first_day_of_week);
+                if (parsed.date_format === 'MDY' || parsed.date_format === 'DMY' || parsed.date_format === 'YMD') setDateFormatState(parsed.date_format);
+                if (parsed.default_category !== undefined) setDefaultCategoryState(parsed.default_category as string | null);
+                if (parsed.default_payment_method !== undefined) setDefaultPaymentMethodState(parsed.default_payment_method as string | null);
+                if (parsed.default_bucket_id !== undefined) setDefaultBucketIdState(parsed.default_bucket_id as string | null);
+                // Migration: if active_workspace_id was previously stored in the
+                // consolidated blob, surface it so the new dedicated key takes over.
+                if (typeof parsed.active_workspace_id === 'string' && !localStorage.getItem(workspaceKey)) {
+                    localStorage.setItem(workspaceKey, parsed.active_workspace_id);
                 }
             }
             const storedWorkspace = localStorage.getItem(workspaceKey);
@@ -305,12 +319,11 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
                 if (data.default_bucket_id !== undefined) setDefaultBucketIdState(data.default_bucket_id);
 
                 // Update cache with fresh data (merge to preserve fields like active_workspace_id)
+                const existing = readCachedProfile(cacheKey);
                 try {
-                    const existing = localStorage.getItem(cacheKey);
-                    const parsed = existing ? JSON.parse(existing) : {};
-                    localStorage.setItem(cacheKey, JSON.stringify({ ...parsed, ...data }));
+                    localStorage.setItem(cacheKey, JSON.stringify({ ...existing, ...data }));
                 } catch {
-                    localStorage.setItem(cacheKey, JSON.stringify(data));
+                    /* quota or unavailable */
                 }
             }
             if (error && error.code !== 'PGRST116') {
@@ -642,9 +655,8 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
         // doesn't read stale currency and revert the change
         if (userId) {
             const cacheKey = `novira_profile_${userId}`;
+            const parsed = readCachedProfile(cacheKey);
             try {
-                const cached = localStorage.getItem(cacheKey);
-                const parsed = cached ? JSON.parse(cached) : {};
                 localStorage.setItem(cacheKey, JSON.stringify({ ...parsed, currency: newCurrency, monthly_budget: newBudget }));
             } catch { /* ignore */ }
         }
@@ -684,9 +696,8 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
         setDigestFrequencyState(freq);
         if (userId) {
             const cacheKey = `novira_profile_${userId}`;
+            const parsed = readCachedProfile(cacheKey);
             try {
-                const cached = localStorage.getItem(cacheKey);
-                const parsed = cached ? JSON.parse(cached) : {};
                 localStorage.setItem(cacheKey, JSON.stringify({ ...parsed, digest_frequency: freq }));
             } catch { /* ignore */ }
 
@@ -709,9 +720,8 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
 
         if (userId) {
             const cacheKey = `novira_profile_${userId}`;
+            const parsed = readCachedProfile(cacheKey);
             try {
-                const cached = localStorage.getItem(cacheKey);
-                const parsed = cached ? JSON.parse(cached) : {};
                 localStorage.setItem(cacheKey, JSON.stringify({ ...parsed, bill_reminder_lead_days: days }));
             } catch { /* ignore */ }
 
@@ -853,9 +863,8 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
         // Update localStorage cache immediately so any re-hydration uses the new value
         if (userId) {
             const cacheKey = `novira_profile_${userId}`;
+            const parsed = readCachedProfile(cacheKey);
             try {
-                const cached = localStorage.getItem(cacheKey);
-                const parsed = cached ? JSON.parse(cached) : {};
                 localStorage.setItem(cacheKey, JSON.stringify({
                     ...parsed,
                     monthly_budget: budget,

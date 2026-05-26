@@ -1,22 +1,30 @@
 'use client';
 
+// Slim bulk-action toolbar used by the Search view. Has only delete +
+// recategorize and delegates recategorize to a separate RecategorizeSheet.
+// The dashboard list uses `components/bulk-action-bar.tsx` instead, which
+// embeds its own category/bucket/account pickers.
+
 import { motion, AnimatePresence } from 'framer-motion';
-import { CheckSquare, Tag, Trash2 } from 'lucide-react';
+import { CheckSquare, Tag, Trash2, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface Props {
     visible: boolean;
     selectedCount: number;
     totalCount: number;
+    /** Disables action buttons while a bulk mutation is in flight. */
+    busy?: boolean;
     onToggleSelectAll: () => void;
     onOpenRecategorize: () => void;
     onBulkDelete: () => void;
 }
 
-export function BulkActionBar({
+export function SearchBulkActionBar({
     visible,
     selectedCount,
     totalCount,
+    busy = false,
     onToggleSelectAll,
     onOpenRecategorize,
     onBulkDelete,
@@ -46,7 +54,7 @@ export function BulkActionBar({
                         size="sm"
                         variant="outline"
                         onClick={onOpenRecategorize}
-                        disabled={selectedCount === 0}
+                        disabled={selectedCount === 0 || busy}
                         className="h-8 rounded-lg bg-secondary/20 border-white/10 text-xs"
                     >
                         <Tag className="w-3.5 h-3.5 mr-1.5" /> Recategorize
@@ -54,10 +62,12 @@ export function BulkActionBar({
                     <Button
                         size="sm"
                         onClick={onBulkDelete}
-                        disabled={selectedCount === 0}
+                        disabled={selectedCount === 0 || busy}
+                        aria-busy={busy}
                         className="h-8 rounded-lg bg-rose-500/20 border border-rose-500/30 text-rose-300 hover:bg-rose-500/30 text-xs disabled:opacity-50"
                     >
-                        <Trash2 className="w-3.5 h-3.5 mr-1.5" /> Delete
+                        {busy ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5 mr-1.5" />}
+                        {busy ? 'Working…' : 'Delete'}
                     </Button>
                 </motion.div>
             )}

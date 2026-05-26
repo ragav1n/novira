@@ -31,6 +31,19 @@ export interface Friend {
     request_id?: string; // The ID of the friendship record, useful for accepting/declining
 }
 
+function unwrapSplits(rows: unknown): Split[] {
+    if (!Array.isArray(rows)) return [];
+    return rows.filter((row): row is Split => {
+        if (!row || typeof row !== 'object') return false;
+        const r = row as Partial<Split>;
+        return typeof r.id === 'string'
+            && typeof r.transaction_id === 'string'
+            && typeof r.user_id === 'string'
+            && (typeof r.amount === 'number' || typeof r.amount === 'string')
+            && typeof r.is_paid === 'boolean';
+    });
+}
+
 export interface Split {
     id: string;
     transaction_id: string;
@@ -233,9 +246,10 @@ export function GroupsProvider({ children }: { children: React.ReactNode }) {
             if (myCreditsResult.error) throw myCreditsResult.error;
 
             // Supabase types nested joins as arrays when columns are explicit, but the
-            // foreign-key relationships here return a single row at runtime.
-            const myDebts = (myDebtsResult.data ?? []) as unknown as Split[];
-            const myCredits = (myCreditsResult.data ?? []) as unknown as Split[];
+            // foreign-key relationships here return a single row at runtime. unwrapSplits
+            // also drops any row that's missing the load-bearing fields.
+            const myDebts = unwrapSplits(myDebtsResult.data);
+            const myCredits = unwrapSplits(myCreditsResult.data);
 
             const totalOwed = myDebts.reduce((acc: number, s: Split) => {
                 const amount = Number(s.amount);

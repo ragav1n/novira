@@ -613,6 +613,9 @@ export function MobileLayout({ children, defaultIsDesktop = false }: { children:
                     duration: 3000,
                 }}
                 duration={3000}
+                visibleToasts={3}
+                richColors
+                closeButton
             />
         </div>
         </MotionConfig>

@@ -165,6 +165,8 @@ export function AddFundsDialog({ isOpen, onClose, userId, defaultBucketId, onSuc
                             id="fund-description"
                             value={description}
                             placeholder="e.g. Salary, Refund..."
+                            required
+                            aria-required="true"
                             aria-invalid={!!errors.description}
                             aria-describedby={errors.description ? 'fund-description-error' : undefined}
                             onChange={(e) => {

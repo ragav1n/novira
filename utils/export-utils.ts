@@ -2,6 +2,16 @@ import type jsPDF from 'jspdf';
 import { format, differenceInDays, parseISO, subDays } from 'date-fns';
 import { DateRange } from 'react-day-picker';
 
+// jsPDF + autoTable expose a few members the published types don't declare.
+// Narrow to just what we use so we get autocompletion and stop bypassing
+// typechecking with `(doc as any)` sprinkled at every call site.
+type GStateCtor = new (opts: { opacity: number }) => unknown;
+type JsPDFWithExtras = jsPDF & {
+    GState: GStateCtor;
+    lastAutoTable: { finalY: number };
+};
+const ext = (doc: jsPDF): JsPDFWithExtras => doc as JsPDFWithExtras;
+
 interface ExportTransaction {
     date: string;
     description: string;
@@ -415,9 +425,9 @@ const drawProgressBar = (doc: jsPDF, percent: number, x: number, y: number, widt
 
 const drawInsightBox = (doc: jsPDF, x: number, y: number, w: number, h: number, label: string, value: string, color: [number, number, number]) => {
     doc.setFillColor(color[0], color[1], color[2]);
-    doc.setGState(new (doc as any).GState({ opacity: 0.08 }));
+    doc.setGState(new (ext(doc).GState)({ opacity: 0.08 }));
     doc.rect(x, y, w, h, 'F');
-    doc.setGState(new (doc as any).GState({ opacity: 1 }));
+    doc.setGState(new (ext(doc).GState)({ opacity: 1 }));
     doc.setDrawColor(color[0], color[1], color[2]);
     doc.setLineWidth(0.4);
     doc.rect(x, y, w, h);
@@ -1035,7 +1045,7 @@ export const generatePDF = async (
         doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(50, 50, 50);
         doc.text('Category Breakdown', 14, tableStartY);
         doc.setFont('helvetica', 'normal');
-        autoTable(doc as any, {
+        autoTable(doc, {
             head: [['Category', 'Amount', '% of Total']],
             body: categoryRows,
             startY: tableStartY + 4,
@@ -1046,7 +1056,7 @@ export const generatePDF = async (
             tableWidth: 'auto',
             margin: { left: 14, right: pageWidth / 2 + 5 },
         });
-        tableStartY = (doc as any).lastAutoTable.finalY + 10;
+        tableStartY = ext(doc).lastAutoTable.finalY + 10;
     }
 
     // ── Monthly Recap ─────────────────────────────────────────────────────────
@@ -1057,7 +1067,7 @@ export const generatePDF = async (
         const monthRows = Object.entries(monthlyTotals)
             .sort((a, b) => new Date(a[0]).getTime() - new Date(b[0]).getTime())
             .map(([month, amount]) => [month, formatForPDF(amount, currency)]);
-        autoTable(doc as any, {
+        autoTable(doc, {
             head: [['Month', 'Total Spent']],
             body: monthRows,
             startY: tableStartY + 4,
@@ -1066,7 +1076,7 @@ export const generatePDF = async (
             styles: { fontSize: 8 },
             tableWidth: 80,
         });
-        tableStartY = (doc as any).lastAutoTable.finalY + 10;
+        tableStartY = ext(doc).lastAutoTable.finalY + 10;
     }
 
     // ── PAGE 3: Distribution, Streaks, Tags, Currency Mix ─────────────────────
@@ -1138,7 +1148,7 @@ export const generatePDF = async (
                     `${d.nativeTotal.toFixed(2)} ${curr}`,
                     formatForPDF(d.convertedTotal, currency),
                 ]);
-            autoTable(doc as any, {
+            autoTable(doc, {
                 head: [['Currency', 'Tx', 'Native Total', `Converted (${currency})`]],
                 body: currencyRows,
                 startY: y,
@@ -1149,7 +1159,7 @@ export const generatePDF = async (
                 tableWidth: 'auto',
                 margin: { left: 14, right: pageWidth / 2 + 5 },
             });
-            y = (doc as any).lastAutoTable.finalY + 8;
+            y = ext(doc).lastAutoTable.finalY + 8;
         }
 
         // Income by category
@@ -1168,7 +1178,7 @@ export const generatePDF = async (
                         `${pct}%`,
                     ];
                 });
-            autoTable(doc as any, {
+            autoTable(doc, {
                 head: [['Category', 'Amount', '% of Income']],
                 body: incomeRows,
                 startY: y,
@@ -1179,7 +1189,7 @@ export const generatePDF = async (
                 tableWidth: 'auto',
                 margin: { left: 14, right: pageWidth / 2 + 5 },
             });
-            y = (doc as any).lastAutoTable.finalY + 8;
+            y = ext(doc).lastAutoTable.finalY + 8;
         }
 
         // Tags Breakdown — full-width below preceding sections so it can't
@@ -1201,7 +1211,7 @@ export const generatePDF = async (
                     const pct = totalExpenses > 0 ? ((d.total / totalExpenses) * 100).toFixed(1) : '0.0';
                     return [tag, String(d.count), formatForPDF(d.total, currency), `${pct}%`];
                 });
-            autoTable(doc as any, {
+            autoTable(doc, {
                 head: [['Tag', 'Tx', 'Total', '%']],
                 body: tagRows,
                 startY: y,
@@ -1232,7 +1242,7 @@ export const generatePDF = async (
             t.is_active ? 'Active' : 'Paused',
         ]);
 
-        autoTable(doc as any, {
+        autoTable(doc, {
             head: [['Description', 'Category', 'Frequency', 'Next Due', 'Amount', 'Status']],
             body: templateRows,
             startY: 24,
@@ -1279,7 +1289,7 @@ export const generatePDF = async (
         return row;
     });
 
-    autoTable(doc as any, {
+    autoTable(doc, {
         head: [tableColumns],
         body: tableRows,
         startY: 24,
@@ -1291,7 +1301,7 @@ export const generatePDF = async (
     });
 
     // ── Footnotes below transaction table ─────────────────────────────────────
-    const footnotesY = (doc as any).lastAutoTable.finalY + 5;
+    const footnotesY = ext(doc).lastAutoTable.finalY + 5;
     const hasMultiCurrency = transactions.some(tx => tx.currency && tx.currency !== currency);
     const footnotes: string[] = [
         '[R] = Recurring transaction · [S] = Settlement',

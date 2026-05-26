@@ -240,9 +240,36 @@ export async function enqueueMutation(type: string, data: any): Promise<string> 
  * an unguarded run on browsers without Web Locks (in which case the in-tab
  * `isSyncingLoopActive` flag still prevents intra-tab overlap).
  */
+interface WebLock {
+    name: string;
+    mode: 'shared' | 'exclusive';
+}
+interface WebLockManager {
+    request: (
+        name: string,
+        options: { ifAvailable?: boolean; mode?: 'shared' | 'exclusive' },
+        callback: (lock: WebLock | null) => Promise<void>,
+    ) => Promise<void>;
+}
+
+function getLockManager(): WebLockManager | null {
+    if (typeof navigator === 'undefined') return null;
+    const candidate = (navigator as Navigator & { locks?: unknown }).locks;
+    if (
+        candidate &&
+        typeof candidate === 'object' &&
+        'request' in candidate &&
+        typeof (candidate as { request?: unknown }).request === 'function'
+    ) {
+        return candidate as WebLockManager;
+    }
+    return null;
+}
+
 async function withSyncLock(body: () => Promise<void>): Promise<void> {
-    if (typeof navigator !== 'undefined' && (navigator as any).locks?.request) {
-        await (navigator as any).locks.request(SYNC_LOCK_NAME, { ifAvailable: true }, async (lock: unknown) => {
+    const locks = getLockManager();
+    if (locks) {
+        await locks.request(SYNC_LOCK_NAME, { ifAvailable: true }, async (lock) => {
             if (!lock) return; // another tab is syncing — yield
             await body();
         });

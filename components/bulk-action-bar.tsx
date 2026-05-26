@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Trash2, FolderInput, Tag as TagIcon, Check, Wallet, Landmark, PiggyBank, CreditCard as CardIcon, Smartphone, CircleDollarSign } from 'lucide-react';
+import { Trash2, FolderInput, Tag as TagIcon, Check, Wallet, Landmark, PiggyBank, CreditCard as CardIcon, Smartphone, CircleDollarSign, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
     AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -53,6 +53,26 @@ export function BulkActionBar({
     const [categoryPickerOpen, setCategoryPickerOpen] = useState(false);
     const [bucketPickerOpen, setBucketPickerOpen] = useState(false);
     const [accountPickerOpen, setAccountPickerOpen] = useState(false);
+    // Tracks the row currently mid-mutation so we can show a spinner on it and
+    // freeze the rest of the dialog until the await resolves. Only one picker
+    // is open at a time, so a single key is enough across all three. The ref
+    // is the actual guard — relying on the state alone would let a fast
+    // double-tap fire two mutations before React re-renders the disabled state.
+    const applyingRef = useRef<string | null>(null);
+    const [applyingKey, setApplyingKey] = useState<string | null>(null);
+
+    const runApply = async (key: string, fn: () => Promise<void> | void, closeDialog: () => void) => {
+        if (applyingRef.current) return;
+        applyingRef.current = key;
+        setApplyingKey(key);
+        try {
+            await fn();
+            closeDialog();
+        } finally {
+            applyingRef.current = null;
+            setApplyingKey(null);
+        }
+    };
 
     const activeBuckets = buckets.filter(b => !b.is_archived);
     const activeAccounts = (accounts ?? []).filter(a => !a.archived_at);
@@ -168,13 +188,14 @@ export function BulkActionBar({
                                 <button
                                     key={cat.id}
                                     type="button"
-                                    onClick={async () => {
+                                    disabled={!!applyingKey}
+                                    onClick={() => {
                                         if (isCurrent) { setCategoryPickerOpen(false); return; }
-                                        setCategoryPickerOpen(false);
-                                        await onRecategorize(cat.id);
+                                        runApply(`cat:${cat.id}`, () => onRecategorize(cat.id), () => setCategoryPickerOpen(false));
                                     }}
                                     aria-current={isCurrent ? 'true' : undefined}
-                                    className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-left transition-colors ${
+                                    aria-busy={applyingKey === `cat:${cat.id}`}
+                                    className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-left transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${
                                         isCurrent
                                             ? 'border-primary/40 bg-primary/10'
                                             : 'border-white/5 bg-secondary/10 hover:border-white/20 hover:bg-secondary/15'
@@ -190,7 +211,11 @@ export function BulkActionBar({
                                         )}
                                     </span>
                                     <span className="text-[12px] font-semibold truncate flex-1">{cat.label}</span>
-                                    {isCurrent && <Check className="w-3.5 h-3.5 text-primary shrink-0" strokeWidth={3} />}
+                                    {applyingKey === `cat:${cat.id}` ? (
+                                        <Loader2 className="w-3.5 h-3.5 text-primary shrink-0 animate-spin" />
+                                    ) : isCurrent ? (
+                                        <Check className="w-3.5 h-3.5 text-primary shrink-0" strokeWidth={3} />
+                                    ) : null}
                                 </button>
                             );
                         })}
@@ -221,13 +246,15 @@ export function BulkActionBar({
                                 <button
                                     key={a.id}
                                     type="button"
-                                    onClick={async () => {
+                                    disabled={!!applyingKey}
+                                    onClick={() => {
                                         if (isCurrent) { setAccountPickerOpen(false); return; }
-                                        setAccountPickerOpen(false);
-                                        if (onMoveToAccount) await onMoveToAccount(a.id);
+                                        if (!onMoveToAccount) return;
+                                        runApply(`acct:${a.id}`, () => onMoveToAccount(a.id), () => setAccountPickerOpen(false));
                                     }}
                                     aria-current={isCurrent ? 'true' : undefined}
-                                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border text-left transition-colors ${
+                                    aria-busy={applyingKey === `acct:${a.id}`}
+                                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border text-left transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${
                                         isCurrent
                                             ? 'border-primary/40 bg-primary/10'
                                             : 'border-white/5 bg-secondary/10 hover:border-white/20 hover:bg-secondary/15'
@@ -243,7 +270,11 @@ export function BulkActionBar({
                                         <p className="text-[12px] font-semibold truncate">{a.name}</p>
                                         <p className="text-[10px] text-muted-foreground/60">{ACCOUNT_TYPE_LABELS[a.type]} · {a.currency}</p>
                                     </div>
-                                    {isCurrent && <Check className="w-3.5 h-3.5 text-primary shrink-0" strokeWidth={3} />}
+                                    {applyingKey === `acct:${a.id}` ? (
+                                        <Loader2 className="w-3.5 h-3.5 text-primary shrink-0 animate-spin" />
+                                    ) : isCurrent ? (
+                                        <Check className="w-3.5 h-3.5 text-primary shrink-0" strokeWidth={3} />
+                                    ) : null}
                                 </button>
                             );
                         })}
@@ -267,13 +298,14 @@ export function BulkActionBar({
                             return (
                                 <button
                                     type="button"
-                                    onClick={async () => {
+                                    disabled={!!applyingKey}
+                                    onClick={() => {
                                         if (isNoneCurrent) { setBucketPickerOpen(false); return; }
-                                        setBucketPickerOpen(false);
-                                        await onMoveToBucket(null);
+                                        runApply('bkt:none', () => onMoveToBucket(null), () => setBucketPickerOpen(false));
                                     }}
                                     aria-current={isNoneCurrent ? 'true' : undefined}
-                                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border text-left transition-colors ${
+                                    aria-busy={applyingKey === 'bkt:none'}
+                                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border text-left transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${
                                         isNoneCurrent
                                             ? 'border-primary/40 bg-primary/10'
                                             : 'border-white/5 bg-secondary/10 hover:border-white/20 hover:bg-secondary/15'
@@ -283,9 +315,13 @@ export function BulkActionBar({
                                         <FolderInput className="w-3.5 h-3.5 text-muted-foreground" />
                                     </span>
                                     <span className="text-[12px] font-semibold flex-1">No bucket</span>
-                                    {isNoneCurrent
-                                        ? <Check className="w-3.5 h-3.5 text-primary shrink-0" strokeWidth={3} />
-                                        : <span className="text-[10px] text-muted-foreground/60">Clear</span>}
+                                    {applyingKey === 'bkt:none' ? (
+                                        <Loader2 className="w-3.5 h-3.5 text-primary shrink-0 animate-spin" />
+                                    ) : isNoneCurrent ? (
+                                        <Check className="w-3.5 h-3.5 text-primary shrink-0" strokeWidth={3} />
+                                    ) : (
+                                        <span className="text-[10px] text-muted-foreground/60">Clear</span>
+                                    )}
                                 </button>
                             );
                         })()}
@@ -300,13 +336,14 @@ export function BulkActionBar({
                                 <button
                                     key={b.id}
                                     type="button"
-                                    onClick={async () => {
+                                    disabled={!!applyingKey}
+                                    onClick={() => {
                                         if (isCurrent) { setBucketPickerOpen(false); return; }
-                                        setBucketPickerOpen(false);
-                                        await onMoveToBucket(b.id);
+                                        runApply(`bkt:${b.id}`, () => onMoveToBucket(b.id), () => setBucketPickerOpen(false));
                                     }}
                                     aria-current={isCurrent ? 'true' : undefined}
-                                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border text-left transition-colors ${
+                                    aria-busy={applyingKey === `bkt:${b.id}`}
+                                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border text-left transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${
                                         isCurrent
                                             ? 'border-primary/40 bg-primary/10'
                                             : 'border-white/5 bg-secondary/10 hover:border-white/20 hover:bg-secondary/15'
@@ -324,7 +361,11 @@ export function BulkActionBar({
                                         <p className="text-[12px] font-semibold truncate">{b.name}</p>
                                         {b.type && <p className="text-[10px] text-muted-foreground/60 capitalize">{b.type}</p>}
                                     </div>
-                                    {isCurrent && <Check className="w-3.5 h-3.5 text-primary shrink-0" strokeWidth={3} />}
+                                    {applyingKey === `bkt:${b.id}` ? (
+                                        <Loader2 className="w-3.5 h-3.5 text-primary shrink-0 animate-spin" />
+                                    ) : isCurrent ? (
+                                        <Check className="w-3.5 h-3.5 text-primary shrink-0" strokeWidth={3} />
+                                    ) : null}
                                 </button>
                             );
                         })}
