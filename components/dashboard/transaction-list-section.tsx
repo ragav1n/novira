@@ -2,6 +2,7 @@
 
 import React, { useRef } from 'react';
 import { Wallet, ChevronRight, Check, Pencil, Clock, ArrowUpRight, ArrowDownLeft, LayoutGrid, MapPin, X } from 'lucide-react';
+import { AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { Transaction } from '@/types/transaction';
 import { TransactionRow } from '@/components/transaction-row';
@@ -139,6 +140,7 @@ export function TransactionListSection({
             </div>
 
             <div className="space-y-1">
+                <AnimatePresence initial={false} mode="popLayout">
                 {filteredRecents.slice(0, 5).map((tx: Transaction) => {
                     const myShare = calculateUserShare(tx, userId);
                     const showConverted = tx.currency && tx.currency.toUpperCase() !== currency.toUpperCase();
@@ -170,6 +172,7 @@ export function TransactionListSection({
                         />
                     );
                 })}
+                </AnimatePresence>
                 {filteredRecents.length === 0 && (
                     <div className="text-center text-sm text-muted-foreground/40 py-8">
                         {selectedCategory ? (

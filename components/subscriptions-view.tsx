@@ -1,6 +1,6 @@
 'use client';
 
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import React, { useEffect, useRef, useState, useCallback, useMemo, useDeferredValue } from 'react';
 import Link from 'next/link';
 import { useUserPreferences } from '@/components/providers/user-preferences-provider';
@@ -62,7 +62,7 @@ export function SubscriptionsView() {
         if (!opts.silent) setLoading(true);
         let query = supabase
             .from('recurring_templates')
-            .select('id, description, amount, currency, frequency, next_occurrence, last_processed, category, is_active, is_income, created_at, user_id, group_id, payment_method, metadata')
+            .select('id, description, amount, currency, frequency, next_occurrence, category, is_active, is_income, created_at, user_id, group_id, payment_method, metadata')
             .eq('user_id', userId)
             .order('next_occurrence', { ascending: true })
             .limit(200);
@@ -75,7 +75,12 @@ export function SubscriptionsView() {
 
         if (fetchGenRef.current !== myGen) return;
         if (error) {
-            console.error('Failed to load subscriptions', error);
+            console.error('Failed to load subscriptions:', {
+                message: error.message,
+                code: error.code,
+                details: error.details,
+                hint: error.hint,
+            });
             if (!opts.silent) toast.error("Couldn't load subscriptions");
         } else if (data) {
             // Subscriptions view is for recurring expenses; hide income templates.
@@ -464,20 +469,30 @@ export function SubscriptionsView() {
                                 </button>
                             </div>
                         ) : (
-                            visibleTemplates.map((template) => (
-                                <SubscriptionRow
-                                    key={template.id}
-                                    template={template}
-                                    lastCharge={lastCharges[template.id]}
-                                    onTogglePin={togglePin}
-                                    onSetPause={setPauseUntil}
-                                    onSetTrial={setTrialEndsAt}
-                                    onAssignBucket={handleAssignBucket}
-                                    onCancel={(id) => setCancelTarget(id)}
-                                    onRequestPriceUpdate={setUpdateTarget}
-                                    onEdit={setEditTarget}
-                                />
-                            ))
+                            <AnimatePresence initial={false} mode="popLayout">
+                                {visibleTemplates.map((template) => (
+                                    <motion.div
+                                        key={template.id}
+                                        layout
+                                        initial={{ opacity: 0, y: 8, scale: 0.98 }}
+                                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                                        exit={{ opacity: 0, y: -8, scale: 0.97 }}
+                                        transition={{ type: 'spring', stiffness: 260, damping: 26 }}
+                                    >
+                                        <SubscriptionRow
+                                            template={template}
+                                            lastCharge={lastCharges[template.id]}
+                                            onTogglePin={togglePin}
+                                            onSetPause={setPauseUntil}
+                                            onSetTrial={setTrialEndsAt}
+                                            onAssignBucket={handleAssignBucket}
+                                            onCancel={(id) => setCancelTarget(id)}
+                                            onRequestPriceUpdate={setUpdateTarget}
+                                            onEdit={setEditTarget}
+                                        />
+                                    </motion.div>
+                                ))}
+                            </AnimatePresence>
                         )}
                     </div>
 

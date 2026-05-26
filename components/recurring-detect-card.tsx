@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Sparkles, X, Plus } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -126,9 +127,17 @@ export function RecurringDetectCard({
         }
     };
 
-    if (visible.length === 0) return null;
-
     return (
+        <AnimatePresence initial={false}>
+        {visible.length > 0 && (
+        <motion.div
+            key="recurring-detect-card"
+            initial={{ opacity: 0, y: 8, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, height: 0, scale: 0.97 }}
+            transition={{ type: 'spring', stiffness: 280, damping: 28 }}
+            style={{ overflow: 'hidden' }}
+        >
         <Card className="bg-gradient-to-br from-amber-500/10 to-rose-500/5 border-amber-500/20 backdrop-blur-md">
             <CardContent className="p-4 space-y-3">
                 <div className="flex items-center gap-2">
@@ -144,10 +153,17 @@ export function RecurringDetectCard({
                     These look like recurring charges. Track them so they show up in your subscriptions.
                 </p>
                 <div className="space-y-2">
+                    <AnimatePresence initial={false} mode="popLayout">
                     {visible.map((c) => (
-                        <div
+                        <motion.div
                             key={c.normalizedKey}
+                            layout
+                            initial={{ opacity: 0, x: -16 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, x: 100, height: 0, marginTop: 0 }}
+                            transition={{ type: 'spring', stiffness: 300, damping: 28 }}
                             className="flex items-center gap-3 rounded-xl bg-card/40 border border-white/5 p-3"
+                            style={{ overflow: 'hidden' }}
                         >
                             <div className="flex-1 min-w-0">
                                 <p className="text-sm font-semibold truncate capitalize">{c.description}</p>
@@ -175,10 +191,14 @@ export function RecurringDetectCard({
                             >
                                 <X className="w-3.5 h-3.5" aria-hidden="true" />
                             </button>
-                        </div>
+                        </motion.div>
                     ))}
+                    </AnimatePresence>
                 </div>
             </CardContent>
         </Card>
+        </motion.div>
+        )}
+        </AnimatePresence>
     );
 }

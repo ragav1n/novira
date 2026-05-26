@@ -195,14 +195,13 @@ export function SettingsView() {
                 if (fallbackError) throw fallbackError;
                 setRecurringTemplates(
                     ((fallbackData || []) as RecurringTemplate[])
-                        .map((t) => ({ ...t, next_occurrence: t.next_occurrence ?? '', last_processed: t.last_processed ?? null }))
+                        .map((t) => ({ ...t, next_occurrence: t.next_occurrence ?? '' }))
                         .filter((t) => t.is_active)
                 );
                 return;
             }
             setRecurringTemplates(
                 (data || [])
-                    .map(t => ({ ...t, last_processed: null as string | null }))
                     .filter(t => t.is_active)
             );
         } catch (error) {
@@ -234,7 +233,7 @@ export function SettingsView() {
                     setRecurringTemplates(prev =>
                         prev.some(t => t.id === row.id)
                             ? prev
-                            : [{ ...row, last_processed: null }, ...prev]
+                            : [row, ...prev]
                     );
                 })
             .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'recurring_templates', filter: `user_id=eq.${userId}` },
@@ -245,7 +244,7 @@ export function SettingsView() {
                         const exists = prev.some(t => t.id === row.id);
                         return exists
                             ? prev.map(t => t.id === row.id ? { ...t, ...row } : t)
-                            : [{ ...row, last_processed: null }, ...prev];
+                            : [row, ...prev];
                     });
                 })
             .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'recurring_templates', filter: `user_id=eq.${userId}` },
@@ -378,7 +377,7 @@ export function SettingsView() {
             const [templatesRes, goalsRes] = await Promise.all([
                 supabase
                     .from('recurring_templates')
-                    .select('id, description, amount, currency, frequency, next_occurrence, last_processed, category, is_active, created_at, payment_method, group_id, metadata')
+                    .select('id, description, amount, currency, frequency, next_occurrence, category, is_active, created_at, payment_method, group_id, metadata')
                     .eq('user_id', userId)
                     .eq('is_active', true),
                 supabase

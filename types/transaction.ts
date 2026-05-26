@@ -115,7 +115,6 @@ export type RecurringTemplate = {
     currency: string;
     frequency: 'daily' | 'weekly' | 'monthly' | 'yearly';
     next_occurrence: string;
-    last_processed: string | null;
     category: string;
     is_active: boolean;
     is_income?: boolean;

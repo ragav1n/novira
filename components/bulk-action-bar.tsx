@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { motion } from 'framer-motion';
 import { Trash2, FolderInput, Tag as TagIcon, Check, Wallet, Landmark, PiggyBank, CreditCard as CardIcon, Smartphone, CircleDollarSign } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -59,9 +60,13 @@ export function BulkActionBar({
 
     return (
         <>
-            <div
+            <motion.div
                 role="toolbar"
                 aria-label={`${count} selected`}
+                initial={{ y: 80, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                exit={{ y: 80, opacity: 0 }}
+                transition={{ type: 'spring', stiffness: 320, damping: 30, mass: 0.8 }}
                 className="fixed bottom-0 left-0 right-0 z-[120] pointer-events-none px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]"
             >
                 <div className="max-w-md lg:max-w-2xl mx-auto pointer-events-auto rounded-2xl bg-card/95 backdrop-blur-xl border border-white/10 shadow-2xl flex items-center gap-1 p-1.5">
@@ -125,7 +130,7 @@ export function BulkActionBar({
                         Cancel
                     </Button>
                 </div>
-            </div>
+            </motion.div>
 
             <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
                 <AlertDialogContent className="z-[130]">

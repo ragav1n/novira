@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { Receipt, CheckSquare } from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { TransactionRow } from '@/components/transaction-row';
 import { BulkActionBar } from '@/components/bulk-action-bar';
 import { CATEGORY_COLORS } from '@/lib/categories';
@@ -188,43 +189,48 @@ export const TransactionList = React.memo(function TransactionList({
         </div>
       )}
 
-      {transactions.map((tx) => {
-        const myShare = calculateUserShare(tx, userId);
-        const showConverted = tx.currency && tx.currency.toUpperCase() !== currency.toUpperCase();
-        return (
-          <div
-            key={tx.id}
-            style={{ contentVisibility: 'auto', containIntrinsicSize: '0 64px' }}
-          >
-            <TransactionRow
-              tx={tx}
-              userId={userId}
-              myShare={myShare}
-              formattedAmount={formatCurrency(Math.abs(myShare), tx.currency)}
-              formattedConverted={
-                showConverted
-                  ? formatCurrency(convertAmount(Math.abs(myShare), tx.currency || 'USD', currency), currency)
-                  : undefined
-              }
-              showConverted={!!showConverted}
-              canEdit={canEditTransaction(tx)}
-              icon={getIconForCategory(tx.category, 'w-4 h-4')}
-              color={CATEGORY_COLORS[tx.category.toLowerCase()] || CATEGORY_COLORS.uncategorized}
-              bucketChip={getBucketChip(tx)}
-              onHistory={() => loadAuditLogs(tx)}
-              onEdit={() => {
-                setEditingTransaction(tx);
-                setIsEditOpen(true);
-              }}
-              onDelete={() => handleDeleteTransaction(tx)}
-              onViewReceipt={onViewReceipt ? () => onViewReceipt(tx) : undefined}
-              selectable={selectMode}
-              selected={selectedIds.has(tx.id)}
-              onToggleSelect={() => toggleId(tx.id)}
-            />
-          </div>
-        );
-      })}
+      <AnimatePresence initial={false}>
+        {transactions.map((tx) => {
+          const myShare = calculateUserShare(tx, userId);
+          const showConverted = tx.currency && tx.currency.toUpperCase() !== currency.toUpperCase();
+          return (
+            <motion.div
+              key={tx.id}
+              initial={false}
+              exit={{ opacity: 0, height: 0, marginTop: 0, scale: 0.97 }}
+              transition={{ duration: 0.26, ease: [0.22, 1, 0.36, 1] }}
+              style={{ contentVisibility: 'auto', containIntrinsicSize: '0 64px', overflow: 'hidden' }}
+            >
+              <TransactionRow
+                tx={tx}
+                userId={userId}
+                myShare={myShare}
+                formattedAmount={formatCurrency(Math.abs(myShare), tx.currency)}
+                formattedConverted={
+                  showConverted
+                    ? formatCurrency(convertAmount(Math.abs(myShare), tx.currency || 'USD', currency), currency)
+                    : undefined
+                }
+                showConverted={!!showConverted}
+                canEdit={canEditTransaction(tx)}
+                icon={getIconForCategory(tx.category, 'w-4 h-4')}
+                color={CATEGORY_COLORS[tx.category.toLowerCase()] || CATEGORY_COLORS.uncategorized}
+                bucketChip={getBucketChip(tx)}
+                onHistory={() => loadAuditLogs(tx)}
+                onEdit={() => {
+                  setEditingTransaction(tx);
+                  setIsEditOpen(true);
+                }}
+                onDelete={() => handleDeleteTransaction(tx)}
+                onViewReceipt={onViewReceipt ? () => onViewReceipt(tx) : undefined}
+                selectable={selectMode}
+                selected={selectedIds.has(tx.id)}
+                onToggleSelect={() => toggleId(tx.id)}
+              />
+            </motion.div>
+          );
+        })}
+      </AnimatePresence>
       {hasMore && onLoadMore && !selectMode && (
         <button
           onClick={onLoadMore}
@@ -235,21 +241,23 @@ export const TransactionList = React.memo(function TransactionList({
         </button>
       )}
 
-      {selectMode && bulkAvailable && (
-        <BulkActionBar
-          count={selectedIds.size}
-          buckets={buckets}
-          accounts={allAccounts.filter(a => !a.archived_at)}
-          onCancel={exitSelect}
-          onDelete={handleBulkDeleteClick}
-          onRecategorize={handleRecategorize}
-          onMoveToBucket={handleMoveToBucket}
-          onMoveToAccount={handleMoveToAccount}
-          currentBucketId={sharedBucketId}
-          currentCategory={sharedCategory}
-          currentAccountId={sharedAccountId ?? undefined}
-        />
-      )}
+      <AnimatePresence>
+        {selectMode && bulkAvailable && (
+          <BulkActionBar
+            count={selectedIds.size}
+            buckets={buckets}
+            accounts={allAccounts.filter(a => !a.archived_at)}
+            onCancel={exitSelect}
+            onDelete={handleBulkDeleteClick}
+            onRecategorize={handleRecategorize}
+            onMoveToBucket={handleMoveToBucket}
+            onMoveToAccount={handleMoveToAccount}
+            currentBucketId={sharedBucketId}
+            currentCategory={sharedCategory}
+            currentAccountId={sharedAccountId ?? undefined}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 });
