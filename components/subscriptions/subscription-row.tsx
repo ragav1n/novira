@@ -2,7 +2,7 @@
 
 import { format, parseISO, formatDistanceToNowStrict, differenceInCalendarDays } from 'date-fns';
 import {
-    Tag, X, TrendingUp, TrendingDown, Star, Pause, Clock,
+    Tag, X, TrendingUp, TrendingDown, Star, Pause, Clock, Pencil,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -24,11 +24,12 @@ interface Props {
     onAssignBucket: (t: Tpl, bucketId: string | null) => void;
     onCancel: (id: string) => void;
     onRequestPriceUpdate: (target: { template: Tpl; change: PriceChange }) => void;
+    onEdit: (t: Tpl) => void;
 }
 
 export function SubscriptionRow({
     template, lastCharge,
-    onTogglePin, onSetPause, onSetTrial, onAssignBucket, onCancel, onRequestPriceUpdate,
+    onTogglePin, onSetPause, onSetTrial, onAssignBucket, onCancel, onRequestPriceUpdate, onEdit,
 }: Props) {
     const { formatCurrency, convertAmount, currency } = useUserPreferences();
     const { buckets } = useBucketsList();
@@ -50,8 +51,9 @@ export function SubscriptionRow({
 
     return (
         <Card
+            onClick={() => onEdit(template)}
             className={cn(
-                "bg-card/40 border-white/5 backdrop-blur-sm overflow-hidden group transition-opacity",
+                "bg-card/40 border-white/5 backdrop-blur-sm overflow-hidden group transition-opacity cursor-pointer",
                 paused && "opacity-60"
             )}
         >
@@ -89,6 +91,7 @@ export function SubscriptionRow({
                             <PopoverTrigger asChild>
                                 <button
                                     type="button"
+                                    onClick={(e) => e.stopPropagation()}
                                     className={cn(
                                         "inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold border transition-colors",
                                         linkedBucket
@@ -112,11 +115,11 @@ export function SubscriptionRow({
                                     )}
                                 </button>
                             </PopoverTrigger>
-                            <PopoverContent align="start" className="w-56 p-1 bg-card/95 backdrop-blur-xl border-white/10">
+                            <PopoverContent align="start" onClick={(e) => e.stopPropagation()} className="w-56 p-1 bg-card/95 backdrop-blur-xl border-white/10">
                                 <div className="max-h-64 overflow-y-auto">
                                     <button
                                         type="button"
-                                        onClick={() => onAssignBucket(template, null)}
+                                        onClick={(e) => { e.stopPropagation(); onAssignBucket(template, null); }}
                                         className={cn(
                                             "w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-xs hover:bg-secondary/30 transition-colors",
                                             !bucketId && "bg-secondary/20"
@@ -129,7 +132,7 @@ export function SubscriptionRow({
                                         <button
                                             type="button"
                                             key={b.id}
-                                            onClick={() => onAssignBucket(template, b.id)}
+                                            onClick={(e) => { e.stopPropagation(); onAssignBucket(template, b.id); }}
                                             className={cn(
                                                 "w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-xs hover:bg-secondary/30 transition-colors",
                                                 bucketId === b.id && "bg-cyan-500/10 text-cyan-300"
@@ -182,7 +185,7 @@ export function SubscriptionRow({
                     {drift && (
                         <button
                             type="button"
-                            onClick={() => onRequestPriceUpdate({ template, change: drift })}
+                            onClick={(e) => { e.stopPropagation(); onRequestPriceUpdate({ template, change: drift }); }}
                             className={cn(
                                 "inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] font-bold transition-colors",
                                 drift.pctChange > 0
@@ -200,15 +203,26 @@ export function SubscriptionRow({
                             </span>
                         </button>
                     )}
-                    <RowActionsMenu
-                        template={template}
-                        meta={meta}
-                        paused={paused}
-                        onTogglePin={onTogglePin}
-                        onSetPause={onSetPause}
-                        onSetTrial={onSetTrial}
-                        onCancel={onCancel}
-                    />
+                    <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                        <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); onEdit(template); }}
+                            aria-label={`Edit ${template.description}`}
+                            className="text-muted-foreground hover:text-foreground p-1 transition-colors"
+                        >
+                            <Pencil className="w-4 h-4" aria-hidden="true" />
+                        </button>
+                        <RowActionsMenu
+                            template={template}
+                            meta={meta}
+                            paused={paused}
+                            onTogglePin={onTogglePin}
+                            onSetPause={onSetPause}
+                            onSetTrial={onSetTrial}
+                            onCancel={onCancel}
+                            onEdit={onEdit}
+                        />
+                    </div>
                 </div>
             </CardContent>
         </Card>

@@ -96,10 +96,10 @@ export function GoalsView() {
     const [historyGoal, setHistoryGoal] = useState<SavingsGoal | null>(null);
     const [historyOpen, setHistoryOpen] = useState(false);
 
-    const loadGoals = useCallback(async () => {
+    const loadGoals = useCallback(async (opts: { silent?: boolean } = {}) => {
         if (!userId) return;
         const myGen = fetchGenRef.current;
-        setLoading(true);
+        if (!opts.silent) setLoading(true);
         // Goals are author-scoped, then filtered to a workspace if one is active.
         let query = supabase
             .from('savings_goals')
@@ -118,7 +118,7 @@ export function GoalsView() {
         if (!error && data) {
             setGoals(data as SavingsGoal[]);
         }
-        setLoading(false);
+        if (!opts.silent) setLoading(false);
     }, [userId, activeWorkspaceId]);
 
     useEffect(() => {
@@ -129,6 +129,15 @@ export function GoalsView() {
     // Batch-fetch the last 90 days of deposits for all goals once whenever the
     // goal set changes — avoids N+1 per-card queries while still giving each
     // card enough history to compute monthly velocity.
+    const loadDeposits = useCallback(async (goalIds: string[]) => {
+        if (!userId || goalIds.length === 0) {
+            setDeposits([]);
+            return;
+        }
+        const d = await GoalService.getDepositsForGoals(userId, goalIds, 90);
+        setDeposits(d);
+    }, [userId]);
+
     useEffect(() => {
         if (!userId || goals.length === 0) {
             setDeposits([]);
@@ -140,6 +149,15 @@ export function GoalsView() {
         return () => { cancelled = true; };
     }, [userId, goals]);
 
+    const matchesGoalWorkspace = useCallback((row: Partial<SavingsGoal> | null | undefined) => {
+        if (!row) return false;
+        if (activeWorkspaceId) return row.group_id === activeWorkspaceId;
+        return !row.group_id;
+    }, [activeWorkspaceId]);
+
+    const goalIdsRef = useRef<string[]>([]);
+    goalIdsRef.current = goals.map(g => g.id);
+
     useEffect(() => {
         if (!userId) return;
 
@@ -147,20 +165,47 @@ export function GoalsView() {
             .channel(`goals-changes-${userId}-${activeWorkspaceId || 'personal'}`)
             .on(
                 'postgres_changes',
-                { event: '*', schema: 'public', table: 'savings_goals', filter: `user_id=eq.${userId}` },
-                () => { loadGoals(); }
+                { event: 'INSERT', schema: 'public', table: 'savings_goals', filter: `user_id=eq.${userId}` },
+                (payload) => {
+                    const row = payload.new as SavingsGoal;
+                    if (!matchesGoalWorkspace(row)) return;
+                    setGoals(prev => prev.some(g => g.id === row.id) ? prev : [row, ...prev]);
+                }
+            )
+            .on(
+                'postgres_changes',
+                { event: 'UPDATE', schema: 'public', table: 'savings_goals', filter: `user_id=eq.${userId}` },
+                (payload) => {
+                    const row = payload.new as SavingsGoal;
+                    setGoals(prev => {
+                        if (!matchesGoalWorkspace(row)) return prev.filter(g => g.id !== row.id);
+                        const exists = prev.some(g => g.id === row.id);
+                        return exists
+                            ? prev.map(g => g.id === row.id ? { ...g, ...row } : g)
+                            : [row, ...prev];
+                    });
+                }
+            )
+            .on(
+                'postgres_changes',
+                { event: 'DELETE', schema: 'public', table: 'savings_goals', filter: `user_id=eq.${userId}` },
+                (payload) => {
+                    const oldRow = payload.old as Partial<SavingsGoal>;
+                    if (!oldRow?.id) return;
+                    setGoals(prev => prev.filter(g => g.id !== oldRow.id));
+                }
             )
             .on(
                 'postgres_changes',
                 { event: '*', schema: 'public', table: 'savings_deposits', filter: `user_id=eq.${userId}` },
-                () => { loadGoals(); }
+                () => { loadDeposits(goalIdsRef.current); }
             )
             .subscribe();
 
         return () => {
             supabase.removeChannel(goalsChannel);
         };
-    }, [userId, activeWorkspaceId, loadGoals]);
+    }, [userId, activeWorkspaceId, matchesGoalWorkspace, loadDeposits]);
 
     const depositsByGoal = useMemo(() => {
         const map = new Map<string, SavingsDeposit[]>();

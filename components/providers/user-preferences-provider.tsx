@@ -528,15 +528,16 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
             )
             .subscribe();
 
+        // workspace_budgets is keyed by group_id (no user_id column). RLS already
+        // restricts visibility to groups the user belongs to, so the subscription
+        // is intentionally unfiltered — the per-workspace budgets shown on the
+        // workspace switcher / settings stay live even while the user is inside a
+        // different workspace.
         const workspaceChannel = supabase
             .channel(`workspace-budget-changes-${userId}-${activeWorkspaceId || 'personal'}-${myGen}`)
             .on(
                 'postgres_changes',
-                {
-                    event: '*',
-                    schema: 'public',
-                    table: 'workspace_budgets'
-                },
+                { event: '*', schema: 'public', table: 'workspace_budgets' },
                 () => {
                     if (realtimeGenRef.current !== myGen) return;
                     loadPreferences(userId);

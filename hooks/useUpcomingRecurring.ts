@@ -32,13 +32,13 @@ export function useUpcomingRecurring(
     // workspace can't land their results on top of the new one.
     const fetchGenRef = useRef(0);
 
-    const load = useCallback(async () => {
+    const load = useCallback(async (opts: { silent?: boolean } = {}) => {
         if (!userId) {
             setItems([]);
             return;
         }
         const myGen = fetchGenRef.current;
-        setLoading(true);
+        if (!opts.silent) setLoading(true);
         try {
             const today = new Date();
             const todayStr = format(today, 'yyyy-MM-dd');
@@ -80,7 +80,7 @@ export function useUpcomingRecurring(
             }
             setItems([]);
         } finally {
-            if (fetchGenRef.current === myGen) setLoading(false);
+            if (fetchGenRef.current === myGen && !opts.silent) setLoading(false);
         }
     }, [userId, activeWorkspaceId]);
 
@@ -88,6 +88,22 @@ export function useUpcomingRecurring(
         fetchGenRef.current++;
         load();
     }, [load]);
+
+    // Realtime: any change to this user's recurring_templates can affect what's
+    // upcoming (new template, edited next_occurrence, cancellation). Reload
+    // silently so the card stays fresh without a skeleton flash.
+    useEffect(() => {
+        if (!userId) return;
+        const channel = supabase
+            .channel(`upcoming-recurring-${userId}-${activeWorkspaceId || 'personal'}`)
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'recurring_templates', filter: `user_id=eq.${userId}` },
+                () => { load({ silent: true }); }
+            )
+            .subscribe();
+        return () => { supabase.removeChannel(channel); };
+    }, [userId, activeWorkspaceId, load]);
 
     return { items, loading, reload: load };
 }

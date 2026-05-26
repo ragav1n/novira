@@ -77,9 +77,9 @@ export function AnalyticsView() {
     }, []);
     const clearTags = useCallback(() => setActiveTags([]), []);
 
-    const fetchData = useCallback(async () => {
+    const fetchData = useCallback(async (opts: { silent?: boolean } = {}) => {
         const myGen = fetchGenRef.current;
-        setLoading(true);
+        if (!opts.silent) setLoading(true);
         setError(null);
         try {
             if (!userId) return;
@@ -118,7 +118,7 @@ export function AnalyticsView() {
                     e.setDate(e.getDate() + 1);
                     endDate = e;
                 }
-                if (!customStart && !customEnd) { setLoading(false); return; }
+                if (!customStart && !customEnd) { if (!opts.silent) setLoading(false); return; }
                 if (startDate && endDate) {
                     const len = Math.max(1, Math.round((endDate.getTime() - startDate.getTime()) / 86_400_000));
                     priorEnd = new Date(startDate);
@@ -200,7 +200,7 @@ export function AnalyticsView() {
             setError(err instanceof Error ? err.message : 'Failed to load analytics data');
             toast.error('Failed to load analytics data');
         } finally {
-            if (fetchGenRef.current === myGen) setLoading(false);
+            if (fetchGenRef.current === myGen && !opts.silent) setLoading(false);
         }
     }, [userId, activeWorkspaceId, activeAccountId, dateRange, selectedBucketId, customStart, customEnd]);
 
@@ -211,13 +211,14 @@ export function AnalyticsView() {
         }
     }, [fetchData, userId, currency]);
 
-    useTransactionInvalidationListener(fetchData);
+    useTransactionInvalidationListener(() => fetchData({ silent: true }));
 
-    // Real-time subscription for transactions
+    // Real-time subscription for transactions. Silent refetch so the chart
+    // doesn't flash a skeleton when a new tx lands in another tab.
     const analyticsDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const debouncedFetchData = useCallback(() => {
         if (analyticsDebounceRef.current) clearTimeout(analyticsDebounceRef.current);
-        analyticsDebounceRef.current = setTimeout(() => fetchData(), 300);
+        analyticsDebounceRef.current = setTimeout(() => fetchData({ silent: true }), 300);
     }, [fetchData]);
 
     useEffect(() => {

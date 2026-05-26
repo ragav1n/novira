@@ -23,6 +23,7 @@ import { SubscriptionFilters } from '@/components/subscriptions/subscription-fil
 import { SubscriptionRow } from '@/components/subscriptions/subscription-row';
 import { InactiveSubscriptions } from '@/components/subscriptions/inactive-subscriptions';
 import { PriceChangeDialog, CancelSubscriptionDialog } from '@/components/subscriptions/subscription-dialogs';
+import { EditSubscriptionDialog } from '@/components/subscriptions/edit-subscription-dialog';
 
 export function SubscriptionsView() {
     const { userId, formatCurrency, convertAmount, currency, activeWorkspaceId } = useUserPreferences();
@@ -32,6 +33,7 @@ export function SubscriptionsView() {
     const [templates, setTemplates] = useState<Tpl[]>([]);
     const [loading, setLoading] = useState(true);
     const [cancelTarget, setCancelTarget] = useState<string | null>(null);
+    const [editTarget, setEditTarget] = useState<Tpl | null>(null);
     const [lastCharges, setLastCharges] = useState<Record<string, LastCharge>>({});
     const [updateTarget, setUpdateTarget] = useState<{ template: Tpl; change: PriceChange } | null>(null);
     // Bumped on each workspace/user change so in-flight fetches from a previous
@@ -54,10 +56,10 @@ export function SubscriptionsView() {
 
     const effectiveActive = useCallback((t: Tpl) => t.is_active && !isPaused(t), [isPaused]);
 
-    const loadTemplates = useCallback(async () => {
+    const loadTemplates = useCallback(async (opts: { silent?: boolean } = {}) => {
         if (!userId) return;
         const myGen = fetchGenRef.current;
-        setLoading(true);
+        if (!opts.silent) setLoading(true);
         let query = supabase
             .from('recurring_templates')
             .select('*')
@@ -74,12 +76,12 @@ export function SubscriptionsView() {
         if (fetchGenRef.current !== myGen) return;
         if (error) {
             console.error('Failed to load subscriptions', error);
-            toast.error("Couldn't load subscriptions");
+            if (!opts.silent) toast.error("Couldn't load subscriptions");
         } else if (data) {
             // Subscriptions view is for recurring expenses; hide income templates.
             setTemplates((data as Tpl[]).filter(t => !t.is_income));
         }
-        setLoading(false);
+        if (!opts.silent) setLoading(false);
     }, [userId, activeWorkspaceId]);
 
     useEffect(() => {
@@ -159,19 +161,59 @@ export function SubscriptionsView() {
     useEffect(() => {
         if (!userId) return;
 
+        const matchesWorkspace = (row: Partial<Tpl> | null | undefined) => {
+            if (!row) return false;
+            if (activeWorkspaceId) return row.group_id === activeWorkspaceId;
+            return !row.group_id;
+        };
+
         const templatesChannel = supabase
             .channel(`templates-changes-${userId}-${activeWorkspaceId || 'personal'}`)
             .on(
                 'postgres_changes',
-                { event: '*', schema: 'public', table: 'recurring_templates', filter: `user_id=eq.${userId}` },
-                () => { loadTemplates(); }
+                { event: 'INSERT', schema: 'public', table: 'recurring_templates', filter: `user_id=eq.${userId}` },
+                (payload) => {
+                    const row = payload.new as Tpl;
+                    if (!matchesWorkspace(row) || row.is_income) return;
+                    setTemplates(prev => prev.some(t => t.id === row.id) ? prev : [...prev, row]);
+                }
+            )
+            .on(
+                'postgres_changes',
+                { event: 'UPDATE', schema: 'public', table: 'recurring_templates', filter: `user_id=eq.${userId}` },
+                (payload) => {
+                    const row = payload.new as Tpl;
+                    if (!matchesWorkspace(row)) {
+                        setTemplates(prev => prev.filter(t => t.id !== row.id));
+                        return;
+                    }
+                    if (row.is_income) {
+                        setTemplates(prev => prev.filter(t => t.id !== row.id));
+                        return;
+                    }
+                    setTemplates(prev => {
+                        const exists = prev.some(t => t.id === row.id);
+                        return exists
+                            ? prev.map(t => t.id === row.id ? { ...t, ...row } : t)
+                            : [...prev, row];
+                    });
+                }
+            )
+            .on(
+                'postgres_changes',
+                { event: 'DELETE', schema: 'public', table: 'recurring_templates', filter: `user_id=eq.${userId}` },
+                (payload) => {
+                    const oldRow = payload.old as Partial<Tpl>;
+                    if (!oldRow?.id) return;
+                    setTemplates(prev => prev.filter(t => t.id !== oldRow.id));
+                }
             )
             .subscribe();
 
         return () => {
             supabase.removeChannel(templatesChannel);
         };
-    }, [userId, activeWorkspaceId, loadTemplates]);
+    }, [userId, activeWorkspaceId]);
 
     const updateMetadata = useCallback(async (template: Tpl, partial: Partial<SubscriptionMetadata>) => {
         const existing = getMeta(template);
@@ -433,6 +475,7 @@ export function SubscriptionsView() {
                                     onAssignBucket={handleAssignBucket}
                                     onCancel={(id) => setCancelTarget(id)}
                                     onRequestPriceUpdate={setUpdateTarget}
+                                    onEdit={setEditTarget}
                                 />
                             ))
                         )}
@@ -457,6 +500,11 @@ export function SubscriptionsView() {
                 open={!!cancelTarget}
                 onClose={() => setCancelTarget(null)}
                 onConfirm={() => { if (cancelTarget) { handleToggleActive(cancelTarget, true); setCancelTarget(null); } }}
+            />
+
+            <EditSubscriptionDialog
+                template={editTarget}
+                onClose={() => setEditTarget(null)}
             />
         </>
     );

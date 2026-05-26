@@ -172,16 +172,16 @@ export function SettingsView() {
         }
     };
 
-    const loadRecurringTemplates = async () => {
+    const loadRecurringTemplates = async (opts: { silent?: boolean } = {}) => {
         if (!userId) {
             setLoadingTemplates(false);
             return;
         }
-        setLoadingTemplates(true);
+        if (!opts.silent) setLoadingTemplates(true);
         try {
             const { data, error } = await supabase
                 .from('recurring_templates')
-                .select('id, description, amount, currency, frequency, created_at, next_occurrence, category, is_active, is_income')
+                .select('id, description, amount, currency, frequency, created_at, next_occurrence, category, is_active, is_income, payment_method, metadata, group_id, user_id')
                 .eq('user_id', userId)
                 .order('created_at', { ascending: false });
 
@@ -208,7 +208,7 @@ export function SettingsView() {
         } catch (error) {
             console.warn('Error loading recurring templates:', error);
         } finally {
-            setLoadingTemplates(false);
+            if (!opts.silent) setLoadingTemplates(false);
         }
     };
 
@@ -218,7 +218,7 @@ export function SettingsView() {
     const loadTemplatesRef = useRef(loadRecurringTemplates);
     loadTemplatesRef.current = loadRecurringTemplates;
 
-    useTransactionInvalidationListener(() => loadTemplatesRef.current());
+    useTransactionInvalidationListener(() => loadTemplatesRef.current({ silent: true }));
 
     useEffect(() => {
         if (!userId) return;
@@ -227,8 +227,33 @@ export function SettingsView() {
             .channel(`settings-sync-${userId}`)
             .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles', filter: `id=eq.${userId}` },
                 () => getProfileRef.current())
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'recurring_templates', filter: `user_id=eq.${userId}` },
-                () => loadTemplatesRef.current())
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'recurring_templates', filter: `user_id=eq.${userId}` },
+                (payload) => {
+                    const row = payload.new as RecurringTemplate;
+                    if (!row?.is_active) return;
+                    setRecurringTemplates(prev =>
+                        prev.some(t => t.id === row.id)
+                            ? prev
+                            : [{ ...row, last_processed: null }, ...prev]
+                    );
+                })
+            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'recurring_templates', filter: `user_id=eq.${userId}` },
+                (payload) => {
+                    const row = payload.new as RecurringTemplate;
+                    setRecurringTemplates(prev => {
+                        if (!row.is_active) return prev.filter(t => t.id !== row.id);
+                        const exists = prev.some(t => t.id === row.id);
+                        return exists
+                            ? prev.map(t => t.id === row.id ? { ...t, ...row } : t)
+                            : [{ ...row, last_processed: null }, ...prev];
+                    });
+                })
+            .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'recurring_templates', filter: `user_id=eq.${userId}` },
+                (payload) => {
+                    const oldRow = payload.old as Partial<RecurringTemplate>;
+                    if (!oldRow?.id) return;
+                    setRecurringTemplates(prev => prev.filter(t => t.id !== oldRow.id));
+                })
             .subscribe();
 
         return () => { supabase.removeChannel(channel); };

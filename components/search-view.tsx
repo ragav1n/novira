@@ -202,9 +202,9 @@ export function SearchView() {
         return Math.max(1000, Number.isFinite(m) ? m : 0);
     });
 
-    const fetchAndFilter = useCallback(async () => {
+    const fetchAndFilter = useCallback(async (opts: { silent?: boolean } = {}) => {
         const myGen = fetchGenRef.current;
-        setLoading(true);
+        if (!opts.silent) setLoading(true);
         try {
             let query = supabase
                 .from('transactions')
@@ -283,7 +283,7 @@ export function SearchView() {
         } catch (error) {
             console.error('Error fetching transactions:', error);
         } finally {
-            if (fetchGenRef.current === myGen) setLoading(false);
+            if (fetchGenRef.current === myGen && !opts.silent) setLoading(false);
         }
     }, [activeWorkspaceId, activeAccountId, debouncedSearchQuery, selectedCategories, selectedPayments, dateRange, priceRange, selectedBucketId, selectedTags, sortBy, maxPossiblePrice, showRecurringOnly, showExcludedOnly]);
 
@@ -321,7 +321,7 @@ export function SearchView() {
         return () => { cancelled = true; };
     }, [userId]);
 
-    useTransactionInvalidationListener(fetchAndFilter);
+    useTransactionInvalidationListener(() => fetchAndFilter({ silent: true }));
 
     // Pull-to-refresh trigger from mobile-layout — same handler the dashboard uses.
     useEffect(() => {
@@ -344,7 +344,8 @@ export function SearchView() {
 
         const debouncedFetch = () => {
             if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
-            searchDebounceRef.current = setTimeout(() => fetchRef.current(), 300);
+            // Silent — realtime echoes shouldn't flash a skeleton over results.
+            searchDebounceRef.current = setTimeout(() => fetchRef.current({ silent: true }), 300);
         };
 
         const channel = supabase

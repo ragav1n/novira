@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { RefreshCcw, Trash2 } from 'lucide-react';
+import { RefreshCcw, Trash2, Pencil } from 'lucide-react';
 import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import {
@@ -15,6 +15,7 @@ import {
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import type { RecurringTemplate } from '@/types/transaction';
+import { EditSubscriptionDialog } from '@/components/subscriptions/edit-subscription-dialog';
 
 interface Props {
     templates: RecurringTemplate[];
@@ -25,6 +26,7 @@ interface Props {
 
 export function RecurringExpensesSection({ templates, loading, formatCurrency, onDelete }: Props) {
     const [templateToDelete, setTemplateToDelete] = React.useState<RecurringTemplate | null>(null);
+    const [templateToEdit, setTemplateToEdit] = React.useState<RecurringTemplate | null>(null);
 
     return (
         <div className="space-y-3">
@@ -55,26 +57,43 @@ export function RecurringExpensesSection({ templates, loading, formatCurrency, o
                 ) : templates.length > 0 ? (
                     templates.map((template) => (
                         <div key={template.id} className="flex items-center justify-between p-3">
-                            <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                            <button
+                                type="button"
+                                onClick={() => setTemplateToEdit(template)}
+                                className="flex items-center gap-3 flex-1 min-w-0 text-left rounded-lg -m-1 p-1 hover:bg-white/5 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+                                aria-label={`Edit ${template.description}`}
+                            >
+                                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
                                     <RefreshCcw className="w-4 h-4 text-primary" />
                                 </div>
-                                <div>
+                                <div className="min-w-0">
                                     <p className="text-sm font-medium truncate max-w-[150px]">{template.description}</p>
                                     <p className="text-[11px] text-muted-foreground">
                                         {formatCurrency(template.amount, template.currency)} • {template.frequency}
                                         {template.created_at && ` • Started ${format(new Date(template.created_at), 'MMM d, yyyy')}`}
                                     </p>
                                 </div>
+                            </button>
+                            <div className="flex items-center gap-1 shrink-0">
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                                    onClick={() => setTemplateToEdit(template)}
+                                    aria-label={`Edit ${template.description}`}
+                                >
+                                    <Pencil className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                                    onClick={() => setTemplateToDelete(template)}
+                                    aria-label={`Stop ${template.description}`}
+                                >
+                                    <Trash2 className="w-4 h-4" />
+                                </Button>
                             </div>
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                                onClick={() => setTemplateToDelete(template)}
-                            >
-                                <Trash2 className="w-4 h-4" />
-                            </Button>
                         </div>
                     ))
                 ) : (
@@ -84,6 +103,11 @@ export function RecurringExpensesSection({ templates, loading, formatCurrency, o
                 )}
             </div>
             <p className="text-[11px] text-muted-foreground">Manage your automated recurring transactions.</p>
+
+            <EditSubscriptionDialog
+                template={templateToEdit}
+                onClose={() => setTemplateToEdit(null)}
+            />
 
             <AlertDialog open={!!templateToDelete} onOpenChange={(open) => !open && setTemplateToDelete(null)}>
                 <AlertDialogContent className="bg-card/95 backdrop-blur-xl border-white/10 rounded-3xl">

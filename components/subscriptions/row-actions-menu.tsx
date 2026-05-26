@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { format } from 'date-fns';
-import { MoreVertical, Star, Pause, Play, Clock, Trash2 } from 'lucide-react';
+import { MoreVertical, Star, Pause, Play, Clock, Trash2, Pencil } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import type { SubscriptionMetadata } from '@/types/transaction';
@@ -16,9 +16,10 @@ interface Props {
     onSetPause: (t: Tpl, dateStr: string | null) => void;
     onSetTrial: (t: Tpl, dateStr: string | null) => void;
     onCancel: (id: string) => void;
+    onEdit?: (t: Tpl) => void;
 }
 
-export function RowActionsMenu({ template, meta, paused, onTogglePin, onSetPause, onSetTrial, onCancel }: Props) {
+export function RowActionsMenu({ template, meta, paused, onTogglePin, onSetPause, onSetTrial, onCancel, onEdit }: Props) {
     const [open, setOpen] = useState(false);
     const todayStr = format(new Date(), 'yyyy-MM-dd');
 
@@ -33,7 +34,17 @@ export function RowActionsMenu({ template, meta, paused, onTogglePin, onSetPause
                     <MoreVertical className="w-4 h-4" aria-hidden="true" />
                 </button>
             </PopoverTrigger>
-            <PopoverContent align="end" className="w-56 p-1 bg-card/95 backdrop-blur-xl border-white/10">
+            <PopoverContent align="end" onClick={(e) => e.stopPropagation()} className="w-56 p-1 bg-card/95 backdrop-blur-xl border-white/10">
+                {onEdit && (
+                    <button
+                        type="button"
+                        onClick={() => { onEdit(template); setOpen(false); }}
+                        className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-xs hover:bg-secondary/30 transition-colors text-left"
+                    >
+                        <Pencil className="w-3.5 h-3.5 text-muted-foreground" aria-hidden="true" />
+                        <span>Edit details</span>
+                    </button>
+                )}
                 <button
                     type="button"
                     onClick={() => { onTogglePin(template); setOpen(false); }}
