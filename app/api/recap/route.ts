@@ -2,6 +2,10 @@ import 'server-only';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
 import { generateRecap, VALID_PERIOD_RE } from '@/lib/recap-generator';
+import { checkRateLimit, rateLimitResponse } from '@/lib/server/rate-limit';
+
+const READ_CFG = { max: 120, windowMs: 60_000 };
+const GENERATE_CFG = { max: 10, windowMs: 24 * 60 * 60 * 1000 };
 
 // VALID_PERIOD_RE allows shapes like "2099-99" or "0000-13". Bound the numeric
 // pieces here so callers can't trigger needlessly expensive queries.
@@ -21,6 +25,9 @@ export async function GET(req: NextRequest) {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    const readLimit = checkRateLimit('recap-read', user.id, READ_CFG);
+    if (!readLimit.allowed) return rateLimitResponse(readLimit, READ_CFG);
 
     const url = new URL(req.url);
     const month = url.searchParams.get('month');
@@ -62,6 +69,9 @@ export async function POST(req: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
+    const genLimit = checkRateLimit('recap-generate', user.id, GENERATE_CFG);
+    if (!genLimit.allowed) return rateLimitResponse(genLimit, GENERATE_CFG, `Daily recap generation limit reached (${GENERATE_CFG.max}/day).`);
+
     const { month, currency, force } = (await req.json()) as { month?: string; currency?: string; force?: boolean };
     if (!month || !isValidMonthPeriod(month)) {
         return NextResponse.json({ error: 'month must be YYYY-MM or YYYY-FY' }, { status: 400 });
@@ -95,6 +105,9 @@ export async function PATCH(req: NextRequest) {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    const readLimit = checkRateLimit('recap-read', user.id, READ_CFG);
+    if (!readLimit.allowed) return rateLimitResponse(readLimit, READ_CFG);
 
     const { month } = (await req.json()) as { month?: string };
     if (!month || !isValidMonthPeriod(month)) {

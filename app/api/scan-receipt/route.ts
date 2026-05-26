@@ -2,6 +2,7 @@ import 'server-only'
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { createClient } from '@/utils/supabase/server'
+import { checkRateLimit, rateLimitResponse } from '@/lib/server/rate-limit'
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
@@ -10,10 +11,15 @@ type SupportedMediaType = 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp
 const SUPPORTED_TYPES: SupportedMediaType[] = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024 // 5MB raw
 
+const RATE_CFG = { max: 30, windowMs: 24 * 60 * 60 * 1000 }
+
 export async function POST(req: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const limit = checkRateLimit('scan-receipt', user.id, RATE_CFG)
+  if (!limit.allowed) return rateLimitResponse(limit, RATE_CFG, `Daily scan limit reached (${RATE_CFG.max}/day).`)
 
   const { imageBase64, mimeType } = await req.json()
 

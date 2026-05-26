@@ -3,31 +3,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { createClient } from '@/utils/supabase/server';
 import { buildInsightsSnapshot, type SnapshotRange } from '@/lib/insights-snapshot';
+import { checkRateLimit } from '@/lib/server/rate-limit';
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 const MODEL = 'claude-haiku-4-5-20251001';
 
 const DAILY_LIMIT = 3;
-
-// Per-user request log for the rolling 24h window. In-memory is enough for our scale —
-// Vercel cold starts will occasionally reset it, which is fine for soft abuse prevention.
-const requestLog = new Map<string, number[]>();
-
-function checkRateLimit(userId: string): { allowed: boolean; remaining: number; resetAt: number } {
-    const now = Date.now();
-    const windowMs = 24 * 60 * 60 * 1000;
-    const cutoff = now - windowMs;
-    const recent = (requestLog.get(userId) || []).filter(ts => ts > cutoff);
-    if (recent.length >= DAILY_LIMIT) {
-        const resetAt = recent[0] + windowMs;
-        requestLog.set(userId, recent);
-        return { allowed: false, remaining: 0, resetAt };
-    }
-    recent.push(now);
-    requestLog.set(userId, recent);
-    return { allowed: true, remaining: DAILY_LIMIT - recent.length, resetAt: now + windowMs };
-}
+const RATE_CFG = { max: DAILY_LIMIT, windowMs: 24 * 60 * 60 * 1000 };
 
 const SYSTEM_PROMPT = `You are a personal finance analyst embedded in Novira. You answer the user's questions about their own spending using ONLY the JSON snapshot below.
 
@@ -72,7 +55,7 @@ export async function POST(req: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const limit = checkRateLimit(user.id);
+    const limit = checkRateLimit('insights-chat', user.id, RATE_CFG);
     if (!limit.allowed) {
         const minutes = Math.max(1, Math.ceil((limit.resetAt - Date.now()) / 60000));
         const hours = Math.floor(minutes / 60);

@@ -1,6 +1,9 @@
 import 'server-only';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
+import { checkRateLimit, rateLimitResponse } from '@/lib/server/rate-limit';
+
+const RATE_CFG = { max: 120, windowMs: 60_000 };
 
 // Server-side proxy for v6.exchangerate-api.com so the API key stays out of the
 // browser. Two modes:
@@ -12,6 +15,9 @@ export async function GET(req: NextRequest) {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    const limit = checkRateLimit('exchange-rate', user.id, RATE_CFG);
+    if (!limit.allowed) return rateLimitResponse(limit, RATE_CFG);
 
     const url = new URL(req.url);
     const from = url.searchParams.get('from');

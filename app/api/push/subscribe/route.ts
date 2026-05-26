@@ -1,11 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
+import { checkRateLimit, rateLimitResponse } from '@/lib/server/rate-limit';
+
+const RATE_CFG = { max: 20, windowMs: 60_000 };
 
 export async function POST(request: NextRequest) {
     try {
         const supabase = await createClient();
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+        const limit = checkRateLimit('push-subscribe', user.id, RATE_CFG);
+        if (!limit.allowed) return rateLimitResponse(limit, RATE_CFG);
 
         const subscription = await request.json();
         if (!subscription?.endpoint) {
@@ -36,6 +42,9 @@ export async function DELETE(request: NextRequest) {
         const supabase = await createClient();
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+        const limit = checkRateLimit('push-subscribe', user.id, RATE_CFG);
+        if (!limit.allowed) return rateLimitResponse(limit, RATE_CFG);
 
         const { endpoint } = await request.json();
         await supabase.from('push_subscriptions').delete().eq('endpoint', endpoint).eq('user_id', user.id);

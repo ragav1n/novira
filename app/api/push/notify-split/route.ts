@@ -10,6 +10,9 @@ import {
     sendToUser,
 } from '@/lib/server/push';
 import { isInQuietHours } from '@/lib/push-quiet-hours';
+import { checkRateLimit, rateLimitResponse } from '@/lib/server/rate-limit';
+
+const RATE_CFG = { max: 30, windowMs: 60 * 60 * 1000 };
 
 interface SplitRow {
     id: string;
@@ -51,6 +54,9 @@ export async function POST(request: NextRequest) {
     const ssr = await createSsrClient();
     const { data: { user } } = await ssr.auth.getUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    const limit = checkRateLimit('notify-split', user.id, RATE_CFG);
+    if (!limit.allowed) return rateLimitResponse(limit, RATE_CFG);
 
     let body: { transaction_id?: unknown };
     try {
