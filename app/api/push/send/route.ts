@@ -1,7 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { timingSafeEqual } from 'node:crypto';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const webpush = require('web-push') as typeof import('web-push');
 import { createClient as createServiceClient } from '@supabase/supabase-js';
+
+function safeEqual(a: string | null | undefined, b: string | null | undefined): boolean {
+    if (!a || !b) return false;
+    const ab = Buffer.from(a);
+    const bb = Buffer.from(b);
+    if (ab.length !== bb.length) return false;
+    return timingSafeEqual(ab, bb);
+}
 
 // VAPID keys must be set in environment variables.
 // Generate with: npx web-push generate-vapid-keys
@@ -60,8 +69,9 @@ export async function POST(request: NextRequest) {
     //   - Authorization: Bearer <CRON_SECRET>   (Vercel Cron + manual curl tests)
     const xPushSecret = request.headers.get('x-push-secret');
     const auth = request.headers.get('authorization');
-    const pushOk = !!process.env.PUSH_SECRET && xPushSecret === process.env.PUSH_SECRET;
-    const cronOk = !!process.env.CRON_SECRET && auth === `Bearer ${process.env.CRON_SECRET}`;
+    const bearerToken = auth?.startsWith('Bearer ') ? auth.slice(7) : null;
+    const pushOk = safeEqual(xPushSecret, process.env.PUSH_SECRET);
+    const cronOk = safeEqual(bearerToken, process.env.CRON_SECRET);
     if (!pushOk && !cronOk) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }

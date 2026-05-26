@@ -16,8 +16,9 @@ export function useSyncQueueState() {
             if (mounted) setQueue(q);
         });
 
-        const handler = (e: any) => {
-            if (mounted) setQueue(e.detail?.queue || []);
+        const handler = (e: Event) => {
+            const detail = (e as CustomEvent<{ queue?: SyncPayload[] }>).detail;
+            if (mounted) setQueue(detail?.queue || []);
         };
 
         const onSyncStart = () => { if (mounted) setIsSyncingEvent(true); };

@@ -226,7 +226,7 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
     const nearbyFetchedRef = useRef(false);
     const isSelectingCurrentRef = useRef(false);
     const sessionTokenRef = useRef({ token: crypto.randomUUID(), createdAt: Date.now() });
-    const googleSessionTokenRef = useRef<any>(null);
+    const googleSessionTokenRef = useRef<string | null>(null);
     const listRef = useRef<HTMLDivElement>(null);
 
     const getSessionToken = useCallback(() => {

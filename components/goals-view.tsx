@@ -103,7 +103,7 @@ export function GoalsView() {
         // Goals are author-scoped, then filtered to a workspace if one is active.
         let query = supabase
             .from('savings_goals')
-            .select('*')
+            .select('id, user_id, name, target_amount, current_amount, currency, deadline, icon, color, group_id, created_at, last_threshold_notified, last_deadline_notified')
             .eq('user_id', userId)
             .order('created_at', { ascending: false })
             .limit(200);

@@ -62,7 +62,7 @@ export function SubscriptionsView() {
         if (!opts.silent) setLoading(true);
         let query = supabase
             .from('recurring_templates')
-            .select('*')
+            .select('id, description, amount, currency, frequency, next_occurrence, last_processed, category, is_active, is_income, created_at, user_id, group_id, payment_method, metadata')
             .eq('user_id', userId)
             .order('next_occurrence', { ascending: true })
             .limit(200);

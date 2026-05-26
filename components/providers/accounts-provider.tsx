@@ -45,7 +45,7 @@ export function AccountsProvider({ children }: { children: React.ReactNode }) {
         try {
             const { data, error } = await supabase
                 .from('accounts')
-                .select('*')
+                .select('id, user_id, name, type, currency, opening_balance, opening_balances, credit_limit, color, icon, is_primary, archived_at, created_at, updated_at')
                 .eq('user_id', userId)
                 .order('archived_at', { ascending: true, nullsFirst: true })
                 .order('is_primary', { ascending: false })

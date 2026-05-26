@@ -24,7 +24,7 @@ export function useCategorizationRules(userId: string | null | undefined) {
         const fetchRules = async () => {
             const { data, error } = await supabase
                 .from('categorization_rules')
-                .select('*')
+                .select('id, user_id, match_field, match_type, pattern, category, bucket_id, exclude_from_allowance, priority, is_active, created_at, updated_at')
                 .eq('user_id', userId)
                 .order('priority', { ascending: false })
                 .order('created_at', { ascending: false });
