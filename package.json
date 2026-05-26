@@ -1,6 +1,6 @@
 {
   "name": "novira",
-  "version": "2.76.6",
+  "version": "2.78.1",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -61,6 +61,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "1.0.4",
+    "cobe": "^2.0.1",
     "date-fns": "^4.1.0",
     "embla-carousel-react": "8.5.1",
     "exceljs": "^4.4.0",

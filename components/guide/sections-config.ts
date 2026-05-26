@@ -45,7 +45,7 @@ export const GUIDE_SECTIONS: GuideSection[] = [
   { id: 'adding-transactions', title: 'Adding transactions', icon: Plus, group: 'Money in & out', blurb: 'Every field, every shortcut, every smart suggestion.' },
   { id: 'recurring', title: 'Recurring & subscriptions', icon: Repeat, group: 'Money in & out', blurb: 'Bills, subscriptions, paychecks. Manual and auto-detected.' },
   { id: 'splits', title: 'Splitting expenses', icon: Users, group: 'Money in & out', blurb: 'Share a tab with friends and settle up cleanly.' },
-  { id: 'multi-currency', title: 'Multi-currency & trips', icon: Globe, group: 'Money in & out', blurb: '20 supported currencies, live conversion, and trip-mode buckets.' },
+  { id: 'multi-currency', title: 'Multi-currency & trips', icon: Globe, group: 'Money in & out', blurb: '26 supported currencies, live conversion, and trip-mode buckets.' },
 
   { id: 'buckets', title: 'Buckets', icon: Box, group: 'Plan & track', blurb: 'Spending containers for trips, projects, and missions.' },
   { id: 'goals', title: 'Savings goals', icon: Target, group: 'Plan & track', blurb: 'Set a target, log deposits, watch the bar fill.' },

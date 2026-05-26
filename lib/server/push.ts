@@ -16,7 +16,10 @@ if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {
 export const pushReady = !!(VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY);
 
 export const CURRENCY_SYMBOLS: Record<string, string> = {
-    USD: '$', EUR: '€', INR: '₹', GBP: '£', SGD: 'S$', JPY: '¥', AUD: 'A$', CAD: 'C$', AED: 'AED'
+    USD: '$', EUR: '€', INR: '₹', GBP: '£', CHF: 'Fr', SGD: 'S$', VND: '₫',
+    TWD: 'NT$', JPY: '¥', KRW: '₩', HKD: 'HK$', MYR: 'RM',
+    PHP: '₱', THB: '฿', CAD: 'C$', AUD: 'A$', MXN: 'Mex$', BRL: 'R$', IDR: 'Rp', AED: 'AED',
+    CNY: 'CN¥', RUB: '₽', ZAR: 'R', TRY: '₺', NZD: 'NZ$', SEK: 'kr'
 };
 
 export function fmtMoney(amount: number, ccy: string): string {

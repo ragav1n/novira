@@ -1,7 +1,7 @@
 // Deterministic (no-AI) parser that turns a dictated transcript into structured
 // expense fields. The Web Speech API hands us a plain-text transcript; because
 // the expense field-set is small and closed (13 categories, 5 payment methods,
-// ~20 currencies) a keyword/pattern parser is enough to route the pieces.
+// ~26 currencies) a keyword/pattern parser is enough to route the pieces.
 //
 // The parser is conservative: every field is null/empty unless confidently
 // detected — it never guesses. Anything not recognised stays in `description`.
@@ -36,12 +36,24 @@ const NUMBER_WORDS: Record<string, number> = {
 const CURRENCY_SEQUENCES: { seq: string[]; code: string }[] = [
     { seq: ['hong', 'kong', 'dollars'], code: 'HKD' },
     { seq: ['hong', 'kong', 'dollar'], code: 'HKD' },
+    { seq: ['new', 'zealand', 'dollars'], code: 'NZD' },
+    { seq: ['new', 'zealand', 'dollar'], code: 'NZD' },
+    { seq: ['south', 'african', 'rand'], code: 'ZAR' },
+    { seq: ['turkish', 'lira'], code: 'TRY' },
+    { seq: ['turkish', 'liras'], code: 'TRY' },
+    { seq: ['russian', 'rubles'], code: 'RUB' },
+    { seq: ['russian', 'ruble'], code: 'RUB' },
+    { seq: ['chinese', 'yuan'], code: 'CNY' },
+    { seq: ['swedish', 'krona'], code: 'SEK' },
+    { seq: ['swedish', 'kronor'], code: 'SEK' },
     { seq: ['canadian', 'dollars'], code: 'CAD' },
     { seq: ['canadian', 'dollar'], code: 'CAD' },
     { seq: ['australian', 'dollars'], code: 'AUD' },
     { seq: ['australian', 'dollar'], code: 'AUD' },
     { seq: ['aussie', 'dollars'], code: 'AUD' },
     { seq: ['aussie', 'dollar'], code: 'AUD' },
+    { seq: ['kiwi', 'dollars'], code: 'NZD' },
+    { seq: ['kiwi', 'dollar'], code: 'NZD' },
     { seq: ['singapore', 'dollars'], code: 'SGD' },
     { seq: ['singapore', 'dollar'], code: 'SGD' },
     { seq: ['taiwan', 'dollars'], code: 'TWD' },
@@ -72,6 +84,12 @@ const CURRENCY_SEQUENCES: { seq: string[]; code: string }[] = [
     { seq: ['php'], code: 'PHP' }, { seq: ['twd'], code: 'TWD' }, { seq: ['sgd'], code: 'SGD' },
     { seq: ['hkd'], code: 'HKD' }, { seq: ['cad'], code: 'CAD' }, { seq: ['aud'], code: 'AUD' },
     { seq: ['mxn'], code: 'MXN' }, { seq: ['brl'], code: 'BRL' },
+    { seq: ['yuan'], code: 'CNY' }, { seq: ['cny'], code: 'CNY' }, { seq: ['rmb'], code: 'CNY' },
+    { seq: ['rubles'], code: 'RUB' }, { seq: ['ruble'], code: 'RUB' }, { seq: ['rub'], code: 'RUB' },
+    { seq: ['rand'], code: 'ZAR' }, { seq: ['zar'], code: 'ZAR' },
+    { seq: ['lira'], code: 'TRY' }, { seq: ['liras'], code: 'TRY' }, { seq: ['try'], code: 'TRY' },
+    { seq: ['nzd'], code: 'NZD' },
+    { seq: ['krona'], code: 'SEK' }, { seq: ['kronor'], code: 'SEK' }, { seq: ['sek'], code: 'SEK' },
 ];
 
 const SYMBOL_CURRENCY: Record<string, string> = {

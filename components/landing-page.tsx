@@ -4,12 +4,18 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import dynamic from 'next/dynamic';
 import { AdvancedButton } from '@/components/ui/gradient-button';
 import { ShinyButton } from '@/components/ui/shiny-button';
 import {
   ArrowRight, CheckCircle2, BarChart3, Globe, Repeat,
   FileText, Calendar, Zap, Menu, X, Smartphone, Hand, Bell, Target, Sparkles,
 } from 'lucide-react';
+
+const GlobeInteractive = dynamic(
+  () => import('@/components/ui/cobe-globe-interactive').then(m => m.GlobeInteractive),
+  { ssr: false },
+);
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -19,6 +25,7 @@ const SECTIONS = [
   { id: 'sec-scan', label: 'AI Scan' },
   { id: 'sec-split', label: 'Split' },
   { id: 'sec-offline', label: 'Offline' },
+  { id: 'sec-currency', label: 'Currencies' },
   { id: 'sec-map', label: 'Map' },
   { id: 'sec-features', label: 'Features' },
   { id: 'sec-cta', label: 'CTA' },
@@ -26,7 +33,7 @@ const SECTIONS = [
 
 const FEATURES = [
   { icon: BarChart3, title: 'Rich analytics', desc: 'Beautiful charts and a What-If simulator that quantifies cuts against your goals — by category, place, time, or person.' },
-  { icon: Globe, title: 'Any currency', desc: '20 supported currencies with live exchange rates, per-transaction conversion, and a base-currency that holds steady over time.' },
+  { icon: Globe, title: 'Any currency', desc: '26 supported currencies with live exchange rates, per-transaction conversion, and a base-currency that holds steady over time.' },
   { icon: Repeat, title: 'Recurring detection', desc: 'Spots subscriptions automatically — and quietly flags silent price hikes before they pile up.' },
   { icon: Calendar, title: 'Smart budgets', desc: 'Weighted-pace forecasting (last-7-day rate mixed with month-to-date) nudges you before you overspend.' },
   { icon: Zap, title: 'Bank imports', desc: 'Drop an HDFC or SBI statement and Novira parses it in seconds — smart duplicate detection included.' },
@@ -589,7 +596,7 @@ export function LandingPage() {
             <span>Novira</span>
           </div>
           <nav className="hidden md:flex gap-[26px]" style={{ fontSize: 13, color: 'rgba(255,255,255,0.78)', fontWeight: 500 }}>
-            {[['sec-dash','Dashboard'],['sec-scan','AI Scan'],['sec-split','Split'],['sec-offline','Offline'],['sec-features','Features']].map(([id, label]) => (
+            {[['sec-dash','Dashboard'],['sec-scan','AI Scan'],['sec-split','Split'],['sec-offline','Offline'],['sec-currency','Currencies'],['sec-features','Features']].map(([id, label]) => (
               <a key={label} href={`#${id}`}
                 onClick={e => { e.preventDefault(); document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' }); }}
                 className="hover:text-white transition-colors whitespace-nowrap cursor-pointer">{label}</a>
@@ -637,7 +644,7 @@ export function LandingPage() {
 
             {/* Nav links */}
             <nav className="flex-1 flex flex-col justify-center px-8 gap-0.5">
-              {([['sec-hero','Home'],['sec-dash','Dashboard'],['sec-scan','AI Scan'],['sec-split','Split'],['sec-offline','Offline'],['sec-features','Features']] as [string,string][]).map(([id, label], i) => (
+              {([['sec-hero','Home'],['sec-dash','Dashboard'],['sec-scan','AI Scan'],['sec-split','Split'],['sec-offline','Offline'],['sec-currency','Currencies'],['sec-features','Features']] as [string,string][]).map(([id, label], i) => (
                 <motion.a
                   key={id}
                   initial={{ opacity: 0, x: -20 }}
@@ -657,7 +664,7 @@ export function LandingPage() {
               <motion.div
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.04 + 6 * 0.05, ease: [0.22, 1, 0.36, 1] }}
+                transition={{ delay: 0.04 + 7 * 0.05, ease: [0.22, 1, 0.36, 1] }}
               >
                 <Link
                   href="/guide"
@@ -834,7 +841,47 @@ export function LandingPage() {
           </motion.div>
         </section>
 
-        {/* ── 6. MAP ───────────────────────────────────────────── */}
+        {/* ── 6. CURRENCIES ───────────────────────────────────── */}
+        <section id="sec-currency" style={snapSection}>
+          <div style={{ maxWidth: 1500, width: '100%', margin: '0 auto', display: 'grid', gridTemplateColumns: '1fr 1.6fr', gap: 64, alignItems: 'center' }} className="two-col-grid">
+            <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp(0.1)}>
+              <Tag>26 currencies</Tag>
+              <h3 style={{ fontSize: 'clamp(32px, 4.5vw, 56px)', lineHeight: 1.05, letterSpacing: '-0.025em', fontWeight: 700, margin: '14px 0 18px' }}>
+                One app,<br /><span className="landing-grad-text">every currency.</span>
+              </h3>
+              <p style={{ color: 'rgba(255,255,255,0.78)', fontSize: 16, lineHeight: 1.6, maxWidth: 480 }}>
+                Spend rupees on a Mumbai train, euros at a Berlin café, yen at a Tokyo bar — Novira converts everything to your base currency with live rates so your budget never lies to you.
+              </p>
+              <div className="flex items-center gap-[22px] mt-7 flex-wrap" style={{ fontSize: 12.5, fontWeight: 500 }}>
+                {['26 currencies', 'Live rates', 'Auto-convert'].map(label => (
+                  <span key={label} className="flex items-center gap-1.5" style={{ color: 'rgba(255,255,255,0.78)' }}>
+                    <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#34d399', boxShadow: '0 0 8px #34d399', flexShrink: 0 }} />
+                    {label}
+                  </span>
+                ))}
+              </div>
+            </motion.div>
+            <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp(0.3)}>
+              <div style={{
+                aspectRatio: '1', borderRadius: 24, position: 'relative', overflow: 'hidden',
+                maxWidth: '100%', maxHeight: 'calc(100vh - 240px)', margin: '0 auto',
+                background: 'radial-gradient(circle at 50% 50%, rgba(58,28,110,0.55) 0%, rgba(20,8,43,0.95) 60%, rgba(10,0,24,1) 100%)',
+                border: '1px solid rgba(164,132,215,0.5)',
+                boxShadow: '0 30px 80px rgba(0,0,0,0.45), 0 0 60px rgba(138,43,226,0.15), inset 0 1px 0 rgba(255,255,255,0.05)',
+                padding: 18,
+              }}>
+                <div style={{
+                  position: 'absolute', inset: '12%', borderRadius: '50%',
+                  background: 'radial-gradient(circle, rgba(168,85,247,0.35) 0%, rgba(138,43,226,0.1) 50%, transparent 75%)',
+                  filter: 'blur(28px)', pointerEvents: 'none', animation: 'haloPulse 6s ease-in-out infinite',
+                }} />
+                <GlobeInteractive />
+              </div>
+            </motion.div>
+          </div>
+        </section>
+
+        {/* ── 7. MAP ───────────────────────────────────────────── */}
         <section id="sec-map" style={snapSection}>
           <div style={{ maxWidth: 1200, width: '100%', margin: '0 auto', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 64, alignItems: 'center' }} className="two-col-grid">
             <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp(0.1)}>
@@ -852,7 +899,7 @@ export function LandingPage() {
           </div>
         </section>
 
-        {/* ── 7. FEATURES ─────────────────────────────────────── */}
+        {/* ── 8. FEATURES ─────────────────────────────────────── */}
         <section id="sec-features" style={{ ...snapSection, flexDirection: 'column', gap: 40 }}>
           <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp(0.1)}
             className="text-center" style={{ maxWidth: 820 }}>
@@ -889,7 +936,7 @@ export function LandingPage() {
           </div>
         </section>
 
-        {/* ── 8. CTA ──────────────────────────────────────────── */}
+        {/* ── 9. CTA ──────────────────────────────────────────── */}
         <section id="sec-cta" style={{ ...snapSection, paddingBottom: 80 }}>
           <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp(0.1)}
             className="text-center" style={{ maxWidth: 780 }}>

@@ -9,7 +9,7 @@ import { useAppBadge } from '@/hooks/useAppBadge';
 import { setQueueUser, attemptSync } from '@/lib/sync-manager';
 import { invalidateTransactionCaches } from '@/lib/sw-cache';
 
-export type Currency = 'USD' | 'EUR' | 'INR' | 'GBP' | 'CHF' | 'SGD' | 'VND' | 'TWD' | 'JPY' | 'KRW' | 'HKD' | 'MYR' | 'PHP' | 'THB' | 'CAD' | 'AUD' | 'MXN' | 'BRL' | 'IDR' | 'AED';
+export type Currency = 'USD' | 'EUR' | 'INR' | 'GBP' | 'CHF' | 'SGD' | 'VND' | 'TWD' | 'JPY' | 'KRW' | 'HKD' | 'MYR' | 'PHP' | 'THB' | 'CAD' | 'AUD' | 'MXN' | 'BRL' | 'IDR' | 'AED' | 'CNY' | 'RUB' | 'ZAR' | 'TRY' | 'NZD' | 'SEK';
 
 // Safely parse a cached profile blob. Returns an object (possibly empty) so
 // callers can spread without runtime surprises; never returns arrays, strings,
@@ -50,7 +50,13 @@ const DEFAULT_BUDGETS: Record<Currency, number> = {
     BRL: 7000,
     IDR: 25000000,
     CHF: 1350,
-    AED: 5500
+    AED: 5500,
+    CNY: 10000,
+    RUB: 130000,
+    ZAR: 28000,
+    TRY: 50000,
+    NZD: 3000,
+    SEK: 15000
 };
 
 interface UserPreferencesContextType {
@@ -123,7 +129,8 @@ interface UserPreferencesContextType {
 export const CURRENCY_SYMBOLS: Record<Currency, string> = {
     USD: '$', EUR: '€', INR: '₹', GBP: '£', CHF: 'Fr', SGD: 'S$', VND: '₫',
     TWD: 'NT$', JPY: '¥', KRW: '₩', HKD: 'HK$', MYR: 'RM',
-    PHP: '₱', THB: '฿', CAD: 'C$', AUD: 'A$', MXN: 'Mex$', BRL: 'R$', IDR: 'Rp', AED: 'AED'
+    PHP: '₱', THB: '฿', CAD: 'C$', AUD: 'A$', MXN: 'Mex$', BRL: 'R$', IDR: 'Rp', AED: 'AED',
+    CNY: 'CN¥', RUB: '₽', ZAR: 'R', TRY: '₺', NZD: 'NZ$', SEK: 'kr'
 };
 
 export const CURRENCY_DETAILS: Record<Currency, { name: string; symbol: string }> = {
@@ -146,7 +153,13 @@ export const CURRENCY_DETAILS: Record<Currency, { name: string; symbol: string }
     MXN: { name: 'Mexican Peso', symbol: 'Mex$' },
     BRL: { name: 'Brazilian Real', symbol: 'R$' },
     IDR: { name: 'Indonesian Rupiah', symbol: 'Rp' },
-    AED: { name: 'UAE Dirham', symbol: 'AED' }
+    AED: { name: 'UAE Dirham', symbol: 'AED' },
+    CNY: { name: 'Chinese Yuan', symbol: 'CN¥' },
+    RUB: { name: 'Russian Ruble', symbol: '₽' },
+    ZAR: { name: 'South African Rand', symbol: 'R' },
+    TRY: { name: 'Turkish Lira', symbol: '₺' },
+    NZD: { name: 'New Zealand Dollar', symbol: 'NZ$' },
+    SEK: { name: 'Swedish Krona', symbol: 'kr' }
 };
 
 const UserPreferencesContext = createContext<UserPreferencesContextType | undefined>(undefined);
@@ -584,6 +597,8 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
             EUR: 'en-IE',
             INR: 'en-IN',
             GBP: 'en-GB',
+            CHF: 'de-CH',
+            AED: 'en-AE',
             SGD: 'en-SG',
             VND: 'vi-VN',
             TWD: 'zh-TW',
@@ -597,7 +612,13 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
             AUD: 'en-AU',
             MXN: 'es-MX',
             BRL: 'pt-BR',
-            IDR: 'id-ID'
+            IDR: 'id-ID',
+            CNY: 'zh-CN',
+            RUB: 'ru-RU',
+            ZAR: 'en-ZA',
+            TRY: 'tr-TR',
+            NZD: 'en-NZ',
+            SEK: 'sv-SE'
         };
 
         const zeroDecimalCurrencies = ['VND', 'IDR', 'JPY', 'KRW', 'INR', 'TWD', 'THB', 'PHP'];

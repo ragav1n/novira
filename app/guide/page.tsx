@@ -101,7 +101,7 @@ const FAQ_LD = {
       acceptedAnswer: {
         '@type': 'Answer',
         text:
-          '20 currencies — INR, USD, EUR, GBP, CHF, SGD, VND, TWD, JPY, KRW, HKD, MYR, PHP, THB, CAD, AUD, MXN, BRL, IDR, AED. Each transaction can be in any of them with live exchange rates.',
+          '26 currencies — INR, USD, EUR, GBP, CHF, SGD, VND, TWD, JPY, KRW, HKD, MYR, PHP, THB, CAD, AUD, MXN, BRL, IDR, AED, CNY, RUB, ZAR, TRY, NZD, SEK. Each transaction can be in any of them with live exchange rates.',
       },
     },
     {

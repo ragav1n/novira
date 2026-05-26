@@ -49,7 +49,7 @@ export const WELCOME_FEATURES = [
     },
     {
         title: 'Multi-Currency',
-        description: '20 currencies with live exchange rates and a base-currency that stays steady over time.',
+        description: '26 currencies with live exchange rates and a base-currency that stays steady over time.',
         icon: 'globe'
     },
     {

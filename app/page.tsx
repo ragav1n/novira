@@ -9,7 +9,7 @@ const APP_LD = {
   '@type': 'SoftwareApplication',
   name: 'Novira',
   description:
-    'Track spending, split with friends, and understand your money — a personal-finance PWA that works offline. 20+ currencies, AI receipt scanning, beautiful analytics.',
+    'Track spending, split with friends, and understand your money — a personal-finance PWA that works offline. 26 currencies, AI receipt scanning, beautiful analytics.',
   url: SITE_URL,
   applicationCategory: 'FinanceApplication',
   operatingSystem: 'Web, iOS, Android',

@@ -43,7 +43,7 @@ export function AddingTransactionsSection() {
           Numbers and basic math. Currency picker next to the field changes which currency this transaction was in.
         </FactRow>
         <FactRow label="Currency">
-          Defaults to your home currency. Pick from any of the 20 supported currencies for that single expense. The exchange rate at submission time is locked into the record so historical totals stay accurate.
+          Defaults to your home currency. Pick from any of the 26 supported currencies for that single expense. The exchange rate at submission time is locked into the record so historical totals stay accurate.
         </FactRow>
         <FactRow label="Description">
           What it was, in your own words. Past descriptions appear as suggestion chips — tap one to apply its full set of defaults.

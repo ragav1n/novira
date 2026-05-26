@@ -10,7 +10,7 @@ const CACHE_TTL = 60 * 60 * 1000; // 1 hour
 const STALE_PRUNE_THRESHOLD = 24 * 60 * 60 * 1000; // 24h — entries older than this are evicted
 
 // Drop stale entries for currencies the user no longer uses, so the cache can't
-// grow unboundedly across sessions where the user has cycled through 20 currencies.
+// grow unboundedly across sessions where the user has cycled through many currencies.
 function pruneStaleCaches() {
     if (typeof window === 'undefined') return;
     const now = Date.now();
