@@ -364,6 +364,13 @@ export function DashboardDialogs({
                         setActiveModal(null);
                     }
                 }}
+                onOpenFullTour={() => {
+                    if (userId) {
+                        localStorage.setItem(`welcome_seen_${userId}`, 'true');
+                    }
+                    setActiveModal(null);
+                    setIsHowToUseOpen(true);
+                }}
             />
 
             <FeatureAnnouncementModal

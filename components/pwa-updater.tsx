@@ -1,39 +1,26 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
-import { toast } from '@/utils/haptics';
-import { RefreshCcw } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { PWAUpdateDialog } from '@/components/pwa-update-dialog';
 
 export function PWAUpdater() {
-    const hasShownToastRef = useRef(false);
+    const [open, setOpen] = useState(false);
+    const registrationRef = useRef<ServiceWorkerRegistration | null>(null);
+    const dismissedRef = useRef(false);
 
     useEffect(() => {
         if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return;
 
         const handleUpdate = (registration: ServiceWorkerRegistration) => {
             if (!registration.waiting) return;
-            if (hasShownToastRef.current) return;
-            
-            hasShownToastRef.current = true;
-
-            // Notify user that a new version is available
-            toast('Novira just got smarter', {
-                id: 'pwa-update-toast',
-                description: 'New: vs-last-month delta, Today chip, upcoming charges, amount calculator, Take Photo, description pills & smart place defaults.',
-                duration: Infinity,
-                action: {
-                    label: 'Update Now',
-                    onClick: () => {
-                        registration.waiting?.postMessage({ type: 'SKIP_WAITING' });
-                    },
-                },
-            });
+            if (dismissedRef.current) return;
+            registrationRef.current = registration;
+            setOpen(true);
         };
 
-        // Check for updates on load
         const checkUpdate = async () => {
-            if (!navigator.serviceWorker.controller) return; // Only check if we are controlled by a SW
-            
+            if (!navigator.serviceWorker.controller) return;
+
             try {
                 const registration = await navigator.serviceWorker.getRegistration();
                 if (registration) {
@@ -52,7 +39,6 @@ export function PWAUpdater() {
             }
         };
 
-        // Listen for new service worker finding an update
         navigator.serviceWorker.getRegistration().then((registration) => {
             if (registration) {
                 registration.addEventListener('updatefound', () => {
@@ -68,10 +54,8 @@ export function PWAUpdater() {
             }
         });
 
-        // 1. Check on mount (after a short delay)
         const mountTimer = setTimeout(checkUpdate, 2000);
 
-        // 2. Check every time the app comes into focus (foreground)
         const handleVisibilityChange = () => {
             if (document.visibilityState === 'visible') {
                 checkUpdate();
@@ -79,10 +63,8 @@ export function PWAUpdater() {
         };
         document.addEventListener('visibilitychange', handleVisibilityChange);
 
-        // 3. Periodic check every 30 minutes
         const interval = setInterval(checkUpdate, 30 * 60 * 1000);
 
-        // Reload the page once the new service worker takes over
         let refreshing = false;
         const handleControllerChange = () => {
             if (!refreshing) {
@@ -100,5 +82,21 @@ export function PWAUpdater() {
         };
     }, []);
 
-    return null;
+    const handleUpdateNow = () => {
+        registrationRef.current?.waiting?.postMessage({ type: 'SKIP_WAITING' });
+        setOpen(false);
+    };
+
+    const handleLater = () => {
+        dismissedRef.current = true;
+        setOpen(false);
+    };
+
+    return (
+        <PWAUpdateDialog
+            open={open}
+            onUpdate={handleUpdateNow}
+            onLater={handleLater}
+        />
+    );
 }

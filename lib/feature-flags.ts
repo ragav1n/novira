@@ -1,29 +1,29 @@
 export const LATEST_FEATURE_ANNOUNCEMENT = {
-    id: 'realtime-voice-receipts-v11',
-    title: "What's New ✦",
+    id: 'redesign-pass-v12',
+    title: "What's new",
     features: [
         {
-            title: 'Splits in Real Time',
-            description: 'When a friend adds a transaction that splits with you, your "You owe / owed" tiles update instantly — no refresh, no waiting.',
-            icon: 'users'
+            title: 'Refreshed dashboard',
+            description: 'New layout for spend, allowance, and buckets. Loads faster when you switch back to the app.',
+            icon: 'home'
         },
         {
-            title: 'Voice Expense Entry',
-            description: 'Tap the mic next to the description field and dictate. A live preview shows the words as you speak; finalised text drops into the form when you stop.',
-            icon: 'mobile'
-        },
-        {
-            title: 'Receipts Gallery',
-            description: 'Every scanned receipt now lives in one place. Settings → Data Management → Browse Receipts. Tap any thumbnail to view full-screen.',
-            icon: 'receipt'
-        },
-        {
-            title: 'Smarter Analytics',
-            description: 'Burn-rate projection shows where your month is heading vs your budget. Tap any tag on a row to filter the search. Pull-to-refresh now works on /search too.',
+            title: 'Analytics on desktop',
+            description: 'Hero summary card, themed sections, and a roomier grid layout when you open Novira on a laptop.',
             icon: 'chart'
         },
+        {
+            title: 'Faster add-expense',
+            description: 'Submission is quicker, especially with splits, recurring entries, and receipts that need scanning.',
+            icon: 'zap'
+        },
+        {
+            title: 'New welcome & help',
+            description: 'Shorter intro, expandable help, and a proper update prompt in place of the old stuck toast.',
+            icon: 'star'
+        },
     ],
-    buttonText: "Let's go!",
+    buttonText: 'Continue',
 };
 
 export const WELCOME_FEATURES = [

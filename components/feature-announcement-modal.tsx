@@ -3,15 +3,58 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Zap, Tag, PieChart, Users, QrCode, Upload, Bell, Globe, FileDown, RefreshCcw, Shield, Search, Sparkles, Moon, CreditCard, Wallet, Lock, SlidersHorizontal, Star, Fingerprint, BarChart2, Receipt, Layers, MessageSquare, Link, Smartphone, MapPin, Home, Target, Calendar, Hand } from 'lucide-react';
+import {
+    X, Zap, Tag, PieChart, Users, QrCode, Upload, Bell, Globe, FileDown,
+    RefreshCcw, Shield, Search, Sparkles, Moon, CreditCard, Wallet, Lock,
+    SlidersHorizontal, Star, Fingerprint, BarChart3, Receipt, Layers,
+    MessageSquare, Link2, Smartphone, MapPin, Home, Target, Calendar, Hand,
+    type LucideIcon,
+} from 'lucide-react';
 import { LATEST_FEATURE_ANNOUNCEMENT } from '@/lib/feature-flags';
 import { Button } from '@/components/ui/button';
+import { version } from '@/package.json';
 
 interface FeatureAnnouncementModalProps {
     showAnnouncement?: boolean;
     userId?: string | null;
     onClose?: () => void;
 }
+
+const ICON_MAP: Record<string, { Icon: LucideIcon; tone: string }> = {
+    home: { Icon: Home, tone: 'text-indigo-300' },
+    chart: { Icon: PieChart, tone: 'text-violet-300' },
+    'bar-chart': { Icon: BarChart3, tone: 'text-violet-300' },
+    zap: { Icon: Zap, tone: 'text-yellow-300' },
+    star: { Icon: Star, tone: 'text-amber-300' },
+    users: { Icon: Users, tone: 'text-blue-300' },
+    mobile: { Icon: Smartphone, tone: 'text-sky-300' },
+    receipt: { Icon: Receipt, tone: 'text-lime-300' },
+    bucket: { Icon: Tag, tone: 'text-amber-300' },
+    wallet: { Icon: Wallet, tone: 'text-emerald-300' },
+    card: { Icon: CreditCard, tone: 'text-blue-300' },
+    recurring: { Icon: RefreshCcw, tone: 'text-emerald-300' },
+    layers: { Icon: Layers, tone: 'text-sky-300' },
+    message: { Icon: MessageSquare, tone: 'text-cyan-300' },
+    link: { Icon: Link2, tone: 'text-indigo-300' },
+    qr: { Icon: QrCode, tone: 'text-cyan-300' },
+    target: { Icon: Target, tone: 'text-emerald-300' },
+    calendar: { Icon: Calendar, tone: 'text-orange-300' },
+    settings: { Icon: SlidersHorizontal, tone: 'text-slate-300' },
+    'dark-mode': { Icon: Moon, tone: 'text-slate-200' },
+    gestures: { Icon: Hand, tone: 'text-fuchsia-300' },
+    shield: { Icon: Shield, tone: 'text-green-300' },
+    lock: { Icon: Lock, tone: 'text-green-300' },
+    fingerprint: { Icon: Fingerprint, tone: 'text-teal-300' },
+    search: { Icon: Search, tone: 'text-fuchsia-300' },
+    ai: { Icon: Sparkles, tone: 'text-amber-300' },
+    upload: { Icon: Upload, tone: 'text-indigo-300' },
+    export: { Icon: FileDown, tone: 'text-pink-300' },
+    bell: { Icon: Bell, tone: 'text-orange-300' },
+    globe: { Icon: Globe, tone: 'text-teal-300' },
+    map: { Icon: MapPin, tone: 'text-rose-300' },
+};
+
+const DEFAULT_ICON = { Icon: Zap, tone: 'text-primary' };
 
 export function FeatureAnnouncementModal({ showAnnouncement = false, userId, onClose }: FeatureAnnouncementModalProps) {
     const [isOpen, setIsOpen] = useState(false);
@@ -29,7 +72,6 @@ export function FeatureAnnouncementModal({ showAnnouncement = false, userId, onC
 
     const handleClose = () => {
         setIsOpen(false);
-        // Save to localStorage so we don't show it again for this specific user
         if (userId) {
             localStorage.setItem(`last_seen_feature_id_${userId}`, LATEST_FEATURE_ANNOUNCEMENT.id);
         } else {
@@ -43,191 +85,83 @@ export function FeatureAnnouncementModal({ showAnnouncement = false, userId, onC
     return createPortal(
         <AnimatePresence>
             {isOpen && (
-                <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 sm:p-0">
-                    {/* Backdrop */}
+                <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 sm:p-6">
                     <motion.div
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        className="fixed inset-0 bg-black/80 backdrop-blur-md"
+                        className="fixed inset-0 bg-black/85 backdrop-blur-md"
                         onClick={handleClose}
                     />
 
-                    {/* Modal */}
                     <motion.div
-                        initial={{ opacity: 0, scale: 0.9, y: 30 }}
+                        initial={{ opacity: 0, scale: 0.95, y: 20 }}
                         animate={{ opacity: 1, scale: 1, y: 0 }}
-                        exit={{ opacity: 0, scale: 0.9, y: 30 }}
-                        transition={{
-                            type: "spring",
-                            stiffness: 300,
-                            damping: 30,
-                            mass: 0.8
-                        }}
-                        className="relative w-full max-w-sm bg-[#0D0D0F]/98 backdrop-blur-xl border border-white/10 rounded-[2.5rem] shadow-[0_0_80px_-15px_rgba(138,43,226,0.4)] overflow-hidden z-[1100] mx-4 flex flex-col max-h-[90dvh]"
+                        exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                        transition={{ type: 'spring', duration: 0.6, bounce: 0.3 }}
+                        className="relative w-full max-w-md bg-[#0A0A0B]/98 backdrop-blur-xl border border-white/10 rounded-[2.5rem] shadow-[0_0_50px_-12px_rgba(138,43,226,0.3)] overflow-hidden z-[1100]"
                     >
-                        {/* More Dynamic Glass Glows */}
-                        <div className="absolute -top-24 -left-24 w-56 h-56 bg-primary/30 rounded-full blur-[70px] opacity-40 motion-safe:animate-pulse" />
-                        <div className="absolute -bottom-24 -right-24 w-56 h-56 bg-purple-500/30 rounded-full blur-[70px] opacity-40 motion-safe:animate-pulse" />
-                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-40 bg-white/5 rounded-full blur-[80px] pointer-events-none" />
+                        <div className="pointer-events-none absolute -top-32 -left-32 w-72 h-72 bg-primary/20 rounded-full blur-[100px] opacity-50" />
+                        <div className="pointer-events-none absolute -bottom-32 -right-32 w-72 h-72 bg-purple-600/20 rounded-full blur-[100px] opacity-50" />
+                        <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-primary/50 to-transparent" />
 
-                        {/* Close Button - more prominent hover */}
                         <button
                             onClick={handleClose}
-                            className="absolute top-5 right-5 p-2 rounded-full hover:bg-white/10 hover:rotate-90 transition-all duration-500 z-20 text-white/50 hover:text-white"
+                            aria-label="Close"
+                            className="absolute top-4 right-4 z-20 p-2 rounded-full hover:bg-white/10 text-white/55 hover:text-white transition-colors"
                         >
                             <X className="w-5 h-5" />
                         </button>
 
-                        {/* Content */}
-                        <div className="flex-1 overflow-y-auto p-8 pt-10 text-center space-y-6 relative z-10 flex flex-col items-center custom-scrollbar">
-                            <div className="space-y-2">
-                                <motion.h1
-                                    initial={{ y: 10, opacity: 0 }}
-                                    animate={{ y: 0, opacity: 1 }}
-                                    transition={{ delay: 0.2 }}
-                                    className="text-2xl font-black text-white tracking-tight leading-tight"
-                                >
+                        <div className="relative flex flex-col">
+                            <div className="px-6 pt-5 pb-3">
+                                <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary mb-1.5">
+                                    Updated · v{version}
+                                </div>
+                                <h2 className="text-xl font-extrabold text-white tracking-tight leading-tight">
                                     {LATEST_FEATURE_ANNOUNCEMENT.title}
-                                </motion.h1>
+                                </h2>
+                                <p className="text-[12px] text-white/55 leading-relaxed mt-1">
+                                    A few things changed since you last opened Novira.
+                                </p>
                             </div>
 
-                            {/* Features List */}
-                            <div className="w-full space-y-4 text-left">
-                                {LATEST_FEATURE_ANNOUNCEMENT.features.map((feature, index) => (
-                                    <motion.div
-                                        key={feature.title}
-                                        initial={{ x: -20, opacity: 0 }}
-                                        animate={{ x: 0, opacity: 1 }}
-                                        transition={{ delay: 0.3 + index * 0.1 }}
-                                        className="flex items-start gap-4 p-4 rounded-3xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors group"
-                                    >
-                                        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary/20 to-purple-500/20 flex items-center justify-center shrink-0 border border-white/10 group-hover:scale-110 transition-transform">
-                                            {feature.icon === 'google' ? (
-                                                <svg className="w-6 h-6" viewBox="0 0 24 24">
-                                                    <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
-                                                    <path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-                                                    <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" />
-                                                    <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.66l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
-                                                </svg>
-                                            ) : feature.icon === 'bucket' ? (
-                                                <Tag className="w-6 h-6 text-amber-500 fill-amber-500/20" />
-                                                /* ── Analytics ── */
-                                            ) : feature.icon === 'chart' ? (
-                                                <PieChart className="w-6 h-6 text-violet-400 fill-violet-400/20" />
-                                            ) : feature.icon === 'bar-chart' ? (
-                                                <BarChart2 className="w-6 h-6 text-violet-400" />
-                                                /* ── Finance / Payments ── */
-                                            ) : feature.icon === 'wallet' ? (
-                                                <Wallet className="w-6 h-6 text-emerald-400 fill-emerald-400/20" />
-                                            ) : feature.icon === 'card' ? (
-                                                <CreditCard className="w-6 h-6 text-blue-400" />
-                                            ) : feature.icon === 'receipt' ? (
-                                                <Receipt className="w-6 h-6 text-lime-400" />
-                                                /* ── Actions / Automation ── */
-                                            ) : feature.icon === 'zap' ? (
-                                                <Zap className="w-6 h-6 text-yellow-400 fill-yellow-400/20" />
-                                            ) : feature.icon === 'recurring' ? (
-                                                <RefreshCcw className="w-6 h-6 text-emerald-400" />
-                                            ) : feature.icon === 'layers' ? (
-                                                <Layers className="w-6 h-6 text-sky-400" />
-                                                /* ── Social / Groups ── */
-                                            ) : feature.icon === 'users' ? (
-                                                <Users className="w-6 h-6 text-blue-400 fill-blue-400/20" />
-                                            ) : feature.icon === 'message' ? (
-                                                <MessageSquare className="w-6 h-6 text-cyan-400 fill-cyan-400/20" />
-                                            ) : feature.icon === 'link' ? (
-                                                <Link className="w-6 h-6 text-indigo-400" />
-                                            ) : feature.icon === 'qr' ? (
-                                                <QrCode className="w-6 h-6 text-cyan-400" />
-                                            ) : feature.icon === 'home' ? (
-                                                <Home className="w-6 h-6 text-indigo-400 fill-indigo-400/20" />
-                                            ) : feature.icon === 'target' ? (
-                                                <Target className="w-6 h-6 text-emerald-400" />
-                                            ) : feature.icon === 'calendar' ? (
-                                                <Calendar className="w-6 h-6 text-orange-400 fill-orange-400/20" />
-                                                /* ── Settings / UX ── */
-                                            ) : feature.icon === 'settings' ? (
-                                                <SlidersHorizontal className="w-6 h-6 text-slate-400" />
-                                            ) : feature.icon === 'dark-mode' ? (
-                                                <Moon className="w-6 h-6 text-slate-300 fill-slate-300/20" />
-                                            ) : feature.icon === 'mobile' ? (
-                                                <Smartphone className="w-6 h-6 text-sky-400" />
-                                            ) : feature.icon === 'gestures' ? (
-                                                <Hand className="w-6 h-6 text-fuchsia-400 fill-fuchsia-400/20" />
-                                            ) : feature.icon === 'star' ? (
-                                                <Star className="w-6 h-6 text-yellow-400 fill-yellow-400/20" />
-                                                /* ── Security / Auth ── */
-                                            ) : feature.icon === 'shield' ? (
-                                                <Shield className="w-6 h-6 text-green-400 fill-green-400/20" />
-                                            ) : feature.icon === 'lock' ? (
-                                                <Lock className="w-6 h-6 text-green-400" />
-                                            ) : feature.icon === 'fingerprint' ? (
-                                                <Fingerprint className="w-6 h-6 text-teal-400" />
-                                                /* ── Discovery / AI ── */
-                                            ) : feature.icon === 'search' ? (
-                                                <Search className="w-6 h-6 text-fuchsia-400" />
-                                            ) : feature.icon === 'ai' ? (
-                                                <Sparkles className="w-6 h-6 text-amber-400 fill-amber-400/20" />
-                                                /* ── Utility ── */
-                                            ) : feature.icon === 'upload' ? (
-                                                <Upload className="w-6 h-6 text-indigo-400" />
-                                            ) : feature.icon === 'export' ? (
-                                                <FileDown className="w-6 h-6 text-pink-400" />
-                                            ) : feature.icon === 'bell' ? (
-                                                <Bell className="w-6 h-6 text-orange-400 fill-orange-400/20" />
-                                            ) : feature.icon === 'globe' ? (
-                                                <Globe className="w-6 h-6 text-teal-400" />
-                                            ) : feature.icon === 'map' ? (
-                                                <MapPin className="w-6 h-6 text-rose-400 fill-rose-400/20" />
-                                            ) : (
-                                                <Zap className="w-6 h-6 text-primary fill-primary/20" />
-                                            )}
-                                        </div>
-                                        <div className="min-w-0">
-                                            <h3 className="text-sm font-bold text-white mb-0.5">{feature.title}</h3>
-                                            <p className="text-xs text-white/50 leading-relaxed truncate-2-lines">{feature.description}</p>
-                                        </div>
-                                    </motion.div>
-                                ))}
+                            <div className="px-6 pb-5 space-y-2">
+                                {LATEST_FEATURE_ANNOUNCEMENT.features.map((feature, index) => {
+                                    const { Icon, tone } = ICON_MAP[feature.icon] ?? DEFAULT_ICON;
+                                    return (
+                                        <motion.div
+                                            key={feature.title}
+                                            initial={{ opacity: 0, y: 8 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            transition={{ delay: 0.08 + index * 0.05, duration: 0.3 }}
+                                            className="flex items-start gap-3 p-3.5 rounded-2xl border border-white/8 bg-white/[0.03]"
+                                        >
+                                            <span className="shrink-0 w-9 h-9 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center">
+                                                <Icon className={`w-4 h-4 ${tone}`} aria-hidden="true" />
+                                            </span>
+                                            <div className="min-w-0 flex-1">
+                                                <h3 className="text-[13px] font-bold text-white leading-tight">
+                                                    {feature.title}
+                                                </h3>
+                                                <p className="text-[11.5px] text-white/60 leading-snug mt-1">
+                                                    {feature.description}
+                                                </p>
+                                            </div>
+                                        </motion.div>
+                                    );
+                                })}
                             </div>
 
-                            <motion.div
-                                initial={{ y: 10, opacity: 0 }}
-                                animate={{ y: 0, opacity: 1 }}
-                                transition={{ delay: 0.6 }}
-                                className="w-full pt-2 pb-2"
-                            >
+                            <div className="px-6 py-4 border-t border-white/5 bg-black/40 backdrop-blur-xl">
                                 <Button
                                     onClick={handleClose}
-                                    className="w-full bg-white text-black hover:bg-white/90 font-black h-14 rounded-2xl shadow-xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] text-sm tracking-widest uppercase"
+                                    className="w-full h-11 rounded-xl bg-white text-black hover:bg-white/90 font-bold text-[12.5px]"
                                 >
                                     {LATEST_FEATURE_ANNOUNCEMENT.buttonText}
                                 </Button>
-                            </motion.div>
+                            </div>
                         </div>
-
-                        {/* Subtle Top Shine */}
-                        <div className="absolute top-0 left-0 w-full h-[1px] bg-white/20" />
-                        <div className="absolute top-0 left-1/4 w-1/2 h-[2px] bg-gradient-to-r from-transparent via-white/40 to-transparent" />
-
-                        {/* Custom scrollbar styles */}
-                        <style jsx global>{`
-                            .custom-scrollbar::-webkit-scrollbar {
-                                width: 4px;
-                            }
-                            .custom-scrollbar::-webkit-scrollbar-track {
-                                background: transparent;
-                            }
-                            .custom-scrollbar::-webkit-scrollbar-thumb {
-                                background: rgba(255, 255, 255, 0.1);
-                                border-radius: 10px;
-                            }
-                            .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-                                background: rgba(255, 255, 255, 0.2);
-                            }
-                        `}</style>
-
                     </motion.div>
                 </div>
             )}

@@ -1,64 +1,102 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, CheckCircle2, Zap, Users, RefreshCw, BarChart3, QrCode, Upload, Bell, Globe, FileDown, Target, Calendar, Home, Smartphone, Hand, MapPin, Receipt } from 'lucide-react';
-import { WELCOME_FEATURES } from '@/lib/feature-flags';
+import { useRouter } from 'next/navigation';
+import {
+    Sparkles,
+    Users,
+    Globe,
+    BarChart3,
+    Receipt,
+    Plus,
+    Tag,
+    Camera,
+    ArrowRight,
+    BookOpen,
+    Compass,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
 interface WelcomeModalProps {
     isOpen: boolean;
     onClose: () => void;
+    onOpenFullTour?: () => void;
 }
 
-const ICON_MAP: Record<string, any> = {
-    zap: Zap,
-    users: Users,
-    refresh: RefreshCw,
-    qr: QrCode,
-    upload: Upload,
-    chart: BarChart3,
-    bell: Bell,
-    globe: Globe,
-    export: FileDown,
-    target: Target,
-    calendar: Calendar,
-    home: Home,
-    mobile: Smartphone,
-    gestures: Hand,
-    map: MapPin,
-    receipt: Receipt,
-};
+type ScreenKey = 'welcome' | 'features' | 'setup';
 
-const COLOR_MAP: Record<string, string> = {
-    zap: 'text-amber-400 bg-amber-400/10 border-amber-400/20 group-hover:bg-amber-400/20 group-hover:border-amber-400/40',
-    users: 'text-blue-400 bg-blue-400/10 border-blue-400/20 group-hover:bg-blue-400/20 group-hover:border-blue-400/40',
-    qr: 'text-cyan-400 bg-cyan-400/10 border-cyan-400/20 group-hover:bg-cyan-400/20 group-hover:border-cyan-400/40',
-    upload: 'text-indigo-400 bg-indigo-400/10 border-indigo-400/20 group-hover:bg-indigo-400/20 group-hover:border-indigo-400/40',
-    chart: 'text-violet-400 bg-violet-400/10 border-violet-400/20 group-hover:bg-violet-400/20 group-hover:border-violet-400/40',
-    bell: 'text-yellow-400 bg-yellow-400/10 border-yellow-400/20 group-hover:bg-yellow-400/20 group-hover:border-yellow-400/40',
-    globe: 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20 group-hover:bg-emerald-400/20 group-hover:border-emerald-400/40',
-    export: 'text-pink-400 bg-pink-400/10 border-pink-400/20 group-hover:bg-pink-400/20 group-hover:border-pink-400/40',
-    target: 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20 group-hover:bg-emerald-400/20 group-hover:border-emerald-400/40',
-    calendar: 'text-orange-400 bg-orange-400/10 border-orange-400/20 group-hover:bg-orange-400/20 group-hover:border-orange-400/40',
-    home: 'text-indigo-400 bg-indigo-400/10 border-indigo-400/20 group-hover:bg-indigo-400/20 group-hover:border-indigo-400/40',
-    mobile: 'text-sky-400 bg-sky-400/10 border-sky-400/20 group-hover:bg-sky-400/20 group-hover:border-sky-400/40',
-    gestures: 'text-fuchsia-400 bg-fuchsia-400/10 border-fuchsia-400/20 group-hover:bg-fuchsia-400/20 group-hover:border-fuchsia-400/40',
-    map: 'text-rose-400 bg-rose-400/10 border-rose-400/20 group-hover:bg-rose-400/20 group-hover:border-rose-400/40',
-    receipt: 'text-lime-400 bg-lime-400/10 border-lime-400/20 group-hover:bg-lime-400/20 group-hover:border-lime-400/40',
-};
+const SCREEN_ORDER: ScreenKey[] = ['welcome', 'features', 'setup'];
 
-export function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
+const HERO_FEATURES = [
+    {
+        title: 'Scan receipts',
+        body: 'Snap one. Amount, merchant, date, and category land in the form in seconds.',
+        Icon: Receipt,
+        tone: 'text-lime-300',
+    },
+    {
+        title: 'Split with friends',
+        body: 'Even, share-weighted, or custom splits. Settle multiple debts in the fewest transfers.',
+        Icon: Users,
+        tone: 'text-blue-300',
+    },
+    {
+        title: 'Multi-currency',
+        body: '26 currencies, live rates, one stable base.',
+        Icon: Globe,
+        tone: 'text-emerald-300',
+    },
+    {
+        title: 'Analytics',
+        body: 'Custom ranges, trends, and a what-if simulator tied to your goals.',
+        Icon: BarChart3,
+        tone: 'text-violet-300',
+    },
+];
+
+export function WelcomeModal({ isOpen, onClose, onOpenFullTour }: WelcomeModalProps) {
     const [mounted, setMounted] = useState(false);
+    const [screen, setScreen] = useState<ScreenKey>('welcome');
+    const router = useRouter();
 
     useEffect(() => {
         setMounted(true);
     }, []);
 
-    const handleClose = () => {
+    useEffect(() => {
+        if (isOpen) setScreen('welcome');
+    }, [isOpen]);
+
+    const screenIndex = SCREEN_ORDER.indexOf(screen);
+
+    const goNext = useCallback(() => {
+        const next = SCREEN_ORDER[screenIndex + 1];
+        if (next) setScreen(next);
+        else onClose();
+    }, [screenIndex, onClose]);
+
+    const goBack = useCallback(() => {
+        const prev = SCREEN_ORDER[screenIndex - 1];
+        if (prev) setScreen(prev);
+    }, [screenIndex]);
+
+    const goTo = (path: string) => {
+        router.push(path);
         onClose();
+    };
+
+    const openFullTour = () => {
+        if (onOpenFullTour) {
+            onClose();
+            // Slight defer so the modal close animation doesn't fight the tour opening
+            setTimeout(onOpenFullTour, 120);
+        } else {
+            router.push('/guide');
+            onClose();
+        }
     };
 
     if (!mounted) return null;
@@ -71,111 +109,199 @@ export function WelcomeModal({ isOpen, onClose }: WelcomeModalProps) {
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        className="fixed inset-0 bg-black/80 backdrop-blur-md"
-                        onClick={handleClose}
+                        className="fixed inset-0 bg-black/85 backdrop-blur-md"
+                        onClick={onClose}
                     />
 
                     <motion.div
                         initial={{ opacity: 0, scale: 0.95, y: 20 }}
                         animate={{ opacity: 1, scale: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                        transition={{ type: "spring", duration: 0.6, bounce: 0.3 }}
-                        className="relative w-full max-w-2xl bg-[#0A0A0B]/98 backdrop-blur-xl border border-white/10 rounded-[2.5rem] shadow-[0_0_50px_-12px_rgba(138,43,226,0.3)] overflow-hidden z-[1100]"
+                        transition={{ type: 'spring', duration: 0.6, bounce: 0.3 }}
+                        className="relative w-full max-w-md bg-[#0A0A0B]/98 backdrop-blur-xl border border-white/10 rounded-[2.5rem] shadow-[0_0_50px_-12px_rgba(138,43,226,0.3)] overflow-hidden z-[1100]"
                     >
-                        {/* Decorative Background Elements */}
-                        <div className="absolute -top-32 -left-32 w-80 h-80 bg-primary/20 rounded-full blur-[100px] opacity-40 motion-safe:animate-pulse" />
-                        <div className="absolute -bottom-32 -right-32 w-80 h-80 bg-purple-600/20 rounded-full blur-[100px] opacity-40 motion-safe:animate-pulse" />
+                        <div className="pointer-events-none absolute -top-32 -left-32 w-72 h-72 bg-primary/20 rounded-full blur-[100px] opacity-50" />
+                        <div className="pointer-events-none absolute -bottom-32 -right-32 w-72 h-72 bg-purple-600/20 rounded-full blur-[100px] opacity-50" />
+                        <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-primary/50 to-transparent" />
 
-                        <div className="flex flex-col max-h-[90vh]">
-                            {/* Scrollable Content Area */}
-                            <div className="flex-1 overflow-y-auto custom-scrollbar p-6 sm:p-10 pb-4">
-                                {/* Header */}
-                                <div className="text-center space-y-3 mb-8 sm:mb-10">
-                                    <motion.div
-                                        initial={{ scale: 0.8, opacity: 0 }}
-                                        animate={{ scale: 1, opacity: 1 }}
-                                        transition={{ delay: 0.3 }}
-                                        className="inline-flex items-center justify-center p-3 rounded-2xl bg-white/5 border border-white/10 mb-2 sm:mb-4"
-                                    >
-                                        <div className="relative">
-                                            <CheckCircle2 className="w-8 h-8 text-primary drop-shadow-[0_0_12px_rgba(138,43,226,0.8)]" />
-                                            <div className="absolute inset-0 blur-lg bg-primary/20 motion-safe:animate-pulse" />
-                                        </div>
-                                    </motion.div>
-                                    <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight leading-tight px-4">
-                                        Welcome to <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-purple-400">Novira</span>
-                                    </h1>
-                                    <p className="text-white/50 text-xs sm:text-sm max-w-[320px] mx-auto leading-relaxed font-medium">
-                                        The Ultimate Multi-Currency Hub to track, manage and split your expenses with ease.
-                                    </p>
+                        <div className="relative flex flex-col">
+                            <div className="px-6 pt-5 pb-3 flex items-center justify-between">
+                                <div className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.18em] font-bold text-primary">
+                                    <Sparkles className="w-3 h-3" aria-hidden="true" />
+                                    Welcome
                                 </div>
-
-                                {/* Features Grid */}
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mb-4">
-                                    {WELCOME_FEATURES.map((feature, idx) => {
-                                        const IconComponent = ICON_MAP[feature.icon] || Zap;
-                                        const colorClasses = COLOR_MAP[feature.icon] || 'text-primary bg-primary/10 border-primary/20';
-                                        
-                                        return (
-                                            <motion.div
-                                                key={idx}
-                                                initial={{ opacity: 0, scale: 0.95 }}
-                                                animate={{ opacity: 1, scale: 1 }}
-                                                transition={{ delay: 0.4 + idx * 0.05 }}
-                                                className="p-4 rounded-3xl bg-white/[0.03] border border-white/5 hover:bg-white/[0.06] hover:border-white/10 transition-all duration-300 group"
-                                            >
-                                                <div className="flex gap-4 items-center h-full">
-                                                    <div className={cn(
-                                                        "shrink-0 p-3 rounded-2xl border transition-all duration-500 group-hover:scale-110 shadow-sm",
-                                                        colorClasses
-                                                    )}>
-                                                        <IconComponent className="w-5 h-5" />
-                                                    </div>
-                                                    <div className="space-y-1">
-                                                        <h3 className="text-[13px] font-black text-white group-hover:text-white transition-colors uppercase tracking-wider">
-                                                            {feature.title}
-                                                        </h3>
-                                                        <p className="text-[11px] text-white/40 leading-relaxed font-medium group-hover:text-white/60 transition-colors">
-                                                            {feature.description}
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                            </motion.div>
-                                        );
-                                    })}
+                                <div className="flex items-center gap-1.5" aria-hidden="true">
+                                    {SCREEN_ORDER.map((_, i) => (
+                                        <span
+                                            key={i}
+                                            className={cn(
+                                                'h-1 rounded-full transition-all duration-300',
+                                                i === screenIndex ? 'w-5 bg-primary' : i < screenIndex ? 'w-1.5 bg-primary/40' : 'w-1.5 bg-white/15'
+                                            )}
+                                        />
+                                    ))}
                                 </div>
                             </div>
 
-                            {/* Sticky/Fixed Footer Action */}
-                            <div className="p-5 sm:p-8 pt-4 border-t border-white/5 bg-black/98 backdrop-blur-xl">
+                            <div className="px-6 pb-5">
+                                <AnimatePresence mode="wait">
+                                    {screen === 'welcome' && (
+                                        <motion.div
+                                            key="welcome"
+                                            initial={{ opacity: 0, x: 16 }}
+                                            animate={{ opacity: 1, x: 0 }}
+                                            exit={{ opacity: 0, x: -16 }}
+                                            transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+                                            className="space-y-5 pt-3"
+                                        >
+                                            <div className="flex flex-col items-center text-center gap-3">
+                                                <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-white/5 border border-white/10">
+                                                    <Compass className="w-7 h-7 text-primary drop-shadow-[0_0_10px_rgba(138,43,226,0.6)]" />
+                                                </div>
+                                                <div className="space-y-1.5">
+                                                    <h1 className="text-2xl font-extrabold text-white tracking-tight leading-tight">
+                                                        Welcome to Novira
+                                                    </h1>
+                                                    <p className="text-[13px] text-white/65 leading-relaxed max-w-[300px] mx-auto">
+                                                        Track, split, and plan money across currencies.
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <div className="rounded-2xl border border-white/8 bg-white/[0.025] divide-y divide-white/5">
+                                                {[
+                                                    { k: 'Log a spend', v: 'In a tap or a snap of a receipt' },
+                                                    { k: 'Plan ahead', v: 'Buckets, allowances, run-rate forecast' },
+                                                    { k: 'Share fairly', v: 'Splits with friends, settled in fewer transfers' },
+                                                ].map(({ k, v }) => (
+                                                    <div key={k} className="flex items-center justify-between gap-3 px-4 py-2.5">
+                                                        <span className="text-[12px] font-bold text-white">{k}</span>
+                                                        <span className="text-[11px] text-white/55 text-right">{v}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </motion.div>
+                                    )}
+
+                                    {screen === 'features' && (
+                                        <motion.div
+                                            key="features"
+                                            initial={{ opacity: 0, x: 16 }}
+                                            animate={{ opacity: 1, x: 0 }}
+                                            exit={{ opacity: 0, x: -16 }}
+                                            transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+                                            className="space-y-4 pt-2"
+                                        >
+                                            <div className="space-y-1">
+                                                <h2 className="text-lg font-extrabold text-white tracking-tight leading-tight">
+                                                    What you can do
+                                                </h2>
+                                                <p className="text-[12px] text-white/55 leading-relaxed">
+                                                    Four things Novira does well. There's more inside.
+                                                </p>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-2.5">
+                                                {HERO_FEATURES.map((f, i) => (
+                                                    <motion.div
+                                                        key={f.title}
+                                                        initial={{ opacity: 0, y: 8 }}
+                                                        animate={{ opacity: 1, y: 0 }}
+                                                        transition={{ delay: 0.05 + i * 0.05, duration: 0.3 }}
+                                                        className="rounded-2xl border border-white/8 bg-white/[0.03] p-3 space-y-1.5"
+                                                    >
+                                                        <f.Icon className={cn('w-4 h-4', f.tone)} aria-hidden="true" />
+                                                        <div className="text-[12px] font-bold text-white leading-tight">
+                                                            {f.title}
+                                                        </div>
+                                                        <p className="text-[10.5px] text-white/55 leading-snug">
+                                                            {f.body}
+                                                        </p>
+                                                    </motion.div>
+                                                ))}
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={openFullTour}
+                                                className="w-full inline-flex items-center justify-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.02] px-3 py-2.5 text-[11.5px] font-semibold text-white/75 hover:text-white hover:bg-white/[0.06] transition-colors"
+                                            >
+                                                <BookOpen className="w-3.5 h-3.5" aria-hidden="true" />
+                                                See the full tour
+                                                <ArrowRight className="w-3 h-3" aria-hidden="true" />
+                                            </button>
+                                        </motion.div>
+                                    )}
+
+                                    {screen === 'setup' && (
+                                        <motion.div
+                                            key="setup"
+                                            initial={{ opacity: 0, x: 16 }}
+                                            animate={{ opacity: 1, x: 0 }}
+                                            exit={{ opacity: 0, x: -16 }}
+                                            transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+                                            className="space-y-4 pt-2"
+                                        >
+                                            <div className="space-y-1">
+                                                <h2 className="text-lg font-extrabold text-white tracking-tight leading-tight">
+                                                    Start with one thing
+                                                </h2>
+                                                <p className="text-[12px] text-white/55 leading-relaxed">
+                                                    Pick where to begin. You can do the rest later.
+                                                </p>
+                                            </div>
+                                            <div className="space-y-2">
+                                                {[
+                                                    { Icon: Plus, label: 'Log a transaction', sub: 'The fastest way in', path: '/add' },
+                                                    { Icon: Camera, label: 'Scan a receipt', sub: 'Camera does the typing', path: '/add' },
+                                                    { Icon: Tag, label: 'Create a bucket', sub: 'For a trip or a project', path: '/groups?tab=buckets' },
+                                                ].map(({ Icon, label, sub, path }) => (
+                                                    <button
+                                                        key={label}
+                                                        type="button"
+                                                        onClick={() => goTo(path)}
+                                                        className="group w-full flex items-center gap-3 rounded-2xl border border-white/8 bg-white/[0.03] hover:bg-white/[0.06] hover:border-white/15 px-3 py-3 text-left transition-colors"
+                                                    >
+                                                        <span className="shrink-0 w-9 h-9 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center group-hover:border-primary/40 group-hover:bg-primary/10 transition-colors">
+                                                            <Icon className="w-4 h-4 text-primary" aria-hidden="true" />
+                                                        </span>
+                                                        <span className="min-w-0 flex-1">
+                                                            <span className="block text-[13px] font-semibold text-white leading-tight">{label}</span>
+                                                            <span className="block text-[11px] text-white/45 leading-tight mt-0.5">{sub}</span>
+                                                        </span>
+                                                        <ArrowRight className="w-4 h-4 text-white/30 group-hover:text-white/70 transition-colors" aria-hidden="true" />
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
+                            </div>
+
+                            <div className="px-6 py-4 border-t border-white/5 bg-black/40 backdrop-blur-xl flex items-center gap-2">
+                                {screenIndex > 0 ? (
+                                    <Button
+                                        variant="ghost"
+                                        onClick={goBack}
+                                        className="h-11 px-4 rounded-xl text-[12px] font-semibold text-white/65 hover:text-white hover:bg-white/5"
+                                    >
+                                        Back
+                                    </Button>
+                                ) : (
+                                    <Button
+                                        variant="ghost"
+                                        onClick={onClose}
+                                        className="h-11 px-4 rounded-xl text-[12px] font-semibold text-white/65 hover:text-white hover:bg-white/5"
+                                    >
+                                        Skip
+                                    </Button>
+                                )}
                                 <Button
-                                    onClick={handleClose}
-                                    className="w-full bg-white text-black hover:bg-white/90 font-black h-14 rounded-2xl shadow-[0_0_40px_-10px_rgba(255,255,255,0.4)] transition-all duration-500 hover:scale-[1.02] active:scale-[0.98] text-sm uppercase tracking-[0.2em]"
+                                    onClick={goNext}
+                                    className="flex-1 h-11 rounded-xl bg-white text-black hover:bg-white/90 font-bold text-[12.5px] inline-flex items-center justify-center gap-1.5"
                                 >
-                                    Get Started
+                                    {screen === 'setup' ? 'Get started' : 'Next'}
+                                    {screen !== 'setup' && <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />}
                                 </Button>
                             </div>
                         </div>
-
-                        {/* Top Accent Line */}
-                        <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-primary to-transparent opacity-50" />
-
-                        {/* Custom scrollbar styles */}
-                        <style jsx global>{`
-                            .custom-scrollbar::-webkit-scrollbar {
-                                width: 4px;
-                            }
-                            .custom-scrollbar::-webkit-scrollbar-track {
-                                background: transparent;
-                            }
-                            .custom-scrollbar::-webkit-scrollbar-thumb {
-                                background: rgba(255, 255, 255, 0.1);
-                                border-radius: 10px;
-                            }
-                            .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-                                background: rgba(255, 255, 255, 0.2);
-                            }
-                        `}</style>
                     </motion.div>
                 </div>
             )}
