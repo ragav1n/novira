@@ -477,10 +477,15 @@ export function MobileLayout({ children, defaultIsDesktop = false }: { children:
         enabled: ptrEnabled,
         onRefresh: async () => {
             if (isNative) toast.haptic(ImpactStyle.Light);
-            window.dispatchEvent(new Event('novira-refresh-requested'));
-            // Hold briefly so the spinner registers visually, even if listeners
-            // refetch instantly. The actual refetch is fire-and-forget.
-            await new Promise(r => setTimeout(r, 600));
+            const pending: Promise<unknown>[] = [];
+            window.dispatchEvent(new CustomEvent('novira-refresh-requested', {
+                detail: { waitUntil: (p: Promise<unknown>) => { pending.push(p); } },
+            }));
+            if (pending.length === 0) {
+                await new Promise(r => setTimeout(r, 300));
+                return;
+            }
+            await Promise.allSettled(pending);
         },
     });
     const ptrProgress = Math.min(1, pull / threshold);
@@ -547,7 +552,7 @@ export function MobileLayout({ children, defaultIsDesktop = false }: { children:
             {ptrEnabled && (pull > 0 || refreshing) && (
                 <div
                     className="absolute left-0 right-0 z-40 flex justify-center pointer-events-none"
-                    style={{ top: `calc(env(safe-area-inset-top) + ${pull * 0.6}px)` }}
+                    style={{ top: `calc(env(safe-area-inset-top) + ${pull}px)` }}
                     aria-hidden
                 >
                     <div

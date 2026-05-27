@@ -266,8 +266,10 @@ export function useDashboardData(
                 setPendingTransactions(prev => prev.filter(t => t.id !== detail.id));
             }
         };
-        const onRefreshRequested = () => {
-            if (userId) loadTxRef.current?.(userId, activeWorkspaceId);
+        const onRefreshRequested = (e: WindowEventMap['novira-refresh-requested']) => {
+            if (!userId) return;
+            const p = loadTxRef.current?.(userId, activeWorkspaceId);
+            if (p) e.detail?.waitUntil?.(p);
         };
         window.addEventListener('novira-queue-updated', onQueueUpdated);
         window.addEventListener('novira-mutation-synced', onMutationSynced);

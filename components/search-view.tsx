@@ -350,7 +350,10 @@ export function SearchView() {
 
     // Pull-to-refresh trigger from mobile-layout — same handler the dashboard uses.
     useEffect(() => {
-        const onRefresh = () => { fetchAndFilter(); };
+        const onRefresh = (e: WindowEventMap['novira-refresh-requested']) => {
+            const p = fetchAndFilter();
+            if (p) e.detail?.waitUntil?.(p);
+        };
         window.addEventListener('novira-refresh-requested', onRefresh);
         return () => window.removeEventListener('novira-refresh-requested', onRefresh);
     }, [fetchAndFilter]);
