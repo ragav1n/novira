@@ -3,6 +3,7 @@
 import React from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
+import { format } from 'date-fns';
 import { Eye, EyeOff, HelpCircle, Plus, UserCircle, Heart, Home, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { FluidDropdown, Category } from '@/components/ui/fluid-dropdown';
@@ -47,8 +48,7 @@ export function WorkspaceHeader({
                     {eligibleGroups.length > 0 ? (
                         <div className="flex items-center flex-wrap gap-x-1.5 gap-y-0.5 -ml-1">
                             <h1 className="text-xl font-bold flex items-center gap-1.5 min-w-0 shrink-0 ml-1">
-                                <span className="bg-clip-text text-transparent bg-gradient-to-r from-white to-white/80 truncate">Hi, {userName.split(' ')[0]}!</span>
-                                <span className="shrink-0">👋</span>
+                                <span className="bg-clip-text text-transparent bg-gradient-to-r from-white to-white/80 truncate">Hello, {userName.split(' ')[0]}</span>
                             </h1>
                             <FluidDropdown
                                 activeId={activeWorkspaceId || 'personal'}
@@ -81,11 +81,10 @@ export function WorkspaceHeader({
                     ) : (
                         <>
                             <h1 className="text-xl font-bold flex items-center gap-1.5 min-w-0 mb-0.5">
-                                <span className="bg-clip-text text-transparent bg-gradient-to-r from-white to-white/80 truncate">Hi, {userName.split(' ')[0]}!</span>
-                                <span className="shrink-0">👋</span>
+                                <span className="bg-clip-text text-transparent bg-gradient-to-r from-white to-white/80 truncate">Hello, {userName.split(' ')[0]}</span>
                             </h1>
                             <p className="text-[11px] text-muted-foreground font-medium truncate">
-                                Track your expenses with Novira
+                                {format(new Date(), 'MMMM')} overview
                             </p>
                         </>
                     )}

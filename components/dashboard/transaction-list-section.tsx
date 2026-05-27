@@ -98,7 +98,7 @@ export function TransactionListSection({
         <div className="space-y-4">
             <div className="flex justify-between items-center gap-2 flex-wrap">
                 <div className="flex items-center gap-2 flex-wrap min-w-0">
-                    <h3 className="text-lg font-bold">{isBucketFocused ? "Mission" : "Recent"} Transactions</h3>
+                    <h3 className="text-lg font-bold">{isBucketFocused ? "Bucket activity" : "Recent activity"}</h3>
                     {selectedCategory && onClearCategory && (
                         <button
                             type="button"
@@ -121,20 +121,20 @@ export function TransactionListSection({
                     {filteredRecents.some(tx => tx.place_lat && tx.place_lng) && (
                         <button
                             onClick={() => setIsMapOpen(true)}
-                            className="text-xs text-emerald-400 font-bold hover:text-emerald-300 transition-colors uppercase tracking-wider px-2 py-1 flex items-center gap-1"
+                            className="text-[13px] text-emerald-400 font-semibold hover:text-emerald-300 transition-colors px-2 py-1 flex items-center gap-1"
                         >
-                            <MapPin className="w-3 h-3" />
+                            <MapPin className="w-3.5 h-3.5" />
                             Map
                         </button>
                     )}
                     <button
                         onClick={() => setIsViewAllOpen(true)}
                         className={cn(
-                            "text-xs font-bold transition-colors uppercase tracking-wider px-2 py-1",
+                            "text-[13px] font-semibold transition-colors px-2 py-1",
                             isCoupleWorkspace ? "text-rose-400 hover:text-rose-300" : isHomeWorkspace ? "text-yellow-500 hover:text-yellow-400" : "text-primary hover:text-primary/80"
                         )}
                     >
-                        View All
+                        View all
                     </button>
                 </div>
             </div>

@@ -370,27 +370,27 @@ export function DashboardView() {
 
                 {/* Empty State */}
                 {(!loading && groups.length === 0 && friends.length === 0 && transactions.length === 0) && (
-                    <Card className="bg-card/40 border-primary/20 overflow-hidden relative">
+                    <Card className="bg-card/40 border-primary/20 overflow-hidden relative rounded-2xl shadow-[inset_0_1px_0_rgb(255_255_255_/0.06)]">
                         <div className="absolute top-0 right-0 p-8 opacity-5">
                             <Users className="w-24 h-24" />
                         </div>
                         <CardContent className="p-5 relative z-10">
-                            <h3 className="font-bold text-lg mb-1">Welcome to Novira!</h3>
-                            <p className="text-xs text-muted-foreground mb-4">Start by creating a group or adding friends to split expenses.</p>
+                            <h3 className="font-bold text-lg mb-1">Get set up</h3>
+                            <p className="text-xs text-muted-foreground mb-4">Create a group or add a friend to start splitting expenses.</p>
                             <div className="flex gap-3">
                                 <button
                                     onClick={() => router.push('/groups')}
                                     className="flex-1 bg-primary text-white text-xs font-bold py-2.5 px-4 rounded-xl hover:bg-primary/90 transition-colors flex items-center justify-center gap-2"
                                 >
                                     <Plus className="w-4 h-4" />
-                                    Start a Group
+                                    Create group
                                 </button>
                                 <button
                                     onClick={() => setIsAddFriendOpen(true)}
                                     className="flex-1 bg-transparent text-primary text-xs font-bold py-2.5 px-4 rounded-xl hover:bg-primary/10 transition-colors flex items-center justify-center gap-2 border border-primary/30"
                                 >
                                     <Users className="w-4 h-4" />
-                                    Add Friends
+                                    Add friend
                                 </button>
                             </div>
                         </CardContent>

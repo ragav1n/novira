@@ -116,6 +116,7 @@ export default async function RootLayout({
         <PWAInstallPrompt />
         <NetworkErrorBanner />
         <AppResetModal />
+        <div className="app-grain" aria-hidden />
         <Analytics />
         <SpeedInsights />
       </body>

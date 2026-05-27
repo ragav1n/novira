@@ -162,7 +162,7 @@ export const SpendingOverview = React.memo(function SpendingOverview({
                 <button
                     onClick={() => setIsFocusMenuOpen(!isFocusMenuOpen)}
                     className={cn(
-                        "flex items-center gap-2 px-5 py-2 rounded-full text-sm font-bold transition-all shadow-lg active:scale-95 border backdrop-blur-md",
+                        "flex items-center gap-2 px-5 py-2 rounded-full text-sm font-bold transition-all shadow-lg active:scale-95 border",
                         isBucketFocused
                             ? "bg-cyan-500/20 border-cyan-500/30 text-cyan-300 shadow-cyan-500/10"
                             : isCoupleWorkspace
@@ -173,9 +173,9 @@ export const SpendingOverview = React.memo(function SpendingOverview({
                     )}
                 >
                     {isBucketFocused ? (
-                        <>{focusedBucket?.name || 'Loading'} Focus</>
+                        <>{focusedBucket?.name || 'Loading'}</>
                     ) : (
-                        <>Monthly Allowance</>
+                        <>Monthly allowance</>
                     )}
                     <motion.div
                         animate={{ rotate: isFocusMenuOpen ? 180 : 0 }}
@@ -226,7 +226,7 @@ export const SpendingOverview = React.memo(function SpendingOverview({
                                     
                                     {activeBuckets.length > 0 && (
                                         <motion.div variants={itemVariants} className="px-3 py-1.5 border-t border-white/5">
-                                            <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">Active Missions</p>
+                                            <p className="text-[11px] font-bold text-muted-foreground">Buckets</p>
                                         </motion.div>
                                     )}
 
@@ -270,28 +270,38 @@ export const SpendingOverview = React.memo(function SpendingOverview({
             {/* Total Spent Card — gradient stops and glow are driven by CSS variables
                 (`--focus-card-from`, `--focus-card-to`, `--focus-card-glow`) so the
                 color transition tweens smoothly when bucket focus or workspace
-                theme changes. See globals.css for the per-state values. */}
+                theme changes. See globals.css for the per-state values. Layered
+                radial spotlights instead of a literal 45° fade so it doesn't read
+                as the stock AI gradient. */}
             <div
-                className="relative overflow-hidden rounded-3xl p-6 shadow-xl"
+                className="relative overflow-hidden rounded-[2rem] p-6"
                 style={{
-                    background: 'linear-gradient(135deg, var(--focus-card-from), var(--focus-card-to))',
-                    boxShadow: '0 0 25px var(--focus-card-glow), 0 20px 25px -5px rgb(0 0 0 / 0.15)',
+                    background:
+                        'radial-gradient(120% 80% at 0% 0%, var(--focus-card-from), transparent 60%),' +
+                        ' radial-gradient(120% 80% at 100% 100%, var(--focus-card-to), transparent 60%),' +
+                        ' oklch(0.16 0.06 280)',
+                    boxShadow:
+                        '0 24px 48px -16px var(--focus-card-glow),' +
+                        ' 0 0 40px var(--focus-card-glow),' +
+                        ' inset 0 1px 0 rgb(255 255 255 / 0.08)',
+                    contain: 'paint',
+                    willChange: 'transform',
                 }}
             >
-                <div className="absolute top-0 right-0 p-6 opacity-10">
-                    <span className="text-9xl font-bold text-white leading-none translate-x-4 -translate-y-4">
+                <div className="absolute top-0 right-0 p-6 opacity-[0.08] pointer-events-none">
+                    <span className="text-9xl font-bold text-white leading-none translate-x-4 -translate-y-4 tracking-[-0.08em]">
                         {CURRENCY_SYMBOLS[bucketCurrency] || '$'}
                     </span>
                 </div>
                 <div className="relative z-10 space-y-6">
                     <div className="flex justify-between items-start">
                         <div className="min-w-0 flex-1">
-                            <p className="text-white/80 text-sm font-medium">
-                                {isBucketFocused ? "Total Mission Spent" : `Spent in ${format(new Date(), 'MMMM')}`}
+                            <p className="text-white/75 text-sm font-medium">
+                                {isBucketFocused ? "Bucket spent" : `Spent in ${format(new Date(), 'MMMM')}`}
                             </p>
-                            <h2 className="text-4xl font-bold text-white mt-1 truncate">
+                            <h2 className="text-6xl font-bold text-white mt-2 truncate tabular-nums tracking-tight leading-none">
                                 {isRatesLoading
-                                    ? <span className="inline-block h-9 w-36 bg-white/20 rounded-lg animate-pulse align-middle" />
+                                    ? <span className="inline-block h-12 w-44 bg-white/20 rounded-lg animate-pulse align-middle" />
                                     : formatCurrency(totalSpent, bucketCurrency)}
                             </h2>
                             {!isBucketFocused && !isRatesLoading && (
@@ -299,7 +309,7 @@ export const SpendingOverview = React.memo(function SpendingOverview({
                                     {lastMonthComparison && (
                                         <span
                                             className={cn(
-                                                "inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full backdrop-blur-sm border",
+                                                "inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full border",
                                                 lastMonthComparison.isUp
                                                     ? "bg-black/25 text-white border-white/15"
                                                     : "bg-white/15 text-white border-white/20"
@@ -310,13 +320,13 @@ export const SpendingOverview = React.memo(function SpendingOverview({
                                             {lastMonthComparison.isUp ? '+' : ''}{lastMonthComparison.deltaPct.toFixed(0)}% vs last month
                                         </span>
                                     )}
-                                    <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-white/15 text-white border border-white/20 backdrop-blur-sm">
+                                    <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-white/15 text-white border border-white/20">
                                         Today {formatCurrency(todaySpent, bucketCurrency)}
                                     </span>
                                 </div>
                             )}
                         </div>
-                        <div className="w-10 h-10 shrink-0 rounded-full bg-white/20 flex items-center justify-center backdrop-blur-sm shadow-sm">
+                        <div className="w-10 h-10 shrink-0 rounded-full bg-white/20 flex items-center justify-center shadow-sm">
                             <span className="text-xl font-bold text-white">
                                 {CURRENCY_SYMBOLS[bucketCurrency] || '$'}
                             </span>
@@ -377,12 +387,12 @@ export const SpendingOverview = React.memo(function SpendingOverview({
                                                 const today = new Date();
                                                 const start = new Date(focusedBucket.start_date!);
                                                 const end = new Date(focusedBucket.end_date!);
-                                                if (today > end) return <span className="text-white/80 font-medium whitespace-nowrap">Mission Completed</span>;
+                                                if (today > end) return <span className="text-white/80 font-medium whitespace-nowrap">Completed</span>;
                                                 const effectiveStart = today > start ? today : start;
                                                 const daysLeft = Math.max(1, differenceInDays(end, effectiveStart));
                                                 const safeToSpendDaily = remaining > 0 ? remaining / daysLeft : 0;
                                                 return (
-                                                    <span className="text-white font-bold bg-white/10 px-2 py-0.5 rounded backdrop-blur-sm border border-white/10 whitespace-nowrap overflow-hidden text-ellipsis max-w-full">
+                                                    <span className="text-white font-bold bg-white/10 px-2 py-0.5 rounded border border-white/10 whitespace-nowrap overflow-hidden text-ellipsis max-w-full">
                                                         {formatCurrency(safeToSpendDaily, bucketCurrency)}/day
                                                     </span>
                                                 );
@@ -408,15 +418,15 @@ export const SpendingOverview = React.memo(function SpendingOverview({
                 animate={{ opacity: 1, y: 0 }}
                 onClick={() => setIsAddFundsOpen(true)}
                 className={cn(
-                    "w-full flex items-center justify-center gap-2 py-4 rounded-3xl backdrop-blur-xl border text-white font-bold transition-all active:scale-95 group",
-                    isCoupleWorkspace 
-                        ? "bg-rose-500/20 border-rose-500/30 shadow-[0_4px_30px_rgba(244,63,94,0.15)] hover:bg-rose-500/30 hover:border-rose-500/50" 
+                    "w-full flex items-center justify-center gap-2 py-4 rounded-2xl border text-white font-bold transition-all active:scale-95 group shadow-[inset_0_1px_0_rgb(255_255_255_/0.06)]",
+                    isCoupleWorkspace
+                        ? "bg-rose-500/20 border-rose-500/30 hover:bg-rose-500/30 hover:border-rose-500/50"
                         : isHomeWorkspace
-                            ? "bg-yellow-500/20 border-yellow-500/30 shadow-[0_4px_30px_rgba(234,179,8,0.15)] hover:bg-yellow-500/30 hover:border-yellow-500/50"
-                            : "bg-primary/20 border-primary/30 shadow-[0_4px_30px_rgba(138,43,226,0.15)] hover:bg-primary/30 hover:border-primary/50"
+                            ? "bg-yellow-500/20 border-yellow-500/30 hover:bg-yellow-500/30 hover:border-yellow-500/50"
+                            : "bg-primary/20 border-primary/30 hover:bg-primary/30 hover:border-primary/50"
                 )}
             >
-                <div className="w-7 h-7 rounded-full bg-white/20 flex items-center justify-center backdrop-blur-sm group-hover:scale-110 transition-transform">
+                <div className="w-7 h-7 rounded-full bg-white/20 flex items-center justify-center group-hover:scale-110 transition-transform">
                     <Plus className="w-5 h-5 text-white" />
                 </div>
                 Add Funds
@@ -428,7 +438,7 @@ export const SpendingOverview = React.memo(function SpendingOverview({
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     className={cn(
-                        "p-4 rounded-3xl border backdrop-blur-md relative overflow-hidden",
+                        "p-4 rounded-2xl border relative overflow-hidden shadow-[inset_0_1px_0_rgb(255_255_255_/0.06)]",
                         runRateData.isExceeding
                             ? isCoupleWorkspace ? "bg-rose-500/10 border-rose-500/20" : isHomeWorkspace ? "bg-yellow-500/10 border-yellow-500/20" : "bg-red-500/10 border-red-500/20"
                             : isCoupleWorkspace ? "bg-rose-500/5 border-rose-500/10" : isHomeWorkspace ? "bg-yellow-500/5 border-yellow-500/10" : "bg-emerald-500/10 border-emerald-500/20"
@@ -443,7 +453,7 @@ export const SpendingOverview = React.memo(function SpendingOverview({
                         <div className="flex justify-between items-start mb-2">
                             <div className="flex items-center gap-2">
                                 <Clock className={cn("w-4 h-4", isCoupleWorkspace ? "text-rose-400" : isHomeWorkspace ? "text-yellow-500" : (runRateData.isExceeding ? "text-red-400" : "text-emerald-400"))} />
-                                <h3 className="text-sm font-bold">Month Forecasting</h3>
+                                <h3 className="text-sm font-bold">Month forecast</h3>
                                 <Popover>
                                     <PopoverTrigger asChild>
                                         <button
@@ -482,8 +492,8 @@ export const SpendingOverview = React.memo(function SpendingOverview({
                                     </PopoverContent>
                                 </Popover>
                             </div>
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground bg-secondary/30 px-2 py-0.5 rounded-full">
-                                Day {runRateData.currentDayOfMonth}/{runRateData.daysInMonth}
+                            <span className="text-[11px] font-bold text-muted-foreground bg-secondary/30 px-2 py-0.5 rounded-full tabular-nums">
+                                Day {runRateData.currentDayOfMonth} of {runRateData.daysInMonth}
                             </span>
                         </div>
 
@@ -551,37 +561,39 @@ export const SpendingOverview = React.memo(function SpendingOverview({
                 />
             )}
 
-            {/* Balance Summary Card */}
-            <div className="grid grid-cols-2 gap-4">
-                <Card className="bg-emerald-500/15 border-emerald-500/20 backdrop-blur-md">
-                    <CardContent className="p-4 flex flex-col items-center justify-center text-center">
-                        <div className="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center mb-2">
-                            <ArrowDownLeft className="w-4 h-4 text-emerald-500" />
-                        </div>
-                        <p className="text-[11px] text-emerald-500 font-bold uppercase tracking-wider">You are owed</p>
-                        <h4 className="text-lg font-bold text-emerald-500 whitespace-nowrap overflow-hidden text-ellipsis w-full">
+            {/* Balance strip — one connected unit, divided by a center rule.
+                Replaces the previous twin-card grid which read as a generic
+                mirrored layout. */}
+            <div className="rounded-2xl bg-card/60 border border-white/5 shadow-[inset_0_1px_0_rgb(255_255_255_/0.06)] grid grid-cols-2 divide-x divide-white/5 overflow-hidden">
+                <div className="p-4 flex items-center gap-3 min-w-0">
+                    <div className="w-9 h-9 rounded-xl bg-emerald-500/15 flex items-center justify-center shrink-0">
+                        <ArrowDownLeft className="w-4 h-4 text-emerald-400" />
+                    </div>
+                    <div className="min-w-0">
+                        <p className="text-[11px] text-muted-foreground font-medium">Owed to you</p>
+                        <p className="text-base font-bold text-emerald-300 tabular-nums truncate">
                             {formatCurrency(balances.totalOwedToMe, baseCurrency)}
-                        </h4>
-                    </CardContent>
-                </Card>
-                <Card className="bg-rose-500/15 border-rose-500/20 backdrop-blur-md">
-                    <CardContent className="p-4 flex flex-col items-center justify-center text-center">
-                        <div className="w-8 h-8 rounded-full bg-rose-500/20 flex items-center justify-center mb-2">
-                            <ArrowUpRight className="w-4 h-4 text-rose-500" />
-                        </div>
-                        <p className="text-[11px] text-rose-500 font-bold uppercase tracking-wider">You owe</p>
-                        <h4 className="text-lg font-bold text-rose-500 whitespace-nowrap overflow-hidden text-ellipsis w-full">
+                        </p>
+                    </div>
+                </div>
+                <div className="p-4 flex items-center gap-3 min-w-0">
+                    <div className="w-9 h-9 rounded-xl bg-rose-500/15 flex items-center justify-center shrink-0">
+                        <ArrowUpRight className="w-4 h-4 text-rose-400" />
+                    </div>
+                    <div className="min-w-0">
+                        <p className="text-[11px] text-muted-foreground font-medium">You owe</p>
+                        <p className="text-base font-bold text-rose-300 tabular-nums truncate">
                             {formatCurrency(balances.totalOwed, baseCurrency)}
-                        </h4>
-                    </CardContent>
-                </Card>
+                        </p>
+                    </div>
+                </div>
             </div>
 
             {/* Spending by Category Pie Chart Section */}
             {showCategoryDonut && (
             <div className="space-y-4">
                 <div className="flex flex-wrap justify-between items-center gap-2">
-                    <h3 className="text-lg font-bold">Spending by Category</h3>
+                    <h3 className="text-lg font-bold">Spending by category</h3>
                     <div className="flex flex-wrap items-center gap-2">
                         {topCategoryMover && !isBucketFocused && (() => {
                             const isActiveFilter = selectedCategory === topCategoryMover.category;
@@ -613,14 +625,14 @@ export const SpendingOverview = React.memo(function SpendingOverview({
                             );
                         })()}
                         <span className={cn(
-                            "text-[11px] bg-secondary/50 backdrop-blur-md px-3 py-1 rounded-full border font-bold uppercase tracking-wider whitespace-nowrap",
+                            "text-[11px] bg-secondary/50 px-3 py-1 rounded-full border font-bold whitespace-nowrap",
                             isCoupleWorkspace ? "text-rose-400 border-rose-500/20" : isHomeWorkspace ? "text-yellow-500 border-yellow-500/20" : "text-primary border-primary/20"
                         )}>
-                            {isBucketFocused ? "Mission" : format(new Date(), 'MMMM')} Overview
+                            {isBucketFocused ? (focusedBucket?.name ?? 'Bucket') : format(new Date(), 'MMMM')} overview
                         </span>
                     </div>
                 </div>
-                <Card className="border-none bg-card/40 backdrop-blur-md shadow-none overflow-hidden">
+                <Card className="border border-white/5 bg-card/60 shadow-[inset_0_1px_0_rgb(255_255_255_/0.06)] rounded-2xl overflow-hidden">
                     <CardContent className="p-4 flex flex-col sm:flex-row items-center justify-start gap-4">
                         {spendingData.length > 0 ? (
                             <>
