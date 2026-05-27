@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ error: 'date must be YYYY-MM-DD' }, { status: 400 });
     }
 
-    const apiKey = process.env.EXCHANGERATE_API_KEY ?? process.env.NEXT_PUBLIC_EXCHANGERATE_API_KEY;
+    const apiKey = process.env.EXCHANGERATE_API_KEY;
     if (!apiKey) {
         return NextResponse.json({ error: 'Exchange rate provider not configured' }, { status: 503 });
     }
@@ -44,7 +44,7 @@ export async function GET(req: NextRequest) {
     }
 
     try {
-        const res = await fetch(upstream);
+        const res = await fetch(upstream, { signal: AbortSignal.timeout(5000) });
         if (!res.ok) {
             return NextResponse.json({ error: `Upstream ${res.status}` }, { status: 502 });
         }

@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-motion';
 import { Lock, Eye, EyeClosed, ArrowRight } from 'lucide-react';
@@ -154,7 +155,7 @@ export default function UpdatePassword() {
                                     className="mx-auto w-10 h-10 mb-4 rounded-full border border-primary/30 flex items-center justify-center relative overflow-hidden"
                                 >
                                     <div className="relative w-full h-full p-2">
-                                        <img src="/Novira.png" alt="Novira Logo" className="w-full h-full object-contain drop-shadow-[0_0_10px_rgba(138,43,226,0.5)]" />
+                                        <Image src="/Novira.png" alt="Novira Logo" fill priority sizes="40px" className="object-contain drop-shadow-[0_0_10px_rgba(138,43,226,0.5)]" />
                                     </div>
                                     <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-transparent opacity-50" />
                                 </motion.div>

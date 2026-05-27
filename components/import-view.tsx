@@ -445,7 +445,7 @@ export function ImportView() {
             className="p-5 max-w-2xl mx-auto space-y-6"
         >
             <div className="flex items-center gap-4">
-                <Button variant="ghost" size="icon" onClick={() => router.back()}>
+                <Button variant="ghost" size="icon" aria-label="Go back" onClick={() => router.back()}>
                     <ArrowLeft className="w-5 h-5" />
                 </Button>
                 <div>

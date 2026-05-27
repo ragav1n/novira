@@ -71,7 +71,7 @@ export function useExchangeRates(currency: string): ExchangeRatesState {
 
             if (FRANKFURTER_SUPPORTED.includes(currency)) {
                 try {
-                    const response = await fetch(`https://api.frankfurter.dev/v1/latest?base=${currency}`);
+                    const response = await fetch(`https://api.frankfurter.dev/v1/latest?base=${currency}`, { signal: AbortSignal.timeout(5000) });
                     if (response.ok) {
                         const data = await response.json();
                         ratesRes = data.rates;
@@ -84,7 +84,7 @@ export function useExchangeRates(currency: string): ExchangeRatesState {
 
             if (!ratesRes) {
                 try {
-                    const response = await fetch(`/api/exchange-rate?from=${currency}`);
+                    const response = await fetch(`/api/exchange-rate?from=${currency}`, { signal: AbortSignal.timeout(5000) });
                     if (response.ok) {
                         const data = await response.json();
                         if (data.result === 'success') {
