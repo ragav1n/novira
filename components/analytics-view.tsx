@@ -351,7 +351,7 @@ export function AnalyticsView() {
                 loading ? 'opacity-50 blur-[2px] pointer-events-none' : 'opacity-100 blur-0'
             )}>
                 {/* Sticky Header — slim: back / title / period badge + total chip when scrolled */}
-                <div className="sticky top-0 z-20 -mx-5 px-5 py-2 bg-background/40 backdrop-blur-xl border-b border-white/5">
+                <div className="sticky top-0 z-20 -mx-5 px-5 py-2">
                     <div className="flex items-center justify-between relative min-h-[40px]">
                         <button
                             onClick={() => router.back()}

@@ -1,29 +1,29 @@
 "use client"
 
 import * as React from "react"
+import { createPortal } from "react-dom"
 import { motion, AnimatePresence, MotionConfig } from "framer-motion"
 import { ChevronDown, Check } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useUserPreferences } from "@/components/providers/user-preferences-provider"
 
-// Custom hook for click outside detection
-function useClickAway(ref: React.RefObject<HTMLElement>, handler: (event: MouseEvent | TouchEvent) => void) {
+// Custom hook for click outside detection across multiple refs
+function useClickAway(refs: Array<React.RefObject<HTMLElement | null>>, handler: () => void) {
     React.useEffect(() => {
-        const listener = (event: MouseEvent | TouchEvent) => {
-            if (!ref.current || ref.current.contains(event.target as Node)) {
-                return
+        const listener = (event: PointerEvent) => {
+            const target = event.target as Node
+            for (const ref of refs) {
+                if (ref.current && ref.current.contains(target)) return
             }
-            handler(event)
+            handler()
         }
 
-        document.addEventListener("mousedown", listener)
-        document.addEventListener("touchstart", listener)
+        document.addEventListener("pointerdown", listener)
 
         return () => {
-            document.removeEventListener("mousedown", listener)
-            document.removeEventListener("touchstart", listener)
+            document.removeEventListener("pointerdown", listener)
         }
-    }, [ref, handler])
+    }, [refs, handler])
 }
 
 // Animation variants
@@ -60,16 +60,48 @@ interface CurrencyDropdownProps {
 export function CurrencyDropdown({ value, onValueChange, className, compact = false }: CurrencyDropdownProps) {
     const [isOpen, setIsOpen] = React.useState(false)
     const [hoveredCode, setHoveredCode] = React.useState<string | null>(null)
-    const dropdownRef = React.useRef<HTMLDivElement>(null)
+    const [menuRect, setMenuRect] = React.useState<{ top: number; left: number; width: number } | null>(null)
+    const triggerRef = React.useRef<HTMLButtonElement>(null)
+    const menuRef = React.useRef<HTMLDivElement>(null)
     const { CURRENCY_DETAILS } = useUserPreferences()
 
-    useClickAway(dropdownRef as React.RefObject<HTMLElement>, () => setIsOpen(false))
+    useClickAway([triggerRef, menuRef], () => setIsOpen(false))
 
-    const handleKeyDown = (e: React.KeyboardEvent) => {
-        if (e.key === "Escape") {
-            setIsOpen(false)
+    const updatePosition = React.useCallback(() => {
+        const node = triggerRef.current
+        if (!node) return
+        const rect = node.getBoundingClientRect()
+        const minWidth = compact ? 180 : rect.width
+        const width = Math.max(rect.width, minWidth)
+        // Right-align with the trigger so the menu can be wider than a narrow trigger
+        const left = Math.min(rect.right - width, window.innerWidth - width - 8)
+        setMenuRect({
+            top: rect.bottom + 8,
+            left: Math.max(8, left),
+            width,
+        })
+    }, [compact])
+
+    React.useEffect(() => {
+        if (!isOpen) return
+        updatePosition()
+        const onScrollOrResize = () => updatePosition()
+        window.addEventListener("scroll", onScrollOrResize, true)
+        window.addEventListener("resize", onScrollOrResize)
+        return () => {
+            window.removeEventListener("scroll", onScrollOrResize, true)
+            window.removeEventListener("resize", onScrollOrResize)
         }
-    }
+    }, [isOpen, updatePosition])
+
+    React.useEffect(() => {
+        if (!isOpen) return
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key === "Escape") setIsOpen(false)
+        }
+        document.addEventListener("keydown", onKey)
+        return () => document.removeEventListener("keydown", onKey)
+    }, [isOpen])
 
     const handleSelect = (code: string) => {
         onValueChange(code);
@@ -77,14 +109,13 @@ export function CurrencyDropdown({ value, onValueChange, className, compact = fa
     }
 
     const currentDetail = CURRENCY_DETAILS[value as keyof typeof CURRENCY_DETAILS] || { symbol: '$', name: value };
+    const portalTarget = typeof window === "undefined" ? null : document.body
 
     return (
         <MotionConfig reducedMotion="user">
-            <div
-                className={cn("w-full relative", className)}
-                ref={dropdownRef}
-            >
+            <div className={cn("w-full relative", className)}>
                 <button
+                    ref={triggerRef}
                     onClick={(e) => {
                         e.preventDefault();
                         setIsOpen(!isOpen);
@@ -118,39 +149,31 @@ export function CurrencyDropdown({ value, onValueChange, className, compact = fa
                     </motion.div>
                 </button>
 
-                <AnimatePresence>
-                    {isOpen && (
-                        <motion.div
-                            initial={{ opacity: 0, y: -10, height: 0 }}
-                            animate={{
-                                opacity: 1,
-                                y: 0,
-                                height: "auto",
-                                transition: {
-                                    duration: 0.5,
-                                    ease: [0.32, 0.725, 0.32, 1],
-                                },
-                            }}
-                            exit={{
-                                opacity: 0,
-                                y: -10,
-                                height: 0,
-                                transition: {
-                                    duration: 0.4,
-                                    ease: [0.32, 0.725, 0.32, 1],
-                                },
-                            }}
-                            className="absolute left-0 right-0 top-full mt-2 z-50 overflow-hidden"
-                            onKeyDown={handleKeyDown}
-                        >
+                {portalTarget && createPortal(
+                    <AnimatePresence>
+                        {isOpen && menuRect && (
                             <motion.div
-                                className="w-full rounded-xl border border-white/10 bg-card p-1 shadow-xl shadow-black/50 overflow-y-auto max-h-[300px] scrollbar-hide"
-                                initial={{ borderRadius: 12 }}
+                                ref={menuRef}
+                                initial={{ opacity: 0, y: -8 }}
                                 animate={{
-                                    borderRadius: 16,
-                                    transition: { duration: 0.2 },
+                                    opacity: 1,
+                                    y: 0,
+                                    transition: { duration: 0.18, ease: [0.32, 0.725, 0.32, 1] },
                                 }}
-                                style={{ transformOrigin: "top" }}
+                                exit={{
+                                    opacity: 0,
+                                    y: -8,
+                                    transition: { duration: 0.15, ease: [0.32, 0.725, 0.32, 1] },
+                                }}
+                                style={{
+                                    position: "fixed",
+                                    top: menuRect.top,
+                                    left: menuRect.left,
+                                    width: menuRect.width,
+                                    zIndex: 9999,
+                                    transformOrigin: "top",
+                                }}
+                                className="rounded-2xl border border-white/10 bg-[#0B0B12] ring-1 ring-white/[0.04] p-1 shadow-[0_24px_60px_-12px_rgba(0,0,0,0.85)] overflow-y-auto max-h-[320px] scrollbar-hide"
                             >
                                 <motion.div
                                     className="py-1 relative"
@@ -167,28 +190,17 @@ export function CurrencyDropdown({ value, onValueChange, className, compact = fa
                                             className={cn(
                                                 "relative flex w-full items-center px-3 py-2.5 text-sm rounded-lg",
                                                 "transition-colors duration-150",
-                                                "focus:outline-none focus:bg-primary/20",
-                                                value === code || hoveredCode === code
-                                                    ? "text-neutral-200"
-                                                    : "text-neutral-400",
+                                                "focus:outline-none focus:bg-white/5",
+                                                value === code
+                                                    ? "bg-primary/20 text-neutral-100"
+                                                    : hoveredCode === code
+                                                        ? "bg-white/5 text-neutral-200"
+                                                        : "text-neutral-400",
                                             )}
                                             whileTap={{ scale: 0.98 }}
                                             variants={itemVariants}
                                             type="button"
                                         >
-                                            {/* Highlight Background */}
-                                            {(value === code || hoveredCode === code) && (
-                                                <motion.div
-                                                    layoutId="currency-highlight"
-                                                    className="absolute inset-0 bg-primary/20 rounded-lg -z-0"
-                                                    transition={{
-                                                        type: "spring",
-                                                        bounce: 0.15,
-                                                        duration: 0.5,
-                                                    }}
-                                                />
-                                            )}
-
                                             <div className="relative z-10 flex items-center w-full gap-3">
                                                 <span className="text-primary font-bold w-6 text-center shrink-0">{detail.symbol}</span>
                                                 <span className="text-sm font-semibold w-8 text-left shrink-0">{code}</span>
@@ -203,9 +215,10 @@ export function CurrencyDropdown({ value, onValueChange, className, compact = fa
                                     ))}
                                 </motion.div>
                             </motion.div>
-                        </motion.div>
-                    )}
-                </AnimatePresence>
+                        )}
+                    </AnimatePresence>,
+                    portalTarget,
+                )}
             </div>
         </MotionConfig>
     )
