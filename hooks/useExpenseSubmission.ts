@@ -286,7 +286,8 @@ export function useExpenseSubmission() {
             const result = await TransactionService.createTransaction({
                 transaction: transactionRecord,
                 splits: splitResult.records,
-                recurring: recurringRecordToInsert
+                recurring: recurringRecordToInsert,
+                offlineReceiptFile: receiptFile ?? null,
             });
 
             if (result.success) {
@@ -294,20 +295,22 @@ export function useExpenseSubmission() {
                     Haptics.notification({ type: result.offline ? NotificationType.Warning : NotificationType.Success }).catch(() => { });
                 }
                 if (result.offline) {
-                    toast('Saved — will sync when online', {
+                    const offlineMsg = receiptFile && !result.receiptDropped
+                        ? 'Saved — receipt will upload after sync'
+                        : 'Saved — will sync when online';
+                    toast(offlineMsg, {
                         icon: '☁️',
                         style: { background: 'rgba(14, 165, 233, 0.1)', border: '1px solid rgba(14, 165, 233, 0.2)', color: '#38BDF8' }
                     });
                 } else {
                     toast.success('Expense added successfully!');
                 }
-                
-                // Receipt upload happens before resetForm so we can read `receiptFile`,
-                // and only on the online path — the offline queue doesn't yet know how
-                // to upload to storage and we'd lose the file across a refresh anyway.
+
                 let uploadedReceiptPath: string | null = null;
-                if (result.offline && receiptFile) {
-                    toast("Receipt can't be saved offline — attach again when online.", {
+                // Receipt storage was full while offline — the row queues but the
+                // file is dropped. Warn the user so they can re-attach later.
+                if (result.offline && receiptFile && result.receiptDropped) {
+                    toast("Receipt storage is full — attach again once synced.", {
                         icon: '⚠️',
                         style: { background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.2)', color: '#FBBF24' }
                     });

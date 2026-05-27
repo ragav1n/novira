@@ -4,6 +4,7 @@ import { enqueueMutation } from '../sync-manager';
 import { applyWorkspaceFilter } from '@/lib/workspace-filter';
 import { toast } from '@/utils/haptics';
 import { format } from 'date-fns';
+import { saveOfflineReceipt, ReceiptQuotaError } from '../offline-receipt-store';
 
 const FRANKFURTER_SUPPORTED = [
     'AUD', 'BRL', 'CAD', 'CHF', 'CNY', 'CZK', 'DKK', 'EUR', 'GBP', 'HKD',
@@ -140,17 +141,38 @@ export const TransactionService = {
         transaction: TransactionRecord;
         splits?: SplitRecord[];
         recurring?: RecurringRecord | null;
+        offlineReceiptFile?: File | Blob | null;
     }) {
-        const { transaction, splits, recurring } = params;
+        const { transaction, splits, recurring, offlineReceiptFile } = params;
 
         // OFFLINE GUARD
         if (!navigator.onLine) {
-            await enqueueMutation('ADD_FULL_TRANSACTION', {
-                transaction,
-                splitRecords: splits,
-                recurringRecord: recurring
-            });
-            return { success: true, offline: true };
+            // Pre-generate the queue id so the Blob and queue entry share one key.
+            // Without a shared id we'd have to re-read the queue post-enqueue to
+            // discover what id was assigned — a races-with-other-tabs hazard.
+            const queueId = crypto.randomUUID();
+            let receiptDropped = false;
+            if (offlineReceiptFile) {
+                try {
+                    await saveOfflineReceipt(queueId, offlineReceiptFile);
+                } catch (e) {
+                    receiptDropped = true;
+                    if (!(e instanceof ReceiptQuotaError)) {
+                        console.warn('[TransactionService] saveOfflineReceipt failed:', e);
+                    }
+                }
+            }
+            await enqueueMutation(
+                'ADD_FULL_TRANSACTION',
+                {
+                    transaction,
+                    splitRecords: splits,
+                    recurringRecord: recurring,
+                    hasOfflineReceipt: !!offlineReceiptFile && !receiptDropped,
+                },
+                { id: queueId },
+            );
+            return { success: true, offline: true, receiptDropped };
         }
 
         try {

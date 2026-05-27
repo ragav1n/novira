@@ -18,6 +18,8 @@ import {
 } from './offline-sync-queue';
 import { TransactionService } from './services/transaction-service';
 import { invalidateTransactionCaches } from './sw-cache';
+import { getOfflineReceipt, deleteOfflineReceipt } from './offline-receipt-store';
+import { uploadReceipt } from './receipt-storage';
 
 const LEGACY_QUEUE_KEY = 'novira-offline-queue';
 const QUEUE_KEY_PREFIX = 'novira-offline-queue:';
@@ -185,7 +187,7 @@ export class QueueFullError extends Error {
 }
 
 // 1. Enqueue Function
-export async function enqueueMutation(type: string, data: any): Promise<string> {
+export async function enqueueMutation(type: string, data: any, opts?: { id?: string }): Promise<string> {
     let currentQueue = await readQueue();
 
     // Dedup: a duplicate DELETE for the same tx id is pure waste — return the
@@ -208,9 +210,15 @@ export async function enqueueMutation(type: string, data: any): Promise<string> 
     // Evict oldest failed/pending items if at capacity. Currently-syncing items are preserved.
     if (currentQueue.length >= MAX_QUEUE_SIZE) {
         const beforeCount = currentQueue.length;
+        const beforeIds = new Set(currentQueue.map(i => i.id));
         currentQueue = evictForCapacity(currentQueue);
         const evictedCount = beforeCount - currentQueue.length;
         if (evictedCount > 0) {
+            // Best-effort cleanup of orphaned offline-receipt Blobs for evicted items.
+            const keptIds = new Set(currentQueue.map(i => i.id));
+            for (const id of beforeIds) {
+                if (!keptIds.has(id)) deleteOfflineReceipt(id);
+            }
             window.dispatchEvent(new CustomEvent('novira-queue-evicted', { detail: { count: evictedCount } }));
             broadcast('novira-queue-evicted', { count: evictedCount });
         }
@@ -219,7 +227,7 @@ export async function enqueueMutation(type: string, data: any): Promise<string> 
         }
     }
 
-    const id = uuidv4();
+    const id = opts?.id ?? uuidv4();
     const newQueue = addToQueue(currentQueue, { id, type, data });
     await writeQueue(newQueue);
 
@@ -311,6 +319,13 @@ async function runSyncLoop(): Promise<void> {
     const expired = expireStaleItems(queue, now);
     if (expired !== queue) {
         const expiredCount = expired.filter((it, i) => queue[i]?.status === 'pending' && it.status === 'failed').length;
+        // Drop offline receipts for newly-expired items — the row will never
+        // post, so the Blob is dead weight in IDB.
+        for (let i = 0; i < expired.length; i++) {
+            if (queue[i]?.status === 'pending' && expired[i].status === 'failed') {
+                deleteOfflineReceipt(expired[i].id);
+            }
+        }
         queue = expired;
         await writeQueue(queue);
         dispatchQueueUpdated(queue);
@@ -344,7 +359,7 @@ async function runSyncLoop(): Promise<void> {
 
             try {
                 if (item.type === 'ADD_FULL_TRANSACTION') {
-                    const { transaction, splitRecords, recurringRecord } = item.data;
+                    const { transaction, splitRecords, recurringRecord, hasOfflineReceipt } = item.data;
                     // Use the queue id as idempotency_key so retries dedupe at the RPC layer.
                     const result = await withTimeout(
                         TransactionService.createTransaction({
@@ -357,6 +372,48 @@ async function runSyncLoop(): Promise<void> {
                     );
 
                     if (result.success) {
+                        // Upload any queued offline receipt against the freshly-created row.
+                        // Failures here don't block markSynced — the transaction is safe on
+                        // the server. The Blob is deleted either way: on success it's no
+                        // longer needed, on failure the user re-attaches from their photo
+                        // library via the row's detail view (orphans would just leak IDB).
+                        if (hasOfflineReceipt) {
+                            const realTxId = (result as { data?: { id?: string } }).data?.id;
+                            // Use the transaction's user_id over `currentUserId` so a
+                            // sign-out racing the sync loop doesn't leave the upload skipped.
+                            const ownerId = (transaction as { user_id?: string })?.user_id;
+                            if (realTxId && ownerId) {
+                                try {
+                                    const blob = await getOfflineReceipt(item.id);
+                                    if (blob) {
+                                        const { path } = await withTimeout(
+                                            uploadReceipt(ownerId, realTxId, blob),
+                                            MUTATION_TIMEOUT_MS,
+                                            'OFFLINE_RECEIPT_UPLOAD'
+                                        );
+                                        const { error: updErr } = await withTimeout(
+                                            Promise.resolve(
+                                                supabase
+                                                    .from('transactions')
+                                                    .update({ receipt_path: path })
+                                                    .eq('id', realTxId)
+                                            ),
+                                            MUTATION_TIMEOUT_MS,
+                                            'OFFLINE_RECEIPT_UPDATE'
+                                        );
+                                        if (updErr) throw updErr;
+                                    }
+                                    await deleteOfflineReceipt(item.id);
+                                } catch (uploadErr) {
+                                    console.warn('[sync-manager] offline receipt upload failed:', uploadErr);
+                                    await deleteOfflineReceipt(item.id);
+                                    window.dispatchEvent(new CustomEvent('novira-receipt-upload-failed', {
+                                        detail: { txId: realTxId, queueId: item.id }
+                                    }));
+                                    broadcast('novira-receipt-upload-failed', { txId: realTxId, queueId: item.id });
+                                }
+                            }
+                        }
                         queue = markSynced(queue, item.id);
                         window.dispatchEvent(new CustomEvent('novira-mutation-synced', {
                             detail: { id: item.id, type: item.type, data: item.data, result }
@@ -489,6 +546,9 @@ export async function discardFailedItem(id: string) {
     queue = queue.filter(item => item.id !== id);
     await writeQueue(queue);
     dispatchQueueUpdated(queue);
+    // Drop any orphaned offline receipt for this item — keeps IDB clean even
+    // for queue types that never had a receipt (no-op when key is absent).
+    deleteOfflineReceipt(id);
 }
 
 // 5. Initialize Online Listeners + Background Sync + Cross-Tab Echo
@@ -537,6 +597,9 @@ if (typeof window !== 'undefined') {
                     break;
                 case 'novira-queue-evicted':
                     window.dispatchEvent(new CustomEvent('novira-queue-evicted', { detail: msg.payload }));
+                    break;
+                case 'novira-receipt-upload-failed':
+                    window.dispatchEvent(new CustomEvent('novira-receipt-upload-failed', { detail: msg.payload }));
                     break;
             }
         };

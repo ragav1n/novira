@@ -8,6 +8,7 @@ import { type SyncErrorKind } from '@/lib/offline-sync-queue';
 import { retryFailedItem, discardFailedItem, attemptSync } from '@/lib/sync-manager';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 import { useSyncQueueState } from '@/hooks/use-sync-queue-state';
+import { toast } from '@/utils/haptics';
 
 const FRIENDLY_TYPE: Record<string, string> = {
     ADD_FULL_TRANSACTION: 'New transaction',
@@ -104,11 +105,21 @@ export function SyncIndicator() {
             if (count > 0) setExpiredNotice({ count });
         };
 
+        // Row synced fine but the queued receipt failed to upload. The Blob is
+        // kept in IDB so the user can re-attach from the row's detail view.
+        const onReceiptUploadFailed = () => {
+            toast("Receipt couldn't upload — open the expense to re-attach.", {
+                icon: '⚠️',
+                style: { background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.2)', color: '#FBBF24' }
+            });
+        };
+
         window.addEventListener('novira-sync-started', onSyncStart);
         window.addEventListener('novira-sync-finished', onSyncEnd);
         window.addEventListener('novira-sync-progress', onProgress);
         window.addEventListener('novira-queue-evicted', onEvicted);
         window.addEventListener('novira-queue-expired', onExpired);
+        window.addEventListener('novira-receipt-upload-failed', onReceiptUploadFailed);
 
         return () => {
             window.removeEventListener('novira-sync-started', onSyncStart);
@@ -116,6 +127,7 @@ export function SyncIndicator() {
             window.removeEventListener('novira-sync-progress', onProgress);
             window.removeEventListener('novira-queue-evicted', onEvicted);
             window.removeEventListener('novira-queue-expired', onExpired);
+            window.removeEventListener('novira-receipt-upload-failed', onReceiptUploadFailed);
         };
     }, []);
 
