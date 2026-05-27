@@ -32,8 +32,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ success: true });
     } catch (err: unknown) {
         console.error('[Push Subscribe]', err);
-        const message = err instanceof Error ? err.message : 'Unknown error';
-        return NextResponse.json({ error: message }, { status: 500 });
+        return NextResponse.json({ error: 'Unable to save subscription' }, { status: 500 });
     }
 }
 
@@ -50,7 +49,7 @@ export async function DELETE(request: NextRequest) {
         await supabase.from('push_subscriptions').delete().eq('endpoint', endpoint).eq('user_id', user.id);
         return NextResponse.json({ success: true });
     } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : 'Unknown error';
-        return NextResponse.json({ error: message }, { status: 500 });
+        console.error('[Push Unsubscribe]', err);
+        return NextResponse.json({ error: 'Unable to remove subscription' }, { status: 500 });
     }
 }

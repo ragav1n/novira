@@ -44,7 +44,7 @@ export async function GET(req: NextRequest) {
             .maybeSingle();
         if (error) {
             console.error('[recap GET]', error);
-            return NextResponse.json({ error: error.message }, { status: 500 });
+            return NextResponse.json({ error: 'Unable to load recap' }, { status: 500 });
         }
         if (!data) return NextResponse.json({ error: 'Not found' }, { status: 404 });
         return NextResponse.json(data);
@@ -57,7 +57,7 @@ export async function GET(req: NextRequest) {
         .order('month', { ascending: false });
     if (error) {
         console.error('[recap GET list]', error);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        return NextResponse.json({ error: 'Unable to load recaps' }, { status: 500 });
     }
     return NextResponse.json({ months: data || [] });
 }
@@ -95,8 +95,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ month, recap, analyzed, cached: false });
     } catch (err: unknown) {
         console.error('[recap] generation failed', err);
-        const msg = err instanceof Error ? err.message : 'Recap generation failed';
-        return NextResponse.json({ error: msg }, { status: 500 });
+        return NextResponse.json({ error: 'Recap generation failed' }, { status: 500 });
     }
 }
 
@@ -120,7 +119,7 @@ export async function PATCH(req: NextRequest) {
         .eq('month', month);
     if (error) {
         console.error('[recap PATCH]', error);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        return NextResponse.json({ error: 'Unable to update recap' }, { status: 500 });
     }
     return NextResponse.json({ ok: true });
 }

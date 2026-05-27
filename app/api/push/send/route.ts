@@ -99,7 +99,6 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ sent: results.filter(r => r.status === 'fulfilled').length });
     } catch (err: unknown) {
         console.error('[Push Send]', err);
-        const message = err instanceof Error ? err.message : 'Unknown error';
-        return NextResponse.json({ error: message }, { status: 500 });
+        return NextResponse.json({ error: 'Unable to send push notification' }, { status: 500 });
     }
 }

@@ -641,7 +641,7 @@ export function AddExpenseView() {
                         );
                     })()}
                     {errors.amount && (
-                        <p id="expense-amount-error" className="text-xs text-destructive font-medium">{errors.amount}</p>
+                        <p id="expense-amount-error" role="alert" aria-live="polite" className="text-xs text-destructive font-medium">{errors.amount}</p>
                     )}
                     <div className="mt-2">
                         <CurrencyDropdown value={formState.txCurrency} onValueChange={(val) => formState.setTxCurrency(val)} />
@@ -815,7 +815,7 @@ export function AddExpenseView() {
                         )}
                     </AnimatePresence>
                     {errors.description && (
-                        <p id="expense-description-error" className="text-xs text-destructive font-medium">{errors.description}</p>
+                        <p id="expense-description-error" role="alert" aria-live="polite" className="text-xs text-destructive font-medium">{errors.description}</p>
                     )}
                     {formState.suggestedCategory && (
                         <div className="flex items-center justify-between gap-3 px-3 py-2 rounded-2xl border border-primary/20 bg-primary/10">

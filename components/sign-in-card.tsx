@@ -520,6 +520,7 @@ export function Component({ isSignUp = false }: { isSignUp?: boolean }) {
                           type="text"
                           placeholder="Full Name"
                           value={name}
+                          autoComplete="name"
                           onChange={(e) => setName(e.target.value)}
                           onFocus={() => setFocusedInput("name")}
                           onBlur={() => setFocusedInput(null)}
@@ -557,6 +558,8 @@ export function Component({ isSignUp = false }: { isSignUp?: boolean }) {
                         type="email"
                         placeholder="Email address"
                         value={email}
+                        autoComplete="email"
+                        inputMode="email"
                         onChange={(e) => setEmail(e.target.value)}
                         onFocus={() => setFocusedInput("email")}
                         onBlur={() => setFocusedInput(null)}
@@ -594,23 +597,26 @@ export function Component({ isSignUp = false }: { isSignUp?: boolean }) {
                         type={showPassword ? "text" : "password"}
                         placeholder="Password"
                         value={password}
+                        autoComplete={isSignUp ? "new-password" : "current-password"}
                         onChange={(e) => setPassword(e.target.value)}
                         onFocus={() => setFocusedInput("password")}
                         onBlur={() => setFocusedInput(null)}
                         className="w-full bg-primary/10 border-transparent focus:border-primary/40 text-foreground placeholder:text-foreground/30 h-10 transition-all duration-300 pl-10 pr-10 focus:bg-primary/15"
                       />
 
-                      {/* Toggle password visibility */}
-                      <div
+                      <button
+                        type="button"
                         onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3 cursor-pointer"
+                        aria-label={showPassword ? "Hide password" : "Show password"}
+                        aria-pressed={showPassword}
+                        className="absolute right-3 inline-flex items-center justify-center p-1 rounded-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
                       >
                         {showPassword ? (
                           <Eye className="w-4 h-4 text-foreground/40 hover:text-primary transition-colors duration-300" />
                         ) : (
                           <EyeClosed className="w-4 h-4 text-foreground/40 hover:text-primary transition-colors duration-300" />
                         )}
-                      </div>
+                      </button>
 
                       {/* Input highlight effect */}
                       {focusedInput === "password" && (
@@ -644,22 +650,26 @@ export function Component({ isSignUp = false }: { isSignUp?: boolean }) {
                           type={showConfirmPassword ? "text" : "password"}
                           placeholder="Confirm Password"
                           value={confirmPassword}
+                          autoComplete="new-password"
                           onChange={(e) => setConfirmPassword(e.target.value)}
                           onFocus={() => setFocusedInput("confirmPassword")}
                           onBlur={() => setFocusedInput(null)}
                           className="w-full bg-primary/10 border-transparent focus:border-primary/40 text-foreground placeholder:text-foreground/30 h-10 transition-all duration-300 pl-10 pr-10 focus:bg-primary/15"
                         />
 
-                        <div
+                        <button
+                          type="button"
                           onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                          className="absolute right-3 cursor-pointer"
+                          aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+                          aria-pressed={showConfirmPassword}
+                          className="absolute right-3 inline-flex items-center justify-center p-1 rounded-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
                         >
                           {showConfirmPassword ? (
                             <Eye className="w-4 h-4 text-foreground/40 hover:text-primary transition-colors duration-300" />
                           ) : (
                             <EyeClosed className="w-4 h-4 text-foreground/40 hover:text-primary transition-colors duration-300" />
                           )}
-                        </div>
+                        </button>
 
                         {focusedInput === "confirmPassword" && (
                           <motion.div

@@ -18,7 +18,8 @@ async function countStoredReceipts(): Promise<number> {
     try {
         const all = await keys();
         return all.filter(k => typeof k === 'string' && k.startsWith(RECEIPT_KEY_PREFIX)).length;
-    } catch {
+    } catch (err) {
+        console.error('[offline-receipt-store] countStoredReceipts failed', err);
         return 0;
     }
 }
@@ -33,7 +34,8 @@ export async function getOfflineReceipt(queueId: string): Promise<Blob | null> {
     try {
         const blob = await get<Blob>(receiptKey(queueId));
         return blob ?? null;
-    } catch {
+    } catch (err) {
+        console.error('[offline-receipt-store] getOfflineReceipt failed', err);
         return null;
     }
 }

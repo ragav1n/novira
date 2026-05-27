@@ -4,6 +4,7 @@ import React from 'react';
 import { ErrorBoundary, FallbackProps } from 'react-error-boundary';
 import { Button } from '@/components/ui/button';
 import { Database, RefreshCcw } from 'lucide-react';
+import { getErrorMessage } from '@/lib/error-utils';
 
 function DataErrorFallback({ error, resetErrorBoundary }: FallbackProps) {
   return (
@@ -19,7 +20,7 @@ function DataErrorFallback({ error, resetErrorBoundary }: FallbackProps) {
       {/* Dev only error trace */}
       {process.env.NODE_ENV === 'development' && (
         <pre className="text-[10px] bg-black/20 p-2 rounded text-left overflow-auto w-full mb-4 text-orange-400">
-          {(error as Error).message}
+          {getErrorMessage(error)}
         </pre>
       )}
 
