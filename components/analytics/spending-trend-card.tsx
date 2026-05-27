@@ -10,6 +10,7 @@ import { supabase } from '@/lib/supabase';
 import { AnalyticsTooltip } from '@/components/analytics/analytics-tooltip';
 import type { DateRange } from '@/hooks/useAnalyticsData';
 import { computeWeightedRunRate } from '@/lib/utils/run-rate';
+import type { WorkspaceTheme } from '@/hooks/useWorkspaceTheme';
 
 type RecurringLite = {
     id: string;
@@ -35,14 +36,11 @@ interface Props {
     activeCategories: string[];
     totalSpentInRange: number;
     recentSpent7d: number;
-    monthlyBudget: number;
-    avgPerDay: number;
-    txCount: number;
-    busiestLabel: string | null;
     priorTotal: number;
-    priorMTDTotal: number;
     formatCurrency: (amount: number) => string;
     convertAmount: (amount: number, fromCurrency: string) => number;
+    themeConfig: WorkspaceTheme;
+    themeHex: { base: string; light: string };
 }
 
 function SpendingTrendCardInner({
@@ -53,17 +51,12 @@ function SpendingTrendCardInner({
     activeCategories,
     totalSpentInRange,
     recentSpent7d,
-    monthlyBudget,
-    avgPerDay,
-    txCount,
-    busiestLabel,
     priorTotal,
-    priorMTDTotal,
     formatCurrency,
     convertAmount,
+    themeConfig,
+    themeHex,
 }: Props) {
-    const monthsBackKind: 'days' | 'months' = (dateRange === '1M' || dateRange === 'LM') ? 'days' : 'months';
-
     const [recurringForecast, setRecurringForecast] = useState<RecurringLite[]>([]);
     useEffect(() => {
         if (!userId) return;
@@ -82,28 +75,6 @@ function SpendingTrendCardInner({
         })();
         return () => { cancelled = true; };
     }, [userId]);
-
-    const pacingChip = useMemo(() => {
-        if (dateRange !== '1M' || totalSpentInRange <= 0) return null;
-        const today = new Date();
-        const day = today.getDate();
-        if (day < 3) return null;
-        const daysInMonth = endOfMonth(today).getDate();
-        const rr = computeWeightedRunRate({
-            totalSpent: totalSpentInRange,
-            recentSpent: recentSpent7d,
-            daysIntoMonth: day,
-            daysInMonth,
-            budget: monthlyBudget,
-        });
-        return {
-            projected: rr.projectedSpend,
-            isExceeding: rr.isExceeding,
-            percentOfBudget: rr.percentOfBudget,
-            overshoot: rr.overshoot,
-            hasBudget: monthlyBudget > 0,
-        };
-    }, [dateRange, totalSpentInRange, recentSpent7d, monthlyBudget]);
 
     const forecastChartData = useMemo(() => {
         if (dateRange !== '1M') return categoryTrendData;
@@ -158,86 +129,40 @@ function SpendingTrendCardInner({
         [forecastChartData, dateRange]
     );
 
-    const momDelta = useMemo(() => {
-        if (dateRange === 'ALL') return null;
-        const baseline = dateRange === '1M' ? priorMTDTotal : priorTotal;
-        if (baseline <= 0) return null;
-        const diff = totalSpentInRange - baseline;
-        const pct = (diff / baseline) * 100;
-        return {
-            pct,
-            absDelta: diff,
-            direction: diff > 0 ? 'up' as const : diff < 0 ? 'down' as const : 'flat' as const,
-        };
-    }, [dateRange, priorMTDTotal, priorTotal, totalSpentInRange]);
-
     return (
-        <Card className="bg-card/40 backdrop-blur-md border-white/5 shadow-none">
+        <Card className="bg-card/40 backdrop-blur-md border-white/5 shadow-none overflow-hidden">
             <CardContent className="p-4 space-y-3">
                 <div className="flex justify-between items-center gap-2">
                     <h3 className="font-bold text-[13px] uppercase tracking-wider text-muted-foreground/80">Spending Trend</h3>
-                    <div className="flex items-center gap-1.5">
-                        {pacingChip && (
-                            <span
-                                className={cn(
-                                    "text-[10px] px-2 py-0.5 rounded-md font-bold border tabular-nums",
-                                    pacingChip.isExceeding
-                                        ? "bg-rose-500/15 border-rose-500/30 text-rose-300"
-                                        : pacingChip.hasBudget && pacingChip.percentOfBudget !== null && pacingChip.percentOfBudget > 85
-                                        ? "bg-amber-500/15 border-amber-500/30 text-amber-300"
-                                        : "bg-emerald-500/15 border-emerald-500/30 text-emerald-300"
-                                )}
-                                title={
-                                    pacingChip.hasBudget
-                                        ? `Projected month-end total at current pace${pacingChip.isExceeding ? ' — over budget' : ''}`
-                                        : 'Estimated end-of-month total at current pace'
-                                }
-                            >
-                                {pacingChip.isExceeding
-                                    ? `${formatCurrency(pacingChip.projected)} · +${formatCurrency(pacingChip.overshoot)} over`
-                                    : pacingChip.hasBudget && pacingChip.percentOfBudget !== null
-                                    ? `${formatCurrency(pacingChip.projected)} · ${Math.round(pacingChip.percentOfBudget)}% of budget`
-                                    : `On pace · ${formatCurrency(pacingChip.projected)}`}
-                            </span>
-                        )}
-                        {hasForecast && (
-                            <span
-                                className="text-[10px] px-2 py-0.5 rounded-md font-bold border bg-cyan-500/15 border-cyan-500/30 text-cyan-300"
-                                title="Run-rate plus upcoming recurring charges"
-                            >
-                                Forecast on
-                            </span>
-                        )}
-                        <span className="text-[10px] bg-secondary/30 px-2 py-0.5 rounded-md text-muted-foreground font-bold">
-                            {dateRange === 'ALL' ? 'All Time' : dateRange}
+                    {hasForecast && (
+                        <span
+                            className={cn(
+                                'text-[10px] px-2 py-0.5 rounded-md font-bold border',
+                                themeConfig.bgLight,
+                                themeConfig.borderMedium,
+                                themeConfig.text,
+                            )}
+                            title="Run-rate plus upcoming recurring charges"
+                        >
+                            Forecast on
                         </span>
-                    </div>
+                    )}
                 </div>
 
-                <div className="grid grid-cols-3 gap-2">
-                    <div className="rounded-xl bg-secondary/10 border border-white/5 px-3 py-2">
-                        <p className="text-[9px] uppercase tracking-widest font-bold text-muted-foreground/70">Avg / {monthsBackKind === 'days' ? 'Day' : 'Month'}</p>
-                        <p className="text-[13px] font-bold mt-0.5 tabular-nums">{formatCurrency(avgPerDay)}</p>
-                    </div>
-                    <div className="rounded-xl bg-secondary/10 border border-white/5 px-3 py-2">
-                        <p className="text-[9px] uppercase tracking-widest font-bold text-muted-foreground/70">Txns</p>
-                        <p className="text-[13px] font-bold mt-0.5 tabular-nums">{txCount}</p>
-                    </div>
-                    <div className="rounded-xl bg-secondary/10 border border-white/5 px-3 py-2">
-                        <p className="text-[9px] uppercase tracking-widest font-bold text-muted-foreground/70">{monthsBackKind === 'days' ? 'Top Day' : 'Top Month'}</p>
-                        <p className="text-[13px] font-bold mt-0.5 truncate">{busiestLabel || '—'}</p>
-                    </div>
-                </div>
-
-                <div className="h-[140px] w-full">
+                <div
+                    className="h-[160px] w-full rounded-xl relative"
+                    style={{
+                        backgroundImage: `radial-gradient(ellipse 80% 60% at 50% 100%, ${themeHex.base}14 0%, transparent 70%)`,
+                    }}
+                >
                     {activeCategories.length > 0 ? (
                         <ResponsiveContainer width="100%" height="100%">
-                            <LineChart data={forecastChartData} margin={{ top: 5, right: 5, bottom: 0, left: 5 }}>
+                            <LineChart data={forecastChartData} margin={{ top: 8, right: 6, bottom: 0, left: 6 }}>
                                 <XAxis
                                     dataKey="month"
                                     axisLine={false}
                                     tickLine={false}
-                                    tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 9, fontWeight: 600 }}
+                                    tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 10, fontWeight: 600 }}
                                     interval={dateRange === '1M' || dateRange === 'LM' ? 4 : (dateRange === '1Y' || dateRange === 'ALL' ? 'preserveStartEnd' : 1)}
                                 />
                                 <Tooltip content={<AnalyticsTooltip formatCurrency={formatCurrency} />} cursor={{ stroke: 'rgba(255,255,255,0.1)', strokeWidth: 1 }} />
@@ -275,7 +200,7 @@ function SpendingTrendCardInner({
                                         type="monotone"
                                         dataKey="forecast_total"
                                         name="Forecast"
-                                        stroke="#06B6D4"
+                                        stroke={themeHex.base}
                                         strokeWidth={2}
                                         strokeDasharray="4 3"
                                         dot={false}
@@ -306,30 +231,14 @@ function SpendingTrendCardInner({
                                 +{activeCategories.length - 6} more
                             </span>
                         )}
-                    </div>
-                )}
-
-                <div className="flex items-center justify-between pt-2 border-t border-white/5">
-                    <div className="flex items-center gap-2">
-                        <span className="text-[11px] text-muted-foreground uppercase tracking-widest font-bold">Total Spent</span>
-                        {momDelta && (
-                            <span
-                                className={cn(
-                                    "text-[10px] font-bold tabular-nums px-1.5 py-0.5 rounded-md border",
-                                    momDelta.direction === 'up'
-                                        ? "bg-rose-500/10 border-rose-500/25 text-rose-300"
-                                        : momDelta.direction === 'down'
-                                        ? "bg-emerald-500/10 border-emerald-500/25 text-emerald-300"
-                                        : "bg-secondary/20 border-white/5 text-muted-foreground"
-                                )}
-                                title={dateRange === '1M' ? 'Same period last month' : 'Previous period'}
-                            >
-                                {momDelta.direction === 'up' ? '▲' : momDelta.direction === 'down' ? '▼' : '·'} {Math.abs(momDelta.pct).toFixed(0)}%
+                        {dateRange !== 'ALL' && priorTotal > 0 && (
+                            <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-secondary/10 border border-white/5 text-muted-foreground/70">
+                                <span className="inline-block w-3 border-t border-dashed border-white/40" />
+                                Prior
                             </span>
                         )}
                     </div>
-                    <span className="text-base font-bold">{formatCurrency(totalSpentInRange)}</span>
-                </div>
+                )}
             </CardContent>
         </Card>
     );

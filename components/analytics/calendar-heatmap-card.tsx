@@ -7,18 +7,32 @@ import { Calendar } from 'lucide-react';
 import { format, parseISO, eachDayOfInterval, startOfWeek, endOfWeek } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useUserPreferences } from '@/components/providers/user-preferences-provider';
+import type { WorkspaceTheme } from '@/hooks/useWorkspaceTheme';
 
 interface Props {
     dailyTotals: Record<string, number>;
     rangeStart: Date | null;
     rangeEnd: Date | null;
     formatCurrency: (amount: number) => string;
+    themeConfig: WorkspaceTheme;
+    themeHex: { base: string; light: string };
 }
 
 const DAY_LABELS_MON = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 const DAY_LABELS_SUN = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
-export function CalendarHeatmapCard({ dailyTotals, rangeStart, rangeEnd, formatCurrency }: Props) {
+// Hex alpha pairs for the 4 intensity levels + neutral.
+const INTENSITY_ALPHA = ['33', '59', '8C', 'D9']; // 20% / 35% / 55% / 85%
+const BORDER_ALPHA    = ['4D', '73', 'A6', 'FF']; // 30% / 45% / 65% / 100%
+
+export function CalendarHeatmapCard({
+    dailyTotals,
+    rangeStart,
+    rangeEnd,
+    formatCurrency,
+    themeConfig,
+    themeHex,
+}: Props) {
     const router = useRouter();
     const { firstDayOfWeek } = useUserPreferences();
     const dayLabels = firstDayOfWeek === 1 ? DAY_LABELS_MON : DAY_LABELS_SUN;
@@ -69,18 +83,37 @@ export function CalendarHeatmapCard({ dailyTotals, rangeStart, rangeEnd, formatC
 
     if (!rangeStart || !rangeEnd || days.length === 0) return null;
 
-    const colorFor = (amount: number) => {
-        if (amount < 0) return 'bg-transparent border-transparent';
-        if (amount === 0) return 'bg-secondary/15 border-white/5';
-        if (amount <= quantiles[0]) return 'bg-cyan-500/20 border-cyan-500/30';
-        if (amount <= quantiles[1]) return 'bg-cyan-500/35 border-cyan-500/45';
-        if (amount <= quantiles[2]) return 'bg-cyan-500/55 border-cyan-500/65';
-        return 'bg-cyan-400/85 border-cyan-300';
+    const intensityIndex = (amount: number): number | null => {
+        if (amount < 0) return null;
+        if (amount === 0) return -1;
+        if (amount <= quantiles[0]) return 0;
+        if (amount <= quantiles[1]) return 1;
+        if (amount <= quantiles[2]) return 2;
+        return 3;
+    };
+
+    const cellStyle = (amount: number): React.CSSProperties => {
+        const idx = intensityIndex(amount);
+        if (idx === null) return { backgroundColor: 'transparent', borderColor: 'transparent' };
+        if (idx === -1) return { backgroundColor: 'rgba(255,255,255,0.04)', borderColor: 'rgba(255,255,255,0.05)' };
+        const base = idx === 3 ? themeHex.light : themeHex.base;
+        return {
+            backgroundColor: `${base}${INTENSITY_ALPHA[idx]}`,
+            borderColor: `${base}${BORDER_ALPHA[idx]}`,
+        };
     };
 
     const onCellClick = (date: string, amount: number) => {
         if (amount <= 0) return;
         router.push(`/search?from=${date}&to=${date}`);
+    };
+
+    const legendSwatchStyle = (idx: number): React.CSSProperties => {
+        const base = idx === 3 ? themeHex.light : themeHex.base;
+        return {
+            backgroundColor: `${base}${INTENSITY_ALPHA[idx]}`,
+            borderColor: `${base}${BORDER_ALPHA[idx]}`,
+        };
     };
 
     return (
@@ -93,7 +126,12 @@ export function CalendarHeatmapCard({ dailyTotals, rangeStart, rangeEnd, formatC
                     </h3>
                     {peakDay && (
                         <span
-                            className="text-[10px] font-bold tabular-nums px-2 py-0.5 rounded-md bg-cyan-500/15 border border-cyan-500/25 text-cyan-200"
+                            className={cn(
+                                'text-[10px] font-bold tabular-nums px-2 py-0.5 rounded-md border',
+                                themeConfig.bgLight,
+                                themeConfig.borderMedium,
+                                themeConfig.text,
+                            )}
                             title={`Peak day: ${format(parseISO(peakDay.date), 'EEE, d MMM')}`}
                         >
                             Peak {formatCurrency(Math.round(peakDay.amount))}
@@ -126,10 +164,10 @@ export function CalendarHeatmapCard({ dailyTotals, rangeStart, rangeEnd, formatC
                                     title={tooltip}
                                     aria-label={tooltip || 'outside range'}
                                     disabled={amount <= 0}
+                                    style={cellStyle(amount)}
                                     className={cn(
                                         'h-3 rounded-[3px] border transition-transform',
                                         amount > 0 && 'hover:scale-125 cursor-pointer',
-                                        colorFor(amount)
                                     )}
                                 />
                             );
@@ -141,11 +179,17 @@ export function CalendarHeatmapCard({ dailyTotals, rangeStart, rangeEnd, formatC
                     <span>{totalDays} days · {formatCurrency(Math.round(totalSpend))}</span>
                     <div className="flex items-center gap-1">
                         <span>Less</span>
-                        <span className="w-2.5 h-2.5 rounded-[3px] bg-secondary/15 border border-white/5" />
-                        <span className="w-2.5 h-2.5 rounded-[3px] bg-cyan-500/20 border border-cyan-500/30" />
-                        <span className="w-2.5 h-2.5 rounded-[3px] bg-cyan-500/35 border border-cyan-500/45" />
-                        <span className="w-2.5 h-2.5 rounded-[3px] bg-cyan-500/55 border border-cyan-500/65" />
-                        <span className="w-2.5 h-2.5 rounded-[3px] bg-cyan-400/85 border border-cyan-300" />
+                        <span
+                            className="w-2.5 h-2.5 rounded-[3px] border"
+                            style={{ backgroundColor: 'rgba(255,255,255,0.04)', borderColor: 'rgba(255,255,255,0.05)' }}
+                        />
+                        {[0, 1, 2, 3].map(idx => (
+                            <span
+                                key={idx}
+                                className="w-2.5 h-2.5 rounded-[3px] border"
+                                style={legendSwatchStyle(idx)}
+                            />
+                        ))}
                         <span>More</span>
                     </div>
                 </div>

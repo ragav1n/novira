@@ -29,12 +29,12 @@ function LargestTransactionsCardInner({ top3Largest, formatCurrency }: Props) {
                     Largest Transactions
                 </span>
             </div>
-            <Card className="bg-card/40 border-none shadow-none backdrop-blur-md overflow-hidden">
-                <CardContent className="p-4 space-y-2.5">
+            <Card className="bg-card/20 border-none shadow-none overflow-hidden">
+                <CardContent className="p-3 space-y-2">
                     {top3Largest.map((tx) => {
                         const dotColor = CATEGORY_COLORS[tx.category.toLowerCase()] || CATEGORY_COLORS.others;
                         return (
-                            <div key={tx.id} className="flex items-center gap-3">
+                            <div key={tx.id} className="flex items-center gap-3 px-1 py-1">
                                 <div
                                     className="w-2 h-2 rounded-full shrink-0"
                                     style={{ backgroundColor: dotColor }}

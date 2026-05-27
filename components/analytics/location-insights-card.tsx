@@ -3,15 +3,19 @@
 import { useRouter } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { MapPin } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import type { LocationCluster } from '@/hooks/useAnalyticsData';
+import type { WorkspaceTheme } from '@/hooks/useWorkspaceTheme';
 
 interface Props {
     locationClusters: LocationCluster[];
     geoTxCount: number;
     formatCurrency: (amount: number) => string;
+    themeConfig: WorkspaceTheme;
+    themeHex: { base: string; light: string };
 }
 
-export function LocationInsightsCard({ locationClusters, geoTxCount, formatCurrency }: Props) {
+export function LocationInsightsCard({ locationClusters, geoTxCount, formatCurrency, themeConfig, themeHex }: Props) {
     const router = useRouter();
     if (locationClusters.length === 0) return null;
 
@@ -28,7 +32,7 @@ export function LocationInsightsCard({ locationClusters, geoTxCount, formatCurre
                     {geoTxCount} located {geoTxCount === 1 ? 'tx' : 'txns'}
                 </span>
             </div>
-            <Card className="bg-card/40 border-none shadow-none backdrop-blur-md overflow-hidden">
+            <Card className="bg-card/20 border-none shadow-none overflow-hidden">
                 <CardContent className="p-3 space-y-1.5">
                     {top.map((cluster, idx) => {
                         const share = totalTop > 0 ? (cluster.amount / totalTop) * 100 : 0;
@@ -38,7 +42,12 @@ export function LocationInsightsCard({ locationClusters, geoTxCount, formatCurre
                                 onClick={() => router.push(`/search?q=${encodeURIComponent(cluster.label)}`)}
                                 className="w-full flex items-center gap-3 p-2.5 rounded-2xl bg-secondary/10 border border-white/5 hover:bg-secondary/20 transition-colors text-left"
                             >
-                                <div className="w-9 h-9 rounded-xl bg-primary/15 border border-primary/25 flex items-center justify-center text-primary shrink-0">
+                                <div className={cn(
+                                    'w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border',
+                                    themeConfig.bgLight,
+                                    themeConfig.borderMedium,
+                                    themeConfig.text,
+                                )}>
                                     <MapPin className="w-4 h-4" />
                                 </div>
                                 <div className="flex-1 min-w-0">
@@ -52,8 +61,8 @@ export function LocationInsightsCard({ locationClusters, geoTxCount, formatCurre
                                         </span>
                                         <div className="h-1 flex-1 max-w-[80px] bg-secondary/20 rounded-full overflow-hidden">
                                             <div
-                                                className="h-full bg-primary rounded-full transition-[width] duration-700"
-                                                style={{ width: `${share}%` }}
+                                                className="h-full rounded-full transition-[width] duration-700"
+                                                style={{ width: `${share}%`, backgroundColor: themeHex.base }}
                                             />
                                         </div>
                                     </div>

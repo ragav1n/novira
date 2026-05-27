@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { ChevronLeft, ChartLine, Plus } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -13,6 +13,7 @@ import { useUserPreferences } from '@/components/providers/user-preferences-prov
 import { useBucketsList, useBucketSpending } from '@/components/providers/buckets-provider';
 import { useAccounts } from '@/components/providers/accounts-provider';
 import { useWorkspaceTheme } from '@/hooks/useWorkspaceTheme';
+import { resolveWorkspaceHex } from '@/lib/utils/workspace-theme-hex';
 import { useTransactionInvalidationListener } from '@/hooks/useTransactionInvalidationListener';
 import { useAnalyticsData, type DateRange } from '@/hooks/useAnalyticsData';
 import {
@@ -21,27 +22,29 @@ import {
     SelectItem,
     SelectTrigger,
     SelectValue,
-} from "@/components/ui/select"
+} from '@/components/ui/select';
 import { motion } from 'framer-motion';
 import { Transaction } from '@/types/transaction';
 import { supabase } from '@/lib/supabase';
 import { toast, ImpactStyle } from '@/utils/haptics';
 import { AnalyticsSkeleton } from '@/components/analytics/analytics-skeleton';
 import { MonthlyRecapCard } from '@/components/analytics/monthly-recap-card';
+import { AnalyticsHero } from '@/components/analytics/analytics-hero';
+import { SectionLabel } from '@/components/analytics/section-label';
 const SpendingTrendCard = dynamic(
     () => import('@/components/analytics/spending-trend-card').then(m => m.SpendingTrendCard),
-    { ssr: false, loading: () => <div className="h-[320px] w-full animate-pulse rounded-2xl bg-card/40" /> }
+    { ssr: false, loading: () => <div className="h-[260px] w-full animate-pulse rounded-2xl bg-card/40" /> }
 );
 import { WeekdayChartCard } from '@/components/analytics/weekday-chart-card';
 import { TopMerchantsCard } from '@/components/analytics/top-merchants-card';
 import { LargestTransactionsCard } from '@/components/analytics/largest-transactions-card';
 const CategoryBreakdownCard = dynamic(
     () => import('@/components/analytics/category-breakdown-card').then(m => m.CategoryBreakdownCard),
-    { ssr: false, loading: () => <div className="h-[200px] w-full animate-pulse rounded-2xl bg-card/40" /> }
+    { ssr: false, loading: () => <div className="h-[220px] w-full animate-pulse rounded-2xl bg-card/40" /> }
 );
 const PaymentBreakdownCard = dynamic(
     () => import('@/components/analytics/payment-breakdown-card').then(m => m.PaymentBreakdownCard),
-    { ssr: false, loading: () => <div className="h-[200px] w-full animate-pulse rounded-2xl bg-card/40" /> }
+    { ssr: false, loading: () => <div className="h-[220px] w-full animate-pulse rounded-2xl bg-card/40" /> }
 );
 import { RecurringSplitCard } from '@/components/analytics/recurring-split-card';
 import { TagsFilterCard } from '@/components/analytics/tags-filter-card';
@@ -73,7 +76,8 @@ export function AnalyticsView() {
     const [activeTags, setActiveTags] = useState<string[]>([]);
     const { formatCurrency, currency, convertAmount, userId, activeWorkspaceId, ratesLastUpdated, firstDayOfWeek, monthlyBudget, convertedWorkspaceBudgets } = useUserPreferences();
     const { activeAccountId } = useAccounts();
-    const { activeWorkspace, theme: themeConfig } = useWorkspaceTheme('cyan');
+    const { workspaceType, theme: themeConfig } = useWorkspaceTheme('cyan');
+    const themeHex = useMemo(() => resolveWorkspaceHex(workspaceType, 'cyan'), [workspaceType]);
 
     const { buckets } = useBucketsList();
     const { bucketSpending } = useBucketSpending();
@@ -206,7 +210,7 @@ export function AnalyticsView() {
             setPriorStart(priorStart);
         } catch (err) {
             if (fetchGenRef.current !== myGen) return;
-            console.error("Error fetching analytics:", err);
+            console.error('Error fetching analytics:', err);
             setError(err instanceof Error ? err.message : 'Failed to load analytics data');
             toast.error('Failed to load analytics data');
         } finally {
@@ -324,22 +328,30 @@ export function AnalyticsView() {
         return null;
     }, [dateRange, customStart, customEnd]);
 
+    const focusedBucket = selectedBucketId !== 'all'
+        ? buckets.find(b => b.id === selectedBucketId)
+        : null;
+
+    const heroMonthlyBudget = selectedBucketId === 'all' && activeTags.length === 0
+        ? (activeWorkspaceId
+            ? (convertedWorkspaceBudgets[activeWorkspaceId] || 0)
+            : monthlyBudget)
+        : 0;
+
     return (
-        <motion.div 
+        <motion.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 8 }}
             transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
             className="relative min-h-[100dvh]"
         >
-
-
             <div className={cn(
-                "p-5 space-y-6 max-w-md lg:max-w-5xl mx-auto relative transition-all duration-300",
-                loading ? "opacity-50 blur-[2px] pointer-events-none" : "opacity-100 blur-0"
+                'p-5 space-y-5 max-w-md lg:max-w-5xl mx-auto relative transition-all duration-300',
+                loading ? 'opacity-50 blur-[2px] pointer-events-none' : 'opacity-100 blur-0'
             )}>
-                {/* Sticky Header — pins to top on scroll, exposes period + running total */}
-                <div className="sticky top-0 z-20 -mx-5 px-5 py-2 bg-background/80 backdrop-blur-xl border-b border-white/5">
+                {/* Sticky Header — slim: back / title / period badge + total chip when scrolled */}
+                <div className="sticky top-0 z-20 -mx-5 px-5 py-2 bg-background/40 backdrop-blur-xl border-b border-white/5">
                     <div className="flex items-center justify-between relative min-h-[40px]">
                         <button
                             onClick={() => router.back()}
@@ -352,25 +364,35 @@ export function AnalyticsView() {
                             <h2 className="text-lg font-semibold truncate text-center leading-tight">Analytics</h2>
                         </div>
                         <div className="flex items-center gap-1.5 shrink-0 z-10">
-                            <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-secondary/30 text-muted-foreground">
-                                {dateRange === 'ALL' ? 'All' : dateRange}
-                            </span>
                             {!loading && totalSpentInRange > 0 && (
-                                <span className="text-[10px] font-bold tabular-nums px-2 py-0.5 rounded-md bg-primary/15 border border-primary/25 text-foreground/90">
+                                <span className={cn(
+                                    'text-[10px] font-bold tabular-nums px-2 py-0.5 rounded-md border',
+                                    themeConfig.bgLight,
+                                    themeConfig.borderMedium,
+                                    themeConfig.text,
+                                )}>
                                     {formatCurrency(Math.round(totalSpentInRange))}
                                 </span>
                             )}
+                            <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-secondary/30 text-muted-foreground">
+                                {dateRange === 'ALL' ? 'All' : dateRange}
+                            </span>
                         </div>
                     </div>
                 </div>
 
                 {/* Filters Row */}
-                <div className="flex flex-wrap items-center justify-center gap-2 px-1">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 px-1">
                     <Select value={selectedBucketId} onValueChange={(val) => {
                         setSelectedBucketId(val);
                         toast.haptic(ImpactStyle.Light);
                     }}>
-                        <SelectTrigger className={`flex-1 min-w-[140px] px-3 h-10 text-[12px] rounded-xl font-bold ${themeConfig.bgLight} ${themeConfig.borderMedium} ${themeConfig.text}`}>
+                        <SelectTrigger className={cn(
+                            'w-full px-3 h-10 text-[12px] rounded-xl font-bold border transition-colors',
+                            selectedBucketId === 'all'
+                                ? 'bg-secondary/20 border-white/5 text-foreground/80'
+                                : cn(themeConfig.bgLight, themeConfig.borderMedium, themeConfig.text),
+                        )}>
                             <SelectValue placeholder="All Spending" />
                         </SelectTrigger>
                         <SelectContent align="center">
@@ -389,8 +411,8 @@ export function AnalyticsView() {
                                             <span className="flex-1 truncate">{b.name}</span>
                                             {Number(b.budget) > 0 && (
                                                 <span className={cn(
-                                                    "ml-2 text-[10px] font-bold tabular-nums shrink-0",
-                                                    remaining < 0 ? "text-rose-400" : "text-muted-foreground/70"
+                                                    'ml-2 text-[10px] font-bold tabular-nums shrink-0',
+                                                    remaining < 0 ? 'text-rose-400' : 'text-muted-foreground/70'
                                                 )}>
                                                     {formatCurrency(remaining)}
                                                 </span>
@@ -405,7 +427,7 @@ export function AnalyticsView() {
                         setDateRange(val);
                         toast.haptic(ImpactStyle.Medium);
                     }}>
-                        <SelectTrigger className="flex-1 min-w-[140px] px-3 h-10 text-[12px] bg-secondary/20 border-white/5 rounded-xl font-bold">
+                        <SelectTrigger className="w-full px-3 h-10 text-[12px] bg-secondary/20 border-white/5 rounded-xl font-bold">
                             <SelectValue placeholder="Period" />
                         </SelectTrigger>
                         <SelectContent align="center">
@@ -472,7 +494,7 @@ export function AnalyticsView() {
                 ) : error ? (
                     <Card className="bg-card/40 border-destructive/30 shadow-none">
                         <CardContent className="p-5 space-y-3 text-center">
-                            <p className="text-sm font-bold text-destructive">Couldn't load analytics</p>
+                            <p className="text-sm font-bold text-destructive">Couldn&apos;t load analytics</p>
                             <p className="text-[12px] text-muted-foreground">{error}</p>
                             <button
                                 onClick={() => fetchData()}
@@ -484,204 +506,248 @@ export function AnalyticsView() {
                     </Card>
                 ) : (
                     <>
-                {/* Bucket Progress Highlight */}
-                {selectedBucketId !== 'all' && buckets.find(b => b.id === selectedBucketId) && (() => {
-                    const focusedBucket = buckets.find(b => b.id === selectedBucketId)!;
-                    const bucketCurr = (focusedBucket.currency || currency).toUpperCase();
-                    const budgetInBase = convertAmount(Number(focusedBucket.budget || 0), bucketCurr);
-                    const remaining = budgetInBase - totalSpentInRange;
-                    return (
-                    <Card className={`${themeConfig.bgLight} ${themeConfig.borderMedium} ${themeConfig.shadowGlow}`}>
-                        <CardContent className="p-4 flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                                <div className={`w-10 h-10 rounded-2xl flex items-center justify-center border ${themeConfig.bgMedium} ${themeConfig.text} ${themeConfig.borderMedium}`}>
-                                    <BucketIcon icon={focusedBucket.icon} className="w-full h-full" />
-                                </div>
-                                <div>
-                                    <h4 className={`text-sm font-bold ${themeConfig.text}`}>{focusedBucket.name}</h4>
-                                    <p className={`text-[11px] font-bold uppercase tracking-widest ${themeConfig.textOpacity}`}>Targeted View</p>
-                                </div>
-                            </div>
-                            <div className="text-right">
-                                <p className={`text-[11px] font-bold uppercase tracking-widest ${themeConfig.textOpacity}`}>Budget Remaining</p>
-                                <p className={`text-sm font-bold ${themeConfig.text}`}>
-                                    {formatCurrency(remaining)}
-                                </p>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    );
-                })()}
-
-                <MonthlyRecapCard currency={currency} formatCurrency={formatCurrency} />
-
-                {transactions.length === 0 ? (
-                    <Card className="bg-card/40 border-white/5 shadow-none">
-                        <CardContent className="p-8 flex flex-col items-center justify-center text-center space-y-3">
-                            <div className="w-12 h-12 rounded-2xl bg-secondary/30 flex items-center justify-center mb-1">
-                                <ChartLine className="w-5 h-5 text-muted-foreground/70" />
-                            </div>
-                            <p className="text-sm font-bold">No transactions in this range</p>
-                            <p className="text-[12px] text-muted-foreground max-w-[260px]">
-                                Try a wider period from the picker above, or add an expense to start seeing trends.
-                            </p>
-                            <button
-                                onClick={() => router.push('/add')}
-                                className="mt-1 inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-primary text-white text-xs font-bold hover:bg-primary/90 transition-colors"
-                            >
-                                <Plus className="w-3.5 h-3.5" />
-                                Add expense
-                            </button>
-                        </CardContent>
-                    </Card>
-                ) : (
-                <>
-                <RecurringSplitCard
-                    recurringTotal={recurringTotal}
-                    discretionaryTotal={discretionaryTotal}
-                    recurringTopCategories={recurringTopCategories}
-                    discretionaryTopCategories={discretionaryTopCategories}
-                    recurringTopItems={recurringTopItems}
-                    discretionaryTopItems={discretionaryTopItems}
-                    formatCurrency={formatCurrency}
-                />
-
-                <LazyMount placeholderHeight={140}>
-                    <WhatIfCard
-                        transactions={transactions}
-                        userId={userId}
-                        currency={currency}
-                        convertAmount={convertAmount}
-                        formatCurrency={formatCurrency}
-                    />
-                </LazyMount>
-
-                <TagsFilterCard
-                    tagBreakdown={tagBreakdown}
-                    activeTags={activeTags}
-                    onToggle={toggleTag}
-                    onClear={clearTags}
-                    formatCurrency={formatCurrency}
-                />
-
-                <SpendingTrendCard
-                    userId={userId}
-                    dateRange={dateRange}
-                    selectedBucketId={selectedBucketId}
-                    categoryTrendData={categoryTrendData}
-                    activeCategories={activeCategories}
-                    totalSpentInRange={totalSpentInRange}
-                    recentSpent7d={recentSpent7d}
-                    monthlyBudget={
-                        selectedBucketId === 'all' && activeTags.length === 0
-                            ? (activeWorkspaceId
-                                ? (convertedWorkspaceBudgets[activeWorkspaceId] || 0)
-                                : monthlyBudget)
-                            : 0
-                    }
-                    avgPerDay={avgPerDay}
-                    txCount={txCount}
-                    busiestLabel={busiestLabel}
-                    priorTotal={priorTotal}
-                    priorMTDTotal={priorMTDTotal}
-                    formatCurrency={formatCurrency}
-                    convertAmount={convertAmount}
-                />
-
-                {dateRange !== '1M' && dateRange !== 'LM' && (
-                    <LazyMount placeholderHeight={220}>
-                        <CalendarHeatmapCard
-                            dailyTotals={dailyTotals}
+                        {/* Hero — headline total, MoM, sparkline, pacing chip */}
+                        <AnalyticsHero
+                            dateRange={dateRange}
                             rangeStart={rangeStart}
                             rangeEnd={rangeEnd}
+                            totalSpentInRange={totalSpentInRange}
+                            dailyTotals={dailyTotals}
+                            priorTotal={priorTotal}
+                            priorMTDTotal={priorMTDTotal}
+                            recentSpent7d={recentSpent7d}
+                            monthlyBudget={heroMonthlyBudget}
+                            avgPerDay={avgPerDay}
+                            txCount={txCount}
+                            busiestLabel={busiestLabel}
                             formatCurrency={formatCurrency}
+                            themeConfig={themeConfig}
+                            themeHex={themeHex}
                         />
-                    </LazyMount>
-                )}
 
-                <LazyMount placeholderHeight={220}>
-                    <WeekdayChartCard
-                        weekdayTotals={weekdayTotals}
-                        totalSpentInRange={totalSpentInRange}
-                        formatCurrency={formatCurrency}
-                    />
-                </LazyMount>
+                        {/* Bucket Progress Highlight — only when bucket selected */}
+                        {focusedBucket && (() => {
+                            const bucketCurr = (focusedBucket.currency || currency).toUpperCase();
+                            const budgetInBase = convertAmount(Number(focusedBucket.budget || 0), bucketCurr);
+                            const remaining = budgetInBase - totalSpentInRange;
+                            return (
+                                <Card className={cn(themeConfig.bgLight, themeConfig.borderMedium, themeConfig.shadowGlow)}>
+                                    <CardContent className="p-4 flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                            <div className={cn(
+                                                'w-10 h-10 rounded-2xl flex items-center justify-center border',
+                                                themeConfig.bgMedium,
+                                                themeConfig.text,
+                                                themeConfig.borderMedium,
+                                            )}>
+                                                <BucketIcon icon={focusedBucket.icon} className="w-full h-full" />
+                                            </div>
+                                            <div>
+                                                <h4 className={cn('text-sm font-bold', themeConfig.text)}>{focusedBucket.name}</h4>
+                                                <p className={cn('text-[11px] font-bold uppercase tracking-widest', themeConfig.textOpacity)}>Targeted View</p>
+                                            </div>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className={cn('text-[11px] font-bold uppercase tracking-widest', themeConfig.textOpacity)}>Budget Remaining</p>
+                                            <p className={cn('text-sm font-bold', themeConfig.text)}>
+                                                {formatCurrency(remaining)}
+                                            </p>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            );
+                        })()}
 
-                <LazyMount placeholderHeight={200}>
-                    <TopMerchantsCard
-                        topMerchants={topMerchants}
-                        newMerchantsCount={newMerchantsCount}
-                        formatCurrency={formatCurrency}
-                    />
-                </LazyMount>
+                        <MonthlyRecapCard currency={currency} formatCurrency={formatCurrency} />
 
-                {locationClusters.length > 0 && (
-                    <LazyMount placeholderHeight={260}>
-                        <LocationInsightsCard
-                            locationClusters={locationClusters}
-                            geoTxCount={geoTxCount}
-                            formatCurrency={formatCurrency}
-                        />
-                    </LazyMount>
-                )}
+                        {transactions.length === 0 ? (
+                            <Card className="bg-card/40 border-white/5 shadow-none">
+                                <CardContent className="p-8 flex flex-col items-center justify-center text-center space-y-3">
+                                    <div className="w-12 h-12 rounded-2xl bg-secondary/30 flex items-center justify-center mb-1">
+                                        <ChartLine className="w-5 h-5 text-muted-foreground/70" />
+                                    </div>
+                                    <p className="text-sm font-bold">No transactions in this range</p>
+                                    <p className="text-[12px] text-muted-foreground max-w-[260px]">
+                                        Try a wider period from the picker above, or add an expense to start seeing trends.
+                                    </p>
+                                    <button
+                                        onClick={() => router.push('/add')}
+                                        className="mt-1 inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-primary text-white text-xs font-bold hover:bg-primary/90 transition-colors"
+                                    >
+                                        <Plus className="w-3.5 h-3.5" />
+                                        Add expense
+                                    </button>
+                                </CardContent>
+                            </Card>
+                        ) : (
+                            <>
+                                {/* ── OVERVIEW ───────────────────────────────────────── */}
+                                <SectionLabel label="Overview" />
 
-                <LazyMount placeholderHeight={180}>
-                    <LargestTransactionsCard
-                        top3Largest={top3Largest}
-                        formatCurrency={formatCurrency}
-                    />
-                </LazyMount>
+                                <SpendingTrendCard
+                                    userId={userId}
+                                    dateRange={dateRange}
+                                    selectedBucketId={selectedBucketId}
+                                    categoryTrendData={categoryTrendData}
+                                    activeCategories={activeCategories}
+                                    totalSpentInRange={totalSpentInRange}
+                                    recentSpent7d={recentSpent7d}
+                                    priorTotal={priorTotal}
+                                    formatCurrency={formatCurrency}
+                                    convertAmount={convertAmount}
+                                    themeConfig={themeConfig}
+                                    themeHex={themeHex}
+                                />
 
-                <LazyMount placeholderHeight={260}>
-                    <CategoryBreakdownCard
-                        title={
-                            selectedBucketId !== 'all' && buckets.find(b => b.id === selectedBucketId)
-                                ? `Categories within ${buckets.find(b => b.id === selectedBucketId)!.name}`
-                                : 'Spending by Category'
-                        }
-                        categoryBreakdown={categoryBreakdown}
-                        categorizedBreakdown={categorizedBreakdown}
-                        formatCurrency={formatCurrency}
-                        analyticsDateRange={analyticsDateRange}
-                        anomalies={categoryAnomalies}
-                    />
-                </LazyMount>
+                                <RecurringSplitCard
+                                    recurringTotal={recurringTotal}
+                                    discretionaryTotal={discretionaryTotal}
+                                    recurringTopCategories={recurringTopCategories}
+                                    discretionaryTopCategories={discretionaryTopCategories}
+                                    recurringTopItems={recurringTopItems}
+                                    discretionaryTopItems={discretionaryTopItems}
+                                    formatCurrency={formatCurrency}
+                                />
 
-                <LazyMount placeholderHeight={260}>
-                    <PaymentBreakdownCard
-                        paymentBreakdown={paymentBreakdown}
-                        categorizedPayment={categorizedPayment}
-                        formatCurrency={formatCurrency}
-                    />
-                </LazyMount>
+                                {/* ── BREAKDOWN ──────────────────────────────────────── */}
+                                <SectionLabel label="Breakdown" />
 
-                <LazyMount placeholderHeight={120}>
-                    <InsightsChatCard
-                        dateRange={dateRange}
-                        customStart={customStart}
-                        customEnd={customEnd}
-                        bucketId={selectedBucketId}
-                        baseCurrency={currency}
-                    />
-                </LazyMount>
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                    <LazyMount placeholderHeight={260}>
+                                        <CategoryBreakdownCard
+                                            title={
+                                                focusedBucket
+                                                    ? `Categories within ${focusedBucket.name}`
+                                                    : 'Spending by Category'
+                                            }
+                                            categoryBreakdown={categoryBreakdown}
+                                            categorizedBreakdown={categorizedBreakdown}
+                                            formatCurrency={formatCurrency}
+                                            analyticsDateRange={analyticsDateRange}
+                                            anomalies={categoryAnomalies}
+                                        />
+                                    </LazyMount>
 
-                {/* Currency conversion staleness footnote */}
-                {usedConversion && ratesLastUpdated && (Date.now() - ratesLastUpdated) > 24 * 60 * 60 * 1000 && (
-                    <p className="text-[10px] text-muted-foreground/60 text-center px-2">
-                        Some amounts converted using exchange rates last refreshed {format(new Date(ratesLastUpdated), 'd MMM, h:mm a')}.
-                    </p>
-                )}
+                                    <LazyMount placeholderHeight={260}>
+                                        <PaymentBreakdownCard
+                                            paymentBreakdown={paymentBreakdown}
+                                            categorizedPayment={categorizedPayment}
+                                            formatCurrency={formatCurrency}
+                                        />
+                                    </LazyMount>
+                                </div>
 
-                {allViewTruncated && (
-                    <p className="text-[10px] text-muted-foreground/60 text-center px-2">
-                        Showing your most recent 5,000 transactions. Pick a narrower range for more detail.
-                    </p>
-                )}
-                </>
-                )}
-                </>
+                                <TagsFilterCard
+                                    tagBreakdown={tagBreakdown}
+                                    activeTags={activeTags}
+                                    onToggle={toggleTag}
+                                    onClear={clearTags}
+                                    formatCurrency={formatCurrency}
+                                    themeConfig={themeConfig}
+                                />
+
+                                {/* ── PATTERNS ───────────────────────────────────────── */}
+                                <SectionLabel label="Patterns" />
+
+                                {dateRange !== '1M' && dateRange !== 'LM' && (
+                                    <LazyMount placeholderHeight={220}>
+                                        <CalendarHeatmapCard
+                                            dailyTotals={dailyTotals}
+                                            rangeStart={rangeStart}
+                                            rangeEnd={rangeEnd}
+                                            formatCurrency={formatCurrency}
+                                            themeConfig={themeConfig}
+                                            themeHex={themeHex}
+                                        />
+                                    </LazyMount>
+                                )}
+
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                    <LazyMount placeholderHeight={200}>
+                                        <WeekdayChartCard
+                                            weekdayTotals={weekdayTotals}
+                                            totalSpentInRange={totalSpentInRange}
+                                            formatCurrency={formatCurrency}
+                                            themeHex={themeHex}
+                                        />
+                                    </LazyMount>
+
+                                    <LazyMount placeholderHeight={200}>
+                                        <TopMerchantsCard
+                                            topMerchants={topMerchants}
+                                            newMerchantsCount={newMerchantsCount}
+                                            formatCurrency={formatCurrency}
+                                        />
+                                    </LazyMount>
+                                </div>
+
+                                {locationClusters.length > 0 ? (
+                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                        <LazyMount placeholderHeight={180}>
+                                            <LargestTransactionsCard
+                                                top3Largest={top3Largest}
+                                                formatCurrency={formatCurrency}
+                                            />
+                                        </LazyMount>
+                                        <LazyMount placeholderHeight={260}>
+                                            <LocationInsightsCard
+                                                locationClusters={locationClusters}
+                                                geoTxCount={geoTxCount}
+                                                formatCurrency={formatCurrency}
+                                                themeConfig={themeConfig}
+                                                themeHex={themeHex}
+                                            />
+                                        </LazyMount>
+                                    </div>
+                                ) : (
+                                    <LazyMount placeholderHeight={180}>
+                                        <LargestTransactionsCard
+                                            top3Largest={top3Largest}
+                                            formatCurrency={formatCurrency}
+                                        />
+                                    </LazyMount>
+                                )}
+
+                                {/* ── EXPLORE ────────────────────────────────────────── */}
+                                <SectionLabel label="Explore" />
+
+                                <LazyMount placeholderHeight={140}>
+                                    <WhatIfCard
+                                        transactions={transactions}
+                                        userId={userId}
+                                        currency={currency}
+                                        convertAmount={convertAmount}
+                                        formatCurrency={formatCurrency}
+                                    />
+                                </LazyMount>
+
+                                <LazyMount placeholderHeight={120}>
+                                    <InsightsChatCard
+                                        dateRange={dateRange}
+                                        customStart={customStart}
+                                        customEnd={customEnd}
+                                        bucketId={selectedBucketId}
+                                        baseCurrency={currency}
+                                    />
+                                </LazyMount>
+
+                                {/* Currency conversion staleness footnote */}
+                                {usedConversion && ratesLastUpdated && (Date.now() - ratesLastUpdated) > 24 * 60 * 60 * 1000 && (
+                                    <p className="text-[10px] text-muted-foreground/60 text-center px-2">
+                                        Some amounts converted using exchange rates last refreshed {format(new Date(ratesLastUpdated), 'd MMM, h:mm a')}.
+                                    </p>
+                                )}
+
+                                {allViewTruncated && (
+                                    <p className="text-[10px] text-muted-foreground/60 text-center px-2">
+                                        Showing your most recent 5,000 transactions. Pick a narrower range for more detail.
+                                    </p>
+                                )}
+                            </>
+                        )}
+                    </>
                 )}
             </div>
         </motion.div>
     );
-};
+}

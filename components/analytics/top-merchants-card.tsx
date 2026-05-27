@@ -29,8 +29,8 @@ function TopMerchantsCardInner({ topMerchants, newMerchantsCount, formatCurrency
                     </span>
                 )}
             </div>
-            <Card className="bg-card/40 border-none shadow-none backdrop-blur-md overflow-hidden">
-                <CardContent className="p-4 space-y-2.5">
+            <Card className="bg-card/20 border-none shadow-none overflow-hidden">
+                <CardContent className="p-3 space-y-2">
                     {topMerchants.map((m, i) => (
                         <button
                             key={m.name}
