@@ -1,6 +1,6 @@
 {
   "name": "novira",
-  "version": "2.80.1",
+  "version": "2.80.4",
   "private": true,
   "scripts": {
     "dev": "next dev",

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { format } from 'date-fns';
 import { toast } from '@/utils/haptics';
 import { Haptics, NotificationType } from '@capacitor/haptics';
@@ -128,6 +128,26 @@ async function buildSplitRecords(
     }
 }
 
+// Network blips, cold sessions, and load-balancer hiccups are the most common
+// reasons a first submit fails. The atomic RPC dedupes by `idempotency_key`,
+// so a single retry on transport-layer errors is safe — Postgres constraint
+// failures, RLS denials, and explicit RAISEs surface user-meaningful errors
+// and must NOT be retried (the user needs to see them).
+function isTransientError(err: unknown): boolean {
+    if (!err || typeof err !== 'object') return false;
+    const e = err as { message?: string; code?: string; details?: string; name?: string };
+    if (e.name === 'QueueFullError') return false;
+    if (e.code) {
+        const c = String(e.code);
+        if (c.startsWith('23') || c.startsWith('42') || c.startsWith('P0')) return false;
+        if (c.startsWith('PGRST') && !e.details) return true;
+    }
+    const msg = String(e.message || '').toLowerCase();
+    if (e.name === 'TypeError' && /fetch|network|load failed/.test(msg)) return true;
+    if (/timeout|abort/.test(msg)) return true;
+    return false;
+}
+
 function buildRecurringRecord(
     userId: string,
     description: string,
@@ -195,8 +215,13 @@ export function useExpenseSubmission() {
     const [loading, setLoading] = useState(false);
     const { activeTrip } = useActiveTrip();
     const { activeWorkspaceId } = useUserPreferences();
+    // Locked once a submission has reached the navigation step. Guards the brief
+    // window between clearing the loading spinner and the page actually unmounting
+    // — without it a determined double-tap could re-enter handleSubmit.
+    const submittedRef = useRef(false);
 
     const handleSubmit = async (params: ExpenseSubmissionParams) => {
+        if (submittedRef.current) return;
         const {
             userId, isNative, router, currency, resetForm, userProfile,
             amount, description, date, selectedCategory, txCurrency,
@@ -219,25 +244,41 @@ export function useExpenseSubmission() {
         const idempotencyKey = crypto.randomUUID();
         setLoading(true);
         try {
+            // Warm the auth session before the RPC fires. On a freshly opened app
+            // the token can still be mid-refresh; calling getSession() forces the
+            // SDK to resolve that race before create_transaction_atomic. Cheap when
+            // already warm (~10ms), pays off on the cold "first submit fails" case.
+            // Inside the try so the spinner is already visible during the warm-up.
+            try {
+                await supabase.auth.getSession();
+            } catch {
+                // Non-fatal — downstream errors will surface real auth problems.
+            }
+
             if (!userId) {
                 toast.error('You must be logged in');
                 router.push('/signin');
                 return;
             }
 
-            const exchangeRate = await TransactionService.getExchangeRate(txCurrency, currency, date!);
-            const convertedAmount = parseFloat(amount) * exchangeRate;
-
             // Auto-append active-trip tag when the transaction date falls within
             // an active trip. The cached `activeTrip` is scoped to the current
             // workspace, so only trust it when this transaction is being filed
             // there AND the date is today; otherwise re-fetch with the right scope.
-            let mergedTags = [...tags];
             const isToday = date && format(date, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
             const sameWorkspace = (selectedGroupId ?? null) === (activeWorkspaceId ?? null);
-            const tripForDate = isToday && sameWorkspace
-                ? (activeTrip?.auto_tag_enabled ? activeTrip : null)
-                : await TripService.getActiveTripForDate(userId, date!, selectedGroupId);
+            // Trip resolution and exchange-rate lookup are independent — run them
+            // in parallel so a cold network only hits one wall-clock wait.
+            const tripPromise = isToday && sameWorkspace
+                ? Promise.resolve(activeTrip?.auto_tag_enabled ? activeTrip : null)
+                : TripService.getActiveTripForDate(userId, date!, selectedGroupId);
+            const [exchangeRate, tripForDate] = await Promise.all([
+                TransactionService.getExchangeRate(txCurrency, currency, date!),
+                tripPromise,
+            ]);
+            const convertedAmount = parseFloat(amount) * exchangeRate;
+
+            const mergedTags = [...tags];
             if (tripForDate?.auto_tag_enabled && !mergedTags.includes(tripForDate.slug)) {
                 mergedTags.push(tripForDate.slug);
             }
@@ -283,12 +324,20 @@ export function useExpenseSubmission() {
                 ? buildRecurringRecord(userId, description, amount, selectedCategory, txCurrency, selectedGroupId, paymentMethod, frequency, date!, excludeFromAllowance, isSplitEnabled, selectedFriendIds, notes, selectedBucketId, placeName, placeAddress, placeLat, placeLng, cleanTags, isIncome)
                 : null;
 
-            const result = await TransactionService.createTransaction({
+            const createPayload = {
                 transaction: transactionRecord,
                 splits: splitResult.records,
                 recurring: recurringRecordToInsert,
                 offlineReceiptFile: receiptFile ?? null,
-            });
+            };
+            let result;
+            try {
+                result = await TransactionService.createTransaction(createPayload);
+            } catch (firstErr) {
+                if (!isTransientError(firstErr)) throw firstErr;
+                await new Promise(r => setTimeout(r, 600));
+                result = await TransactionService.createTransaction(createPayload);
+            }
 
             if (result.success) {
                 if (isNative) {
@@ -306,7 +355,6 @@ export function useExpenseSubmission() {
                     toast.success('Expense added successfully!');
                 }
 
-                let uploadedReceiptPath: string | null = null;
                 // Receipt storage was full while offline — the row queues but the
                 // file is dropped. Warn the user so they can re-attach later.
                 if (result.offline && receiptFile && result.receiptDropped) {
@@ -315,27 +363,9 @@ export function useExpenseSubmission() {
                         style: { background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.2)', color: '#FBBF24' }
                     });
                 }
-                if (!result.offline && receiptFile) {
-                    const typedResultEarly = result as { data?: { id?: string }; idempotent?: boolean };
-                    const createdId = typedResultEarly.data?.id;
-                    if (createdId && !typedResultEarly.idempotent) {
-                        try {
-                            const { path } = await uploadReceipt(userId, createdId, receiptFile);
-                            const { error: updErr } = await supabase
-                                .from('transactions')
-                                .update({ receipt_path: path })
-                                .eq('id', createdId);
-                            if (updErr) throw updErr;
-                            uploadedReceiptPath = path;
-                        } catch (uploadErr) {
-                            console.error('[useExpenseSubmission] receipt upload failed', uploadErr);
-                            toast('Expense saved, but receipt upload failed. You can re-attach later.', {
-                                icon: '⚠️',
-                                style: { background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.2)', color: '#FBBF24' }
-                            });
-                        }
-                    }
-                }
+
+                const typedResult = result as { data?: { id?: string }; idempotent?: boolean };
+                const createdId = typedResult.data?.id;
 
                 resetForm();
                 if (!result.offline) {
@@ -343,11 +373,11 @@ export function useExpenseSubmission() {
 
                     // Stash the just-created row so the dashboard can render it
                     // immediately on mount, before its network fetch returns. Realtime
-                    // and the mount-time refetch will reconcile by id.
+                    // and the mount-time refetch will reconcile by id. Receipt path is
+                    // intentionally undefined here — the background upload below will
+                    // patch it and the Realtime UPDATE listener will swap the row in.
                     // Skip on idempotent retries — the row is already on the server
                     // and likely already shown elsewhere; re-stashing risks visual churn.
-                    const typedResult = result as { data?: { id?: string }; idempotent?: boolean };
-                    const createdId = typedResult.data?.id;
                     if (!typedResult.idempotent && createdId && typeof sessionStorage !== 'undefined') {
                         const stashed: Transaction = {
                             id: createdId,
@@ -372,7 +402,7 @@ export function useExpenseSubmission() {
                             tags: transactionRecord.tags,
                             group_id: transactionRecord.group_id,
                             account_id: transactionRecord.account_id ?? undefined,
-                            receipt_path: uploadedReceiptPath ?? undefined,
+                            receipt_path: undefined,
                             splits: (splitResult.records ?? []).map(s => ({ user_id: s.user_id, amount: s.amount })),
                             profile: userProfile,
                         };
@@ -386,59 +416,89 @@ export function useExpenseSubmission() {
                 sessionStorage.setItem('novira_expense_added', 'true');
                 window.dispatchEvent(new Event('novira:expense-added'));
 
-                // Notify each split participant in real time. Postgres-changes on
-                // `splits` isn't reliable for the receiving user (publication / RLS
-                // quirks), so a broadcast guarantees their "You owe / owed" tiles
-                // update without a refresh. Skip on offline submits — the row hasn't
-                // been written yet, and the broadcast wouldn't reach anyone anyway.
-                if (!result.offline && splitResult.records && splitResult.records.length > 0) {
-                    for (const split of splitResult.records) {
-                        if (!split.user_id || split.user_id === userId) continue;
-                        const ch = supabase.channel(`split-notify-${split.user_id}`);
-                        // Track terminal-state cleanup. SUBSCRIBED fires the broadcast and
-                        // disposes after `.send` settles; CHANNEL_ERROR / TIMED_OUT / CLOSED
-                        // dispose immediately. A 5s safety timer guarantees the channel is
-                        // freed even if no status callback fires (rare socket quirks).
-                        let disposed = false;
-                        const dispose = () => {
-                            if (disposed) return;
-                            disposed = true;
-                            clearTimeout(safety);
-                            supabase.removeChannel(ch);
-                        };
-                        const safety = setTimeout(dispose, 5000);
-                        ch.subscribe((status) => {
-                            if (status === 'SUBSCRIBED') {
-                                ch.send({
-                                    type: 'broadcast',
-                                    event: 'split-added',
-                                    payload: { fromUserId: userId },
-                                }).finally(dispose);
-                            } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
-                                dispose();
-                            }
-                        });
-                    }
-
-                    // The broadcast above only reaches debtors whose app is open.
-                    // Fire a Web Push fan-out so closed apps still get a notification.
-                    // Fire-and-forget — push delivery failure must never block the
-                    // happy path of recording the expense.
-                    const createdId = (result as { data?: { id?: string } }).data?.id;
-                    if (createdId) {
-                        fetch('/api/push/notify-split', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ transaction_id: createdId }),
-                            credentials: 'same-origin',
-                        }).catch(() => { /* best-effort */ });
-                    }
-                }
-
+                // Navigate immediately. Receipt upload, split broadcasts, and Web
+                // Push fan-out happen in the background — the user sees the
+                // dashboard with the optimistic row right away. submittedRef locks
+                // re-entry during the brief gap between clearing the spinner and
+                // the page actually unmounting.
+                submittedRef.current = true;
+                setLoading(false);
                 router.push('/');
+
+                if (!result.offline) {
+                    void (async () => {
+                        // Receipt upload — the row already exists on the server,
+                        // so we patch receipt_path after the file lands. Realtime
+                        // UPDATE on the dashboard picks up the change automatically.
+                        if (receiptFile && createdId && !typedResult.idempotent) {
+                            try {
+                                const { path } = await uploadReceipt(userId, createdId, receiptFile);
+                                const { error: updErr } = await supabase
+                                    .from('transactions')
+                                    .update({ receipt_path: path })
+                                    .eq('id', createdId);
+                                if (updErr) throw updErr;
+                            } catch (uploadErr) {
+                                console.error('[useExpenseSubmission] receipt upload failed', uploadErr);
+                                toast('Expense saved, but receipt upload failed. Re-attach from the transaction details.', {
+                                    icon: '⚠️',
+                                    style: { background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.2)', color: '#FBBF24' }
+                                });
+                            }
+                        }
+
+                        // Notify each split participant in real time. Postgres-changes on
+                        // `splits` isn't reliable for the receiving user (publication / RLS
+                        // quirks), so a broadcast guarantees their "You owe / owed" tiles
+                        // update without a refresh.
+                        if (splitResult.records && splitResult.records.length > 0) {
+                            for (const split of splitResult.records) {
+                                if (!split.user_id || split.user_id === userId) continue;
+                                const ch = supabase.channel(`split-notify-${split.user_id}`);
+                                // Track terminal-state cleanup. SUBSCRIBED fires the broadcast and
+                                // disposes after `.send` settles; CHANNEL_ERROR / TIMED_OUT / CLOSED
+                                // dispose immediately. A 5s safety timer guarantees the channel is
+                                // freed even if no status callback fires (rare socket quirks).
+                                let disposed = false;
+                                const dispose = () => {
+                                    if (disposed) return;
+                                    disposed = true;
+                                    clearTimeout(safety);
+                                    supabase.removeChannel(ch);
+                                };
+                                const safety = setTimeout(dispose, 5000);
+                                ch.subscribe((status) => {
+                                    if (status === 'SUBSCRIBED') {
+                                        ch.send({
+                                            type: 'broadcast',
+                                            event: 'split-added',
+                                            payload: { fromUserId: userId },
+                                        }).finally(dispose);
+                                    } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+                                        dispose();
+                                    }
+                                });
+                            }
+
+                            // The broadcast above only reaches debtors whose app is open.
+                            // Fire a Web Push fan-out so closed apps still get a notification.
+                            if (createdId) {
+                                fetch('/api/push/notify-split', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ transaction_id: createdId }),
+                                    credentials: 'same-origin',
+                                }).catch(() => { /* best-effort */ });
+                            }
+                        }
+                    })();
+                }
             }
 
         } catch (error) {
+            // Allow the user to retry after a failure — the submission lock only
+            // applies when we've successfully navigated.
+            submittedRef.current = false;
             if (isNative) {
                 Haptics.notification({ type: NotificationType.Error }).catch(() => { });
             }

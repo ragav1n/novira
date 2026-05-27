@@ -24,7 +24,7 @@ export function CategorySelector({ categories, selectedCategory, onSelect, sugge
     return (
         <div className="space-y-2">
             <div className="flex items-center justify-between gap-2">
-                <p className="text-sm font-medium">Category *</p>
+                <p className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest">Category *</p>
                 {suggestion && onApplySuggestion && (
                     <button
                         type="button"
@@ -70,12 +70,12 @@ export function BucketSelector({ buckets, selectedBucketId, setSelectedBucketId 
 
     return (
         <div className="space-y-2">
-            <p className="text-sm font-medium">Personal Bucket (Private)</p>
+            <p className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest">Personal Bucket (Private)</p>
             <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1 custom-scrollbar">
                 <div
                     onClick={() => setSelectedBucketId(null)}
                     className={cn(
-                        "flex flex-col items-center gap-1.5 p-3 rounded-xl border transition-all min-w-[80px] cursor-pointer",
+                        "flex flex-col items-center gap-1.5 p-3 rounded-xl border transition-all min-w-[80px] cursor-pointer active:scale-[0.98]",
                         selectedBucketId === null
                             ? "bg-secondary/30 border-white/20"
                             : "bg-background/20 border-white/5 hover:border-white/10"
@@ -91,9 +91,9 @@ export function BucketSelector({ buckets, selectedBucketId, setSelectedBucketId 
                         key={bucket.id}
                         onClick={() => setSelectedBucketId(bucket.id)}
                         className={cn(
-                            "flex flex-col items-center gap-1.5 p-3 rounded-xl border transition-all min-w-[80px] cursor-pointer",
+                            "flex flex-col items-center gap-1.5 p-3 rounded-xl border transition-all min-w-[80px] cursor-pointer active:scale-[0.98]",
                             selectedBucketId === bucket.id
-                                ? "bg-primary/20 border-primary shadow-[0_0_15px_rgba(138,43,226,0.2)]"
+                                ? "bg-primary/20 border-primary ring-1 ring-primary/20"
                                 : "bg-background/20 border-white/5 hover:border-white/10"
                         )}
                     >

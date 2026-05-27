@@ -144,7 +144,7 @@ export function CurrencyDropdown({ value, onValueChange, className, compact = fa
                             onKeyDown={handleKeyDown}
                         >
                             <motion.div
-                                className="w-full rounded-xl border border-white/10 bg-card p-1 shadow-xl shadow-black/50 backdrop-blur-xl overflow-y-auto max-h-[300px] scrollbar-hide"
+                                className="w-full rounded-xl border border-white/10 bg-card p-1 shadow-xl shadow-black/50 overflow-y-auto max-h-[300px] scrollbar-hide"
                                 initial={{ borderRadius: 12 }}
                                 animate={{
                                     borderRadius: 16,

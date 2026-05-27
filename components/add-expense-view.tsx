@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronLeft, CreditCard, Utensils, Car, Zap, ShoppingBag, HeartPulse, Clapperboard, Wallet, Banknote, HelpCircle, Calendar as CalendarIcon, Home, School, LayoutGrid, Building2, MapPin, Shirt, ShoppingCart, LocateFixed, ScanSearch, Sparkles, Camera, Image as ImageIcon, Plane, X, FileText } from 'lucide-react';
+import { ChevronLeft, CreditCard, Utensils, Car, Zap, ShoppingBag, HeartPulse, Clapperboard, Wallet, Banknote, HelpCircle, Calendar as CalendarIcon, Home, School, LayoutGrid, Building2, MapPin, Shirt, ShoppingCart, LocateFixed, ScanSearch, Sparkles, Camera, Image as ImageIcon, Plane, X, FileText, Loader2 } from 'lucide-react';
 import UniqueLoading from '@/components/ui/grid-loading';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -52,6 +52,7 @@ const ACCOUNT_TYPE_ICONS: Record<AccountType, React.ComponentType<{ className?: 
 import { TagsSection } from './add-expense/tags-section';
 import { useExpenseForm } from '@/hooks/useExpenseForm';
 import { useExpenseSubmission, getExpenseFormErrors, type ExpenseFormErrors } from '@/hooks/useExpenseSubmission';
+import { TransactionService } from '@/lib/services/transaction-service';
 import { getDistance } from '@/lib/location';
 import { takePendingSharedFile } from '@/lib/share-target';
 import { validateReceiptFile } from '@/lib/receipt-storage';
@@ -128,6 +129,7 @@ export function AddExpenseView() {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const cameraInputRef = useRef<HTMLInputElement>(null);
     const amountInputRef = useRef<HTMLInputElement>(null);
+    const paymentScrollRef = useRef<HTMLDivElement>(null);
     const scanAbortRef = useRef<AbortController | null>(null);
     const [scanning, setScanning] = React.useState(false);
     const [errors, setErrors] = React.useState<ExpenseFormErrors>({});
@@ -407,6 +409,24 @@ export function AddExpenseView() {
         }
     }, []);
 
+    // One-shot: center the pre-selected payment method in the scroller so the
+    // user can see what's currently picked even if it sits off-screen on first paint.
+    useEffect(() => {
+        if (!formState.paymentMethod) return;
+        const btn = paymentScrollRef.current?.querySelector<HTMLButtonElement>(
+            `button[data-payment-method="${formState.paymentMethod}"]`
+        );
+        btn?.scrollIntoView({ inline: 'center', block: 'nearest' });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    // Prime the exchange rate cache before the user submits. Same-currency
+    // entries short-circuit inside the service, so this is a no-op then.
+    useEffect(() => {
+        if (formState.txCurrency === currency) return;
+        TransactionService.getExchangeRate(formState.txCurrency, currency, new Date()).catch(() => { /* best-effort */ });
+    }, [formState.txCurrency, currency]);
+
     // Trip mode: when the user picks a trip-type bucket whose start/end window
     // covers today and whose currency differs from the form's, auto-switch the
     // tx currency to the destination currency. Saves the user from manually
@@ -471,32 +491,41 @@ export function AddExpenseView() {
             )}>
 
                 {/* Header */}
-                <div className="flex items-center justify-between relative min-h-[40px]">
-                    <button
-                        onClick={() => {
-                            if (isNative) Haptics.impact({ style: ImpactStyle.Light }).catch(() => { });
-                            router.back();
-                        }}
-                        aria-label="Go back"
-                        className="p-2 rounded-full bg-secondary/30 hover:bg-secondary/50 transition-colors shrink-0 z-10"
-                    >
-                        <ChevronLeft className="w-5 h-5" />
-                    </button>
-                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                        <h2 className={cn(
-                            "text-lg font-bold truncate px-24 text-center leading-tight transition-colors duration-500",
-                            formState.selectedBucketId ? "text-cyan-400" : "text-foreground"
-                        )}>
-                            {formState.selectedBucketId ? buckets.find(b => b.id === formState.selectedBucketId)?.name : "Add Expense"}
+                <div className="space-y-2">
+                    <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3 min-h-[40px]">
+                        <button
+                            onClick={() => {
+                                if (isNative) Haptics.impact({ style: ImpactStyle.Light }).catch(() => { });
+                                router.back();
+                            }}
+                            aria-label="Go back"
+                            className="p-2 rounded-full bg-secondary/30 hover:bg-secondary/50 transition-colors active:scale-[0.92]"
+                        >
+                            <ChevronLeft className="w-5 h-5" />
+                        </button>
+                        <h2 className="text-lg font-bold text-center truncate leading-tight">
+                            Add Expense
                         </h2>
+                        <button
+                            onClick={onSubmit}
+                            disabled={loading}
+                            className="px-3 py-1.5 rounded-full bg-primary/15 border border-primary/30 text-primary text-sm font-semibold disabled:opacity-50 hover:bg-primary/20 transition-colors active:scale-[0.95]"
+                        >
+                            {loading ? 'Saving...' : 'Save'}
+                        </button>
                     </div>
-                    <button
-                        onClick={onSubmit}
-                        disabled={loading}
-                        className="text-sm font-medium text-primary hover:text-primary/80 disabled:opacity-50 shrink-0 z-10"
-                    >
-                        {loading ? 'Saving...' : 'Save'}
-                    </button>
+                    {formState.selectedBucketId && (() => {
+                        const b = buckets.find(x => x.id === formState.selectedBucketId);
+                        if (!b) return null;
+                        return (
+                            <div className="flex justify-center">
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-300 text-[11px] font-semibold">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" aria-hidden="true" />
+                                    <span className="truncate max-w-[200px]">{b.name}</span>
+                                </span>
+                            </div>
+                        );
+                    })()}
                 </div>
 
                 {/* Scan Receipt — primary CTA opens the camera. A separate, clearly
@@ -522,7 +551,7 @@ export function AddExpenseView() {
                         onClick={() => cameraInputRef.current?.click()}
                         disabled={scanning}
                         aria-label="Scan receipt — take a photo"
-                        className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl border border-primary/30 bg-primary/10 hover:bg-primary/20 transition-all disabled:opacity-50 group"
+                        className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl border border-primary/30 bg-primary/10 hover:bg-primary/20 transition-all disabled:opacity-50 group active:scale-[0.99]"
                     >
                         <div className="w-9 h-9 rounded-xl bg-primary/20 border border-primary/30 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
                             <Camera className="w-4 h-4 text-primary" />
@@ -537,7 +566,7 @@ export function AddExpenseView() {
                         onClick={() => fileInputRef.current?.click()}
                         disabled={scanning}
                         aria-label="Choose a receipt image from your gallery"
-                        className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-[12px] font-semibold text-muted-foreground hover:text-primary hover:bg-primary/5 transition-all disabled:opacity-50"
+                        className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-[12px] font-semibold text-muted-foreground hover:text-primary hover:bg-primary/5 transition-all disabled:opacity-50 active:scale-[0.99]"
                     >
                         <ImageIcon className="w-3.5 h-3.5" />
                         Or choose from gallery
@@ -570,7 +599,7 @@ export function AddExpenseView() {
                                 type="button"
                                 onClick={() => formState.setReceiptFile(null)}
                                 aria-label="Remove attached receipt"
-                                className="shrink-0 p-1.5 rounded-full text-emerald-300/70 hover:text-emerald-300 hover:bg-emerald-500/20 transition-colors"
+                                className="shrink-0 p-1.5 rounded-full text-emerald-300/70 hover:text-emerald-300 hover:bg-emerald-500/20 transition-colors active:scale-[0.92]"
                             >
                                 <X className="w-3.5 h-3.5" />
                             </button>
@@ -581,7 +610,7 @@ export function AddExpenseView() {
 
                 {/* Amount Input */}
                 <div className="space-y-2">
-                    <label htmlFor="expense-amount" className="text-sm font-medium block">Amount *</label>
+                    <label htmlFor="expense-amount" className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest block">Amount *</label>
                     <ExpressionKeypad
                         inputRef={amountInputRef}
                         value={formState.amount}
@@ -622,13 +651,22 @@ export function AddExpenseView() {
                                 }
                             }}
                             className={cn(
-                                "h-16 text-3xl font-bold pl-12 bg-secondary/10 focus-visible:ring-primary/50",
-                                errors.amount ? "border-destructive focus-visible:ring-destructive/50" : "border-primary/50"
+                                "h-16 text-3xl font-bold pl-12 pr-32 bg-secondary/10 tabular-nums tracking-tight",
+                                errors.amount
+                                    ? "border-destructive focus-visible:ring-destructive/50"
+                                    : "border-white/10 focus-visible:border-primary/50 focus-visible:ring-primary/30"
                             )}
                         />
-                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-bold text-primary">
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-bold text-primary pointer-events-none">
                             {CURRENCY_SYMBOLS[formState.txCurrency as keyof typeof CURRENCY_SYMBOLS] || '$'}
                         </span>
+                        <div className="absolute right-2 top-1/2 -translate-y-1/2 w-[120px]">
+                            <CurrencyDropdown
+                                value={formState.txCurrency}
+                                onValueChange={(val) => formState.setTxCurrency(val)}
+                                compact
+                            />
+                        </div>
                     </div>
                     {(() => {
                         const preview = evaluateExpression(formState.amount);
@@ -643,9 +681,6 @@ export function AddExpenseView() {
                     {errors.amount && (
                         <p id="expense-amount-error" role="alert" aria-live="polite" className="text-xs text-destructive font-medium">{errors.amount}</p>
                     )}
-                    <div className="mt-2">
-                        <CurrencyDropdown value={formState.txCurrency} onValueChange={(val) => formState.setTxCurrency(val)} />
-                    </div>
                 </div>
 
                 {/* Description */}
@@ -834,7 +869,7 @@ export function AddExpenseView() {
                                         formState.setSuggestedCategory(null);
                                     }}
                                     aria-label={`Apply suggested category: ${formState.suggestedCategory}`}
-                                    className="text-[11px] font-bold text-primary hover:text-primary/80 px-2 py-1 rounded-full bg-primary/15 border border-primary/30 transition-colors"
+                                    className="text-[11px] font-bold text-primary hover:text-primary/80 px-2 py-1 rounded-full bg-primary/15 border border-primary/30 transition-colors active:scale-[0.96]"
                                 >
                                     Apply
                                 </button>
@@ -842,9 +877,9 @@ export function AddExpenseView() {
                                     type="button"
                                     onClick={() => formState.setSuggestedCategory(null)}
                                     aria-label="Dismiss category suggestion"
-                                    className="text-[11px] text-primary/70 hover:text-primary/90 px-1"
+                                    className="text-primary/70 hover:text-primary/90 p-1 rounded-full active:scale-[0.92] transition-transform duration-100"
                                 >
-                                    ×
+                                    <X className="w-3 h-3" />
                                 </button>
                             </div>
                         </div>
@@ -1039,7 +1074,7 @@ export function AddExpenseView() {
                                         if (sd.bucket_id) formState.setSelectedBucketId(sd.bucket_id);
                                         formState.setSmartDefaults(null);
                                     }}
-                                    className="text-[11px] font-bold text-amber-300 hover:text-amber-200 px-2 py-1 rounded-full bg-amber-400/15 border border-amber-400/30"
+                                    className="text-[11px] font-bold text-amber-300 hover:text-amber-200 px-2 py-1 rounded-full bg-amber-400/15 border border-amber-400/30 transition-colors active:scale-[0.96]"
                                 >
                                     Apply
                                 </button>
@@ -1047,9 +1082,9 @@ export function AddExpenseView() {
                                     type="button"
                                     onClick={() => formState.setSmartDefaults(null)}
                                     aria-label="Dismiss suggestion"
-                                    className="text-[11px] text-amber-300/70 hover:text-amber-200 px-1"
+                                    className="text-amber-300/70 hover:text-amber-200 p-1 rounded-full active:scale-[0.92] transition-transform duration-100"
                                 >
-                                    ×
+                                    <X className="w-3 h-3" />
                                 </button>
                             </div>
                         </div>
@@ -1091,7 +1126,7 @@ export function AddExpenseView() {
                                         formState.setSuggestedBucket(null);
                                     }}
                                     aria-label={`Apply suggested bucket: ${sb.name}`}
-                                    className="text-[11px] font-bold text-cyan-300 hover:text-cyan-200 px-2 py-1 rounded-full bg-cyan-400/15 border border-cyan-400/30 transition-colors"
+                                    className="text-[11px] font-bold text-cyan-300 hover:text-cyan-200 px-2 py-1 rounded-full bg-cyan-400/15 border border-cyan-400/30 transition-colors active:scale-[0.96]"
                                 >
                                     Apply
                                 </button>
@@ -1099,9 +1134,9 @@ export function AddExpenseView() {
                                     type="button"
                                     onClick={() => formState.setSuggestedBucket(null)}
                                     aria-label="Dismiss bucket suggestion"
-                                    className="text-[11px] text-cyan-300/70 hover:text-cyan-200 px-1"
+                                    className="text-cyan-300/70 hover:text-cyan-200 p-1 rounded-full active:scale-[0.92] transition-transform duration-100"
                                 >
-                                    ×
+                                    <X className="w-3 h-3" />
                                 </button>
                             </div>
                         </div>
@@ -1115,7 +1150,7 @@ export function AddExpenseView() {
 
                 {activeAccounts.length > 0 && (
                     <div className="space-y-2">
-                        <p className="text-sm font-medium">Account</p>
+                        <p className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest">Account</p>
                         <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1 custom-scrollbar">
                             {activeAccounts.map(a => {
                                 const TypeIcon = ACCOUNT_TYPE_ICONS[a.type] || CircleDollarSign;
@@ -1130,9 +1165,9 @@ export function AddExpenseView() {
                                         }}
                                         aria-pressed={selected}
                                         className={cn(
-                                            'flex flex-col items-center gap-1.5 p-3 rounded-xl border transition-all min-w-[80px] cursor-pointer text-center',
+                                            'flex flex-col items-center gap-1.5 p-3 rounded-xl border transition-all min-w-[80px] cursor-pointer text-center active:scale-[0.98]',
                                             selected
-                                                ? 'shadow-[0_0_15px_rgba(138,43,226,0.15)]'
+                                                ? 'ring-1 ring-primary/20'
                                                 : 'bg-background/20 border-white/5 hover:border-white/10',
                                         )}
                                         style={selected ? {
@@ -1172,7 +1207,7 @@ export function AddExpenseView() {
                 {/* Date & Payment */}
                 <div className="space-y-4">
                     <div className="space-y-2">
-                        <p className="text-sm font-medium">Date *</p>
+                        <p className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest">Date *</p>
                         <Popover modal={true}>
                             <PopoverTrigger asChild>
                                 <Button
@@ -1203,72 +1238,66 @@ export function AddExpenseView() {
                         </Popover>
                     </div>
                     <div className="space-y-2">
-                        <p className="text-sm font-medium">Payment Method</p>
-                        <div className="grid grid-cols-2 gap-2">
-                            {(['Cash', 'UPI', 'Debit Card', 'Credit Card', 'Bank Transfer'] as const).map((method, index) => {
-                                const isSelected = formState.paymentMethod === method;
-                                const color = PAYMENT_METHOD_COLORS[method];
-
-                                return (
-                                    <div
-                                        key={method}
-                                        onClick={() => formState.setPaymentMethod(method)}
-                                        className={cn(
-                                            "flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all",
-                                            isSelected
-                                                ? "border-white/20 shadow-lg"
-                                                : "bg-secondary/10 border-white/5 hover:bg-secondary/20",
-                                            index === 4 && "col-span-2"
-                                        )}
-                                        style={{
-                                            backgroundColor: isSelected ? `${color}20` : undefined,
-                                            borderColor: isSelected ? color : undefined,
-                                        }}
-                                    >
-                                        <div
-                                            className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition-colors"
-                                            style={{
-                                                backgroundColor: isSelected ? `${color}30` : 'rgba(255,255,255,0.05)',
-                                                color: isSelected ? color : 'inherit'
+                        <p className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest">Payment Method</p>
+                        <div
+                            className="relative -mx-5"
+                            style={{
+                                maskImage: 'linear-gradient(to right, transparent, black 20px, black calc(100% - 28px), transparent)',
+                                WebkitMaskImage: 'linear-gradient(to right, transparent, black 20px, black calc(100% - 28px), transparent)',
+                            }}
+                        >
+                            <div
+                                ref={paymentScrollRef}
+                                className="flex gap-2 overflow-x-auto px-5 pb-2 snap-x snap-mandatory custom-scrollbar"
+                            >
+                                {(['Cash', 'UPI', 'Debit Card', 'Credit Card', 'Bank Transfer'] as const).map((method) => {
+                                    const isSelected = formState.paymentMethod === method;
+                                    const color = PAYMENT_METHOD_COLORS[method];
+                                    const Icon = method === 'Cash' ? Banknote
+                                        : method === 'UPI' ? Wallet
+                                            : method === 'Bank Transfer' ? Building2
+                                                : CreditCard;
+                                    return (
+                                        <button
+                                            key={method}
+                                            type="button"
+                                            data-payment-method={method}
+                                            aria-pressed={isSelected}
+                                            onClick={() => {
+                                                if (isNative) Haptics.impact({ style: ImpactStyle.Light }).catch(() => { });
+                                                formState.setPaymentMethod(method);
                                             }}
+                                            className={cn(
+                                                "flex items-center gap-2 px-3.5 py-2.5 rounded-full border whitespace-nowrap shrink-0 snap-start transition-colors active:scale-[0.96]",
+                                                !isSelected && "bg-secondary/10 border-white/5 text-muted-foreground hover:bg-secondary/20 hover:text-foreground"
+                                            )}
+                                            style={isSelected ? {
+                                                backgroundColor: `${color}20`,
+                                                borderColor: color,
+                                                color,
+                                            } : undefined}
                                         >
-                                            {method === 'Cash' ? <Banknote className="w-4 h-4" /> :
-                                                method === 'UPI' ? <Wallet className="w-4 h-4" /> :
-                                                    method === 'Debit Card' ? <CreditCard className="w-4 h-4" /> :
-                                                        method === 'Credit Card' ? <CreditCard className="w-4 h-4" /> :
-                                                            <Building2 className="w-4 h-4" />}
-                                        </div>
-                                        <span
-                                            className="text-sm font-medium transition-colors"
-                                            style={{ color: isSelected ? color : undefined }}
-                                        >
-                                            {method}
-                                        </span>
-                                    </div>
-                                );
-                            })}
+                                            <Icon className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                                            <span className="text-sm font-medium">{method}</span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
                         </div>
                     </div>
                 </div>
 
                 {/* Exclude from Allowance Toggle */}
-                <div className="space-y-4 p-4 rounded-2xl bg-secondary/10 border border-white/5">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-cyan-500/20 flex items-center justify-center shrink-0">
-                                <Wallet className="w-4 h-4 text-cyan-500" />
-                            </div>
-                            <div>
-                                <p className="text-sm font-medium">Exclude from Allowance</p>
-                                <p className="text-[11px] text-muted-foreground">Don't count this against your monthly limit</p>
-                            </div>
-                        </div>
-                        <Switch
-                            checked={formState.excludeFromAllowance}
-                            onCheckedChange={formState.setExcludeFromAllowance}
-                            className="data-[state=checked]:bg-cyan-500"
-                        />
+                <div className="flex items-center justify-between gap-4">
+                    <div className="min-w-0">
+                        <p className="text-sm font-medium">Exclude from Allowance</p>
+                        <p className="text-[11px] text-muted-foreground">Don't count against your monthly limit</p>
                     </div>
+                    <Switch
+                        checked={formState.excludeFromAllowance}
+                        onCheckedChange={formState.setExcludeFromAllowance}
+                        className="data-[state=checked]:bg-cyan-500 shrink-0"
+                    />
                 </div>
 
                 {/* Quick split with most recent partner — only when not already splitting and a partner is known */}
@@ -1286,7 +1315,7 @@ export function AddExpenseView() {
                                 formState.setSelectedGroupId(null);
                                 formState.setSelectedFriendIds([partner.id]);
                             }}
-                            className="w-full flex items-center justify-between gap-3 px-4 py-3 rounded-2xl bg-primary/10 border border-primary/25 hover:bg-primary/15 transition-colors text-left"
+                            className="w-full flex items-center justify-between gap-3 px-4 py-3 rounded-2xl bg-primary/10 border border-primary/25 hover:bg-primary/15 transition-colors text-left active:scale-[0.99]"
                             aria-label={`Quick split 50/50 with ${partner.full_name}`}
                         >
                             <div className="flex items-center gap-3 min-w-0">
@@ -1342,7 +1371,7 @@ export function AddExpenseView() {
 
                 {/* Notes */}
                 <div className="space-y-2">
-                    <label htmlFor="expense-notes" className="text-sm font-medium">Notes (Optional)</label>
+                    <label htmlFor="expense-notes" className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest block">Notes (Optional)</label>
                     <Textarea
                         id="expense-notes"
                         name="notes"
@@ -1357,9 +1386,14 @@ export function AddExpenseView() {
                 <Button
                     onClick={onSubmit}
                     disabled={loading}
-                    className="w-full h-12 text-base font-semibold shadow-[0_0_20px_rgba(138,43,226,0.3)] hover:shadow-[0_0_30px_rgba(138,43,226,0.5)] transition-all"
+                    className="w-full h-12 text-base font-semibold active:scale-[0.98] transition-transform duration-100"
                 >
-                    {loading ? 'Adding Expense...' : 'Add Expense'}
+                    {loading ? (
+                        <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" aria-hidden="true" />
+                            Adding Expense...
+                        </>
+                    ) : 'Add Expense'}
                 </Button>
             </div>
         </motion.div>
