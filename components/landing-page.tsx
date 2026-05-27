@@ -10,6 +10,7 @@ import { ShinyButton } from '@/components/ui/shiny-button';
 import {
   ArrowRight, CheckCircle2, BarChart3, Globe, Repeat,
   FileText, Calendar, Zap, Menu, X, Smartphone, Hand, Bell, Target, Sparkles,
+  Coffee, Wine, Car, ShoppingBag,
 } from 'lucide-react';
 
 const GlobeInteractive = dynamic(
@@ -31,16 +32,17 @@ const SECTIONS = [
   { id: 'sec-cta', label: 'CTA' },
 ];
 
-const FEATURES = [
-  { icon: BarChart3, title: 'Rich analytics', desc: 'Beautiful charts and a What-If simulator that quantifies cuts against your goals — by category, place, time, or person.' },
-  { icon: Globe, title: 'Any currency', desc: '26 supported currencies with live exchange rates, per-transaction conversion, and a base-currency that holds steady over time.' },
-  { icon: Repeat, title: 'Recurring detection', desc: 'Spots subscriptions automatically — and quietly flags silent price hikes before they pile up.' },
-  { icon: Calendar, title: 'Smart budgets', desc: 'Weighted-pace forecasting (last-7-day rate mixed with month-to-date) nudges you before you overspend.' },
-  { icon: Zap, title: 'Bank imports', desc: 'Drop an HDFC or SBI statement and Novira parses it in seconds — smart duplicate detection included.' },
-  { icon: FileText, title: 'Clean exports', desc: 'Multi-page PDFs, CSV, and an ICS bill schedule — your accountant, tax software, and calendar will thank you.' },
-  { icon: Smartphone, title: 'Install anywhere', desc: 'One-tap install on iPhone, Android, Mac, and Windows. Own home-screen icon, runs offline, no app store.' },
-  { icon: Hand, title: 'Gesture-first', desc: 'Swipe to edit or delete, pull to refresh, drag to reorder your dashboard — Novira gets faster the more you use it.' },
-  { icon: Bell, title: 'Bills & nudges', desc: 'Opt-in push for bills, budget warnings, bucket deadlines, and daily or weekly digests — with quiet hours.' },
+type FeatureVisual = 'chart' | 'gauge';
+const FEATURES: { icon: React.ComponentType<{ style?: React.CSSProperties; className?: string }>; title: string; desc: string; span?: 1 | 2; visual?: FeatureVisual }[] = [
+  { icon: BarChart3, title: 'Rich analytics',     desc: 'Beautiful charts and a What-If simulator that quantifies cuts against your goals — by category, place, time, or person.', span: 2, visual: 'chart' },
+  { icon: Globe,     title: 'Any currency',       desc: '26 supported currencies with live exchange rates, per-transaction conversion, and a base-currency that holds steady over time.' },
+  { icon: Repeat,    title: 'Recurring detection', desc: 'Spots subscriptions automatically — and quietly flags silent price hikes before they pile up.' },
+  { icon: Calendar,  title: 'Smart budgets',      desc: 'Weighted-pace forecasting (last-7-day rate mixed with month-to-date) nudges you before you overspend.', span: 2, visual: 'gauge' },
+  { icon: Zap,       title: 'Bank imports',       desc: 'Drop an HDFC or SBI statement and Novira parses it in seconds — smart duplicate detection included.' },
+  { icon: FileText,  title: 'Clean exports',      desc: 'Multi-page PDFs, CSV, and an ICS bill schedule — your accountant, tax software, and calendar will thank you.' },
+  { icon: Smartphone, title: 'Install anywhere',  desc: 'One-tap install on iPhone, Android, Mac, and Windows. Own home-screen icon, runs offline, no app store.' },
+  { icon: Hand,      title: 'Gesture-first',      desc: 'Swipe to edit or delete, pull to refresh, drag to reorder your dashboard — Novira gets faster the more you use it.' },
+  { icon: Bell,      title: 'Bills & nudges',     desc: 'Opt-in push for bills, budget warnings, bucket deadlines, and daily or weekly digests — with quiet hours.', span: 2 },
 ];
 
 const TXNS = [
@@ -61,6 +63,98 @@ function Tag({ children }: { children: React.ReactNode }) {
     <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, fontSize: 13, fontWeight: 500 }}>
       <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#8A2BE2', boxShadow: '0 0 10px #8A2BE2', flexShrink: 0 }} />
       {children}
+    </div>
+  );
+}
+
+// ─── Hero "New" pill — rotating ticker of distinctive Novira features ─────────
+const HERO_TICKER_ITEMS: { icon: React.ComponentType<{ className?: string }>; label: string }[] = [
+  { icon: Sparkles, label: 'AI receipt scan' },
+  { icon: FileText, label: 'Bank statement imports' },
+  { icon: Target,   label: 'What-If simulator' },
+];
+
+function HeroTicker() {
+  const [i, setI] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setI(v => (v + 1) % HERO_TICKER_ITEMS.length), 2600);
+    return () => clearInterval(id);
+  }, []);
+  const Item = HERO_TICKER_ITEMS[i];
+  const Icon = Item.icon;
+  return (
+    <div
+      className="inline-flex items-center gap-0"
+      style={{
+        marginBottom: 22,
+        borderRadius: 999,
+        border: '1px solid rgba(164,132,215,0.35)',
+        background: 'linear-gradient(180deg, rgba(36,18,72,0.55), rgba(20,10,40,0.55))',
+        padding: 3,
+        whiteSpace: 'nowrap',
+        boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)',
+      }}
+    >
+      <span
+        style={{
+          fontSize: 10,
+          fontWeight: 800,
+          letterSpacing: '0.14em',
+          textTransform: 'uppercase',
+          padding: '4px 9px 4px 10px',
+          borderRadius: 999,
+          background: 'linear-gradient(135deg, #8A2BE2 0%, #A855F7 100%)',
+          color: '#fff',
+          textShadow: '0 0 6px rgba(168,85,247,0.6)',
+        }}
+      >
+        New
+      </span>
+      <span
+        aria-live="polite"
+        style={{
+          position: 'relative',
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 7,
+          minWidth: 196,
+          padding: '0 14px',
+          fontSize: 12.5,
+          fontWeight: 500,
+          color: 'rgba(255,255,255,0.86)',
+          overflow: 'hidden',
+          height: 22,
+        }}
+      >
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.span
+            key={i}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 7 }}
+          >
+            <Icon className="w-3.5 h-3.5" />
+            {Item.label}
+          </motion.span>
+        </AnimatePresence>
+      </span>
+      <span style={{ display: 'inline-flex', gap: 4, paddingRight: 10 }}>
+        {HERO_TICKER_ITEMS.map((_, k) => (
+          <span
+            key={k}
+            style={{
+              width: k === i ? 12 : 4,
+              height: 4,
+              borderRadius: 2,
+              background: k === i ? '#C084FC' : 'rgba(255,255,255,0.18)',
+              boxShadow: k === i ? '0 0 6px #C084FC' : 'none',
+              transition: 'all 0.32s cubic-bezier(0.22,1,0.36,1)',
+            }}
+          />
+        ))}
+      </span>
     </div>
   );
 }
@@ -325,13 +419,49 @@ function DeviceFrame({ tiltRef }: { tiltRef: React.RefObject<HTMLDivElement | nu
 // ─── Scan Visual ──────────────────────────────────────────────────────────────
 
 function ScanVisual() {
-  const items = [
+  const items: [string, string][] = [
     ['Milk 1L', '₹62'], ['Bread', '₹145'], ['Coffee 500g', '₹389'],
     ['Apples 1kg', '₹88'], ['Yogurt', '₹54'], ['Bananas', '₹46'],
     ['Pasta', '₹92'], ['Cheese', '₹212'],
   ];
+  const fields: { label: string; value: string; accent: string }[] = [
+    { label: 'Amount',   value: '₹1,088',    accent: '#34d399' },
+    { label: 'Merchant', value: 'REWE',      accent: '#A855F7' },
+    { label: 'Category', value: 'Groceries', accent: '#22D3EE' },
+  ];
+
+  const rootRef = useRef<HTMLDivElement>(null);
+  const [step, setStep] = useState(0);
+  const [inView, setInView] = useState(false);
+
+  useEffect(() => {
+    const el = rootRef.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      ([e]) => setInView(e.isIntersecting && e.intersectionRatio >= 0.25),
+      { threshold: 0.25 }
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!inView) { setStep(0); return; }
+    let s = 0;
+    setStep(0);
+    const id = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      s = (s + 1) % 5;
+      setStep(s > 3 ? 3 : s);
+    }, 1100);
+    return () => clearInterval(id);
+  }, [inView]);
+
   return (
-    <div style={{ aspectRatio: '4/3.3', borderRadius: 24, position: 'relative', overflow: 'hidden', background: 'linear-gradient(180deg, rgba(28,14,55,0.9), rgba(14,6,30,0.95))', border: '1px solid rgba(164,132,215,0.5)', boxShadow: '0 30px 80px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.05)' }}>
+    <div
+      ref={rootRef}
+      style={{ aspectRatio: '4/3.3', borderRadius: 24, position: 'relative', overflow: 'hidden', background: 'linear-gradient(180deg, rgba(28,14,55,0.9), rgba(14,6,30,0.95))', border: '1px solid rgba(164,132,215,0.5)', boxShadow: '0 30px 80px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.05)' }}
+    >
       <div style={{ position: 'absolute', inset: 24, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         {/* receipt */}
         <div style={{
@@ -346,7 +476,7 @@ function ScanVisual() {
               <span>{n}</span><span>{p}</span>
             </div>
           ))}
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800, marginTop: 8, fontSize: 12 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0 0', fontWeight: 800, fontSize: 13, borderTop: '2px solid #000', marginTop: 6 }}>
             <span>TOTAL</span><span>₹1,088</span>
           </div>
         </div>
@@ -355,17 +485,32 @@ function ScanVisual() {
       <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
         <div className="scan-laser-beam" />
       </div>
-      {/* result card */}
+      {/* result card — old compact corner card with new step-based field fill */}
       <div style={{ position: 'absolute', right: 30, bottom: 30, padding: '12px 14px', borderRadius: 14, background: 'rgba(20,10,40,0.94)', border: '1px solid rgba(164,132,215,0.5)', backdropFilter: 'blur(14px)', fontSize: 11, boxShadow: '0 10px 30px rgba(0,0,0,0.5)', animation: 'popIn 0.6s cubic-bezier(0.34,1.5,0.64,1) 0.8s both', color: '#fff' }}>
-        {[['Amount','₹1,088'],['Merchant','REWE'],['Category','Groceries']].map(([l,v]) => (
-          <div key={l} style={{ display: 'flex', justifyContent: 'space-between', gap: 18, padding: '3px 0', color: 'rgba(255,255,255,0.7)' }}>
-            <span>{l}</span><b style={{ color: '#fff', fontWeight: 600 }}>{v}</b>
-          </div>
-        ))}
-        <div style={{ color: '#34d399', marginTop: 6, display: 'flex', alignItems: 'center', gap: 4, fontWeight: 600 }}>
+        {fields.map((f, i) => {
+          const filled = step > i;
+          return (
+            <div key={f.label} style={{ display: 'flex', justifyContent: 'space-between', gap: 18, padding: '3px 0', color: 'rgba(255,255,255,0.7)' }}>
+              <span>{f.label}</span>
+              <motion.b
+                animate={{ opacity: filled ? 1 : 0.4 }}
+                transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontWeight: 600 }}
+              >
+                <span style={{ width: 4, height: 4, borderRadius: '50%', background: filled ? f.accent : 'rgba(255,255,255,0.25)', boxShadow: filled ? `0 0 6px ${f.accent}` : 'none', transition: 'all 0.3s' }} />
+                <span style={{ color: filled ? '#fff' : 'rgba(255,255,255,0.4)' }}>{filled ? f.value : '—'}</span>
+              </motion.b>
+            </div>
+          );
+        })}
+        <motion.div
+          animate={{ opacity: step >= 3 ? 1 : 0, y: step >= 3 ? 0 : 4 }}
+          transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+          style={{ color: '#34d399', marginTop: 6, display: 'flex', alignItems: 'center', gap: 4, fontWeight: 600 }}
+        >
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><path d="M20 6 9 17l-5-5"/></svg>
           Form pre-filled
-        </div>
+        </motion.div>
       </div>
     </div>
   );
@@ -375,10 +520,9 @@ function ScanVisual() {
 
 function SplitVisual() {
   const avatars = [
-    { l: 'R', bg: 'linear-gradient(135deg, #F472B6, #EC4899)' },
-    { l: 'A', bg: 'linear-gradient(135deg, #7B39FC, #C084FC)' },
-    { l: 'K', bg: 'linear-gradient(135deg, #06B6D4, #22D3EE)' },
-    { l: '+2', bg: 'rgba(255,255,255,0.08)' },
+    { l: 'S', bg: 'linear-gradient(135deg, #F472B6, #EC4899)' },
+    { l: 'R', bg: 'linear-gradient(135deg, #7B39FC, #C084FC)' },
+    { l: 'D', bg: 'linear-gradient(135deg, #06B6D4, #22D3EE)' },
   ];
   return (
     <div style={{ aspectRatio: '4/3.3', borderRadius: 24, position: 'relative', overflow: 'hidden', background: 'linear-gradient(180deg, rgba(28,14,55,0.9), rgba(14,6,30,0.95))', border: '1px solid rgba(164,132,215,0.5)', boxShadow: '0 30px 80px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.05)' }}>
@@ -476,11 +620,11 @@ function OfflineVisual() {
 // ─── Map Visual ───────────────────────────────────────────────────────────────
 
 function MapVisual() {
-  const pins = [
-    { cls: { top: '22%', left: '22%' }, bg: '#8A2BE2', delay: '0s' },
-    { cls: { top: '55%', left: '55%' }, bg: '#EC4899', delay: '-1s' },
-    { cls: { top: '35%', left: '72%' }, bg: '#06B6D4', delay: '-0.5s' },
-    { cls: { top: '70%', left: '28%' }, bg: '#34d399', delay: '-1.5s' },
+  const pins: { top: string; left: string; bg: string; delay: string; name: string; icon: React.ComponentType<{ style?: React.CSSProperties }>; labelSide: 'right' | 'left' }[] = [
+    { top: '22%', left: '22%', bg: '#8A2BE2', delay: '0s',    name: 'Blue Tokai', icon: Coffee,      labelSide: 'right' },
+    { top: '30%', left: '72%', bg: '#EC4899', delay: '-0.5s', name: 'Café Roma',  icon: Wine,        labelSide: 'left'  },
+    { top: '58%', left: '62%', bg: '#06B6D4', delay: '-1s',   name: 'DMart',      icon: ShoppingBag, labelSide: 'left'  },
+    { top: '70%', left: '28%', bg: '#34d399', delay: '-1.5s', name: 'Auto',       icon: Car,         labelSide: 'right' },
   ];
   return (
     <div style={{ aspectRatio: '4/3.3', borderRadius: 24, position: 'relative', overflow: 'hidden', background: 'linear-gradient(180deg, rgba(28,14,55,0.9), rgba(14,6,30,0.95))', border: '1px solid rgba(164,132,215,0.5)', boxShadow: '0 30px 80px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.05)' }}>
@@ -496,19 +640,95 @@ function MapVisual() {
         <path d="M90 66 Q 180 30, 220 165 T 290 105" stroke="rgba(168,85,247,0.4)" strokeWidth="2" fill="none" strokeDasharray="4 6" style={{ animation: 'dashFlow 2s linear infinite' }}/>
         <path d="M220 165 Q 160 210, 112 210" stroke="rgba(168,85,247,0.4)" strokeWidth="2" fill="none" strokeDasharray="4 6" style={{ animation: 'dashFlow 2s linear infinite' }}/>
       </svg>
-      {pins.map((p, i) => (
-        <div key={i} style={{
-          position: 'absolute', ...p.cls as React.CSSProperties,
-          width: 32, height: 32, borderRadius: '50%', display: 'grid', placeItems: 'center',
-          background: p.bg, border: '2px solid #fff',
-          animation: `pinPulse 2s ease-out infinite ${p.delay}`,
-          zIndex: 2,
-        }}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="white" strokeLinecap="round" strokeLinejoin="round" style={{ width: 14, height: 14, strokeWidth: 2.5 }}>
-            <path d="M17 8h1a4 4 0 1 1 0 8h-1M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z"/>
-          </svg>
-        </div>
-      ))}
+      {pins.map((p, i) => {
+        const Icon = p.icon;
+        const chipStyle: React.CSSProperties = p.labelSide === 'right'
+          ? { left: 38, top: '50%', transform: 'translateY(-50%)' }
+          : { right: 38, top: '50%', transform: 'translateY(-50%)' };
+        return (
+          <div key={i} style={{
+            position: 'absolute', top: p.top, left: p.left,
+            width: 32, height: 32, borderRadius: '50%', display: 'grid', placeItems: 'center',
+            background: p.bg, border: '2px solid #fff',
+            animation: `pinPulse 2s ease-out infinite ${p.delay}`,
+            zIndex: 2,
+          }}>
+            <Icon style={{ width: 14, height: 14, color: '#fff', strokeWidth: 2.5 } as React.CSSProperties} />
+            <span style={{
+              position: 'absolute', ...chipStyle,
+              padding: '4px 9px',
+              borderRadius: 99,
+              background: 'rgba(20,10,40,0.94)',
+              border: '1px solid rgba(164,132,215,0.4)',
+              color: 'rgba(255,255,255,0.92)',
+              fontSize: 10.5,
+              fontWeight: 600,
+              whiteSpace: 'nowrap',
+              boxShadow: '0 6px 18px rgba(0,0,0,0.45)',
+              letterSpacing: '-0.005em',
+            }}>
+              {p.name}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─── Feature anchor micro-visuals (Rich analytics, Smart budgets) ────────────
+
+function MiniChart() {
+  // Mini bar chart — 7 weekday bars, varied heights, gradient fill, with a
+  // ghost average line. Drawn as static SVG; entrance handled by parent card.
+  const bars = [42, 28, 60, 50, 78, 92, 64];
+  const max = 100;
+  const w = 140, h = 84, bw = 12, gap = 6;
+  return (
+    <svg viewBox={`0 0 ${w} ${h}`} width="100%" height="100%" preserveAspectRatio="xMidYMid meet" style={{ display: 'block', maxHeight: 90 }}>
+      <defs>
+        <linearGradient id="mini-bar-grad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#C084FC" />
+          <stop offset="100%" stopColor="#7B39FC" stopOpacity="0.55" />
+        </linearGradient>
+      </defs>
+      {/* baseline */}
+      <line x1="6" y1={h - 8} x2={w - 6} y2={h - 8} stroke="rgba(255,255,255,0.08)" strokeWidth="1" />
+      {/* average dashed line */}
+      <line x1="6" y1={h - 8 - (58 / max) * (h - 16)} x2={w - 6} y2={h - 8 - (58 / max) * (h - 16)} stroke="rgba(244,114,182,0.5)" strokeWidth="0.8" strokeDasharray="2 3" />
+      {bars.map((v, i) => {
+        const bh = (v / max) * (h - 16);
+        const x = 6 + i * (bw + gap);
+        const y = h - 8 - bh;
+        return (
+          <rect key={i} x={x} y={y} width={bw} height={bh} rx={2.5} ry={2.5} fill="url(#mini-bar-grad)" />
+        );
+      })}
+    </svg>
+  );
+}
+
+function MiniGauge() {
+  // Horizontal pace gauge — track + filled segment + position marker, with a
+  // small "On pace" tag below.
+  const pct = 62;
+  return (
+    <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 10, padding: '4px 2px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, fontWeight: 600, color: 'rgba(255,255,255,0.55)', letterSpacing: '0.04em' }}>
+        <span>Spent</span>
+        <span style={{ color: '#fff' }}>62%</span>
+      </div>
+      <div style={{ position: 'relative', height: 8, borderRadius: 99, background: 'rgba(255,255,255,0.08)', overflow: 'visible' }}>
+        <div style={{ position: 'absolute', inset: 0, width: `${pct}%`, borderRadius: 99, background: 'linear-gradient(90deg, #7B39FC, #C084FC)', boxShadow: '0 0 14px rgba(168,85,247,0.45)' }} />
+        {/* "On pace" marker */}
+        <div style={{ position: 'absolute', top: -4, left: '66%', transform: 'translateX(-50%)', width: 2, height: 16, background: '#34d399', borderRadius: 99, boxShadow: '0 0 8px #34d399' }} />
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10.5, fontWeight: 600 }}>
+        <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#34d399', boxShadow: '0 0 6px #34d399' }} />
+        <span style={{ color: '#34d399' }}>On pace</span>
+        <span style={{ color: 'rgba(255,255,255,0.45)' }}>·</span>
+        <span style={{ color: 'rgba(255,255,255,0.65)' }}>12 days left</span>
+      </div>
     </div>
   );
 }
@@ -710,11 +930,8 @@ export function LandingPage() {
             <div style={{ display: 'grid', gridTemplateColumns: '1.05fr 0.95fr', gap: 56, alignItems: 'center' }} className="hero-grid-cols">
               {/* Left */}
               <div>
-                <motion.div initial="hidden" animate="visible" variants={fadeUp(0.1)}
-                  className="inline-flex items-center gap-2.5 px-3 py-[7px] rounded-full text-[12.5px]"
-                  style={{ background: 'rgba(85,80,110,0.4)', border: '1px solid rgba(164,132,215,0.5)', backdropFilter: 'blur(14px)', boxShadow: '0 0 20px rgba(123,57,252,0.15), inset 0 1px 0 rgba(255,255,255,0.08)', marginBottom: 22, whiteSpace: 'nowrap' }}>
-                  <span style={{ background: '#8A2BE2', color: '#fff', fontSize: 10.5, fontWeight: 700, padding: '3px 9px', borderRadius: 999, letterSpacing: '0.04em', textTransform: 'uppercase', boxShadow: '0 0 8px rgba(123,57,252,0.4)' }}>New</span>
-                  <span style={{ color: 'rgba(255,255,255,0.8)', fontWeight: 500 }}>Push reminders, swipe gestures, custom date ranges</span>
+                <motion.div initial="hidden" animate="visible" variants={fadeUp(0.1)}>
+                  <HeroTicker />
                 </motion.div>
 
                 <motion.h1 initial="hidden" animate="visible" variants={fadeUp(0.2)}
@@ -907,29 +1124,64 @@ export function LandingPage() {
             <h2 style={{ fontSize: 'clamp(34px, 5.5vw, 64px)', lineHeight: 1.03, letterSpacing: '-0.03em', fontWeight: 700, margin: '16px 0 0' }}>Details, dialed in.</h2>
             <p style={{ color: 'rgba(255,255,255,0.78)', fontSize: 'clamp(15px, 1.4vw, 17px)', lineHeight: 1.55, margin: '14px auto 0', maxWidth: 560 }}>Everything you need, nothing you don't. Built obsessively for people who actually care where their money goes.</p>
           </motion.div>
-          <div style={{ maxWidth: 1200, width: '100%', margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, padding: '0 28px' }} className="features-grid">
+          <div style={{ maxWidth: 1200, width: '100%', margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, padding: '0 28px' }} className="features-grid">
             {FEATURES.map((f, i) => {
               const isNew = i >= FEATURES.length - 3;
+              const isAnchor = f.span === 2 && !!f.visual;
+              const Icon = f.icon;
               return (
-                <motion.div key={f.title} initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp(i * 0.05)}
+                <motion.div
+                  key={f.title}
+                  initial="hidden"
+                  whileInView="visible"
+                  viewport={{ once: true }}
+                  variants={fadeUp(i * 0.04)}
                   className="group landing-feature-card"
-                  style={{ position: 'relative', padding: 26, borderRadius: 20, border: '1px solid rgba(164,132,215,0.22)', background: 'linear-gradient(180deg, rgba(28,14,55,0.55), rgba(20,10,40,0.75))', backdropFilter: 'blur(12px)', transition: 'all 0.35s cubic-bezier(0.22,1,0.36,1)', cursor: 'default', overflow: 'hidden' }}
-                  whileHover={{ borderColor: 'rgba(164,132,215,0.45)', y: -4, boxShadow: '0 20px 50px rgba(138,43,226,0.18)' }}>
+                  style={{
+                    gridColumn: f.span === 2 ? 'span 2' : 'span 1',
+                    position: 'relative',
+                    padding: isAnchor ? '20px 22px' : '18px 18px 16px',
+                    borderRadius: 18,
+                    border: '1px solid rgba(164,132,215,0.22)',
+                    background: 'linear-gradient(180deg, rgba(28,14,55,0.55), rgba(20,10,40,0.75))',
+                    backdropFilter: 'blur(12px)',
+                    transition: 'all 0.35s cubic-bezier(0.22,1,0.36,1)',
+                    cursor: 'default',
+                    overflow: 'hidden',
+                    display: 'flex',
+                    flexDirection: 'column',
+                  }}
+                  whileHover={{ borderColor: 'rgba(164,132,215,0.45)', y: -4, boxShadow: '0 20px 50px rgba(138,43,226,0.18)' }}
+                >
                   {isNew && (
-                    <span style={{ position: 'absolute', top: 14, right: 14, display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 8px', borderRadius: 999, fontSize: 9.5, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', background: 'rgba(138,43,226,0.18)', border: '1px solid rgba(192,132,252,0.35)', color: '#E9D5FF', boxShadow: '0 0 12px rgba(138,43,226,0.25)' }}>
+                    <span style={{ position: 'absolute', top: 12, right: 12, display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 8px', borderRadius: 999, fontSize: 9.5, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', background: 'rgba(138,43,226,0.18)', border: '1px solid rgba(192,132,252,0.35)', color: '#E9D5FF', boxShadow: '0 0 12px rgba(138,43,226,0.25)' }}>
                       <Sparkles style={{ width: 10, height: 10 }} />
                       New
                     </span>
                   )}
-                  <motion.div
-                    whileHover={{ scale: 1.08, rotate: 4 }}
-                    transition={{ type: 'spring', stiffness: 320, damping: 18 }}
-                    style={{ width: 42, height: 42, borderRadius: 12, display: 'grid', placeItems: 'center', background: 'rgba(138,43,226,0.15)', border: '1px solid rgba(138,43,226,0.3)', marginBottom: 14 }}
-                  >
-                    <f.icon style={{ width: 20, height: 20, color: '#C084FC', strokeWidth: 2.2 }} />
-                  </motion.div>
-                  <h4 style={{ margin: '0 0 6px', fontSize: 15.5, fontWeight: 600, letterSpacing: '-0.01em' }}>{f.title}</h4>
-                  <p style={{ margin: 0, fontSize: 13.5, color: 'rgba(255,255,255,0.78)', lineHeight: 1.55 }}>{f.desc}</p>
+
+                  {isAnchor ? (
+                    <div style={{ display: 'flex', gap: 18, alignItems: 'stretch', flex: 1 }} className="anchor-row">
+                      <div style={{ flex: '1 1 0', minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginBottom: 8, color: '#C084FC' }}>
+                          <Icon style={{ width: 16, height: 16, strokeWidth: 2.2 }} />
+                          <h4 style={{ margin: 0, fontSize: 15.5, fontWeight: 600, letterSpacing: '-0.01em', color: '#fff' }}>{f.title}</h4>
+                        </div>
+                        <p style={{ margin: 0, fontSize: 13, color: 'rgba(255,255,255,0.74)', lineHeight: 1.55 }}>{f.desc}</p>
+                      </div>
+                      <div style={{ flex: '0 0 38%', minWidth: 120, alignSelf: 'stretch', display: 'flex', alignItems: 'center', justifyContent: 'center' }} className="anchor-visual">
+                        {f.visual === 'chart' ? <MiniChart /> : <MiniGauge />}
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginBottom: 6, color: '#C084FC' }}>
+                        <Icon style={{ width: 15, height: 15, strokeWidth: 2.2 }} />
+                        <h4 style={{ margin: 0, fontSize: 14.5, fontWeight: 600, letterSpacing: '-0.005em', color: '#fff' }}>{f.title}</h4>
+                      </div>
+                      <p style={{ margin: 0, fontSize: 13, color: 'rgba(255,255,255,0.72)', lineHeight: 1.5 }}>{f.desc}</p>
+                    </>
+                  )}
                 </motion.div>
               );
             })}
@@ -938,22 +1190,63 @@ export function LandingPage() {
 
         {/* ── 9. CTA ──────────────────────────────────────────── */}
         <section id="sec-cta" style={{ ...snapSection, paddingBottom: 80 }}>
-          <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp(0.1)}
-            className="text-center" style={{ maxWidth: 780 }}>
-            <Tag>Start free today</Tag>
-            <h2 style={{ fontSize: 'clamp(42px, 7vw, 88px)', lineHeight: 0.98, letterSpacing: '-0.03em', fontWeight: 800, margin: '14px 0 22px' }}>
-              Take control of<br /><span className="landing-grad-text">your money.</span>
-            </h2>
-            <p style={{ color: 'rgba(255,255,255,0.78)', fontSize: 17, lineHeight: 1.55, margin: '0 auto 32px', maxWidth: 520 }}>
-              Create a free account in 30 seconds. No credit card, no commitment, no nonsense.
-            </p>
-            <div className="flex items-center justify-center gap-3">
-              <AdvancedButton href="/signup" size="large">
-                Create free account <ArrowRight className="w-4 h-4" />
-              </AdvancedButton>
-              <ShinyButton href="/signin">Sign in</ShinyButton>
-            </div>
-          </motion.div>
+          <div style={{ maxWidth: 1100, width: '100%', margin: '0 auto', display: 'grid', gridTemplateColumns: '1.1fr 0.9fr', gap: 56, alignItems: 'center' }} className="cta-grid">
+            <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp(0.1)}>
+              <Tag>Start free today</Tag>
+              <h2 style={{ fontSize: 'clamp(42px, 6.4vw, 78px)', lineHeight: 0.98, letterSpacing: '-0.03em', fontWeight: 800, margin: '14px 0 18px' }}>
+                Take control of<br /><span className="landing-grad-text">your money.</span>
+              </h2>
+              <p style={{ color: 'rgba(255,255,255,0.78)', fontSize: 16, lineHeight: 1.55, margin: '0 0 28px', maxWidth: 460 }}>
+                Create a free account in 30 seconds. No credit card, no commitment, no nonsense.
+              </p>
+              <div className="flex items-center gap-3 flex-wrap">
+                <AdvancedButton href="/signup" size="large">
+                  Create free account <ArrowRight className="w-4 h-4" />
+                </AdvancedButton>
+                <ShinyButton href="/signin">Sign in</ShinyButton>
+              </div>
+            </motion.div>
+
+            {/* Onboarding preview — feels like the first three screens of the product */}
+            <motion.div
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true, amount: 0.35 }}
+              style={{ padding: 22, borderRadius: 20, border: '1px solid rgba(164,132,215,0.28)', background: 'linear-gradient(180deg, rgba(28,14,55,0.6), rgba(20,10,40,0.85))', backdropFilter: 'blur(14px)', boxShadow: '0 24px 60px rgba(0,0,0,0.4)' }}
+              className="cta-onboarding"
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.5)' }}>First 30 seconds</span>
+                <span style={{ fontSize: 10, fontWeight: 700, color: '#34d399', letterSpacing: '0.04em' }}>FREE</span>
+              </div>
+              {[
+                { n: '01', t: 'Create your account', s: 'Email and a password. No card.' },
+                { n: '02', t: 'Add your first expense', s: 'Snap a receipt or type it in.' },
+                { n: '03', t: 'See your week', s: 'Buckets, pace, top categories — live.' },
+              ].map((step, i) => (
+                <motion.div
+                  key={step.n}
+                  variants={{
+                    hidden: { opacity: 0, x: -10 },
+                    visible: { opacity: 1, x: 0, transition: { delay: 0.2 + i * 0.12, duration: 0.4, ease: [0.22, 1, 0.36, 1] } },
+                  }}
+                  style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', alignItems: 'center', gap: 14, padding: '12px 4px', borderTop: i === 0 ? 'none' : '1px solid rgba(255,255,255,0.06)' }}
+                >
+                  <div style={{ width: 34, height: 34, borderRadius: 10, display: 'grid', placeItems: 'center', background: 'rgba(138,43,226,0.16)', border: '1px solid rgba(192,132,252,0.35)', fontSize: 11.5, fontWeight: 800, color: '#E9D5FF', letterSpacing: '-0.005em' }}>
+                    {step.n}
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 13.5, fontWeight: 600, color: '#fff', letterSpacing: '-0.005em' }}>{step.t}</div>
+                    <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', marginTop: 1 }}>{step.s}</div>
+                  </div>
+                </motion.div>
+              ))}
+              <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'rgba(255,255,255,0.6)' }}>
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#34d399" strokeWidth="3" strokeLinecap="round"><path d="M20 6 9 17l-5-5"/></svg>
+                Works offline from the very first tap
+              </div>
+            </motion.div>
+          </div>
         </section>
 
       </main>
@@ -963,12 +1256,20 @@ export function LandingPage() {
         @media (max-width: 900px) {
           .hero-grid-cols { grid-template-columns: 1fr !important; text-align: center; }
           .two-col-grid { grid-template-columns: 1fr !important; gap: 32px !important; }
+          .cta-grid { grid-template-columns: 1fr !important; gap: 32px !important; }
         }
-        @media (max-width: 980px) {
+        @media (max-width: 1100px) {
+          .features-grid { grid-template-columns: repeat(3, 1fr) !important; }
+        }
+        @media (max-width: 820px) {
           .features-grid { grid-template-columns: repeat(2, 1fr) !important; }
+          .features-grid > * { grid-column: span 1 !important; }
         }
-        @media (max-width: 640px) {
+        @media (max-width: 560px) {
           .features-grid { grid-template-columns: 1fr !important; }
+          .features-grid > * { grid-column: span 1 !important; }
+          .features-grid .anchor-row { flex-direction: column !important; gap: 14px !important; }
+          .features-grid .anchor-visual { flex-basis: auto !important; width: 100%; }
         }
         @media (max-width: 640px) {
           section[id^="sec-"] { padding-left: 18px !important; padding-right: 18px !important; }
