@@ -7,9 +7,8 @@ import Link from 'next/link';
 import { useUserPreferences, CURRENCY_SYMBOLS, type Currency } from '@/components/providers/user-preferences-provider';
 import { useWorkspaceTheme } from '@/hooks/useWorkspaceTheme';
 import { supabase } from '@/lib/supabase';
-import { Card, CardContent } from '@/components/ui/card';
 import {
-    Target, Plus, ArrowLeft, Calendar, PiggyBank, Search, X, ArrowUpDown, Check,
+    Target, Plus, ChevronLeft, Calendar, PiggyBank, Search, X, ArrowUpDown, Check,
     ChevronDown, BookOpen,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -361,8 +360,8 @@ export function GoalsView() {
         // Milestone celebration: fire once per threshold per goal lifetime.
         if (newMilestone > prevMilestone && newMilestone > lastNotified) {
             const message = newMilestone === 100
-                ? `🎉 ${goal.name} fully funded!`
-                : `🎉 ${newMilestone}% there on ${goal.name}!`;
+                ? `${goal.name} is fully funded.`
+                : `${newMilestone}% of the way to ${goal.name}.`;
             toast.success(message);
             await supabase
                 .from('savings_goals')
@@ -379,6 +378,16 @@ export function GoalsView() {
             return acc + amountInBase;
         }, 0);
     }, [goals, convertAmount, currency]);
+
+    const dueSoonCount = useMemo(() => {
+        let count = 0;
+        for (const g of goals) {
+            if (Number(g.current_amount) >= Number(g.target_amount)) continue;
+            const days = daysUntilDeadline(g.deadline);
+            if (days !== null && days >= 0 && days <= 30) count++;
+        }
+        return count;
+    }, [goals]);
 
     const filteredSortedGoals = useMemo(() => {
         const q = deferredSearch.trim().toLowerCase();
@@ -468,63 +477,54 @@ export function GoalsView() {
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.98 }}
             transition={{ type: 'spring', stiffness: 220, damping: 28, mass: 0.9 }}
-            className="relative min-h-screen w-full"
+            className="relative min-h-[100dvh] w-full bg-[radial-gradient(ellipse_90%_60%_at_50%_-10%,_rgba(138,43,226,0.18),_transparent_60%)]"
         >
-            <div
-                aria-hidden="true"
-                className={cn(
-                    'pointer-events-none absolute -top-32 left-1/2 -translate-x-1/2 w-[min(520px,90vw)] h-[min(520px,90vw)] rounded-full blur-[120px] opacity-30',
-                    themeConfig.bgSolid
-                )}
-            />
-            <div className="p-5 max-w-md lg:max-w-4xl mx-auto pb-32 lg:pb-8 relative z-10 space-y-6">
-                <div className="flex items-center justify-between relative min-h-[40px] mb-2">
+            <div className="p-5 space-y-7 max-w-md lg:max-w-2xl mx-auto relative pb-24 lg:pb-8 z-10">
+                <div className="relative flex items-center gap-3 min-h-[40px]">
                     <button
                         onClick={() => router.back()}
                         aria-label="Go back"
-                        className="w-10 h-10 rounded-full bg-secondary/30 hover:bg-secondary/50 flex items-center justify-center transition-colors border border-white/5 shrink-0 z-10"
+                        className="p-2 -ml-2 rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary/30 transition-colors shrink-0 z-10"
                     >
-                        <ArrowLeft className="w-5 h-5" aria-hidden="true" />
+                        <ChevronLeft className="w-5 h-5" aria-hidden="true" />
                     </button>
-                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                        <h1 className="text-lg font-semibold flex items-center gap-2">
-                            <Target className={`w-5 h-5 ${themeConfig.textLight}`} />
-                            Savings Goals
-                        </h1>
+                    <h2 className="absolute inset-0 flex items-center justify-center pointer-events-none text-[15px] font-semibold tracking-tight">
+                        Savings Goals
+                    </h2>
+                    <div className="ml-auto z-10">
+                        <button
+                            onClick={openAddModal}
+                            aria-label="Add savings goal"
+                            className={cn(
+                                'h-9 px-3 rounded-full inline-flex items-center gap-1.5 text-[12px] font-semibold border transition-colors',
+                                themeConfig.bg, themeConfig.hoverBg, themeConfig.border, themeConfig.textLight
+                            )}
+                        >
+                            <Plus className="w-3.5 h-3.5" aria-hidden="true" />
+                            New
+                        </button>
                     </div>
-
-                    <button
-                        onClick={openAddModal}
-                        aria-label="Add savings goal"
-                        className={`w-10 h-10 rounded-full flex items-center justify-center border transition-colors shrink-0 z-10 pointer-events-auto ${themeConfig.bg} ${themeConfig.hoverBg} ${themeConfig.border}`}
-                    >
-                        <Plus className={`w-5 h-5 ${themeConfig.textLight}`} aria-hidden="true" />
-                    </button>
                 </div>
 
-                <Card className={cn('bg-gradient-to-br backdrop-blur-md overflow-hidden relative', themeConfig.gradient, themeConfig.border)}>
-                    <div className="absolute -top-2 -right-2 p-6 opacity-[0.07] pointer-events-none">
-                        <PiggyBank className={cn('w-32 h-32', themeConfig.text)} />
-                    </div>
-                    <CardContent className="p-5 relative z-10">
-                        <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-bold">
-                            Total Savings
-                        </p>
-                        <h2 className={cn('text-3xl font-bold mt-1', themeConfig.text)}>
-                            {formatCurrency(totalSaved)}
-                        </h2>
-                        <p className="text-xs text-muted-foreground mt-1">
-                            {goals.length} {goals.length === 1 ? 'goal' : 'goals'}
-                            {achievedGoals.length > 0 && <span className="opacity-70"> · {achievedGoals.length} achieved</span>}
-                        </p>
-                    </CardContent>
-                </Card>
+                <section className="space-y-2 text-center">
+                    <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground/70">
+                        Total saved
+                    </p>
+                    <h2 className={cn('text-[40px] leading-none font-bold tracking-tight tabular-nums', themeConfig.text)}>
+                        {formatCurrency(totalSaved)}
+                    </h2>
+                    <p className="text-[11px] text-muted-foreground/70">
+                        {goals.length} {goals.length === 1 ? 'goal' : 'goals'}
+                        {achievedGoals.length > 0 && ` · ${achievedGoals.length} achieved`}
+                        {dueSoonCount > 0 && ` · ${dueSoonCount} due soon`}
+                    </p>
+                </section>
 
                 {goals.length > 0 && (
-                    <div className="space-y-2">
+                    <div className="rounded-3xl bg-card/40 backdrop-blur-xl border border-white/[0.06] p-2.5 space-y-2">
                         <div className="flex gap-2">
                             <div className="relative flex-1">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" aria-hidden="true" />
+                                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" aria-hidden="true" />
                                 <Input
                                     id="goals-search"
                                     name="goals-search"
@@ -532,7 +532,7 @@ export function GoalsView() {
                                     placeholder="Search goals"
                                     value={search}
                                     onChange={(e) => setSearch(e.target.value)}
-                                    className={`pl-9 pr-9 bg-secondary/10 border-white/10 h-10 rounded-xl ${themeConfig.ring}`}
+                                    className={cn('pl-10 pr-10 h-10 rounded-full bg-secondary/15 border-white/[0.06] text-[14px]', themeConfig.ring)}
                                 />
                                 {search && (
                                     <button
@@ -550,7 +550,7 @@ export function GoalsView() {
                                     <button
                                         type="button"
                                         className={cn(
-                                            'h-10 px-3 rounded-xl bg-secondary/10 border border-white/10 inline-flex items-center gap-1.5 text-xs font-bold shrink-0',
+                                            'h-10 px-3 rounded-full bg-secondary/15 border border-white/[0.06] inline-flex items-center gap-1.5 text-xs font-semibold shrink-0',
                                             themeConfig.text
                                         )}
                                         aria-label="Sort goals"
@@ -578,17 +578,17 @@ export function GoalsView() {
                             </Popover>
                         </div>
 
-                        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-hide">
+                        <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide">
                             {(Object.keys(FILTER_LABELS) as FilterKey[]).map(key => (
                                 <button
                                     key={key}
                                     type="button"
                                     onClick={() => setFilterKey(key)}
                                     className={cn(
-                                        'shrink-0 px-2.5 py-1 rounded-full text-[10px] font-bold border transition-colors',
+                                        'shrink-0 px-3 py-1.5 rounded-full text-[11px] font-semibold border transition-colors',
                                         filterKey === key
                                             ? cn(themeConfig.bgMedium, themeConfig.borderMedium, themeConfig.text)
-                                            : 'bg-secondary/20 border-white/10 text-muted-foreground hover:text-foreground'
+                                            : 'bg-transparent border-white/[0.06] text-muted-foreground hover:border-white/15 hover:text-foreground/80'
                                     )}
                                 >
                                     {FILTER_LABELS[key]}
@@ -671,9 +671,9 @@ export function GoalsView() {
                                     <div className={cn('inline-flex w-12 h-12 rounded-full items-center justify-center mb-3 border', themeConfig.bgLight, themeConfig.border)}>
                                         <PiggyBank className={cn('w-6 h-6', themeConfig.textLight)} aria-hidden="true" />
                                     </div>
-                                    <p className="text-sm font-bold">Every goal is funded 🎉</p>
+                                    <p className="text-sm font-bold">Every goal is funded.</p>
                                     <p className="text-xs text-muted-foreground mt-1 max-w-[260px] mx-auto">
-                                        Time to dream up the next one. Tap + above to start.
+                                        Time to dream up the next one. Tap New above to start.
                                     </p>
                                 </motion.div>
                             )}
@@ -682,7 +682,7 @@ export function GoalsView() {
                                     <CollapsibleTrigger asChild>
                                         <button
                                             type="button"
-                                            className="w-full flex items-center justify-between gap-2 px-4 py-3 rounded-2xl bg-secondary/10 border border-white/5 text-xs font-bold text-muted-foreground hover:text-foreground transition-colors"
+                                            className="w-full flex items-center justify-between gap-2 px-4 py-3 rounded-2xl bg-card/40 backdrop-blur-xl border border-white/[0.06] text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors"
                                         >
                                             <span>Achieved ({achievedGoals.length})</span>
                                             <ChevronDown className={cn('w-4 h-4 transition-transform', showAchieved && 'rotate-180')} aria-hidden="true" />
