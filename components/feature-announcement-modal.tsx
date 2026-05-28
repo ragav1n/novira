@@ -8,6 +8,7 @@ import {
     RefreshCcw, Shield, Search, Sparkles, Moon, CreditCard, Wallet, Lock,
     SlidersHorizontal, Star, Fingerprint, BarChart3, Receipt, Layers,
     MessageSquare, Link2, Smartphone, MapPin, Home, Target, Calendar, Hand,
+    Mic, Palette,
     type LucideIcon,
 } from 'lucide-react';
 import { LATEST_FEATURE_ANNOUNCEMENT } from '@/lib/feature-flags';
@@ -52,6 +53,8 @@ const ICON_MAP: Record<string, { Icon: LucideIcon; tone: string }> = {
     bell: { Icon: Bell, tone: 'text-orange-300' },
     globe: { Icon: Globe, tone: 'text-teal-300' },
     map: { Icon: MapPin, tone: 'text-rose-300' },
+    mic: { Icon: Mic, tone: 'text-rose-300' },
+    palette: { Icon: Palette, tone: 'text-fuchsia-300' },
 };
 
 const DEFAULT_ICON = { Icon: Zap, tone: 'text-primary' };

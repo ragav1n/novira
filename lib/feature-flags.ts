@@ -1,26 +1,26 @@
 export const LATEST_FEATURE_ANNOUNCEMENT = {
-    id: 'redesign-pass-v12',
+    id: 'recent-tools-v13',
     title: "What's new",
     features: [
         {
-            title: 'Refreshed dashboard',
-            description: 'New layout for spend, allowance, and buckets. Loads faster when you switch back to the app.',
-            icon: 'home'
+            title: 'Voice entry',
+            description: 'Dictate a full expense — amount, category, payment method, tags, even the location — and review it in one tap.',
+            icon: 'mic'
         },
         {
-            title: 'Analytics on desktop',
-            description: 'Hero summary card, themed sections, and a roomier grid layout when you open Novira on a laptop.',
-            icon: 'chart'
+            title: 'Recurring payments editor',
+            description: 'A proper editor for recurring templates with realtime sweep, so changes apply the moment you save them.',
+            icon: 'recurring'
         },
         {
-            title: 'Faster add-expense',
-            description: 'Submission is quicker, especially with splits, recurring entries, and receipts that need scanning.',
-            icon: 'zap'
+            title: 'Receipts gallery + offline queue',
+            description: 'Browse every receipt in one place. Photos taken offline now queue up and upload as soon as you reconnect.',
+            icon: 'receipt'
         },
         {
-            title: 'New welcome & help',
-            description: 'Shorter intro, expandable help, and a proper update prompt in place of the old stuck toast.',
-            icon: 'star'
+            title: 'Refreshed Search, Cashflow, Subs & Goals',
+            description: 'Centered heroes, glass chrome, and unified filter strips across the views you reach for most.',
+            icon: 'palette'
         },
     ],
     buttonText: 'Continue',

@@ -970,7 +970,7 @@ export function LandingPage() {
                 </motion.div>
 
                 <motion.div initial="hidden" animate="visible" variants={fadeUp(0.5)} className="flex gap-7 mt-9 pt-7" style={{ borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-                  {[['20','Currencies'],['< 2s','Scan time']].map(([n,l]) => (
+                  {[['26','Currencies'],['< 2s','Scan time']].map(([n,l]) => (
                     <div key={l}>
                       <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-0.02em', color: '#fff' }}>
                         {n.replace(/[+s★]/g,'')}<span style={{ color: '#C084FC' }}>{n.match(/[+s★]/)?.[0]}</span>
