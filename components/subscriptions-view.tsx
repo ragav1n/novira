@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useUserPreferences } from '@/components/providers/user-preferences-provider';
 import { useWorkspaceTheme } from '@/hooks/useWorkspaceTheme';
 import { supabase } from '@/lib/supabase';
-import { Calendar, RotateCw, ArrowLeft, BookOpen } from 'lucide-react';
+import { Calendar, ChevronLeft, BookOpen } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { differenceInCalendarDays, parseISO } from 'date-fns';
 import { useRouter } from 'next/navigation';
@@ -374,6 +374,24 @@ export function SubscriptionsView() {
     const totalActiveCount = templates.filter(effectiveActive).length;
     const pausedCount = templates.filter(t => t.is_active && isPaused(t)).length;
 
+    const nextTrialEnding = useMemo(() => {
+        const now = new Date();
+        let best: { description: string; daysLeft: number } | null = null;
+        for (const t of templates) {
+            if (!t.is_active) continue;
+            const ends = getMeta(t).trial_ends_at;
+            if (!ends) continue;
+            const dt = parseISO(ends);
+            if (dt <= now) continue;
+            const daysLeft = differenceInCalendarDays(dt, now);
+            if (daysLeft > 7) continue;
+            if (!best || daysLeft < best.daysLeft) {
+                best = { description: t.description, daysLeft };
+            }
+        }
+        return best;
+    }, [templates]);
+
     return (
         <>
             <motion.div
@@ -381,24 +399,20 @@ export function SubscriptionsView() {
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.98 }}
                 transition={{ type: 'spring', stiffness: 220, damping: 28, mass: 0.9 }}
-                className="relative min-h-screen w-full"
+                className="relative min-h-[100dvh] w-full bg-[radial-gradient(ellipse_90%_60%_at_50%_-10%,_rgba(138,43,226,0.18),_transparent_60%)]"
             >
-                <div className="p-5 space-y-6 max-w-md lg:max-w-4xl mx-auto relative min-h-screen z-10">
-                    <div className="flex items-center justify-between relative min-h-[40px] mb-2">
+                <div className="p-5 space-y-7 max-w-md lg:max-w-2xl mx-auto relative pb-24 lg:pb-8 z-10">
+                    <div className="relative flex items-center gap-3 min-h-[40px]">
                         <button
                             onClick={() => router.back()}
                             aria-label="Go back"
-                            className="w-10 h-10 rounded-full bg-secondary/30 hover:bg-secondary/50 flex items-center justify-center transition-colors shrink-0 z-10"
+                            className="p-2 -ml-2 rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary/30 transition-colors shrink-0 z-10"
                         >
-                            <ArrowLeft className="w-5 h-5" aria-hidden="true" />
+                            <ChevronLeft className="w-5 h-5" aria-hidden="true" />
                         </button>
-                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                            <h1 className="text-lg font-semibold flex items-center gap-2">
-                                <RotateCw className={`w-5 h-5 ${themeConfig.text}`} />
-                                Subscriptions
-                            </h1>
-                        </div>
-                        <div className="w-10 shrink-0 z-10" />
+                        <h2 className="absolute inset-0 flex items-center justify-center pointer-events-none text-[15px] font-semibold tracking-tight">
+                            Subscriptions
+                        </h2>
                     </div>
 
                     <SubscriptionSummaryCard
@@ -407,6 +421,7 @@ export function SubscriptionsView() {
                         totalActiveCount={totalActiveCount}
                         pausedCount={pausedCount}
                         breakdown={breakdown}
+                        nextTrialEnding={nextTrialEnding}
                     />
 
                     {totalActiveCount > 0 && (
@@ -436,7 +451,16 @@ export function SubscriptionsView() {
                     />
 
                     <div className="space-y-3">
-                        <h3 className="text-lg font-bold mb-4">Upcoming Renewals</h3>
+                        <div className="flex items-end justify-between">
+                            <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground/70">
+                                Upcoming renewals
+                            </p>
+                            {!loading && visibleTemplates.length > 0 && (
+                                <span className="text-[11px] text-muted-foreground/70 tabular-nums">
+                                    {visibleTemplates.length} item{visibleTemplates.length === 1 ? '' : 's'}
+                                </span>
+                            )}
+                        </div>
 
                         {loading ? (
                             <div className="space-y-3">

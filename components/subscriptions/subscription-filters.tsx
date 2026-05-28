@@ -34,7 +34,7 @@ export function SubscriptionFilters({
     const { theme: themeConfig } = useWorkspaceTheme();
 
     return (
-        <div className="space-y-2">
+        <div className="bg-card/40 border border-white/[0.06] rounded-3xl p-3 backdrop-blur-sm space-y-2">
             <div className="flex gap-2">
                 <div className="relative flex-1">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" aria-hidden="true" />
@@ -45,7 +45,7 @@ export function SubscriptionFilters({
                         placeholder="Search subscriptions"
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
-                        className={`pl-9 pr-9 bg-secondary/10 border-white/10 h-10 rounded-xl ${themeConfig.ring}`}
+                        className={`pl-9 pr-9 bg-secondary/20 border-white/5 h-9 rounded-full ${themeConfig.ring}`}
                     />
                     {search && (
                         <button
@@ -63,7 +63,7 @@ export function SubscriptionFilters({
                         <button
                             type="button"
                             className={cn(
-                                "h-10 px-3 rounded-xl bg-secondary/10 border border-white/10 inline-flex items-center gap-1.5 text-xs font-bold shrink-0",
+                                "h-9 px-3 rounded-full bg-secondary/20 border border-white/5 inline-flex items-center gap-1.5 text-xs font-bold shrink-0",
                                 themeConfig.text
                             )}
                             aria-label="Sort subscriptions"
