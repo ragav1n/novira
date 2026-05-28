@@ -18,13 +18,12 @@ import {
     startOfWeek,
     subMonths,
 } from 'date-fns';
-import { ArrowLeft, ChevronLeft, ChevronRight, Plus, RotateCw, Target, Tag, CalendarDays, Bell, TrendingDown, Check, Trash2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, RotateCw, Target, Tag, Bell, TrendingDown, Check, Trash2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useUserPreferences } from '@/components/providers/user-preferences-provider';
 import { useBucketsList } from '@/components/providers/buckets-provider';
 import { useWorkspaceTheme } from '@/hooks/useWorkspaceTheme';
 import { cn } from '@/lib/utils';
-import { Card, CardContent } from '@/components/ui/card';
 import { getCategoryLabel, CATEGORY_COLORS } from '@/lib/categories';
 import { ScheduleSheet } from '@/components/calendar/schedule-sheet';
 import { toast } from '@/utils/haptics';
@@ -343,6 +342,17 @@ export function CalendarView() {
             : null;
     }, [dailyDelta, viewMonth]);
 
+    const monthCounts = useMemo(() => {
+        let recurring = 0, oneOff = 0, goal = 0;
+        for (const e of events) {
+            if (!isSameMonth(e.date, viewMonth)) continue;
+            if (e.kind === 'recurring') recurring++;
+            else if (e.kind === 'one-off' && !e.isCompleted) oneOff++;
+            else if (e.kind === 'goal') goal++;
+        }
+        return { recurring, oneOff, goal, total: recurring + oneOff + goal };
+    }, [events, viewMonth]);
+
     const selectedKey = format(selectedDate, 'yyyy-MM-dd');
     const selectedEvents = eventsByDay.get(selectedKey) || [];
 
@@ -382,71 +392,98 @@ export function CalendarView() {
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.98 }}
             transition={{ type: 'spring', stiffness: 220, damping: 28, mass: 0.9 }}
-            className="relative min-h-[100dvh] w-full"
+            className="relative min-h-[100dvh] w-full bg-[radial-gradient(ellipse_90%_60%_at_50%_-10%,_rgba(138,43,226,0.18),_transparent_60%)]"
         >
-            <div className="p-5 space-y-5 max-w-md lg:max-w-2xl mx-auto relative pb-24 lg:pb-8 z-10">
-                <div className="flex items-center justify-between relative min-h-[40px]">
+            <div className="p-5 space-y-7 max-w-md lg:max-w-2xl mx-auto relative pb-24 lg:pb-8 z-10">
+                <div className="relative flex items-center gap-3 min-h-[40px]">
                     <button
                         onClick={() => router.back()}
                         aria-label="Go back"
-                        className="w-10 h-10 rounded-full bg-secondary/30 hover:bg-secondary/50 flex items-center justify-center transition-colors shrink-0 z-10"
+                        className="p-2 -ml-2 rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary/30 transition-colors shrink-0 z-10"
                     >
-                        <ArrowLeft className="w-5 h-5" aria-hidden="true" />
+                        <ChevronLeft className="w-5 h-5" aria-hidden="true" />
                     </button>
-                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                        <h1 className="text-lg font-semibold flex items-center gap-2">
-                            <CalendarDays className={`w-5 h-5 ${themeConfig.text}`} />
-                            Cash Flow
-                        </h1>
+                    <h2 className="absolute inset-0 flex items-center justify-center pointer-events-none text-[15px] font-semibold tracking-tight">
+                        Cash Flow
+                    </h2>
+                    <div className="flex items-center gap-1.5 ml-auto z-10">
+                        <button
+                            onClick={() => setScheduleOpen(true)}
+                            aria-label="Schedule event"
+                            title="Schedule event"
+                            className="h-9 w-9 inline-flex items-center justify-center rounded-full text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+                        >
+                            <Plus className="w-[18px] h-[18px]" />
+                        </button>
                     </div>
-                    <div className="w-10 shrink-0" />
                 </div>
 
-                <Card className={cn('bg-gradient-to-br backdrop-blur-md', themeConfig.gradient, themeConfig.border)}>
-                    <CardContent className="p-5">
-                        <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-bold">
-                            {format(viewMonth, 'MMMM yyyy')} projected
-                        </p>
-                        <h2 className={cn('text-3xl font-bold mt-1', monthlyTotal < 0 ? 'text-rose-400' : themeConfig.text)}>
+                <section className="space-y-3 text-center">
+                    <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground/70">
+                        {format(viewMonth, 'MMMM yyyy')} · projected
+                    </p>
+                    <div className="flex items-end justify-center gap-3 flex-wrap">
+                        <h3 className={cn(
+                            'text-[40px] leading-none font-bold tracking-tight tabular-nums',
+                            monthlyTotal < 0 ? 'text-rose-400' : themeConfig.text,
+                        )}>
                             {monthlyTotal >= 0 ? '+' : ''}{formatCurrency(monthlyTotal)}
-                        </h2>
-                        <p className="text-xs text-muted-foreground mt-1">From recurring expenses, goal deadlines and one-off bills.</p>
-                        {tightestDay && (
+                        </h3>
+                        {monthCounts.total > 0 && (
+                            <span className="text-[11px] text-muted-foreground/70 mb-1.5">
+                                from {monthCounts.total} item{monthCounts.total === 1 ? '' : 's'}
+                            </span>
+                        )}
+                    </div>
+                    {monthCounts.total > 0 && (
+                        <div className="flex items-center justify-center gap-2 text-[11px] text-muted-foreground/70 flex-wrap">
+                            {monthCounts.recurring > 0 && (
+                                <span><span className="font-semibold text-foreground/85">{monthCounts.recurring}</span> recurring</span>
+                            )}
+                            {monthCounts.recurring > 0 && monthCounts.oneOff > 0 && <span className="text-muted-foreground/30">·</span>}
+                            {monthCounts.oneOff > 0 && (
+                                <span><span className="font-semibold text-foreground/85">{monthCounts.oneOff}</span> bill{monthCounts.oneOff === 1 ? '' : 's'}</span>
+                            )}
+                            {(monthCounts.recurring > 0 || monthCounts.oneOff > 0) && monthCounts.goal > 0 && <span className="text-muted-foreground/30">·</span>}
+                            {monthCounts.goal > 0 && (
+                                <span><span className="font-semibold text-foreground/85">{monthCounts.goal}</span> goal deadline{monthCounts.goal === 1 ? '' : 's'}</span>
+                            )}
+                        </div>
+                    )}
+                    {tightestDay && (
+                        <div className="flex justify-center pt-0.5">
                             <button
                                 type="button"
                                 onClick={() => setSelectedDate(tightestDay.date)}
-                                className="mt-3 pt-3 border-t border-white/5 w-full flex items-center gap-2 text-[11px] text-left rounded-md hover:bg-white/5 -mx-1 px-1 py-1 transition-colors"
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-rose-500/10 border border-rose-500/20 text-rose-400 hover:bg-rose-500/15 transition-colors"
                             >
-                                <TrendingDown className="w-3.5 h-3.5 text-rose-400 shrink-0" />
-                                <span className="text-muted-foreground">Tightest day:</span>
-                                <span className="font-bold">{format(tightestDay.date, 'MMM d')}</span>
-                                <span className="text-rose-400 font-bold ml-auto">
-                                    {formatCurrency(tightestDay.cumulative)}
-                                </span>
+                                <TrendingDown className="w-3 h-3" />
+                                <span>Tightest {format(tightestDay.date, 'MMM d')}</span>
+                                <span className="tabular-nums">{formatCurrency(tightestDay.cumulative)}</span>
                             </button>
-                        )}
-                    </CardContent>
-                </Card>
+                        </div>
+                    )}
+                </section>
 
-                <div className="bg-card/40 border border-white/5 rounded-3xl p-3 backdrop-blur-sm">
-                    <div className="flex items-center justify-between px-2 py-1">
+                <div className="bg-card/40 border border-white/[0.06] rounded-3xl p-3 backdrop-blur-sm">
+                    <div className="flex items-center justify-between px-1 pb-1">
                         <button
                             onClick={() => setViewMonth(prev => subMonths(prev, 1))}
                             aria-label="Previous month"
-                            className="w-8 h-8 rounded-full bg-secondary/20 hover:bg-secondary/40 flex items-center justify-center"
+                            className="p-1.5 rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary/30 transition-colors"
                         >
                             <ChevronLeft className="w-4 h-4" />
                         </button>
-                        <p className="text-sm font-semibold">{format(viewMonth, 'MMMM yyyy')}</p>
+                        <p className="text-[13px] font-semibold tracking-tight">{format(viewMonth, 'MMMM yyyy')}</p>
                         <button
                             onClick={() => setViewMonth(prev => addMonths(prev, 1))}
                             aria-label="Next month"
-                            className="w-8 h-8 rounded-full bg-secondary/20 hover:bg-secondary/40 flex items-center justify-center"
+                            className="p-1.5 rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary/30 transition-colors"
                         >
                             <ChevronRight className="w-4 h-4" />
                         </button>
                     </div>
-                    <div className="grid grid-cols-7 gap-1 mt-2 text-center text-[10px] uppercase font-bold text-muted-foreground">
+                    <div className="grid grid-cols-7 gap-1 mt-1 text-center text-[10px] uppercase tracking-[0.18em] text-muted-foreground/60">
                         {['S','M','T','W','T','F','S'].map((d, i) => <div key={i}>{d}</div>)}
                     </div>
                     <div className="grid grid-cols-7 gap-1 mt-1">
@@ -473,16 +510,18 @@ export function CalendarView() {
                                     onClick={() => setSelectedDate(day)}
                                     style={heatmapStyle}
                                     className={cn(
-                                        'aspect-square rounded-xl flex flex-col items-center justify-center text-xs gap-0.5 border transition-colors relative p-1',
+                                        'aspect-square rounded-xl flex flex-col items-center justify-center text-xs gap-0.5 transition-colors relative p-1 border',
                                         inMonth ? 'text-foreground' : 'text-muted-foreground/40',
                                         isSelected
                                             ? `${themeConfig.bgMedium} ${themeConfig.borderMedium} ${themeConfig.text}`
-                                            : intensity === 0 && 'bg-secondary/5 hover:bg-secondary/15',
-                                        !isSelected && 'border-white/5',
-                                        isToday && !isSelected && 'border-primary/40'
+                                            : 'border-transparent',
+                                        !isSelected && intensity === 0 && 'hover:bg-secondary/15',
                                     )}
                                 >
-                                    <span className={cn('font-bold', isToday && 'text-primary')}>{format(day, 'd')}</span>
+                                    <span className={cn('font-semibold tabular-nums', isToday && !isSelected && 'text-primary')}>{format(day, 'd')}</span>
+                                    {isToday && !isSelected && (
+                                        <span className="absolute top-1 right-1 w-1 h-1 rounded-full bg-primary" aria-hidden="true" />
+                                    )}
                                     {dayEvents.length > 0 && (
                                         <div className="flex items-center gap-0.5">
                                             {dayEvents.slice(0, 3).map((e, i) => (
@@ -496,7 +535,7 @@ export function CalendarView() {
                                         </div>
                                     )}
                                     {delta < 0 && inMonth && (
-                                        <span className="text-[9px] font-semibold text-rose-400/80 leading-none">
+                                        <span className="text-[9px] font-medium text-rose-400/80 leading-none tabular-nums">
                                             {formatCurrency(delta)}
                                         </span>
                                     )}
@@ -506,26 +545,14 @@ export function CalendarView() {
                     </div>
                 </div>
 
-                <div className="space-y-3">
-                    <div className="flex items-center justify-between gap-2">
-                        <h3 className="text-sm font-semibold">{format(selectedDate, 'EEEE, MMM d')}</h3>
-                        <div className="flex items-center gap-2">
-                            {selectedEvents.length > 0 && (
-                                <span className="text-[11px] text-muted-foreground font-medium">
-                                    {selectedEvents.length} item{selectedEvents.length === 1 ? '' : 's'}
-                                </span>
-                            )}
-                            <button
-                                type="button"
-                                onClick={() => setScheduleOpen(true)}
-                                className={cn(
-                                    'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold border transition-colors',
-                                    themeConfig.bgMedium, themeConfig.borderMedium, themeConfig.text, themeConfig.hoverBg
-                                )}
-                            >
-                                <Plus className="w-3 h-3" /> Schedule
-                            </button>
-                        </div>
+                <div className="space-y-2.5">
+                    <div className="flex items-center justify-between gap-2 px-0.5">
+                        <h3 className="text-[13px] font-semibold tracking-tight">{format(selectedDate, 'EEEE, MMM d')}</h3>
+                        {selectedEvents.length > 0 && (
+                            <span className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground/70">
+                                {selectedEvents.length} item{selectedEvents.length === 1 ? '' : 's'}
+                            </span>
+                        )}
                     </div>
                     {loading ? (
                         <div className="space-y-2">
@@ -533,7 +560,7 @@ export function CalendarView() {
                             <div className="h-14 rounded-2xl bg-secondary/10 animate-pulse" />
                         </div>
                     ) : selectedEvents.length === 0 ? (
-                        <div className="text-center py-8 border border-dashed border-white/10 rounded-2xl text-muted-foreground text-xs">
+                        <div className="text-center py-8 border border-dashed border-white/[0.08] rounded-2xl text-muted-foreground/70 text-[11px]">
                             Nothing scheduled.
                         </div>
                     ) : (
@@ -547,7 +574,7 @@ export function CalendarView() {
                                 <div
                                     key={e.id}
                                     className={cn(
-                                        'flex items-center gap-3 p-3 rounded-2xl bg-card/40 border border-white/5 backdrop-blur-sm',
+                                        'flex items-center gap-3 px-3 py-2.5 rounded-2xl bg-card/40 border border-white/[0.06] backdrop-blur-sm',
                                         e.isCompleted && 'opacity-50'
                                     )}
                                 >
@@ -561,13 +588,13 @@ export function CalendarView() {
                                         <Icon className="w-4 h-4" style={{ color: e.color || '#8A2BE2' }} />
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                        <p className={cn('text-sm font-semibold truncate', e.isCompleted && 'line-through')}>{e.label}</p>
+                                        <p className={cn('text-[13px] font-semibold truncate', e.isCompleted && 'line-through')}>{e.label}</p>
                                         {e.detail && (
-                                            <p className="text-[11px] text-muted-foreground truncate">{e.detail}</p>
+                                            <p className="text-[11px] text-muted-foreground/70 truncate">{e.detail}</p>
                                         )}
                                     </div>
                                     {e.amount != null && (
-                                        <span className={cn('text-sm font-bold', e.amount < 0 ? 'text-rose-400' : themeConfig.text)}>
+                                        <span className={cn('text-[13px] font-bold tabular-nums', e.amount < 0 ? 'text-rose-400' : themeConfig.text)}>
                                             {formatCurrency(e.amount, e.currency)}
                                         </span>
                                     )}
@@ -578,10 +605,10 @@ export function CalendarView() {
                                                 onClick={() => handleToggleOneOff(e.sourceId, !e.isCompleted)}
                                                 aria-label={e.isCompleted ? 'Mark as not completed' : 'Mark as completed'}
                                                 className={cn(
-                                                    'w-7 h-7 rounded-full flex items-center justify-center border transition-colors',
+                                                    'h-7 w-7 inline-flex items-center justify-center rounded-full transition-colors',
                                                     e.isCompleted
-                                                        ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-400'
-                                                        : 'bg-secondary/20 border-white/10 text-muted-foreground hover:bg-secondary/40'
+                                                        ? 'text-emerald-400 bg-emerald-500/15 hover:bg-emerald-500/25'
+                                                        : 'text-muted-foreground hover:text-foreground hover:bg-secondary/30'
                                                 )}
                                             >
                                                 <Check className="w-3.5 h-3.5" />
@@ -590,7 +617,7 @@ export function CalendarView() {
                                                 type="button"
                                                 onClick={() => handleDeleteOneOff(e.sourceId)}
                                                 aria-label="Delete one-off"
-                                                className="w-7 h-7 rounded-full flex items-center justify-center border bg-secondary/20 border-white/10 text-muted-foreground hover:bg-rose-500/20 hover:text-rose-400 transition-colors"
+                                                className="h-7 w-7 inline-flex items-center justify-center rounded-full text-muted-foreground hover:text-rose-400 hover:bg-rose-500/15 transition-colors"
                                             >
                                                 <Trash2 className="w-3.5 h-3.5" />
                                             </button>
