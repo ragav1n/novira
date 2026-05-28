@@ -77,16 +77,18 @@ export function GroupsView() {
         >
             <div className="p-5 space-y-7 max-w-md lg:max-w-2xl mx-auto relative pb-24 lg:pb-8">
                 {/* Header */}
-                <div className="flex items-center gap-3">
+                <div className="relative flex items-center gap-3 min-h-[40px]">
                     <button
                         onClick={() => router.back()}
                         aria-label="Go back"
-                        className="p-2 -ml-2 rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary/30 transition-colors shrink-0"
+                        className="p-2 -ml-2 rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary/30 transition-colors shrink-0 z-10"
                     >
                         <ChevronLeft className="w-5 h-5" aria-hidden="true" />
                     </button>
-                    <h2 className="text-[15px] font-semibold tracking-tight">Groups &amp; friends</h2>
-                    <div className="flex items-center gap-1.5 ml-auto">
+                    <h2 className="absolute inset-0 flex items-center justify-center pointer-events-none text-[15px] font-semibold tracking-tight">
+                        Groups &amp; friends
+                    </h2>
+                    <div className="flex items-center gap-1.5 ml-auto z-10">
                         <AddFriendDialog userId={userId} open={addFriendOpen} onOpenChange={setAddFriendOpen} />
                         <GroupCreationDialog open={createGroupOpen} onOpenChange={setCreateGroupOpen} />
                         {showGroupHeaderActions && (

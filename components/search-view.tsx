@@ -15,7 +15,6 @@ import { enqueueMutation } from '@/lib/sync-manager';
 import { motion } from 'framer-motion';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
 import { toast, ImpactStyle } from '@/utils/haptics';
@@ -569,121 +568,191 @@ export function SearchView() {
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.98 }}
             transition={{ type: 'spring', stiffness: 220, damping: 28, mass: 0.9 }}
-            className="relative min-h-[100dvh] w-full h-full"
+            className="relative min-h-[100dvh] w-full h-full bg-[radial-gradient(ellipse_90%_60%_at_50%_-10%,_rgba(138,43,226,0.18),_transparent_60%)]"
         >
-            <div className="p-5 space-y-6 max-w-md lg:max-w-4xl mx-auto relative pb-24 lg:pb-8 h-full flex flex-col z-10">
+            <div className="p-5 space-y-7 max-w-md lg:max-w-2xl mx-auto relative pb-24 lg:pb-8 h-full flex flex-col z-10">
                 {/* Header */}
-                <div className="flex items-center justify-between relative min-h-[40px]">
+                <div className="relative flex items-center gap-3 shrink-0 min-h-[40px]">
                     <button
                         onClick={() => router.back()}
                         aria-label="Go back"
-                        className="p-2 rounded-full bg-secondary/30 hover:bg-secondary/50 transition-colors shrink-0 z-10"
+                        className="p-2 -ml-2 rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary/30 transition-colors shrink-0 z-10"
                     >
-                        <ChevronLeft className="w-5 h-5" />
+                        <ChevronLeft className="w-5 h-5" aria-hidden="true" />
                     </button>
-                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                        <h2 className="text-lg font-semibold truncate px-12">Search & Filter</h2>
+                    <h2 className="absolute inset-0 flex items-center justify-center pointer-events-none text-[15px] font-semibold tracking-tight">
+                        Search &amp; filter
+                    </h2>
+                    <div className="flex items-center gap-1.5 ml-auto z-10">
+                        <button
+                            onClick={() => bulkMode ? exitBulkMode() : setBulkMode(true)}
+                            aria-label={bulkMode ? 'Exit selection mode' : 'Enter selection mode'}
+                            title={bulkMode ? 'Exit selection mode' : 'Select multiple'}
+                            className={cn(
+                                'h-9 w-9 inline-flex items-center justify-center rounded-full transition-colors',
+                                bulkMode
+                                    ? `${themeConfig.text} ${themeConfig.bgMedium}`
+                                    : 'text-muted-foreground hover:text-foreground hover:bg-secondary/30'
+                            )}
+                        >
+                            <CheckSquare className="w-[18px] h-[18px]" />
+                        </button>
+                        <SearchFilterSheet
+                            open={isFilterSheetOpen}
+                            onOpenChange={setIsFilterSheetOpen}
+                            activeFilterCount={activeFilterCount}
+                            sortBy={sortBy}
+                            setSortBy={setSortBy}
+                            priceRange={priceRange}
+                            setPriceRange={setPriceRange}
+                            maxPossiblePrice={maxPossiblePrice}
+                            dateRange={dateRange}
+                            setDateRange={setDateRange}
+                            selectedBucketId={selectedBucketId}
+                            setSelectedBucketId={setSelectedBucketId}
+                            knownTags={knownTags}
+                            selectedTags={selectedTags}
+                            setSelectedTags={setSelectedTags}
+                            selectedCategories={selectedCategories}
+                            setSelectedCategories={setSelectedCategories}
+                            selectedPayments={selectedPayments}
+                            setSelectedPayments={setSelectedPayments}
+                            onReset={resetFilters}
+                        />
                     </div>
-                    <div className="w-9 shrink-0 z-10" />
                 </div>
 
-                {/* Search Bar & Filter Toggle */}
-                <div className="flex gap-2">
-                    <div className="relative flex-1">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                        <Input
-                            id="transaction-search"
-                            name="transaction-search"
-                            autoComplete="off"
-                            placeholder="Search transactions"
-                            value={searchQuery}
-                            onChange={(e) => {
-                                setSearchQuery(e.target.value);
-                                if (e.target.value.length === 0) toast.haptic(ImpactStyle.Light);
-                            }}
-                            onFocus={() => setInputFocused(true)}
-                            // Delay so a tap on a history row registers before blur closes the dropdown.
-                            onBlur={() => setTimeout(() => setInputFocused(false), 150)}
-                            className={`pl-9 pr-9 bg-secondary/10 border-white/10 h-10 rounded-xl ${themeConfig.ring}`}
-                        />
-                        {(searchQuery !== debouncedSearchQuery || (loading && !!searchQuery)) && (
-                            <div className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full border-2 border-primary border-t-transparent animate-spin" aria-hidden="true" />
-                        )}
-                        {inputFocused && searchQuery === '' && history.length > 0 && (
-                            <div className="absolute top-full left-0 right-0 mt-1 z-40 rounded-xl bg-card/95 backdrop-blur-xl border border-white/10 shadow-2xl overflow-hidden">
-                                <div className="px-3 py-2 text-[9px] uppercase tracking-widest font-bold text-muted-foreground/70 border-b border-white/5">Recent searches</div>
-                                {history.map(h => (
-                                    <button
-                                        key={h}
-                                        type="button"
-                                        onMouseDown={(e) => e.preventDefault()}
-                                        onClick={() => {
-                                            setSearchQuery(h);
-                                            setInputFocused(false);
-                                        }}
-                                        className="w-full flex items-center gap-2 px-3 py-2 text-left text-[12px] hover:bg-white/5 transition-colors"
-                                    >
-                                        <Clock className="w-3 h-3 text-muted-foreground/60 shrink-0" />
-                                        <span className="truncate">{h}</span>
-                                    </button>
-                                ))}
-                                <button
-                                    type="button"
-                                    onMouseDown={(e) => e.preventDefault()}
-                                    onClick={clearHistory}
-                                    className="w-full px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70 hover:text-foreground hover:bg-white/5 transition-colors border-t border-white/5"
+                {/* Hero — total when filters yielded results, quiet intro only when truly idle */}
+                {filterStats && (activeFilterCount > 0 || debouncedSearchQuery) ? (
+                    <section className="space-y-2 shrink-0 text-center">
+                        <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground/70">
+                            Total matching
+                        </p>
+                        <div className="flex items-end justify-center gap-3 flex-wrap">
+                            <h3 className={cn(
+                                'text-[40px] leading-none font-bold tracking-tight tabular-nums',
+                                themeConfig.text
+                            )}>
+                                {formatCurrency(filterStats.total)}
+                            </h3>
+                            <span className="text-[11px] text-muted-foreground/70 mb-1.5">
+                                {filterStats.count} txn{filterStats.count === 1 ? '' : 's'} &middot; avg {formatCurrency(filterStats.avg)}
+                            </span>
+                        </div>
+                        {filterStats.topCategory && (
+                            <div className="flex items-center justify-center gap-2 pt-0.5">
+                                <span className="text-[10px] text-muted-foreground/60 uppercase tracking-[0.18em]">Top</span>
+                                <span
+                                    className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-bold capitalize"
+                                    style={{
+                                        backgroundColor: `${CATEGORY_COLORS[filterStats.topCategory] || '#8A2BE2'}20`,
+                                        color: CATEGORY_COLORS[filterStats.topCategory] || '#8A2BE2',
+                                    }}
                                 >
-                                    Clear history
-                                </button>
+                                    <span className="w-3 h-3 shrink-0">
+                                        {React.cloneElement(getIconForCategory(filterStats.topCategory, 'w-3 h-3') as React.ReactElement<{ style?: React.CSSProperties }>, {
+                                            style: { color: CATEGORY_COLORS[filterStats.topCategory] || '#8A2BE2' },
+                                        })}
+                                    </span>
+                                    <span className="truncate max-w-[160px]">{getCategoryLabel(filterStats.topCategory)}</span>
+                                </span>
                             </div>
                         )}
-                    </div>
+                    </section>
+                ) : (activeFilterCount === 0 && !debouncedSearchQuery) ? (
+                    <section className="space-y-1.5 shrink-0 text-center">
+                        <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground/70">
+                            Search &amp; filter
+                        </p>
+                        <p className="text-[14px] text-muted-foreground/70 leading-snug">
+                            Find transactions by description, place, notes or tags.
+                        </p>
+                    </section>
+                ) : null}
 
-                    <Button
-                        variant="outline"
-                        size="icon"
-                        onClick={() => bulkMode ? exitBulkMode() : setBulkMode(true)}
+                {/* Search bar */}
+                <div className="relative shrink-0">
+                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/60" />
+                    <Input
+                        id="transaction-search"
+                        name="transaction-search"
+                        autoComplete="off"
+                        placeholder="Search transactions"
+                        value={searchQuery}
+                        onChange={(e) => {
+                            setSearchQuery(e.target.value);
+                            if (e.target.value.length === 0) toast.haptic(ImpactStyle.Light);
+                        }}
+                        onFocus={() => setInputFocused(true)}
+                        // Delay so a tap on a history row registers before blur closes the dropdown.
+                        onBlur={() => setTimeout(() => setInputFocused(false), 150)}
                         className={cn(
-                            "h-10 w-10 shrink-0 rounded-xl bg-secondary/10 border-white/10",
-                            bulkMode && `${themeConfig.bgMedium} ${themeConfig.borderMedium} ${themeConfig.text}`
+                            'pl-10 pr-10 h-11 rounded-2xl bg-secondary/15 border-white/[0.06] text-[14px]',
+                            themeConfig.ring
                         )}
-                        aria-label={bulkMode ? 'Exit selection mode' : 'Enter selection mode'}
-                        title={bulkMode ? 'Exit selection mode' : 'Select multiple'}
-                    >
-                        <CheckSquare className="w-4 h-4" />
-                    </Button>
-
-                    <SearchFilterSheet
-                        open={isFilterSheetOpen}
-                        onOpenChange={setIsFilterSheetOpen}
-                        activeFilterCount={activeFilterCount}
-                        sortBy={sortBy}
-                        setSortBy={setSortBy}
-                        priceRange={priceRange}
-                        setPriceRange={setPriceRange}
-                        maxPossiblePrice={maxPossiblePrice}
-                        dateRange={dateRange}
-                        setDateRange={setDateRange}
-                        selectedBucketId={selectedBucketId}
-                        setSelectedBucketId={setSelectedBucketId}
-                        knownTags={knownTags}
-                        selectedTags={selectedTags}
-                        setSelectedTags={setSelectedTags}
-                        selectedCategories={selectedCategories}
-                        setSelectedCategories={setSelectedCategories}
-                        selectedPayments={selectedPayments}
-                        setSelectedPayments={setSelectedPayments}
-                        onReset={resetFilters}
                     />
+                    {(searchQuery !== debouncedSearchQuery || (loading && !!searchQuery)) && (
+                        <div className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full border-2 border-primary border-t-transparent animate-spin" aria-hidden="true" />
+                    )}
+                    {inputFocused && searchQuery === '' && history.length > 0 && (
+                        <div className="absolute top-full left-0 right-0 mt-1.5 z-40 rounded-2xl bg-card/95 backdrop-blur-xl border border-white/[0.06] shadow-2xl overflow-hidden">
+                            <div className="px-3 py-2 text-[10px] uppercase tracking-[0.18em] font-medium text-muted-foreground/70 border-b border-white/[0.04]">
+                                Recent
+                            </div>
+                            {history.map(h => (
+                                <button
+                                    key={h}
+                                    type="button"
+                                    onMouseDown={(e) => e.preventDefault()}
+                                    onClick={() => {
+                                        setSearchQuery(h);
+                                        setInputFocused(false);
+                                    }}
+                                    className="w-full flex items-center gap-2 px-3 py-2 text-left text-[12px] hover:bg-white/[0.04] transition-colors"
+                                >
+                                    <Clock className="w-3 h-3 text-muted-foreground/60 shrink-0" />
+                                    <span className="truncate">{h}</span>
+                                </button>
+                            ))}
+                            <button
+                                type="button"
+                                onMouseDown={(e) => e.preventDefault()}
+                                onClick={clearHistory}
+                                className="w-full px-3 py-2 text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground/60 hover:text-foreground hover:bg-white/[0.04] transition-colors border-t border-white/[0.04]"
+                            >
+                                Clear history
+                            </button>
+                        </div>
+                    )}
                 </div>
 
-                {/* Quick filter chips */}
-                <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide shrink-0 -mt-2">
+                {/* Numeric query hint — inline minimal */}
+                {numericQueryActive && (
+                    <div className="flex items-center justify-between gap-2 -mt-3 shrink-0">
+                        <span className={cn('inline-flex items-center gap-2 text-[11px] font-semibold', themeConfig.text)}>
+                            <span className="uppercase tracking-[0.18em] text-muted-foreground/60 font-medium text-[10px]">
+                                Amount
+                            </span>
+                            {numericQueryActive.op} {formatCurrency(numericQueryActive.value)}
+                        </span>
+                        <button
+                            type="button"
+                            onClick={() => setSearchQuery('')}
+                            className="text-muted-foreground/60 hover:text-foreground transition-colors"
+                            aria-label="Clear amount filter"
+                        >
+                            <X className="w-3.5 h-3.5" />
+                        </button>
+                    </div>
+                )}
+
+                {/* Filter chip strip — quick ranges + toggles + active filter chips, one row */}
+                <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide shrink-0 -mt-2">
                     {([
                         { id: 'today' as const, label: 'Today' },
                         { id: '7d' as const, label: '7d' },
                         { id: '30d' as const, label: '30d' },
-                        { id: 'month' as const, label: 'This month' },
+                        { id: 'month' as const, label: 'Month' },
                     ]).map(({ id, label }) => {
                         const active = activeQuickRange === id;
                         return (
@@ -695,7 +764,7 @@ export function SearchView() {
                                     'shrink-0 px-3 py-1.5 rounded-full text-[11px] font-semibold border transition-colors',
                                     active
                                         ? `${themeConfig.bgMedium} ${themeConfig.borderMedium} ${themeConfig.text}`
-                                        : 'bg-secondary/10 border-white/10 text-muted-foreground hover:border-white/20'
+                                        : 'bg-transparent border-white/[0.06] text-muted-foreground hover:border-white/15 hover:text-foreground/80'
                                 )}
                             >
                                 {label}
@@ -709,7 +778,7 @@ export function SearchView() {
                             'shrink-0 inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-[11px] font-semibold border transition-colors',
                             showRecurringOnly
                                 ? 'bg-cyan-500/15 border-cyan-500/40 text-cyan-300'
-                                : 'bg-secondary/10 border-white/10 text-muted-foreground hover:border-white/20'
+                                : 'bg-transparent border-white/[0.06] text-muted-foreground hover:border-white/15 hover:text-foreground/80'
                         )}
                     >
                         <RefreshCcw className="w-3 h-3" />
@@ -722,36 +791,134 @@ export function SearchView() {
                             'shrink-0 inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-[11px] font-semibold border transition-colors',
                             showExcludedOnly
                                 ? 'bg-rose-500/15 border-rose-500/40 text-rose-300'
-                                : 'bg-secondary/10 border-white/10 text-muted-foreground hover:border-white/20'
+                                : 'bg-transparent border-white/[0.06] text-muted-foreground hover:border-white/15 hover:text-foreground/80'
                         )}
                     >
                         <Ban className="w-3 h-3" />
                         Excluded
                     </button>
+
+                    {/* Separator between toggles and active filter chips */}
+                    {(dateRange.from
+                        || priceRange[0] > 0
+                        || priceRange[1] < maxPossiblePrice
+                        || selectedCategories.length > 0
+                        || selectedPayments.length > 0
+                        || selectedBucketId
+                        || selectedTags.length > 0
+                    ) && (
+                        <span aria-hidden="true" className="shrink-0 self-center w-px h-5 bg-white/[0.08] mx-0.5" />
+                    )}
+
+                    {dateRange.from && (
+                        <div className={cn(
+                            'shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold border whitespace-nowrap',
+                            themeConfig.bgMedium, themeConfig.borderMedium, themeConfig.text
+                        )}>
+                            Date
+                            <button
+                                type="button"
+                                onClick={() => setDateRange({ from: undefined, to: undefined })}
+                                aria-label="Clear date filter"
+                                className="hover:opacity-70 transition-opacity"
+                            >
+                                <X className="w-3 h-3" />
+                            </button>
+                        </div>
+                    )}
+                    {(priceRange[0] > 0 || priceRange[1] < maxPossiblePrice) && (
+                        <div className={cn(
+                            'shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold border whitespace-nowrap tabular-nums',
+                            themeConfig.bgMedium, themeConfig.borderMedium, themeConfig.text
+                        )}>
+                            {formatCurrency(priceRange[0])}&ndash;{formatCurrency(priceRange[1])}
+                            <button
+                                type="button"
+                                onClick={() => setPriceRange([0, maxPossiblePrice])}
+                                aria-label="Clear price filter"
+                                className="hover:opacity-70 transition-opacity"
+                            >
+                                <X className="w-3 h-3" />
+                            </button>
+                        </div>
+                    )}
+                    {selectedCategories.map(cat => (
+                        <div
+                            key={cat}
+                            className={cn(
+                                'shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold border whitespace-nowrap capitalize',
+                                themeConfig.bgMedium, themeConfig.borderMedium, themeConfig.text
+                            )}
+                        >
+                            {cat}
+                            <button
+                                type="button"
+                                onClick={() => setSelectedCategories(prev => prev.filter(c => c !== cat))}
+                                aria-label={`Clear ${cat} filter`}
+                                className="hover:opacity-70 transition-opacity"
+                            >
+                                <X className="w-3 h-3" />
+                            </button>
+                        </div>
+                    ))}
+                    {selectedPayments.map(p => (
+                        <div
+                            key={p}
+                            className={cn(
+                                'shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold border whitespace-nowrap',
+                                themeConfig.bgMedium, themeConfig.borderMedium, themeConfig.text
+                            )}
+                        >
+                            {p}
+                            <button
+                                type="button"
+                                onClick={() => setSelectedPayments(prev => prev.filter(m => m !== p))}
+                                aria-label={`Clear ${p} filter`}
+                                className="hover:opacity-70 transition-opacity"
+                            >
+                                <X className="w-3 h-3" />
+                            </button>
+                        </div>
+                    ))}
+                    {selectedBucketId && buckets.find(b => b.id === selectedBucketId) && (
+                        <div className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold border whitespace-nowrap bg-cyan-500/15 border-cyan-500/30 text-cyan-300">
+                            <span className="w-3 h-3 shrink-0">
+                                <BucketIcon name={buckets.find(b => b.id === selectedBucketId)?.icon} />
+                            </span>
+                            {buckets.find(b => b.id === selectedBucketId)?.name}
+                            <button
+                                type="button"
+                                onClick={() => setSelectedBucketId(null)}
+                                aria-label="Clear bucket filter"
+                                className="hover:opacity-70 transition-opacity"
+                            >
+                                <X className="w-3 h-3" />
+                            </button>
+                        </div>
+                    )}
+                    {selectedTags.map(t => (
+                        <div
+                            key={t}
+                            className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold border whitespace-nowrap bg-primary/15 border-primary/30 text-primary"
+                        >
+                            #{t}
+                            <button
+                                type="button"
+                                onClick={() => setSelectedTags(prev => prev.filter(x => x !== t))}
+                                aria-label={`Clear ${t} tag`}
+                                className="hover:opacity-70 transition-opacity"
+                            >
+                                <X className="w-3 h-3" />
+                            </button>
+                        </div>
+                    ))}
                 </div>
 
-                {/* Numeric query hint */}
-                {numericQueryActive && (
-                    <div className={`flex items-center justify-between gap-2 px-3 py-1.5 rounded-xl text-[11px] shrink-0 ${themeConfig.bgMedium} ${themeConfig.borderMedium} border`}>
-                        <span className={`${themeConfig.text} font-semibold`}>
-                            Filtering by amount {numericQueryActive.op} {formatCurrency(numericQueryActive.value)}
-                        </span>
-                        <button
-                            type="button"
-                            onClick={() => setSearchQuery('')}
-                            className="text-muted-foreground hover:text-foreground"
-                            aria-label="Clear amount filter"
-                        >
-                            <X className="w-3.5 h-3.5" />
-                        </button>
-                    </div>
-                )}
-
-                {/* Saved presets row */}
-                {presets.length > 0 && (
-                    <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide shrink-0">
+                {/* Preset rail + save trigger merged */}
+                {(presets.length > 0 || activeFilterCount > 0) && (
+                    <div className="flex gap-1.5 items-center overflow-x-auto pb-1 scrollbar-hide shrink-0 -mt-3">
                         {presets.map((p) => (
-                            <div key={p.id} className="shrink-0 inline-flex items-center gap-1 pl-3 pr-1.5 py-1 rounded-full text-[11px] font-semibold bg-secondary/15 border border-white/10 text-foreground/80">
+                            <div key={p.id} className="shrink-0 inline-flex items-center gap-1 pl-3 pr-1.5 py-1 rounded-full text-[11px] font-semibold bg-secondary/15 border border-white/[0.06] text-foreground/80">
                                 <button type="button" onClick={() => applySnapshot(p.filters)} className="inline-flex items-center gap-1.5">
                                     <Bookmark className="w-3 h-3" />
                                     {p.name}
@@ -766,142 +933,51 @@ export function SearchView() {
                                 </button>
                             </div>
                         ))}
-                    </div>
-                )}
-
-                {/* Save preset control (only when there are filters to save) */}
-                {activeFilterCount > 0 && (
-                    <div className="flex items-center gap-2 shrink-0">
-                        {showPresetInput ? (
-                            <>
-                                <Input
-                                    autoFocus
-                                    placeholder="Preset name"
-                                    value={presetNameDraft}
-                                    onChange={(e) => setPresetNameDraft(e.target.value)}
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter') handleSavePreset();
-                                        if (e.key === 'Escape') { setShowPresetInput(false); setPresetNameDraft(''); }
-                                    }}
-                                    className="h-8 text-xs bg-secondary/10 border-white/10 rounded-lg flex-1"
-                                />
-                                <Button
-                                    size="sm"
-                                    onClick={handleSavePreset}
-                                    disabled={!presetNameDraft.trim()}
-                                    className={`h-8 text-[11px] rounded-lg ${themeConfig.bgSolid} ${themeConfig.textWhite}`}
-                                >
-                                    Save
-                                </Button>
-                                <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    onClick={() => { setShowPresetInput(false); setPresetNameDraft(''); }}
-                                    className="h-8 text-[11px] rounded-lg"
-                                >
-                                    Cancel
-                                </Button>
-                            </>
-                        ) : (
-                            <button
-                                type="button"
-                                onClick={() => setShowPresetInput(true)}
-                                className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
-                            >
-                                <BookmarkPlus className="w-3.5 h-3.5" />
-                                Save filter as preset
-                            </button>
-                        )}
-                    </div>
-                )}
-
-                {/* Active Filters Summary Chips */}
-                {activeFilterCount > 0 && (
-                    <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide shrink-0">
-                        {dateRange.from && (
-                            <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] whitespace-nowrap ${themeConfig.bgMedium} ${themeConfig.borderMedium} ${themeConfig.text}`}>
-                                Date Range <X className="w-3 h-3 cursor-pointer" onClick={() => setDateRange({ from: undefined, to: undefined })} />
-                            </div>
-                        )}
-                        {(priceRange[0] > 0 || priceRange[1] < maxPossiblePrice) && (
-                            <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] whitespace-nowrap ${themeConfig.bgMedium} ${themeConfig.borderMedium} ${themeConfig.text}`}>
-                                Price: {formatCurrency(priceRange[0])}-{formatCurrency(priceRange[1])} <X className="w-3 h-3 cursor-pointer" onClick={() => setPriceRange([0, maxPossiblePrice])} />
-                            </div>
-                        )}
-                        {selectedCategories.map(cat => (
-                            <div key={cat} className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] whitespace-nowrap capitalize ${themeConfig.bgMedium} ${themeConfig.borderMedium} ${themeConfig.text}`}>
-                                {cat} <X className="w-3 h-3 cursor-pointer" onClick={() => setSelectedCategories(prev => prev.filter(c => c !== cat))} />
-                            </div>
-                        ))}
-                        {selectedPayments.map(p => (
-                            <div key={p} className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] whitespace-nowrap ${themeConfig.bgMedium} ${themeConfig.borderMedium} ${themeConfig.text}`}>
-                                {p} <X className="w-3 h-3 cursor-pointer" onClick={() => setSelectedPayments(prev => prev.filter(m => m !== p))} />
-                            </div>
-                        ))}
-                        {selectedBucketId && buckets.find(b => b.id === selectedBucketId) && (
-                            <div className="flex items-center gap-1.5 px-3 py-1 bg-cyan-500/20 border border-cyan-500/20 rounded-full text-[11px] text-cyan-500 whitespace-nowrap">
-                                <div className="w-3 h-3">
-                                    <BucketIcon name={buckets.find(b => b.id === selectedBucketId)?.icon} />
-                                </div>
-                                Bucket: {buckets.find(b => b.id === selectedBucketId)?.name} <X className="w-3 h-3 cursor-pointer" onClick={() => setSelectedBucketId(null)} />
-                            </div>
-                        )}
-                        {selectedTags.map(t => (
-                            <div key={t} className="flex items-center gap-1.5 px-3 py-1 bg-primary/15 border border-primary/30 rounded-full text-[11px] text-primary whitespace-nowrap">
-                                #{t} <X className="w-3 h-3 cursor-pointer" onClick={() => setSelectedTags(prev => prev.filter(x => x !== t))} />
-                            </div>
-                        ))}
-                        {showRecurringOnly && (
-                            <div className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] whitespace-nowrap bg-cyan-500/15 border border-cyan-500/40 text-cyan-300">
-                                Recurring <X className="w-3 h-3 cursor-pointer" onClick={() => setShowRecurringOnly(false)} />
-                            </div>
-                        )}
-                        {showExcludedOnly && (
-                            <div className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] whitespace-nowrap bg-rose-500/15 border border-rose-500/40 text-rose-300">
-                                Excluded <X className="w-3 h-3 cursor-pointer" onClick={() => setShowExcludedOnly(false)} />
-                            </div>
-                        )}
-                    </div>
-                )}
-
-                {/* Filter Stats Card (Visible when filtered) */}
-                {activeFilterCount > 0 && filterStats && (
-                    <div className={`bg-gradient-to-r to-secondary/20 p-3 rounded-2xl shrink-0 border ${themeConfig.gradient} ${themeConfig.borderLight}`}>
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                            <div className="flex flex-col">
-                                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Total</span>
-                                <span className={`text-base font-bold ${themeConfig.text} tabular-nums`}>{formatCurrency(filterStats.total)}</span>
-                            </div>
-                            <div className="flex flex-col">
-                                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Count</span>
-                                <span className={`text-base font-bold ${themeConfig.text} tabular-nums`}>{filterStats.count}</span>
-                            </div>
-                            <div className="flex flex-col">
-                                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Avg</span>
-                                <span className={`text-base font-bold ${themeConfig.text} tabular-nums`}>{formatCurrency(filterStats.avg)}</span>
-                            </div>
-                            <div className="flex flex-col min-w-0">
-                                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Top Category</span>
-                                {filterStats.topCategory ? (
-                                    <span
-                                        className="inline-flex items-center gap-1.5 mt-0.5 px-1.5 py-0.5 rounded-md text-[11px] font-bold capitalize self-start max-w-full truncate"
-                                        style={{
-                                            backgroundColor: `${CATEGORY_COLORS[filterStats.topCategory] || '#8A2BE2'}20`,
-                                            color: CATEGORY_COLORS[filterStats.topCategory] || '#8A2BE2',
+                        {activeFilterCount > 0 && (
+                            showPresetInput ? (
+                                <div className="shrink-0 inline-flex items-center gap-1 pl-1 pr-1 py-0.5 rounded-full bg-secondary/15 border border-white/[0.06]">
+                                    <Input
+                                        autoFocus
+                                        placeholder="Preset name"
+                                        value={presetNameDraft}
+                                        onChange={(e) => setPresetNameDraft(e.target.value)}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter') handleSavePreset();
+                                            if (e.key === 'Escape') { setShowPresetInput(false); setPresetNameDraft(''); }
                                         }}
+                                        className="h-7 text-[11px] bg-transparent border-0 rounded-full px-2 w-32 focus-visible:ring-0"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={handleSavePreset}
+                                        disabled={!presetNameDraft.trim()}
+                                        className={cn(
+                                            'text-[10px] font-bold uppercase tracking-[0.14em] px-2 py-1 rounded-full disabled:opacity-40 transition-opacity',
+                                            themeConfig.text
+                                        )}
                                     >
-                                        <span className="w-3 h-3 shrink-0">
-                                            {React.cloneElement(getIconForCategory(filterStats.topCategory, 'w-3 h-3') as React.ReactElement<{ style?: React.CSSProperties }>, {
-                                                style: { color: CATEGORY_COLORS[filterStats.topCategory] || '#8A2BE2' },
-                                            })}
-                                        </span>
-                                        <span className="truncate">{getCategoryLabel(filterStats.topCategory)}</span>
-                                    </span>
-                                ) : (
-                                    <span className="text-base font-bold text-muted-foreground">—</span>
-                                )}
-                            </div>
-                        </div>
+                                        Save
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => { setShowPresetInput(false); setPresetNameDraft(''); }}
+                                        className="p-0.5 rounded-full hover:bg-white/10 text-muted-foreground"
+                                        aria-label="Cancel save preset"
+                                    >
+                                        <X className="w-3 h-3" />
+                                    </button>
+                                </div>
+                            ) : (
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPresetInput(true)}
+                                    className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold border border-dashed border-white/[0.08] text-muted-foreground hover:text-foreground hover:border-white/20 transition-colors"
+                                >
+                                    <BookmarkPlus className="w-3 h-3" />
+                                    Save preset
+                                </button>
+                            )
+                        )}
                     </div>
                 )}
 
@@ -917,14 +993,6 @@ export function SearchView() {
                         onViewReceipt={receiptViewer.view}
                         onResetFilters={resetFilters}
                     />
-                </div>
-
-                {/* Total Footer */}
-                <div className="pt-4 border-t border-white/5 flex-shrink-0">
-                    <div className="flex justify-between items-center px-2">
-                        <p className="text-[11px] text-muted-foreground font-medium uppercase tracking-widest">{filteredTransactions.length} transactions match</p>
-                        <button onClick={resetFilters} className="text-[11px] text-primary font-bold hover:underline">RESET</button>
-                    </div>
                 </div>
             </div>
 

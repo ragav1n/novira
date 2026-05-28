@@ -77,26 +77,38 @@ export function SearchFilterSheet({
     return (
         <Sheet open={open} onOpenChange={onOpenChange}>
             <SheetTrigger asChild>
-                <Button variant="outline" size="icon" className="h-10 w-10 shrink-0 rounded-xl bg-secondary/10 border-white/10 relative">
-                    <SlidersHorizontal className="w-4 h-4" />
+                <button
+                    type="button"
+                    aria-label={activeFilterCount > 0 ? `Filters (${activeFilterCount} active)` : 'Open filters'}
+                    className={cn(
+                        'relative h-9 w-9 inline-flex items-center justify-center rounded-full transition-colors',
+                        activeFilterCount > 0
+                            ? `${themeConfig.text} ${themeConfig.bgMedium}`
+                            : 'text-muted-foreground hover:text-foreground hover:bg-secondary/30'
+                    )}
+                >
+                    <SlidersHorizontal className="w-[18px] h-[18px]" />
                     {activeFilterCount > 0 && (
-                        <span className={`absolute -top-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center font-bold text-[11px] ${themeConfig.bgSolid} ${themeConfig.textWhite}`}>
+                        <span className={cn(
+                            'absolute -top-0.5 -right-0.5 min-w-4 h-4 px-1 rounded-full flex items-center justify-center font-bold text-[10px] tabular-nums',
+                            themeConfig.bgSolid, themeConfig.textWhite
+                        )}>
                             {activeFilterCount}
                         </span>
                     )}
-                </Button>
+                </button>
             </SheetTrigger>
-            <SheetContent side="right" className="w-[300px] sm:w-[400px] border-white/5 bg-background p-0 flex flex-col">
-                <SheetHeader className="p-6 pb-2">
-                    <SheetTitle>Filter & Sort</SheetTitle>
-                    <SheetDescription>Refine your transaction search.</SheetDescription>
+            <SheetContent side="right" className="w-[320px] sm:w-[400px] border-white/[0.06] bg-background p-0 flex flex-col">
+                <SheetHeader className="p-6 pb-2 space-y-1">
+                    <SheetTitle className="text-[15px] font-semibold tracking-tight">Filter &amp; sort</SheetTitle>
+                    <SheetDescription className="text-[12px] text-muted-foreground/70">Refine your transaction search.</SheetDescription>
                 </SheetHeader>
 
                 <div className="flex-1 overflow-y-auto p-6 pt-2 space-y-8">
                     <div className="space-y-3">
-                        <Label className="text-xs font-bold uppercase text-muted-foreground tracking-wider">Sort By</Label>
+                        <Label className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground/70">Sort By</Label>
                         <Select value={sortBy} onValueChange={(val: SortOption) => setSortBy(val)}>
-                            <SelectTrigger className="w-full bg-secondary/10 border-white/10 h-11 rounded-xl">
+                            <SelectTrigger className="w-full bg-secondary/10 border-white/[0.06] h-10 rounded-xl text-[13px]">
                                 <SelectValue placeholder="Sort by" />
                             </SelectTrigger>
                             <SelectContent>
@@ -110,7 +122,7 @@ export function SearchFilterSheet({
 
                     <div className="space-y-4">
                         <div className="flex justify-between">
-                            <Label className="text-xs font-bold uppercase text-muted-foreground tracking-wider">Price Range</Label>
+                            <Label className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground/70">Price Range</Label>
                             <span className={`text-xs font-mono font-bold ${themeConfig.text}`}>
                                 {formatCurrency(priceRange[0])} - {formatCurrency(priceRange[1])}
                             </span>
@@ -126,14 +138,14 @@ export function SearchFilterSheet({
                     </div>
 
                     <div className="space-y-3">
-                        <Label className="text-xs font-bold uppercase text-muted-foreground tracking-wider">Date Range</Label>
+                        <Label className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground/70">Date Range</Label>
                         <Popover modal={true}>
                             <PopoverTrigger asChild>
                                 <Button
                                     variant="outline"
                                     className={cn(
-                                        "w-full justify-start text-left font-normal h-11 rounded-xl bg-secondary/10 border-white/10 hover:bg-secondary/20",
-                                        !dateRange.from && "text-muted-foreground"
+                                        'w-full justify-start text-left font-normal h-10 rounded-xl bg-secondary/10 border-white/[0.06] hover:bg-secondary/20 text-[13px]',
+                                        !dateRange.from && 'text-muted-foreground'
                                     )}
                                 >
                                     <CalendarIcon className="mr-2 h-4 w-4" />
@@ -167,48 +179,51 @@ export function SearchFilterSheet({
 
                     {buckets.length > 0 && (
                         <div className="space-y-3">
-                            <Label className="text-xs font-bold uppercase text-muted-foreground tracking-wider">Bucket (Private)</Label>
+                            <Label className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground/70">Bucket (Private)</Label>
                             <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
                                 <div
                                     onClick={() => setSelectedBucketId(null)}
                                     className={cn(
-                                        "flex flex-col items-center gap-1.5 p-2 rounded-xl border transition-all min-w-[70px] cursor-pointer",
+                                        'flex flex-col items-center gap-1.5 p-2 rounded-xl border transition-colors min-w-[70px] cursor-pointer',
                                         !selectedBucketId
                                             ? `${themeConfig.bgMedium} ${themeConfig.borderMedium}`
-                                            : "bg-secondary/10 border-white/5 hover:border-white/10"
+                                            : 'bg-secondary/10 border-white/[0.06] hover:border-white/15'
                                     )}
                                 >
-                                    <div className="w-8 h-8 rounded-full flex items-center justify-center bg-secondary/20 border border-white/5">
+                                    <div className="w-8 h-8 rounded-full flex items-center justify-center bg-secondary/20 border border-white/[0.06]">
                                         <X className="w-3.5 h-3.5 text-muted-foreground" />
                                     </div>
                                     <span className="text-[11px] font-medium truncate w-14 text-center">All</span>
                                 </div>
-                                {buckets.map((bucket) => (
-                                    <div
-                                        key={bucket.id}
-                                        onClick={() => setSelectedBucketId(bucket.id)}
-                                        className={cn(
-                                            "flex flex-col items-center gap-1.5 p-2 rounded-xl border transition-all min-w-[70px] cursor-pointer",
-                                            selectedBucketId === bucket.id
-                                                ? "bg-cyan-500/20 border-cyan-500 shadow-[0_0_10px_rgba(6,182,212,0.1)]"
-                                                : "bg-secondary/10 border-white/5 hover:border-white/10"
-                                        )}
-                                    >
-                                        <div className="w-8 h-8 rounded-full flex items-center justify-center bg-secondary/20 border border-white/5">
-                                            <div className="w-4 h-4 text-cyan-500">
-                                                <BucketIcon name={bucket.icon} />
+                                {buckets.map((bucket) => {
+                                    const active = selectedBucketId === bucket.id;
+                                    return (
+                                        <div
+                                            key={bucket.id}
+                                            onClick={() => setSelectedBucketId(bucket.id)}
+                                            className={cn(
+                                                'flex flex-col items-center gap-1.5 p-2 rounded-xl border transition-colors min-w-[70px] cursor-pointer',
+                                                active
+                                                    ? 'bg-cyan-500/15 border-cyan-500/40'
+                                                    : 'bg-secondary/10 border-white/[0.06] hover:border-white/15'
+                                            )}
+                                        >
+                                            <div className="w-8 h-8 rounded-full flex items-center justify-center bg-secondary/20 border border-white/[0.06]">
+                                                <div className={cn('w-4 h-4', active ? 'text-cyan-300' : 'text-cyan-500/80')}>
+                                                    <BucketIcon name={bucket.icon} />
+                                                </div>
                                             </div>
+                                            <span className="text-[11px] font-medium truncate w-14 text-center">{bucket.name}</span>
                                         </div>
-                                        <span className="text-[11px] font-medium truncate w-14 text-center">{bucket.name}</span>
-                                    </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                         </div>
                     )}
 
                     {knownTags.length > 0 && (
                         <div className="space-y-3">
-                            <Label className="text-xs font-bold uppercase text-muted-foreground tracking-wider">Tags</Label>
+                            <Label className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground/70">Tags</Label>
                             <div className="flex flex-wrap gap-1.5">
                                 {knownTags.slice(0, 30).map((t) => {
                                     const active = selectedTags.includes(t);
@@ -218,10 +233,10 @@ export function SearchFilterSheet({
                                             key={t}
                                             onClick={() => setSelectedTags(prev => active ? prev.filter(x => x !== t) : [...prev, t])}
                                             className={cn(
-                                                "inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold border transition-colors",
+                                                'inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold border transition-colors',
                                                 active
-                                                    ? "bg-primary/20 border-primary/40 text-primary"
-                                                    : "bg-secondary/10 border-white/5 text-muted-foreground hover:border-white/10"
+                                                    ? 'bg-primary/20 border-primary/40 text-primary'
+                                                    : 'bg-secondary/10 border-white/[0.06] text-muted-foreground hover:border-white/15'
                                             )}
                                         >
                                             #{t}
@@ -233,16 +248,16 @@ export function SearchFilterSheet({
                     )}
 
                     <div className="space-y-3">
-                        <Label className="text-xs font-bold uppercase text-muted-foreground tracking-wider">Categories</Label>
+                        <Label className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground/70">Categories</Label>
                         <div className="grid grid-cols-1 gap-2">
                             {SYSTEM_CATEGORIES.map((cat) => (
                                 <div
                                     key={cat.id}
                                     className={cn(
-                                        "flex items-center justify-between p-3 rounded-xl border transition-colors cursor-pointer",
+                                        'flex items-center justify-between p-3 rounded-xl border transition-colors cursor-pointer',
                                         selectedCategories.includes(cat.id)
                                             ? `${themeConfig.bgMedium} ${themeConfig.borderMedium}`
-                                            : "bg-secondary/10 border-white/5 hover:border-white/10"
+                                            : 'bg-secondary/10 border-white/[0.06] hover:border-white/15'
                                     )}
                                     onClick={() => {
                                         setSelectedCategories(prev =>
@@ -262,7 +277,7 @@ export function SearchFilterSheet({
                                                 style: { color: CATEGORY_COLORS[cat.id] || '#8A2BE2' }
                                             })}
                                         </div>
-                                        <span className="text-xs font-medium">{cat.label}</span>
+                                        <span className="text-[13px] font-medium">{cat.label}</span>
                                     </div>
                                     {selectedCategories.includes(cat.id) && <Check className={`w-4 h-4 ${themeConfig.text}`} />}
                                 </div>
@@ -271,17 +286,17 @@ export function SearchFilterSheet({
                     </div>
 
                     <div className="space-y-3">
-                        <Label className="text-xs font-bold uppercase text-muted-foreground tracking-wider">Payment Method</Label>
+                        <Label className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground/70">Payment Method</Label>
                         <div className="flex flex-wrap gap-2">
                             {paymentMethods.map((method) => (
                                 <Badge
                                     key={method}
                                     variant="outline"
                                     className={cn(
-                                        "px-3 py-1 cursor-pointer transition-colors border-white/10",
+                                        'px-3 py-1 cursor-pointer transition-colors border-white/[0.06] text-[11px]',
                                         selectedPayments.includes(method)
                                             ? `${themeConfig.bgSolid} ${themeConfig.borderSolid} text-white`
-                                            : "bg-secondary/10 hover:bg-secondary/20"
+                                            : 'bg-secondary/10 hover:bg-secondary/20'
                                     )}
                                     onClick={() => {
                                         setSelectedPayments(prev =>
@@ -296,13 +311,13 @@ export function SearchFilterSheet({
                     </div>
                 </div>
 
-                <SheetFooter className="p-6 border-t border-white/5 bg-secondary/5 gap-3 sm:flex-col items-stretch">
-                    <Button variant="secondary" onClick={onReset} className="h-11 rounded-xl">
-                        Reset All
+                <SheetFooter className="p-6 border-t border-white/[0.06] bg-secondary/5 gap-2.5 sm:flex-col items-stretch">
+                    <Button variant="secondary" onClick={onReset} className="h-10 rounded-xl text-[13px]">
+                        Reset all
                     </Button>
                     <SheetClose asChild>
-                        <Button className={`h-11 rounded-xl shadow-lg ${themeConfig.bgSolid} ${themeConfig.shadowGlow} ${themeConfig.textWhite} ${themeConfig.hoverBg}`}>
-                            Apply Filters
+                        <Button className={cn('h-10 rounded-xl text-[13px] font-semibold', themeConfig.bgSolid, themeConfig.textWhite, themeConfig.hoverBg)}>
+                            Apply
                         </Button>
                     </SheetClose>
                 </SheetFooter>

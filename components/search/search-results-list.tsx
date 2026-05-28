@@ -94,7 +94,7 @@ export function SearchResultsList({
                                     nodes.push(
                                         <div
                                             key={`hdr-${dateKey}`}
-                                            className="sticky top-0 z-10 bg-background/85 backdrop-blur px-2 pt-2 pb-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground"
+                                            className="sticky top-0 z-10 bg-background/85 backdrop-blur px-2 pt-3 pb-1.5 text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground/70"
                                         >
                                             {format(parseISO(dateKey), 'EEE, MMM d')}
                                         </div>
@@ -136,13 +136,13 @@ export function SearchResultsList({
                                             onClick={() => toggleSelection(tx.id)}
                                             className={cn(
                                                 "relative flex items-center gap-2 cursor-pointer rounded-xl transition-colors",
-                                                isSelected && `${themeConfig.bgMedium}`
+                                                isSelected && 'bg-white/[0.04]'
                                             )}
                                         >
                                             <div className="pl-2 shrink-0">
                                                 {isSelected
                                                     ? <CheckSquare className={cn("w-5 h-5", themeConfig.text)} />
-                                                    : <Square className="w-5 h-5 text-muted-foreground" />}
+                                                    : <Square className="w-5 h-5 text-muted-foreground/60" />}
                                             </div>
                                             <div className="flex-1 min-w-0 pointer-events-none">
                                                 {row}
@@ -157,18 +157,19 @@ export function SearchResultsList({
                         <motion.div
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
-                            className="flex flex-col items-center justify-center py-12 px-6 text-center"
+                            className="flex flex-col items-center justify-center py-16 px-6 text-center"
                         >
-                            <div className="w-14 h-14 rounded-2xl bg-secondary/20 border border-white/5 flex items-center justify-center mb-3">
-                                <SearchX className="w-6 h-6 text-muted-foreground/50" strokeWidth={1.75} />
-                            </div>
-                            <p className="text-sm font-bold text-muted-foreground/80">No matches</p>
-                            <p className="text-xs text-muted-foreground/50 mt-1 max-w-[240px]">
+                            <SearchX className="w-7 h-7 text-muted-foreground/40 mb-4" strokeWidth={1.5} />
+                            <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground/70">No matches</p>
+                            <p className="text-[13px] text-muted-foreground/60 mt-2 max-w-[260px] leading-snug">
                                 Try a wider date range or clear some filters.
                             </p>
                             <button
                                 onClick={onResetFilters}
-                                className="mt-4 text-xs font-bold uppercase tracking-wider px-4 py-2 rounded-full bg-primary/15 hover:bg-primary/25 border border-primary/30 text-primary transition-colors"
+                                className={cn(
+                                    'mt-5 text-[11px] font-semibold tracking-tight hover:underline transition-colors',
+                                    themeConfig.text
+                                )}
                             >
                                 Reset filters
                             </button>
