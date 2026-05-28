@@ -17,44 +17,144 @@ export default function TermsOfService() {
                 </RevealItem>
 
                 <RevealItem>
-                    <h1 className="text-3xl font-bold mb-6 bg-clip-text text-transparent bg-gradient-to-b from-foreground to-foreground/70">
+                    <h1 className="text-3xl font-bold mb-2 bg-clip-text text-transparent bg-gradient-to-b from-foreground to-foreground/70">
                         Terms of Service
                     </h1>
                 </RevealItem>
 
+                <RevealItem>
+                    <p className="text-xs text-muted-foreground mb-8">Last updated: 28 May 2026</p>
+                </RevealItem>
+
                 <div className="space-y-6 text-sm text-muted-foreground leading-relaxed">
                     <RevealItem as="section">
-                        <h2 className="text-lg font-semibold text-foreground mb-2">1. Nature of Service</h2>
+                        <h2 className="text-lg font-semibold text-foreground mb-2">1. Acceptance</h2>
                         <p>
-                            Novira is a personal finance tracking tool designed for manual data entry and expense management. By using our services, you acknowledge that Novira is a <strong>tracking utility</strong> and does not provide financial, investment, or legal advice.
+                            By creating an account or using Novira you agree to these Terms. If you don't agree, please don't use the app.
                         </p>
                     </RevealItem>
 
                     <RevealItem as="section">
-                        <h2 className="text-xl font-semibold text-foreground mb-3">2. User Responsibility</h2>
+                        <h2 className="text-xl font-semibold text-foreground mb-3">2. What Novira is</h2>
                         <p>
-                            Since Novira relies on manual entry or imported data files, you are solely responsible for the accuracy and completeness of the information you provide. Novira is not responsible for any financial decisions made based on the data tracked within the application.
+                            Novira is a free, manual-entry personal finance Progressive Web App. It is <strong>not</strong> a bank, broker, payment processor, financial advisor, accountant, or regulated financial service. It is a tool for you to record and reflect on your own spending.
                         </p>
                     </RevealItem>
 
                     <RevealItem as="section">
-                        <h2 className="text-xl font-semibold text-foreground mb-3">3. No Financial Advisory</h2>
+                        <h2 className="text-xl font-semibold text-foreground mb-3">3. Eligibility</h2>
                         <p>
-                            The budget summaries, analytics, and alerts provided by Novira are for informational purposes only. We do not guarantee any specific financial outcomes, and our services should not be used as a substitute for professional financial planning.
+                            You must be at least 13 years old, or the minimum age of digital consent in your country (16 in much of the EEA and the UK), whichever is higher.
                         </p>
                     </RevealItem>
 
                     <RevealItem as="section">
-                        <h2 className="text-xl font-semibold text-foreground mb-3">4. Account Security</h2>
+                        <h2 className="text-xl font-semibold text-foreground mb-3">4. Your account</h2>
                         <p>
-                            You are responsible for maintaining the confidentiality of your account credentials. Any data lost through unauthorized access due to weakened security on your end is your responsibility.
+                            You are responsible for the security of your credentials and for activity that happens under your account. If you sign in with Google, account security is also subject to your Google account's protections.
                         </p>
                     </RevealItem>
 
                     <RevealItem as="section">
-                        <h2 className="text-xl font-semibold text-foreground mb-3">5. Termination</h2>
+                        <h2 className="text-xl font-semibold text-foreground mb-3">5. Your content</h2>
                         <p>
-                            We reserve the right to suspend or terminate your account if you violate these terms or engage in activities that threaten the security and integrity of the Novira platform.
+                            The data you enter — transactions, notes, receipt photos, goals, and so on — is yours. You grant Novira a limited, non-exclusive licence to store, process, and transmit that data only to run the service for you, including sending it to the sub-processors named in the <Link href="/privacy" className="text-primary hover:underline">Privacy Policy</Link>.
+                        </p>
+                    </RevealItem>
+
+                    <RevealItem as="section">
+                        <h2 className="text-xl font-semibold text-foreground mb-3">6. AI features</h2>
+                        <p>
+                            Receipt scanning, the Insights chat, and monthly and yearly recaps are powered by Anthropic Claude. AI outputs can be inaccurate, incomplete, or biased — treat them as suggestions, never as authoritative numbers, and verify anything important. AI providers may log requests for abuse prevention as described in their own terms.
+                        </p>
+                    </RevealItem>
+
+                    <RevealItem as="section">
+                        <h2 className="text-xl font-semibold text-foreground mb-3">7. No financial advice</h2>
+                        <p>
+                            Budget summaries, projections, run-rate forecasts, charts, and any text generated by the app are for personal awareness only. Nothing in Novira is financial, investment, tax, accounting, or legal advice. Talk to a qualified professional before making decisions that matter.
+                        </p>
+                    </RevealItem>
+
+                    <RevealItem as="section">
+                        <h2 className="text-xl font-semibold text-foreground mb-3">8. Manual entry and accuracy</h2>
+                        <p>
+                            Novira does not connect to your bank and cannot verify your data. You're responsible for the accuracy and completeness of everything you enter or import.
+                        </p>
+                    </RevealItem>
+
+                    <RevealItem as="section">
+                        <h2 className="text-xl font-semibold text-foreground mb-3">9. Acceptable use</h2>
+                        <p className="mb-3">Please don't:</p>
+                        <ul className="list-disc pl-5 space-y-2">
+                            <li>reverse engineer or attempt to bypass security or rate limits;</li>
+                            <li>scrape or automate the app in a way that puts undue load on it;</li>
+                            <li>use the AI features to process other people's personal data without their consent;</li>
+                            <li>use the service for unlawful activity, harassment, or fraud;</li>
+                            <li>attempt to access data that doesn't belong to you.</li>
+                        </ul>
+                    </RevealItem>
+
+                    <RevealItem as="section">
+                        <h2 className="text-xl font-semibold text-foreground mb-3">10. Service availability</h2>
+                        <p>
+                            Novira is provided on an &ldquo;as is&rdquo; and &ldquo;as available&rdquo; basis. There is no uptime guarantee. The app is solo-developed and actively evolving — features may be added, changed, or removed without notice. Offline mode is best-effort and may be inconsistent across browsers.
+                        </p>
+                    </RevealItem>
+
+                    <RevealItem as="section">
+                        <h2 className="text-xl font-semibold text-foreground mb-3">11. Third-party services</h2>
+                        <p>
+                            Using Novira means data you trigger sending will reach the sub-processors named in the Privacy Policy (Supabase, Vercel, Anthropic, Google, Mapbox, Photon, ExchangeRate API, and your browser's push gateway). Their own terms govern what they do with that data.
+                        </p>
+                    </RevealItem>
+
+                    <RevealItem as="section">
+                        <h2 className="text-xl font-semibold text-foreground mb-3">12. Disclaimer of warranties</h2>
+                        <p>
+                            To the maximum extent permitted by law, Novira disclaims all warranties, express or implied, including merchantability, fitness for a particular purpose, non-infringement, accuracy of AI output, and uninterrupted availability.
+                        </p>
+                    </RevealItem>
+
+                    <RevealItem as="section">
+                        <h2 className="text-xl font-semibold text-foreground mb-3">13. Limitation of liability</h2>
+                        <p>
+                            To the maximum extent permitted by law, the developer of Novira is not liable for indirect, incidental, consequential, special, or punitive damages, including lost profits, lost data, or financial decisions made based on app data. Because the service is currently free, aggregate liability is capped at ₹0 or the amount you have paid for the service in the last twelve months, whichever is greater.
+                        </p>
+                    </RevealItem>
+
+                    <RevealItem as="section">
+                        <h2 className="text-xl font-semibold text-foreground mb-3">14. Indemnity</h2>
+                        <p>
+                            You agree to indemnify the developer of Novira against claims arising from your misuse of the service or from data you entered that you weren't authorised to handle (for example, another person's financial details added without their consent).
+                        </p>
+                    </RevealItem>
+
+                    <RevealItem as="section">
+                        <h2 className="text-xl font-semibold text-foreground mb-3">15. Termination</h2>
+                        <p>
+                            You can delete your account at any time from Settings. Before doing so, you can export your data from the same screen (CSV, PDF, ICS). Novira may suspend or terminate accounts that violate these Terms or threaten the integrity of the platform.
+                        </p>
+                    </RevealItem>
+
+                    <RevealItem as="section">
+                        <h2 className="text-xl font-semibold text-foreground mb-3">16. Changes to these terms</h2>
+                        <p>
+                            These Terms may be updated as the app evolves. Material changes are communicated through the in-app &ldquo;What's new&rdquo; announcement and reflected in the &ldquo;Last updated&rdquo; date above. Continued use after a change means you accept the updated Terms.
+                        </p>
+                    </RevealItem>
+
+                    <RevealItem as="section">
+                        <h2 className="text-xl font-semibold text-foreground mb-3">17. Governing law</h2>
+                        <p>
+                            These Terms are governed by the laws of India. Any dispute is subject to the exclusive jurisdiction of the courts of India.
+                        </p>
+                    </RevealItem>
+
+                    <RevealItem as="section">
+                        <h2 className="text-xl font-semibold text-foreground mb-3">18. Contact</h2>
+                        <p>
+                            Questions about these Terms? Email <a href="mailto:ragava22005@gmail.com" className="text-primary hover:underline">ragava22005@gmail.com</a>.
                         </p>
                     </RevealItem>
                 </div>
