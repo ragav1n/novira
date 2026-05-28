@@ -3,6 +3,10 @@ import { format, differenceInDays, parseISO, subDays } from 'date-fns';
 import { DateRange } from 'react-day-picker';
 import type { Bucket } from '@/components/providers/buckets-provider';
 import type { Group } from '@/components/providers/groups-provider';
+import type { Account } from '@/types/account';
+import { ACCOUNT_TYPE_LABELS } from '@/types/account';
+import type { SavingsGoal, SavingsDeposit } from '@/types/goal';
+import type { SubscriptionMetadata } from '@/types/transaction';
 
 // jsPDF + autoTable expose a few members the published types don't declare.
 // Narrow to just what we use so we get autocompletion and stop bypassing
@@ -19,21 +23,49 @@ interface ExportTransaction {
     description: string;
     category: string;
     amount: number;
+    user_id?: string;
+    // Supabase generated types model a `profile:profiles(...)` join as an
+    // array even though it's a single row at runtime. Accept both shapes.
+    profile?: { full_name?: string | null } | { full_name?: string | null }[] | null;
     currency?: string;
     payment_method: string;
     exchange_rate?: number;
     base_currency?: string;
     converted_amount?: number;
     bucket_id?: string;
-    group_id?: string;
+    group_id?: string | null;
     is_recurring?: boolean;
     is_settlement?: boolean;
+    is_income?: boolean;
+    is_transfer?: boolean;
+    transfer_pair_id?: string | null;
     exclude_from_allowance?: boolean;
     place_name?: string | null;
+    place_address?: string | null;
+    place_lat?: number | null;
+    place_lng?: number | null;
     notes?: string | null;
     tags?: string[] | null;
     created_at?: string | null;
+    receipt_path?: string | null;
+    account_id?: string | null;
+    splits?: ExportSplit[] | null;
 }
+
+export interface ExportSplit {
+    user_id: string;
+    amount: number;
+    is_paid?: boolean;
+    // See ExportTransaction.profile — Supabase types nested joins as arrays.
+    profile?: { full_name?: string | null } | { full_name?: string | null }[] | null;
+}
+
+const unwrapProfile = (
+    p: { full_name?: string | null } | { full_name?: string | null }[] | null | undefined
+): { full_name?: string | null } | null => {
+    if (!p) return null;
+    return Array.isArray(p) ? (p[0] ?? null) : p;
+};
 
 export interface ExportRecurringTemplate {
     id: string;
@@ -44,8 +76,23 @@ export interface ExportRecurringTemplate {
     frequency: 'daily' | 'weekly' | 'monthly' | 'yearly';
     next_occurrence: string;
     is_active: boolean;
+    is_income?: boolean;
     payment_method?: string | null;
     group_id?: string | null;
+    metadata?: SubscriptionMetadata | null;
+}
+
+export interface ExportContext {
+    email?: string;
+    avatarUrl?: string | null;
+    workspaceName?: string;
+    monthlyBudget?: number;
+    accounts?: Account[];
+    goals?: SavingsGoal[];
+    deposits?: SavingsDeposit[];
+    recurringTemplates?: ExportRecurringTemplate[];
+    /** True when the export is scoped to a single non-personal group. */
+    isGroupScope?: boolean;
 }
 
 /**
@@ -88,6 +135,23 @@ interface ReportStats {
     topMerchantsByVisits: { name: string; count: number; total: number }[];
     topCategory: [string, number] | null;
     busiestDay: [string, number] | null;
+    // New roll-ups for richer exports.
+    accountTotals: Record<string, { spent: number; income: number; txCount: number }>;
+    transferTotal: number;
+    transferCount: number;
+    transfers: ExportTransaction[];
+    splitTotals: Record<string, {
+        name: string;
+        // How much this person paid for (i.e. how much others owe them).
+        paidFor: number;
+        // How much this person owes (their share of others' transactions).
+        owes: number;
+        owed: number;
+        outstandingOwes: number;     // owes that aren't paid yet
+        outstandingOwed: number;     // owed amounts that haven't been settled to them
+    }>;
+    receiptedCount: number;
+    receiptCoveragePct: number;
 }
 
 const quantile = (sorted: number[], p: number): number => {
@@ -122,12 +186,45 @@ function computeStats(
     const expenseAmounts: number[] = [];
     let biggestSingleTx: ExportTransaction | null = null;
     let biggestSingleTxAmt = 0;
+    const accountTotals: Record<string, { spent: number; income: number; txCount: number }> = {};
+    const splitTotals: ReportStats['splitTotals'] = {};
+    const transfers: ExportTransaction[] = [];
+    let transferTotal = 0;
+    let receiptedCount = 0;
+
+    const ensureSplit = (userId: string, name: string) => {
+        if (!splitTotals[userId]) {
+            splitTotals[userId] = {
+                name,
+                paidFor: 0,
+                owes: 0,
+                owed: 0,
+                outstandingOwes: 0,
+                outstandingOwed: 0,
+            };
+        } else if (name && splitTotals[userId].name === 'Unknown') {
+            splitTotals[userId].name = name;
+        }
+        return splitTotals[userId];
+    };
 
     transactions.forEach(tx => {
         const rawAmount = resolveAmount(tx, currency, convertAmount);
-        const isIncome = rawAmount < 0 || tx.category === 'income';
+        const isIncome = tx.is_income === true || rawAmount < 0 || tx.category === 'income';
         const amount = Math.abs(rawAmount);
         const dateKey = tx.date.slice(0, 10);
+
+        // Transfers are internal moves — track them separately and skip
+        // expense/income/category roll-ups so they don't double-count.
+        if (tx.is_transfer) {
+            transferTotal += amount;
+            transfers.push(tx);
+            if (tx.account_id) {
+                if (!accountTotals[tx.account_id]) accountTotals[tx.account_id] = { spent: 0, income: 0, txCount: 0 };
+                accountTotals[tx.account_id].txCount += 1;
+            }
+            return;
+        }
 
         // Currency split — group by source currency before conversion.
         const srcCurr = (tx.currency || currency).toUpperCase();
@@ -135,6 +232,17 @@ function computeStats(
         currencyTotals[srcCurr].count += 1;
         currencyTotals[srcCurr].nativeTotal += Math.abs(Number(tx.amount));
         currencyTotals[srcCurr].convertedTotal += amount;
+
+        // Account roll-up.
+        if (tx.account_id) {
+            if (!accountTotals[tx.account_id]) accountTotals[tx.account_id] = { spent: 0, income: 0, txCount: 0 };
+            accountTotals[tx.account_id].txCount += 1;
+            if (isIncome) accountTotals[tx.account_id].income += amount;
+            else accountTotals[tx.account_id].spent += amount;
+        }
+
+        // Receipt coverage — count expenses with a receipt attached.
+        if (!isIncome && tx.receipt_path) receiptedCount += 1;
 
         if (isIncome) {
             totalIncome += amount;
@@ -145,6 +253,40 @@ function computeStats(
         totalExpenses += amount;
         if (tx.is_recurring) recurringTotal += amount;
         expenseAmounts.push(amount);
+
+        // Split roll-up — driven by the splits[] join. The row's `user_id` is
+        // the payer; each entry in splits[] is a fellow member's share that
+        // they owe back to the payer. Mirror each share so both sides line up
+        // (payer is credited owed/paidFor; splittee is debited owes).
+        if (Array.isArray(tx.splits) && tx.splits.length > 0 && tx.user_id) {
+            const txCurr = (tx.currency || currency).toUpperCase();
+            const displayCurr = currency.toUpperCase();
+            const nativeAmount = Math.abs(Number(tx.amount)) || 0;
+            const convertShare = (raw: number): number => {
+                const abs = Math.abs(raw);
+                if (txCurr === displayCurr) return abs;
+                if (amount > 0 && nativeAmount > 0) return (abs / nativeAmount) * amount;
+                return convertAmount(abs, txCurr);
+            };
+            const payerName = unwrapProfile(tx.profile)?.full_name || 'Unknown';
+            const payer = ensureSplit(tx.user_id, payerName);
+            payer.paidFor += amount;
+
+            for (const s of tx.splits) {
+                if (!s?.user_id) continue;
+                const share = convertShare(Number(s.amount) || 0);
+                const memberName = unwrapProfile(s.profile)?.full_name || 'Unknown';
+                // Splittee owes this share back (unless they ARE the payer,
+                // in which case it's their own portion, no debt).
+                if (s.user_id !== tx.user_id) {
+                    const member = ensureSplit(s.user_id, memberName);
+                    member.owes += share;
+                    if (s.is_paid === false) member.outstandingOwes += share;
+                    payer.owed += share;
+                    if (s.is_paid === false) payer.outstandingOwed += share;
+                }
+            }
+        }
 
         if (amount > biggestSingleTxAmt) {
             biggestSingleTxAmt = amount;
@@ -285,6 +427,10 @@ function computeStats(
     const topCategory = Object.entries(categoryTotals).sort((a, b) => b[1] - a[1])[0] ?? null;
     const busiestDay = Object.entries(dailyTotals).sort((a, b) => b[1] - a[1])[0] ?? null;
 
+    const receiptCoveragePct = expenseTxCount > 0
+        ? (receiptedCount / expenseTxCount) * 100
+        : 0;
+
     return {
         totalExpenses, totalIncome, recurringTotal,
         expenseTxCount, incomeTxCount,
@@ -302,6 +448,13 @@ function computeStats(
         topMerchantsByVisits,
         topCategory: topCategory as [string, number] | null,
         busiestDay: busiestDay as [string, number] | null,
+        accountTotals,
+        transferTotal,
+        transferCount: transfers.length,
+        transfers,
+        splitTotals,
+        receiptedCount,
+        receiptCoveragePct,
     };
 }
 
@@ -450,9 +603,19 @@ export const generateCSV = (
     buckets: Bucket[] = [],
     groups: Group[] = [],
     reportRange?: DateRange,
-    ownerInfo?: { email?: string; workspaceName?: string; monthlyBudget?: number },
-    recurringTemplates: ExportRecurringTemplate[] = []
+    context: ExportContext = {}
 ) => {
+    const {
+        email, workspaceName, monthlyBudget,
+        accounts = [], goals = [], deposits = [],
+        recurringTemplates = [], isGroupScope = false,
+    } = context;
+    const accountMap = Object.fromEntries(accounts.map(a => [a.id, a]));
+    const depositsByGoal: Record<string, SavingsDeposit[]> = {};
+    for (const d of deposits) {
+        if (!depositsByGoal[d.goal_id]) depositsByGoal[d.goal_id] = [];
+        depositsByGoal[d.goal_id].push(d);
+    }
     // RFC 4180-compliant quoting — always quote strings
     const q = (val: string | number | null | undefined): string => {
         if (val === null || val === undefined) return '';
@@ -469,7 +632,7 @@ export const generateCSV = (
     transactions = transactions.filter(tx => tx.date && tx.amount != null && !isNaN(Number(tx.amount)));
     const sorted = [...transactions].sort((a, b) => parseISO(a.date.slice(0, 10)).getTime() - parseISO(b.date.slice(0, 10)).getTime());
 
-    const stats = computeStats(transactions, currency, convertAmount, buckets, reportRange, ownerInfo?.monthlyBudget);
+    const stats = computeStats(transactions, currency, convertAmount, buckets, reportRange, monthlyBudget);
     const {
         totalExpenses, totalIncome, recurringTotal,
         expenseTxCount, incomeTxCount,
@@ -482,6 +645,8 @@ export const generateCSV = (
         longestSpendStreak, longestNoSpendStreak,
         firstTxDate, lastTxDate, forecast,
         topCategory,
+        accountTotals, transferTotal, transferCount, transfers,
+        splitTotals, receiptedCount, receiptCoveragePct,
     } = stats;
 
     const dowLabels = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -490,8 +655,8 @@ export const generateCSV = (
 
     // ── Section 1: Report Info ─────────────────────────────────────────────────
     lines.push(heading('NOVIRA FINANCIAL REPORT'));
-    if (ownerInfo?.workspaceName) lines.push(row('Workspace', ownerInfo.workspaceName));
-    if (ownerInfo?.email)         lines.push(row('Account', ownerInfo.email));
+    if (workspaceName) lines.push(row('Workspace', workspaceName));
+    if (email)         lines.push(row('Account', email));
     if (reportRange?.from) {
         const period = reportRange.to
             ? `${format(reportRange.from, 'MMM d, yyyy')} – ${format(reportRange.to, 'MMM d, yyyy')}`
@@ -521,6 +686,12 @@ export const generateCSV = (
     lines.push(row('Recurring Spend', `${recurringPct.toFixed(1)}% of total`));
     lines.push(row('Recurring Total', recurringTotal.toFixed(2)));
     if (topCategory) lines.push(row('Top Category', `${topCategory[0]} (${((topCategory[1] / totalExpenses) * 100).toFixed(1)}%)`));
+    if (expenseTxCount > 0) {
+        lines.push(row('Receipts Attached', `${receiptedCount} of ${expenseTxCount} expenses (${receiptCoveragePct.toFixed(0)}%)`));
+    }
+    if (transferCount > 0) {
+        lines.push(row('Transfers (internal)', `${transferCount} moves · ${transferTotal.toFixed(2)} ${currency}`));
+    }
     lines.push(blank());
 
     // ── Section 2b: Spending Distribution ─────────────────────────────────────
@@ -670,24 +841,215 @@ export const generateCSV = (
         lines.push(blank());
     }
 
+    // ── Account Breakdown ─────────────────────────────────────────────────────
+    if (accounts.length > 0 && Object.keys(accountTotals).length > 0) {
+        lines.push(heading('ACCOUNT BREAKDOWN'));
+        lines.push(row(
+            'Account', 'Type', 'Account Currency', `Spent (${currency})`,
+            `Income (${currency})`, `Net (${currency})`, 'Transactions', 'Primary', 'Archived',
+        ));
+        const ordered = accounts
+            .filter(a => accountTotals[a.id])
+            .sort((a, b) => {
+                const aNet = (accountTotals[a.id]?.income || 0) - (accountTotals[a.id]?.spent || 0);
+                const bNet = (accountTotals[b.id]?.income || 0) - (accountTotals[b.id]?.spent || 0);
+                return bNet - aNet;
+            });
+        ordered.forEach(a => {
+            const t = accountTotals[a.id];
+            const net = t.income - t.spent;
+            lines.push(row(
+                a.name,
+                ACCOUNT_TYPE_LABELS[a.type] || a.type,
+                a.currency,
+                t.spent.toFixed(2),
+                t.income.toFixed(2),
+                net.toFixed(2),
+                t.txCount,
+                a.is_primary ? 'Yes' : '',
+                a.archived_at ? 'Yes' : '',
+            ));
+        });
+        // Transactions with no account_id.
+        const unassigned = transactions.filter(tx => !tx.account_id);
+        if (unassigned.length > 0) {
+            const u = unassigned.reduce((acc, tx) => {
+                if (tx.is_transfer) return acc;
+                const a = Math.abs(resolveAmount(tx, currency, convertAmount));
+                const isIncome = tx.is_income === true || tx.category === 'income';
+                if (isIncome) acc.income += a; else acc.spent += a;
+                acc.txCount += 1;
+                return acc;
+            }, { spent: 0, income: 0, txCount: 0 });
+            if (u.txCount > 0) {
+                lines.push(row(
+                    '(Unassigned)', '', '',
+                    u.spent.toFixed(2), u.income.toFixed(2), (u.income - u.spent).toFixed(2),
+                    u.txCount, '', '',
+                ));
+            }
+        }
+        lines.push(blank());
+    }
+
+    // ── Transfers ─────────────────────────────────────────────────────────────
+    if (transfers.length > 0) {
+        lines.push(heading('TRANSFERS (internal moves)'));
+        lines.push(row(
+            'Date', 'Description', 'From Account', 'To Account',
+            `Amount (Original)`, 'Original Currency', `Converted (${currency})`, 'Pair ID',
+        ));
+        // Group transfers by pair so we can label one row "From" and the other "To".
+        const byPair: Record<string, ExportTransaction[]> = {};
+        const lonely: ExportTransaction[] = [];
+        for (const tx of transfers) {
+            const key = tx.transfer_pair_id || '';
+            if (!key) lonely.push(tx);
+            else {
+                if (!byPair[key]) byPair[key] = [];
+                byPair[key].push(tx);
+            }
+        }
+        const renderRow = (tx: ExportTransaction, fromName: string, toName: string) => {
+            const dateObj = parseISO(tx.date.slice(0, 10));
+            const converted = Math.abs(resolveAmount(tx, currency, convertAmount));
+            lines.push(row(
+                format(dateObj, 'yyyy-MM-dd'),
+                tx.description,
+                fromName,
+                toName,
+                Number(tx.amount).toFixed(2),
+                tx.currency || currency,
+                converted.toFixed(2),
+                tx.transfer_pair_id || '',
+            ));
+        };
+        // Each pair has two rows: the "out" leg (positive amount on the source
+        // account) and the "in" leg (positive amount on the destination).
+        // Heuristic: the row whose own account is the source has amount > 0
+        // depending on storage, but we don't strictly know — list both legs and
+        // mark from/to with the account names of each leg.
+        const orderedPairs = Object.entries(byPair).sort(([, a], [, b]) =>
+            parseISO(a[0].date.slice(0, 10)).getTime() - parseISO(b[0].date.slice(0, 10)).getTime()
+        );
+        for (const [, legs] of orderedPairs) {
+            if (legs.length === 2) {
+                const [legA, legB] = legs;
+                const nameA = legA.account_id ? (accountMap[legA.account_id]?.name || '') : '';
+                const nameB = legB.account_id ? (accountMap[legB.account_id]?.name || '') : '';
+                renderRow(legA, nameA, nameB);
+                renderRow(legB, nameB, nameA);
+            } else {
+                for (const tx of legs) {
+                    const own = tx.account_id ? (accountMap[tx.account_id]?.name || '') : '';
+                    renderRow(tx, own, '(paired account)');
+                }
+            }
+        }
+        for (const tx of lonely) {
+            const own = tx.account_id ? (accountMap[tx.account_id]?.name || '') : '';
+            renderRow(tx, own, '');
+        }
+        lines.push(blank());
+    }
+
+    // ── Savings Goals ─────────────────────────────────────────────────────────
+    if (goals.length > 0) {
+        lines.push(heading('SAVINGS GOALS'));
+        lines.push(row(
+            'Goal', 'Currency', 'Target', 'Saved', 'Remaining',
+            '% Complete', 'Deadline', 'Days Left', 'Deposits',
+        ));
+        const today = new Date();
+        const sortedGoals = [...goals].sort((a, b) => {
+            const pa = a.target_amount > 0 ? a.current_amount / a.target_amount : 0;
+            const pb = b.target_amount > 0 ? b.current_amount / b.target_amount : 0;
+            return pb - pa;
+        });
+        for (const g of sortedGoals) {
+            const remaining = Math.max(0, g.target_amount - g.current_amount);
+            const pct = g.target_amount > 0 ? (g.current_amount / g.target_amount) * 100 : 0;
+            const daysLeft = g.deadline ? differenceInDays(parseISO(g.deadline), today) : null;
+            lines.push(row(
+                g.name,
+                g.currency,
+                g.target_amount.toFixed(2),
+                g.current_amount.toFixed(2),
+                remaining.toFixed(2),
+                `${pct.toFixed(1)}%`,
+                g.deadline || '',
+                daysLeft !== null ? String(daysLeft) : '',
+                String((depositsByGoal[g.id] || []).length),
+            ));
+        }
+        // Deposit log (only if any deposits exist) — nested under the goals.
+        if (deposits.length > 0) {
+            lines.push(blank());
+            lines.push(heading('SAVINGS DEPOSITS'));
+            lines.push(row('Goal', 'Date', 'Amount', 'Currency'));
+            const goalById = Object.fromEntries(goals.map(g => [g.id, g]));
+            const sortedDeposits = [...deposits].sort((a, b) => b.created_at.localeCompare(a.created_at));
+            for (const d of sortedDeposits) {
+                lines.push(row(
+                    goalById[d.goal_id]?.name || d.goal_id,
+                    d.created_at.slice(0, 10),
+                    Number(d.amount).toFixed(2),
+                    d.currency,
+                ));
+            }
+        }
+        lines.push(blank());
+    }
+
+    // ── Splits & Settlements (group exports only) ─────────────────────────────
+    if (isGroupScope && Object.keys(splitTotals).length > 0) {
+        lines.push(heading('SPLITS & SETTLEMENTS'));
+        lines.push(row(
+            'Member', `Paid For (${currency})`, `Owed To Them (${currency})`,
+            `They Owe (${currency})`, `Outstanding Owed To Them (${currency})`,
+            `Outstanding They Owe (${currency})`, `Net (${currency})`,
+        ));
+        const ordered = Object.values(splitTotals).sort((a, b) => b.paidFor - a.paidFor);
+        for (const m of ordered) {
+            const net = m.owed - m.owes;
+            lines.push(row(
+                m.name,
+                m.paidFor.toFixed(2),
+                m.owed.toFixed(2),
+                m.owes.toFixed(2),
+                m.outstandingOwed.toFixed(2),
+                m.outstandingOwes.toFixed(2),
+                net.toFixed(2),
+            ));
+        }
+        lines.push(blank());
+    }
+
     // ── Section 8b: Recurring Templates ───────────────────────────────────────
     if (recurringTemplates.length > 0) {
         lines.push(heading('RECURRING TEMPLATES'));
         lines.push(row(
-            'Description', 'Category', 'Amount', 'Currency',
-            'Frequency', 'Next Occurrence', 'Active', 'Group', 'Payment Method'
+            'Description', 'Category', 'Type', 'Amount', 'Currency',
+            'Frequency', 'Next Occurrence', 'Active',
+            'Trial Ends', 'Paused Until', 'Group', 'Payment Method',
         ));
         const sortedTemplates = [...recurringTemplates].sort((a, b) => a.next_occurrence.localeCompare(b.next_occurrence));
         sortedTemplates.forEach(t => {
             const group = t.group_id ? groupMap[t.group_id] : null;
+            const meta = t.metadata || {};
+            const trialEnds = typeof meta.trial_ends_at === 'string' ? meta.trial_ends_at.slice(0, 10) : '';
+            const pauseUntil = typeof meta.pause_until === 'string' ? meta.pause_until.slice(0, 10) : '';
             lines.push(row(
                 t.description,
                 t.category.charAt(0).toUpperCase() + t.category.slice(1),
+                t.is_income ? 'Income' : 'Expense',
                 Number(t.amount).toFixed(2),
                 t.currency,
                 t.frequency.charAt(0).toUpperCase() + t.frequency.slice(1),
                 t.next_occurrence,
                 t.is_active ? 'Yes' : 'No',
+                trialEnds,
+                pauseUntil,
                 group?.name || '',
                 t.payment_method || '',
             ));
@@ -699,32 +1061,47 @@ export const generateCSV = (
     lines.push(heading('TRANSACTION DETAILS'));
     lines.push(row(
         'Date', 'Description', 'Category', 'Type',
-        'Bucket', 'Group', 'Payment Method',
+        'Bucket', 'Group', 'Account', 'Payment Method',
         `Amount (Original)`, 'Original Currency',
         `Converted Amount (${currency})`,
-        'Location', 'Tags', 'Notes', 'Recurring', 'Excluded from Allowance'
+        'Location', 'Address', 'Lat', 'Lng',
+        'Tags', 'Notes',
+        'Recurring', 'Transfer', 'Receipt', 'Splits (paid/total)', 'Excluded from Allowance'
     ));
     sorted.forEach(tx => {
         const converted = resolveAmount(tx, currency, convertAmount);
-        const isIncome = converted < 0 || tx.category === 'income';
+        const isIncome = tx.is_income === true || converted < 0 || tx.category === 'income';
         const bucket = tx.bucket_id ? bucketMap[tx.bucket_id] : null;
         const group = tx.group_id ? groupMap[tx.group_id] : null;
+        const account = tx.account_id ? accountMap[tx.account_id] : null;
         const dateObj = parseISO(tx.date.slice(0, 10));
+        const splitCount = Array.isArray(tx.splits) ? tx.splits.length : 0;
+        const splitPaid = Array.isArray(tx.splits) ? tx.splits.filter(s => s.is_paid).length : 0;
+        const type = tx.is_settlement ? 'Settlement'
+            : tx.is_transfer ? 'Transfer'
+            : isIncome ? 'Income' : 'Expense';
         lines.push(row(
             format(dateObj, 'yyyy-MM-dd'),
             tx.description,
             tx.is_settlement ? 'Settlement' : tx.category.charAt(0).toUpperCase() + tx.category.slice(1),
-            tx.is_settlement ? 'Settlement' : isIncome ? 'Income' : 'Expense',
+            type,
             bucket?.name || '',
             group?.name || '',
+            account?.name || '',
             tx.payment_method || '',
             Number(tx.amount).toFixed(2),
             tx.currency || currency,
             Math.abs(converted).toFixed(2),
             tx.place_name || '',
+            tx.place_address || '',
+            tx.place_lat != null ? String(tx.place_lat) : '',
+            tx.place_lng != null ? String(tx.place_lng) : '',
             Array.isArray(tx.tags) && tx.tags.length ? tx.tags.join('; ') : '',
             tx.notes || '',
             tx.is_recurring ? 'Yes' : 'No',
+            tx.is_transfer ? 'Yes' : 'No',
+            tx.receipt_path ? 'Yes' : 'No',
+            splitCount > 0 ? `${splitPaid}/${splitCount}` : '',
             tx.exclude_from_allowance ? 'Yes' : 'No',
         ));
     });
@@ -761,9 +1138,15 @@ export const generatePDF = async (
     buckets: Bucket[] = [],
     groups: Group[] = [],
     reportRange?: DateRange,
-    ownerInfo?: { email?: string; avatarUrl?: string | null; workspaceName?: string; monthlyBudget?: number },
-    recurringTemplates: ExportRecurringTemplate[] = []
+    context: ExportContext = {}
 ) => {
+    const {
+        email, avatarUrl, workspaceName, monthlyBudget,
+        accounts = [], goals = [], deposits = [],
+        recurringTemplates = [], isGroupScope = false,
+    } = context;
+    const accountMap = Object.fromEntries(accounts.map(a => [a.id, a]));
+    void deposits;
     const [{ default: jsPDFCtor }, { default: autoTable }] = await Promise.all([
         import('jspdf'),
         import('jspdf-autotable'),
@@ -789,7 +1172,7 @@ export const generatePDF = async (
             .replace('Mex$', ' MXN ').replace('C$', ' CAD ').replace('A$', ' AUD ')
             .replace('RM', ' MYR ').replace('R$', ' BRL ').replace('Rp', ' IDR ');
 
-    const stats = computeStats(transactions, currency, convertAmount, buckets, reportRange, ownerInfo?.monthlyBudget);
+    const stats = computeStats(transactions, currency, convertAmount, buckets, reportRange, monthlyBudget);
     const {
         totalExpenses, totalIncome, recurringTotal,
         expenseTxCount, incomeTxCount,
@@ -803,6 +1186,8 @@ export const generatePDF = async (
         firstTxDate, lastTxDate, forecast,
         topMerchantsByVisits,
         topCategory, busiestDay,
+        accountTotals, transferTotal, transferCount, transfers,
+        splitTotals, receiptedCount, receiptCoveragePct,
     } = stats;
 
     const topExpenses = [...transactions]
@@ -822,10 +1207,10 @@ export const generatePDF = async (
     doc.text('Expense Audit Report', 14, 18);
     doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
 
-    if (ownerInfo?.workspaceName) {
+    if (workspaceName) {
         doc.setTextColor(220, 200, 255);
         doc.setFontSize(10); doc.setFont('helvetica', 'bold');
-        doc.text(ownerInfo.workspaceName, 14, 26);
+        doc.text(workspaceName, 14, 26);
         doc.setFont('helvetica', 'normal');
     }
 
@@ -844,17 +1229,17 @@ export const generatePDF = async (
     doc.setTextColor(200, 185, 240); doc.setFontSize(7.5);
     doc.text(`All amounts in ${currency}`, pageWidth - 14, 33, { align: 'right' });
 
-    if (ownerInfo) {
-        if (ownerInfo.avatarUrl) {
-            try {
-                const img = await loadImage(ownerInfo.avatarUrl);
-                doc.addImage(img, 'JPEG', pageWidth - 28, 8, 14, 14, undefined, 'FAST');
-            } catch (err) {
-                console.error('[export] avatar load failed', ownerInfo.avatarUrl, err);
-            }
+    if (avatarUrl) {
+        try {
+            const img = await loadImage(avatarUrl);
+            doc.addImage(img, 'JPEG', pageWidth - 28, 8, 14, 14, undefined, 'FAST');
+        } catch (err) {
+            console.error('[export] avatar load failed', avatarUrl, err);
         }
+    }
+    if (email) {
         doc.setFontSize(8); doc.setTextColor(200, 185, 240);
-        doc.text(ownerInfo.email || '', pageWidth - 14, 39, { align: 'right' });
+        doc.text(email, pageWidth - 14, 39, { align: 'right' });
     }
 
     // ── Summary row 1: Spent / Income / Net ──────────────────────────────────
@@ -1115,6 +1500,17 @@ export const generatePDF = async (
             y += cellH + 8;
         }
 
+        // Receipt coverage line — surfaces a number that's only otherwise
+        // visible by spot-checking receipts in the gallery.
+        if (expenseTxCount > 0) {
+            doc.setFontSize(8); doc.setTextColor(80, 80, 80);
+            doc.text(
+                `Receipts attached: ${receiptedCount} of ${expenseTxCount} expenses (${receiptCoveragePct.toFixed(0)}%)`,
+                14, y,
+            );
+            y += 6;
+        }
+
         // Forecast box
         if (forecast) {
             doc.setFontSize(11); doc.setFont('helvetica', 'bold'); doc.setTextColor(50, 50, 50);
@@ -1227,6 +1623,236 @@ export const generatePDF = async (
         }
     }
 
+    // ── Accounts / Transfers / Goals / Splits ────────────────────────────────
+    // All four ride on the same page-bookkeeping helper so we can grow without
+    // collisions. ensureRoom() page-breaks if there isn't enough vertical room
+    // for the next section's header.
+    const accountIdsWithActivity = Object.keys(accountTotals);
+    const hasUnassigned = transactions.some(tx => !tx.account_id && !tx.is_transfer);
+    const showAccounts = accounts.length > 0 && (accountIdsWithActivity.length > 0 || hasUnassigned);
+    const showTransfers = transfers.length > 0;
+    const showGoals = goals.length > 0;
+    const showSplits = isGroupScope && Object.keys(splitTotals).length > 0;
+
+    if (showAccounts || showTransfers || showGoals || showSplits) {
+        doc.addPage();
+        let extrasY = 18;
+        const ensureRoom = (needed: number) => {
+            if (extrasY + needed > pageHeight - 14) {
+                doc.addPage();
+                extrasY = 18;
+            }
+        };
+
+        if (showAccounts) {
+            ensureRoom(20);
+            doc.setFontSize(13); doc.setFont('helvetica', 'bold'); doc.setTextColor(50, 50, 50);
+            doc.text('Account Breakdown', 14, extrasY);
+            doc.setFont('helvetica', 'normal');
+            extrasY += 4;
+            const ordered = accounts
+                .filter(a => accountTotals[a.id])
+                .sort((a, b) => {
+                    const aNet = (accountTotals[a.id]?.income || 0) - (accountTotals[a.id]?.spent || 0);
+                    const bNet = (accountTotals[b.id]?.income || 0) - (accountTotals[b.id]?.spent || 0);
+                    return bNet - aNet;
+                });
+            const accountRows: (string | number)[][] = ordered.map(a => {
+                const t = accountTotals[a.id];
+                const net = t.income - t.spent;
+                return [
+                    a.name + (a.is_primary ? ' *' : ''),
+                    ACCOUNT_TYPE_LABELS[a.type] || a.type,
+                    a.currency,
+                    formatForPDF(t.spent, currency),
+                    formatForPDF(t.income, currency),
+                    formatForPDF(net, currency),
+                    String(t.txCount),
+                ];
+            });
+            if (hasUnassigned) {
+                const u = transactions.reduce((acc, tx) => {
+                    if (tx.account_id || tx.is_transfer) return acc;
+                    const amt = Math.abs(resolveAmount(tx, currency, convertAmount));
+                    const isIncome = tx.is_income === true || tx.category === 'income';
+                    if (isIncome) acc.income += amt; else acc.spent += amt;
+                    acc.txCount += 1;
+                    return acc;
+                }, { spent: 0, income: 0, txCount: 0 });
+                if (u.txCount > 0) {
+                    accountRows.push([
+                        '(Unassigned)', '', '',
+                        formatForPDF(u.spent, currency),
+                        formatForPDF(u.income, currency),
+                        formatForPDF(u.income - u.spent, currency),
+                        String(u.txCount),
+                    ]);
+                }
+            }
+            autoTable(doc, {
+                head: [['Account', 'Type', 'Currency', 'Spent', 'Income', 'Net', 'Tx']],
+                body: accountRows,
+                startY: extrasY,
+                theme: 'striped',
+                headStyles: { fillColor: [138, 43, 226], textColor: [255, 255, 255] },
+                styles: { fontSize: 8, cellPadding: 2 },
+                columnStyles: { 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right' }, 6: { halign: 'right' } },
+                margin: { left: 14, right: 14 },
+            });
+            extrasY = ext(doc).lastAutoTable.finalY + 4;
+            doc.setFontSize(6.5); doc.setTextColor(150, 150, 150);
+            doc.text('* = primary account', 14, extrasY);
+            extrasY += 8;
+        }
+
+        if (showTransfers) {
+            ensureRoom(20);
+            doc.setFontSize(13); doc.setFont('helvetica', 'bold'); doc.setTextColor(50, 50, 50);
+            doc.text('Transfers', 14, extrasY);
+            doc.setFont('helvetica', 'normal');
+            extrasY += 4;
+            const byPair: Record<string, ExportTransaction[]> = {};
+            const lonely: ExportTransaction[] = [];
+            for (const tx of transfers) {
+                const key = tx.transfer_pair_id || '';
+                if (!key) lonely.push(tx);
+                else (byPair[key] ||= []).push(tx);
+            }
+            const transferRows: string[][] = [];
+            const pushRow = (date: string, desc: string, from: string, to: string, amt: string) => {
+                transferRows.push([date, desc, from, to, amt]);
+            };
+            const sortedPairs = Object.entries(byPair).sort(([, a], [, b]) =>
+                parseISO(a[0].date.slice(0, 10)).getTime() - parseISO(b[0].date.slice(0, 10)).getTime()
+            );
+            for (const [, legs] of sortedPairs) {
+                const top = legs[0];
+                const dateStr = format(parseISO(top.date.slice(0, 10)), 'MMM d, yy');
+                const desc = top.description.length > 22 ? top.description.substring(0, 20) + '..' : top.description;
+                if (legs.length === 2) {
+                    const [legA, legB] = legs;
+                    const nameA = legA.account_id ? (accountMap[legA.account_id]?.name || '?') : '?';
+                    const nameB = legB.account_id ? (accountMap[legB.account_id]?.name || '?') : '?';
+                    const amt = formatForPDF(Math.abs(resolveAmount(top, currency, convertAmount)), currency);
+                    pushRow(dateStr, desc, nameA, nameB, amt);
+                } else {
+                    for (const tx of legs) {
+                        const own = tx.account_id ? (accountMap[tx.account_id]?.name || '?') : '?';
+                        pushRow(
+                            format(parseISO(tx.date.slice(0, 10)), 'MMM d, yy'),
+                            tx.description.length > 22 ? tx.description.substring(0, 20) + '..' : tx.description,
+                            own, '(paired)',
+                            formatForPDF(Math.abs(resolveAmount(tx, currency, convertAmount)), currency),
+                        );
+                    }
+                }
+            }
+            for (const tx of lonely) {
+                const own = tx.account_id ? (accountMap[tx.account_id]?.name || '?') : '?';
+                pushRow(
+                    format(parseISO(tx.date.slice(0, 10)), 'MMM d, yy'),
+                    tx.description.length > 22 ? tx.description.substring(0, 20) + '..' : tx.description,
+                    own, '',
+                    formatForPDF(Math.abs(resolveAmount(tx, currency, convertAmount)), currency),
+                );
+            }
+            autoTable(doc, {
+                head: [['Date', 'Description', 'From', 'To', 'Amount']],
+                body: transferRows,
+                startY: extrasY,
+                theme: 'striped',
+                headStyles: { fillColor: [99, 102, 241], textColor: [255, 255, 255] },
+                styles: { fontSize: 8, cellPadding: 2 },
+                columnStyles: { 4: { halign: 'right' } },
+                margin: { left: 14, right: 14 },
+            });
+            extrasY = ext(doc).lastAutoTable.finalY + 8;
+        }
+
+        if (showGoals) {
+            ensureRoom(20 + Math.min(goals.length, 6) * 12);
+            doc.setFontSize(13); doc.setFont('helvetica', 'bold'); doc.setTextColor(50, 50, 50);
+            doc.text('Savings Goals', 14, extrasY);
+            doc.setFont('helvetica', 'normal');
+            extrasY += 6;
+
+            const today = new Date();
+            const sortedGoals = [...goals].sort((a, b) => {
+                const pa = a.target_amount > 0 ? a.current_amount / a.target_amount : 0;
+                const pb = b.target_amount > 0 ? b.current_amount / b.target_amount : 0;
+                return pb - pa;
+            });
+            for (const g of sortedGoals) {
+                ensureRoom(16);
+                const pct = g.target_amount > 0 ? Math.min(100, (g.current_amount / g.target_amount) * 100) : 0;
+                const daysLeft = g.deadline ? differenceInDays(parseISO(g.deadline), today) : null;
+                doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(50, 50, 50);
+                const goalName = g.name.length > 32 ? g.name.substring(0, 30) + '..' : g.name;
+                doc.text(goalName, 14, extrasY);
+                doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor(130, 130, 130);
+                doc.text(`${pct.toFixed(0)}%`, pageWidth - 14, extrasY, { align: 'right' });
+
+                doc.setFontSize(7.5); doc.setTextColor(80, 80, 80);
+                doc.text(
+                    `${formatForPDF(g.current_amount, g.currency)} of ${formatForPDF(g.target_amount, g.currency)}`,
+                    14, extrasY + 5,
+                );
+                if (g.deadline) {
+                    doc.setTextColor(120, 120, 120);
+                    const due = format(parseISO(g.deadline), 'MMM d, yyyy');
+                    const tag = daysLeft != null
+                        ? (daysLeft < 0 ? `overdue · ${Math.abs(daysLeft)}d ago` : `${daysLeft}d left`)
+                        : '';
+                    doc.text(`Due ${due}${tag ? ' · ' + tag : ''}`, pageWidth - 14, extrasY + 5, { align: 'right' });
+                }
+                const barColor: [number, number, number] = pct >= 100 ? [16, 185, 129] : [138, 43, 226];
+                drawProgressBar(doc, pct, 14, extrasY + 7, pageWidth - 28, 3, barColor);
+                extrasY += 14;
+            }
+            extrasY += 4;
+        }
+
+        if (showSplits) {
+            ensureRoom(30);
+            doc.setFontSize(13); doc.setFont('helvetica', 'bold'); doc.setTextColor(50, 50, 50);
+            doc.text('Splits & Settlements', 14, extrasY);
+            doc.setFont('helvetica', 'normal');
+            extrasY += 4;
+            const ordered = Object.values(splitTotals).sort((a, b) => b.paidFor - a.paidFor);
+            const splitRows = ordered.map(m => {
+                const net = m.owed - m.owes;
+                return [
+                    m.name,
+                    formatForPDF(m.paidFor, currency),
+                    formatForPDF(m.owed, currency),
+                    formatForPDF(m.owes, currency),
+                    formatForPDF(m.outstandingOwed, currency),
+                    formatForPDF(m.outstandingOwes, currency),
+                    formatForPDF(net, currency),
+                ];
+            });
+            autoTable(doc, {
+                head: [['Member', 'Paid', 'Owed To Them', 'They Owe', 'Outstanding Owed', 'Outstanding Owes', 'Net']],
+                body: splitRows,
+                startY: extrasY,
+                theme: 'striped',
+                headStyles: { fillColor: [255, 20, 147], textColor: [255, 255, 255] },
+                styles: { fontSize: 7.5, cellPadding: 2 },
+                columnStyles: {
+                    1: { halign: 'right' }, 2: { halign: 'right' }, 3: { halign: 'right' },
+                    4: { halign: 'right' }, 5: { halign: 'right' }, 6: { halign: 'right' },
+                },
+                margin: { left: 14, right: 14 },
+            });
+            extrasY = ext(doc).lastAutoTable.finalY + 4;
+            doc.setFontSize(6.5); doc.setTextColor(150, 150, 150);
+            doc.text(
+                'Paid = sum of bills this member fronted · Owed To Them = others\' shares · They Owe = their shares of others\' bills · Outstanding = unsettled portion',
+                14, extrasY,
+            );
+        }
+    }
+
     // ── Recurring Templates (own page so it doesn't fight the transaction list) ──
     if (recurringTemplates.length > 0) {
         doc.addPage();
@@ -1235,23 +1861,31 @@ export const generatePDF = async (
         doc.setFont('helvetica', 'normal');
 
         const sortedTemplates = [...recurringTemplates].sort((a, b) => a.next_occurrence.localeCompare(b.next_occurrence));
-        const templateRows = sortedTemplates.map(t => [
-            t.description.length > 24 ? t.description.substring(0, 22) + '..' : t.description,
-            t.category.charAt(0).toUpperCase() + t.category.slice(1),
-            t.frequency.charAt(0).toUpperCase() + t.frequency.slice(1),
-            t.next_occurrence,
-            formatForPDF(Number(t.amount), t.currency),
-            t.is_active ? 'Active' : 'Paused',
-        ]);
+        const templateRows = sortedTemplates.map(t => {
+            const meta = t.metadata || {};
+            const trialEnds = typeof meta.trial_ends_at === 'string' ? meta.trial_ends_at.slice(0, 10) : '';
+            const pauseUntil = typeof meta.pause_until === 'string' ? meta.pause_until.slice(0, 10) : '';
+            const flag = trialEnds ? `Trial → ${trialEnds}` : pauseUntil ? `Paused → ${pauseUntil}` : '';
+            return [
+                t.description.length > 24 ? t.description.substring(0, 22) + '..' : t.description,
+                t.category.charAt(0).toUpperCase() + t.category.slice(1),
+                t.is_income ? 'Income' : 'Expense',
+                t.frequency.charAt(0).toUpperCase() + t.frequency.slice(1),
+                t.next_occurrence,
+                formatForPDF(Number(t.amount), t.currency),
+                t.is_active ? 'Active' : 'Paused',
+                flag,
+            ];
+        });
 
         autoTable(doc, {
-            head: [['Description', 'Category', 'Frequency', 'Next Due', 'Amount', 'Status']],
+            head: [['Description', 'Category', 'Type', 'Frequency', 'Next Due', 'Amount', 'Status', 'Notes']],
             body: templateRows,
             startY: 24,
             theme: 'striped',
             headStyles: { fillColor: [138, 43, 226], textColor: [255, 255, 255] },
             styles: { fontSize: 8, cellPadding: 2 },
-            columnStyles: { 4: { halign: 'right' } },
+            columnStyles: { 5: { halign: 'right' } },
             margin: { top: 20 },
         });
     }
@@ -1264,25 +1898,40 @@ export const generatePDF = async (
 
     const hasNotes = transactions.some(tx => tx.notes);
     const hasTags = transactions.some(tx => Array.isArray(tx.tags) && tx.tags.length > 0);
+    const hasAccounts = accounts.length > 0 && transactions.some(tx => tx.account_id);
+    const hasReceipts = transactions.some(tx => tx.receipt_path);
+    const hasTransfers = transferCount > 0;
     const tableColumns = ['Date', 'Description', 'Category', 'Bucket', 'Payment', 'Amount'];
+    if (hasAccounts) tableColumns.splice(4, 0, 'Account');
     if (hasTags) tableColumns.push('Tags');
     if (hasNotes) tableColumns.push('Notes');
 
+    const amountColIdx = tableColumns.indexOf('Amount');
+
     const tableRows = sortedTx.map(tx => {
         const bucket = tx.bucket_id ? bucketMap[tx.bucket_id] : null;
+        const account = tx.account_id ? accountMap[tx.account_id] : null;
         const rawAmount = resolveAmount(tx, currency, convertAmount);
-        const isIncome = rawAmount < 0 || tx.category === 'income';
+        const isIncome = tx.is_income === true || rawAmount < 0 || tx.category === 'income';
         const displayAmount = isIncome
             ? `+${formatForPDF(Math.abs(rawAmount), currency)}`
-            : formatForPDF(rawAmount, currency);
-        const row = [
+            : formatForPDF(Math.abs(rawAmount), currency);
+        const markers: string[] = [];
+        if (tx.is_settlement) markers.push('[S]');
+        else if (tx.is_transfer) markers.push('[T]');
+        else if (tx.is_recurring) markers.push('[R]');
+        if (tx.receipt_path) markers.push('[*]');
+        const prefix = markers.length ? markers.join(' ') + ' ' : '';
+        const descBody = tx.description.length > 22 ? tx.description.substring(0, 20) + '..' : tx.description;
+        const row: string[] = [
             format(parseISO(tx.date.slice(0, 10)), 'MMM d, yy'),
-            (tx.is_settlement ? '[S] ' : tx.is_recurring ? '[R] ' : '') + (tx.description.length > 22 ? tx.description.substring(0, 20) + '..' : tx.description),
-            tx.is_settlement ? 'Settlement' : tx.category.charAt(0).toUpperCase() + tx.category.slice(1),
+            prefix + descBody,
+            tx.is_settlement ? 'Settlement' : tx.is_transfer ? 'Transfer' : tx.category.charAt(0).toUpperCase() + tx.category.slice(1),
             bucket?.name || '-',
-            tx.payment_method || '-',
-            displayAmount,
         ];
+        if (hasAccounts) row.push(account?.name || '-');
+        row.push(tx.payment_method || '-');
+        row.push(displayAmount);
         if (hasTags) {
             const t = Array.isArray(tx.tags) && tx.tags.length ? tx.tags.join(', ') : '';
             row.push(t.length > 18 ? t.substring(0, 16) + '..' : t);
@@ -1298,18 +1947,21 @@ export const generatePDF = async (
         theme: 'striped',
         headStyles: { fillColor: [138, 43, 226], textColor: [255, 255, 255] },
         styles: { fontSize: 7.5, cellPadding: 2 },
-        columnStyles: { 5: { halign: 'right' } },
+        columnStyles: amountColIdx >= 0 ? { [amountColIdx]: { halign: 'right' } } : {},
         margin: { top: 20 },
     });
 
     // ── Footnotes below transaction table ─────────────────────────────────────
     const footnotesY = ext(doc).lastAutoTable.finalY + 5;
     const hasMultiCurrency = transactions.some(tx => tx.currency && tx.currency !== currency);
+    const markerLegend: string[] = ['[R] = Recurring', '[S] = Settlement'];
+    if (hasTransfers) markerLegend.push('[T] = Transfer');
+    if (hasReceipts) markerLegend.push('[*] = Receipt attached');
     const footnotes: string[] = [
-        '[R] = Recurring transaction · [S] = Settlement',
+        markerLegend.join(' · '),
         'Income rows are shown with a + prefix',
     ];
-    if (hasMultiCurrency) footnotes.push(`* Amounts converted to ${currency} using rates at time of import`);
+    if (hasMultiCurrency) footnotes.push(`Amounts converted to ${currency} using rates at time of import`);
 
     doc.setFontSize(7); doc.setTextColor(150, 150, 150);
     footnotes.forEach((note, i) => {

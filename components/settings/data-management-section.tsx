@@ -53,7 +53,7 @@ export function DataManagementSection({ loading, onImport, onExportCSV, onExport
                 >
                     <CalendarDays className="w-5 h-5 text-primary group-hover:scale-110 transition-transform" />
                     <span className="text-xs font-medium">{icsLoading ? 'Building calendar...' : 'Export to Calendar (.ics)'}</span>
-                    <span className="text-[10px] text-muted-foreground">Bills, goals & bucket deadlines</span>
+                    <span className="text-[10px] text-muted-foreground">Bills, income, goals, buckets & trial endings</span>
                 </Button>
                 <Button
                     variant="outline"
