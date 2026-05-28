@@ -3,12 +3,13 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { UserPlus, Copy } from 'lucide-react';
+import { UserPlus, Copy, ScanLine, QrCode } from 'lucide-react';
 import { NoviraQrCode } from '@/components/ui/qr-code';
 import { QrScanner } from '@/components/ui/qr-scanner';
 import { useGroupsActions } from '@/components/providers/groups-provider';
 import { toast } from '@/utils/haptics';
 import { getErrorMessage } from '@/lib/error-utils';
+import { cn } from '@/lib/utils';
 
 interface AddFriendDialogProps {
     userId: string | null;
@@ -42,7 +43,7 @@ export function AddFriendDialog({ userId, open, onOpenChange }: AddFriendDialogP
             }
             setFriendEmail('');
             setIsOpen(false);
-            toast.success('Friend request sent!');
+            toast.success('Friend request sent');
         } catch (error) {
             toast.error(getErrorMessage(error, 'Failed to add friend'));
         } finally {
@@ -50,52 +51,73 @@ export function AddFriendDialog({ userId, open, onOpenChange }: AddFriendDialogP
         }
     };
 
+    const triggerClasses = cn(
+        'rounded-md text-[11px] font-medium tracking-tight h-7 data-[state=active]:text-primary text-muted-foreground/70 data-[state=active]:bg-primary/10 transition-colors gap-1.5',
+    );
+
     return (
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
             {!isControlled && (
                 <DialogTrigger asChild>
-                    <button className="p-2 rounded-full bg-primary/20 hover:bg-primary/30 text-primary transition-colors border border-primary/20">
-                        <UserPlus className="w-5 h-5" />
+                    <button className="h-9 w-9 inline-flex items-center justify-center rounded-full text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors">
+                        <UserPlus className="w-[18px] h-[18px]" />
                     </button>
                 </DialogTrigger>
             )}
-            <DialogContent className="max-w-[400px] w-[95vw] rounded-3xl border-white/10 bg-card/90 backdrop-blur-xl p-0 overflow-hidden shadow-2xl">
-                <div className="p-6 space-y-4 w-full max-w-full overflow-hidden flex flex-col box-border">
-                    <DialogHeader className="text-left px-0 w-full">
-                        <DialogTitle>Add Friend</DialogTitle>
-                        <DialogDescription className="truncate">Add a friend by email or scan their code.</DialogDescription>
+            <DialogContent className="max-w-[400px] w-[95vw] rounded-[28px] border-white/[0.08] bg-card/95 backdrop-blur-2xl p-0 overflow-hidden shadow-2xl">
+                <div className="p-5 space-y-4">
+                    <DialogHeader className="text-left flex-row items-start gap-3 space-y-0">
+                        <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 bg-primary/[0.06]">
+                            <UserPlus className="w-[18px] h-[18px] text-primary" />
+                        </div>
+                        <div className="min-w-0">
+                            <DialogTitle className="text-[15px] font-semibold tracking-tight">Add a friend</DialogTitle>
+                            <DialogDescription className="text-[12px] mt-0.5">
+                                By email, ID, or by scanning a code.
+                            </DialogDescription>
+                        </div>
                     </DialogHeader>
 
-                    <Tabs defaultValue="email" className="w-full mt-2">
-                        <TabsList className="grid w-full grid-cols-3 bg-secondary/20 p-1 rounded-xl h-9">
-                            <TabsTrigger value="email" className="rounded-lg text-xs font-medium data-[state=active]:bg-primary data-[state=active]:text-white transition-all">Email / ID</TabsTrigger>
-                            <TabsTrigger value="scan" className="rounded-lg text-xs font-medium data-[state=active]:bg-primary data-[state=active]:text-white transition-all">Scan</TabsTrigger>
-                            <TabsTrigger value="code" className="rounded-lg text-xs font-medium data-[state=active]:bg-primary data-[state=active]:text-white transition-all">My Code</TabsTrigger>
+                    <Tabs defaultValue="email" className="w-full">
+                        <TabsList className="grid w-full grid-cols-3 bg-secondary/15 p-0.5 rounded-lg h-8">
+                            <TabsTrigger value="email" className={triggerClasses}>
+                                <UserPlus className="w-3 h-3" />
+                                Email
+                            </TabsTrigger>
+                            <TabsTrigger value="scan" className={triggerClasses}>
+                                <ScanLine className="w-3 h-3" />
+                                Scan
+                            </TabsTrigger>
+                            <TabsTrigger value="code" className={triggerClasses}>
+                                <QrCode className="w-3 h-3" />
+                                My code
+                            </TabsTrigger>
                         </TabsList>
 
-                        <TabsContent value="email" className="space-y-4 py-4">
-                            <div className="space-y-2">
-                                <Input
-                                    id="friend-email"
-                                    name="friend-email"
-                                    autoComplete="email"
-                                    placeholder="friend@example.com or User ID"
-                                    value={friendEmail}
-                                    onChange={(e) => setFriendEmail(e.target.value)}
-                                    className="bg-secondary/20 border-white/5 h-12 rounded-2xl"
-                                />
-                            </div>
+                        <TabsContent value="email" className="space-y-3 pt-4 focus-visible:outline-none">
+                            <Input
+                                id="friend-email"
+                                name="friend-email"
+                                autoComplete="email"
+                                placeholder="friend@example.com or user ID"
+                                value={friendEmail}
+                                onChange={(e) => setFriendEmail(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') handleAddFriend();
+                                }}
+                                className="bg-secondary/20 border-white/[0.06] h-11 rounded-xl"
+                            />
                             <Button
                                 onClick={handleAddFriend}
-                                disabled={isProcessing}
-                                className="w-full h-12 rounded-2xl bg-primary hover:bg-primary/90 text-white font-bold transition-colors"
+                                disabled={isProcessing || !friendEmail.trim()}
+                                className="w-full h-11 rounded-xl bg-primary hover:bg-primary/90 text-white font-semibold transition-colors disabled:opacity-60"
                             >
-                                {isProcessing ? 'Sending...' : 'Send Friend Request'}
+                                {isProcessing ? 'Sending…' : 'Send request'}
                             </Button>
                         </TabsContent>
 
-                        <TabsContent value="scan" className="py-4 space-y-2">
-                            <div className="h-64 w-full bg-black rounded-2xl overflow-hidden relative border border-white/10">
+                        <TabsContent value="scan" className="pt-4 space-y-2 focus-visible:outline-none">
+                            <div className="aspect-square w-full bg-black rounded-2xl overflow-hidden relative border border-white/[0.08]">
                                 <QrScanner
                                     onScan={async (scannedId) => {
                                         if (isProcessing) return;
@@ -103,7 +125,7 @@ export function AddFriendDialog({ userId, open, onOpenChange }: AddFriendDialogP
                                         try {
                                             await addFriendById(scannedId);
                                             setIsOpen(false);
-                                            toast.success('Friend request sent!');
+                                            toast.success('Friend request sent');
                                         } catch (error) {
                                             const msg = getErrorMessage(error, 'Failed to add friend');
                                             if (msg !== 'You are already friends (or have a pending request) with this user') {
@@ -120,32 +142,29 @@ export function AddFriendDialog({ userId, open, onOpenChange }: AddFriendDialogP
                                 />
                             </div>
                             <p className="text-[11px] text-center text-muted-foreground">
-                                Align the QR code within the frame to scan.
+                                Align the QR code within the frame.
                             </p>
                         </TabsContent>
 
-                        <TabsContent value="code" className="py-6 space-y-6 flex flex-col items-center">
-                            <div className="relative group">
-                                <div className="absolute -inset-1 bg-gradient-to-r from-violet-600 to-pink-600 rounded-[2rem] blur opacity-40 group-hover:opacity-75 transition duration-500"></div>
-                                <div className="relative">
-                                    <NoviraQrCode value={userId || ''} width={220} height={220} />
-                                </div>
+                        <TabsContent value="code" className="pt-4 flex flex-col items-center gap-4 focus-visible:outline-none">
+                            <div className="p-3 rounded-3xl bg-white">
+                                <NoviraQrCode value={userId || ''} width={200} height={200} />
                             </div>
-                            <p className="text-xs text-muted-foreground text-center px-4 max-w-[200px] leading-relaxed">
-                                Let your friend scan this code to add you instantly.
+                            <p className="text-[11px] text-muted-foreground text-center max-w-[220px] leading-relaxed">
+                                Have your friend scan this from their device.
                             </p>
                             <Button
-                                variant="outline"
-                                className="h-10 rounded-xl gap-2 text-xs border-white/10"
+                                variant="ghost"
+                                className="h-9 rounded-full gap-1.5 text-[12px] font-medium text-primary hover:bg-primary/10"
                                 onClick={() => {
                                     if (userId) {
                                         navigator.clipboard.writeText(userId);
-                                        toast.success('User ID copied to clipboard');
+                                        toast.success('Code copied');
                                     }
                                 }}
                             >
                                 <Copy className="w-3.5 h-3.5" />
-                                Copy My Code
+                                Copy my code
                             </Button>
                         </TabsContent>
                     </Tabs>

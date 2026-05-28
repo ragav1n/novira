@@ -20,6 +20,21 @@ interface BucketDialogProps {
     editingBucket?: Bucket | null;
 }
 
+const ICONS = [
+    { name: 'Tag', label: 'Tag', icon: Tag },
+    { name: 'Plane', label: 'Trip', icon: Plane },
+    { name: 'Home', label: 'Home', icon: Home },
+    { name: 'Gift', label: 'Gift', icon: Gift },
+    { name: 'Car', label: 'Car', icon: Car },
+    { name: 'Utensils', label: 'Food', icon: Utensils },
+    { name: 'ShoppingCart', label: 'Shop', icon: ShoppingCart },
+    { name: 'Heart', label: 'Health', icon: Heart },
+    { name: 'Gamepad2', label: 'Game', icon: Gamepad2 },
+    { name: 'Music', label: 'Music', icon: Music },
+    { name: 'Laptop', label: 'Tech', icon: Laptop },
+    { name: 'School', label: 'School', icon: School },
+];
+
 export function BucketDialog({ isOpen, onClose, editingBucket }: BucketDialogProps) {
     const { createBucket, updateBucket } = useBucketsList();
     const { currency, formatCurrency, userId } = useUserPreferences();
@@ -41,7 +56,7 @@ export function BucketDialog({ isOpen, onClose, editingBucket }: BucketDialogPro
                 setNewBucketIcon(editingBucket.icon || 'Tag');
                 setBucketDateRange({
                     from: editingBucket.start_date ? new Date(editingBucket.start_date) : undefined,
-                    to: editingBucket.end_date ? new Date(editingBucket.end_date) : undefined
+                    to: editingBucket.end_date ? new Date(editingBucket.end_date) : undefined,
                 });
                 setNewBucketCurrency(editingBucket.currency || currency || 'USD');
                 setAllowedCategories(editingBucket.allowed_categories || []);
@@ -57,8 +72,6 @@ export function BucketDialog({ isOpen, onClose, editingBucket }: BucketDialogPro
         }
     }, [isOpen, editingBucket, currency]);
 
-    // Fetch avg-last-3-months and same-month-last-year spending for the bucket
-    // being edited so the user can tap-to-fill instead of guessing.
     useEffect(() => {
         if (!isOpen || !editingBucket || !userId) {
             setBudgetSuggestions(null);
@@ -129,7 +142,7 @@ export function BucketDialog({ isOpen, onClose, editingBucket }: BucketDialogPro
                     start_date: bucketDateRange?.from?.toISOString(),
                     end_date: bucketDateRange?.to?.toISOString(),
                     currency: newBucketCurrency,
-                    allowed_categories: allowedCategories
+                    allowed_categories: allowedCategories,
                 });
                 toast.success('Bucket updated');
             } else {
@@ -141,7 +154,7 @@ export function BucketDialog({ isOpen, onClose, editingBucket }: BucketDialogPro
                     start_date: bucketDateRange?.from?.toISOString(),
                     end_date: bucketDateRange?.to?.toISOString(),
                     currency: newBucketCurrency,
-                    allowed_categories: allowedCategories
+                    allowed_categories: allowedCategories,
                 });
                 toast.success('Bucket created');
             }
@@ -154,211 +167,217 @@ export function BucketDialog({ isOpen, onClose, editingBucket }: BucketDialogPro
         }
     };
 
+    const ActiveIcon = ICONS.find(i => i.name === newBucketIcon)?.icon || Tag;
+
     return (
         <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-            <DialogContent className="max-w-[400px] w-[95vw] rounded-3xl border-white/10 bg-card/95 backdrop-blur-xl p-0 overflow-hidden shadow-2xl">
-                <div className="p-6 space-y-4 w-full max-w-full overflow-hidden flex flex-col box-border">
-                    <DialogHeader className="text-left px-0">
-                        <DialogTitle>{editingBucket ? 'Edit Bucket' : 'Create Bucket'}</DialogTitle>
-                        <DialogDescription>{editingBucket ? 'Modify your bucket details.' : 'Organize your private spending.'}</DialogDescription>
+            <DialogContent className="max-w-[420px] w-[95vw] rounded-[28px] border-white/[0.08] bg-card/95 backdrop-blur-2xl p-0 overflow-hidden shadow-2xl">
+                <div className="p-5 space-y-4 max-h-[88vh] overflow-y-auto">
+                    <DialogHeader className="text-left flex-row items-start gap-3 space-y-0">
+                        <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 bg-cyan-400/[0.08] text-cyan-400">
+                            <ActiveIcon className="w-[18px] h-[18px]" />
+                        </div>
+                        <div className="min-w-0">
+                            <DialogTitle className="text-[15px] font-semibold tracking-tight">
+                                {editingBucket ? 'Edit bucket' : 'New bucket'}
+                            </DialogTitle>
+                            <DialogDescription className="text-[12px] mt-0.5">
+                                {editingBucket ? 'Update name, budget, or category filter.' : 'Group spending under a private label.'}
+                            </DialogDescription>
+                        </div>
                     </DialogHeader>
-                    <div className="space-y-4 py-4">
-                        <div className="space-y-3 w-full overflow-hidden">
-                            <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest pl-1">Select Icon</p>
-                            <div className="flex gap-2 overflow-x-auto pb-4 px-1 w-full scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
-                                {[
-                                    { name: 'Tag', label: 'Tag', icon: Tag },
-                                    { name: 'Plane', label: 'Trip', icon: Plane },
-                                    { name: 'Home', label: 'Home', icon: Home },
-                                    { name: 'Gift', label: 'Gift', icon: Gift },
-                                    { name: 'Car', label: 'Car', icon: Car },
-                                    { name: 'Utensils', label: 'Food', icon: Utensils },
-                                    { name: 'ShoppingCart', label: 'Shop', icon: ShoppingCart },
-                                    { name: 'Heart', label: 'Health', icon: Heart },
-                                    { name: 'Gamepad2', label: 'Game', icon: Gamepad2 },
-                                    { name: 'Music', label: 'Music', icon: Music },
-                                    { name: 'Laptop', label: 'Tech', icon: Laptop },
-                                    { name: 'School', label: 'School', icon: School },
-                                ].map(item => (
-                                    <div key={item.name} className="flex flex-col items-center gap-1.5 shrink-0">
+
+                    <div className="space-y-4">
+                        {/* Icon picker */}
+                        <div className="space-y-1.5">
+                            <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground/70 pl-1">Icon</p>
+                            <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
+                                {ICONS.map(item => {
+                                    const active = newBucketIcon === item.name;
+                                    return (
                                         <button
+                                            key={item.name}
                                             type="button"
                                             onClick={(e) => {
                                                 e.preventDefault();
                                                 setNewBucketIcon(item.name);
                                             }}
+                                            aria-label={item.label}
+                                            aria-pressed={active}
                                             className={cn(
-                                                "w-12 h-12 rounded-2xl border flex items-center justify-center transition-all",
-                                                newBucketIcon === item.name
-                                                    ? "bg-cyan-500/20 border-cyan-500 text-cyan-500 shadow-[0_0_15px_rgba(6,182,212,0.2)]"
-                                                    : "bg-secondary/10 border-white/5 text-muted-foreground hover:border-white/10"
+                                                'h-10 w-10 shrink-0 rounded-xl border flex items-center justify-center transition-colors',
+                                                active
+                                                    ? 'bg-cyan-400/15 border-cyan-400/40 text-cyan-300'
+                                                    : 'bg-secondary/10 border-white/[0.05] text-muted-foreground hover:border-white/[0.1]',
                                             )}
                                         >
-                                            <item.icon className="w-5 h-5 pointer-events-none" />
+                                            <item.icon className="w-4 h-4 pointer-events-none" />
                                         </button>
-                                        <span className={cn(
-                                            "text-[9px] font-bold uppercase tracking-wider",
-                                            newBucketIcon === item.name ? "text-cyan-500" : "text-muted-foreground"
-                                        )}>
-                                            {item.label}
-                                        </span>
-                                    </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                         </div>
-                        <div className="space-y-2 text-left w-full">
-                            <label htmlFor="bucket-name" className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest pl-1">Bucket Name</label>
+
+                        {/* Name */}
+                        <div className="space-y-1.5">
+                            <label htmlFor="bucket-name" className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground/70 pl-1">
+                                Name
+                            </label>
                             <Input
                                 autoFocus
                                 id="bucket-name"
                                 name="bucket-name"
-                                placeholder="e.g. Trip, New iPhone, Gift..."
+                                placeholder="e.g. Trip, New iPhone, Gift…"
                                 value={newBucketName}
                                 onChange={(e) => setNewBucketName(e.target.value)}
-                                className="bg-secondary/20 border-white/5 h-12 rounded-2xl focus-visible:ring-cyan-500/50 w-full"
+                                className="bg-secondary/20 border-white/[0.06] h-11 rounded-xl focus-visible:ring-cyan-400/40"
                             />
                         </div>
 
-                        <div className="space-y-4">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <div className="space-y-2 text-left w-full">
-                                    <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest pl-1">Currency</p>
-                                    <Select value={newBucketCurrency} onValueChange={setNewBucketCurrency}>
-                                        <SelectTrigger className="bg-secondary/20 border-white/5 h-12 rounded-2xl w-full">
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-primary font-bold w-6">{CURRENCY_DETAILS[newBucketCurrency as keyof typeof CURRENCY_DETAILS]?.symbol}</span>
-                                                <span className="text-sm font-semibold">{newBucketCurrency}</span>
-                                            </div>
-                                        </SelectTrigger>
-                                        <SelectContent position="popper" className="bg-card border-white/10 rounded-xl overflow-y-auto max-h-[200px]">
-                                            {Object.entries(CURRENCY_DETAILS).map(([code, detail]) => (
-                                                <SelectItem key={code} value={code} className="py-2.5 px-3 focus:bg-primary/20 rounded-lg">
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="text-primary font-bold w-6 text-left">{detail.symbol}</span>
-                                                        <span className="text-sm font-semibold">{code}</span>
-                                                    </div>
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-
-                                <div className="space-y-2 text-left w-full">
-                                    <label htmlFor="bucket-budget" className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest pl-1">Total Budget</label>
-                                    <div className="relative w-full">
-                                        <Input
-                                            id="bucket-budget"
-                                            name="bucket-budget"
-                                            type="number"
-                                            inputMode="decimal"
-                                            placeholder="0.00"
-                                            value={newBucketTarget}
-                                            onChange={(e) => setNewBucketTarget(e.target.value)}
-                                            className="bg-secondary/20 border-white/5 h-12 rounded-2xl pl-8 focus-visible:ring-cyan-500/50 w-full"
-                                        />
-                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-bold">
-                                            {CURRENCY_DETAILS[newBucketCurrency as keyof typeof CURRENCY_DETAILS]?.symbol || '$'}
-                                        </span>
-                                    </div>
-                                    {budgetSuggestions && (
-                                        <div className="flex flex-wrap gap-1.5 pt-1">
-                                            <span className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground/60 inline-flex items-center gap-1">
-                                                <Sparkles className="w-3 h-3" aria-hidden="true" />
-                                                Try
-                                            </span>
-                                            {budgetSuggestions.avg3mo > 0 && (
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setNewBucketTarget(Math.round(budgetSuggestions.avg3mo).toString())}
-                                                    className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/25 text-cyan-300 hover:bg-cyan-500/15 transition-colors tabular-nums"
-                                                >
-                                                    Avg 3mo · {formatCurrency(budgetSuggestions.avg3mo)}
-                                                </button>
-                                            )}
-                                            {budgetSuggestions.sameMonthLastYear > 0 && (
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setNewBucketTarget(Math.round(budgetSuggestions.sameMonthLastYear).toString())}
-                                                    className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/25 text-cyan-300 hover:bg-cyan-500/15 transition-colors tabular-nums"
-                                                >
-                                                    Last year · {formatCurrency(budgetSuggestions.sameMonthLastYear)}
-                                                </button>
-                                            )}
+                        {/* Currency + Budget */}
+                        <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-1.5">
+                                <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground/70 pl-1">Currency</p>
+                                <Select value={newBucketCurrency} onValueChange={setNewBucketCurrency}>
+                                    <SelectTrigger className="bg-secondary/20 border-white/[0.06] h-11 rounded-xl">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-cyan-300 font-bold w-5 text-left">{CURRENCY_DETAILS[newBucketCurrency as keyof typeof CURRENCY_DETAILS]?.symbol}</span>
+                                            <span className="text-[13px] font-semibold">{newBucketCurrency}</span>
                                         </div>
-                                    )}
+                                    </SelectTrigger>
+                                    <SelectContent position="popper" className="bg-card border-white/[0.08] rounded-xl overflow-y-auto max-h-[200px]">
+                                        {Object.entries(CURRENCY_DETAILS).map(([code, detail]) => (
+                                            <SelectItem key={code} value={code} className="py-2 px-3 focus:bg-cyan-400/10 rounded-lg">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-cyan-300 font-bold w-5 text-left">{detail.symbol}</span>
+                                                    <span className="text-[13px] font-semibold">{code}</span>
+                                                </div>
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            <div className="space-y-1.5">
+                                <label htmlFor="bucket-budget" className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground/70 pl-1">
+                                    Budget
+                                </label>
+                                <div className="relative">
+                                    <Input
+                                        id="bucket-budget"
+                                        name="bucket-budget"
+                                        type="number"
+                                        inputMode="decimal"
+                                        placeholder="0.00"
+                                        value={newBucketTarget}
+                                        onChange={(e) => setNewBucketTarget(e.target.value)}
+                                        className="bg-secondary/20 border-white/[0.06] h-11 rounded-xl pl-7 focus-visible:ring-cyan-400/40 tabular-nums"
+                                    />
+                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-[13px] font-bold">
+                                        {CURRENCY_DETAILS[newBucketCurrency as keyof typeof CURRENCY_DETAILS]?.symbol || '$'}
+                                    </span>
                                 </div>
                             </div>
+                        </div>
 
-                            <div className="space-y-2 text-left w-full">
-                                <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest pl-1">Dates</p>
-                                <DateRangePicker
-                                    date={bucketDateRange}
-                                    setDate={setBucketDateRange}
-                                    className="h-12"
-                                    numberOfMonths={1}
-                                    align="center"
-                                />
+                        {budgetSuggestions && (
+                            <div className="flex flex-wrap items-center gap-1.5 -mt-1">
+                                <span className="text-[10px] uppercase tracking-[0.14em] font-medium text-muted-foreground/60 inline-flex items-center gap-1">
+                                    <Sparkles className="w-3 h-3" aria-hidden="true" />
+                                    Try
+                                </span>
+                                {budgetSuggestions.avg3mo > 0 && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setNewBucketTarget(Math.round(budgetSuggestions.avg3mo).toString())}
+                                        className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-cyan-400/10 border border-cyan-400/25 text-cyan-300 hover:bg-cyan-400/15 transition-colors tabular-nums"
+                                    >
+                                        Avg 3mo · {formatCurrency(budgetSuggestions.avg3mo)}
+                                    </button>
+                                )}
+                                {budgetSuggestions.sameMonthLastYear > 0 && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setNewBucketTarget(Math.round(budgetSuggestions.sameMonthLastYear).toString())}
+                                        className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-cyan-400/10 border border-cyan-400/25 text-cyan-300 hover:bg-cyan-400/15 transition-colors tabular-nums"
+                                    >
+                                        Last year · {formatCurrency(budgetSuggestions.sameMonthLastYear)}
+                                    </button>
+                                )}
                             </div>
+                        )}
 
-                            <div className="space-y-2 text-left w-full">
-                                <div className="flex items-center justify-between pl-1">
-                                    <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-1.5">
-                                        <Filter className="w-3 h-3" aria-hidden="true" />
-                                        Limit to categories
-                                    </p>
-                                    {allowedCategories.length > 0 && (
+                        {/* Dates */}
+                        <div className="space-y-1.5">
+                            <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground/70 pl-1">Dates</p>
+                            <DateRangePicker
+                                date={bucketDateRange}
+                                setDate={setBucketDateRange}
+                                className="h-11"
+                                numberOfMonths={1}
+                                align="center"
+                            />
+                        </div>
+
+                        {/* Category filter */}
+                        <div className="space-y-1.5">
+                            <div className="flex items-center justify-between pl-1">
+                                <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground/70 inline-flex items-center gap-1.5">
+                                    <Filter className="w-3 h-3" aria-hidden="true" />
+                                    Limit to categories
+                                </p>
+                                {allowedCategories.length > 0 && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setAllowedCategories([])}
+                                        className="text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+                                    >
+                                        Clear
+                                    </button>
+                                )}
+                            </div>
+                            <p className="text-[10px] text-muted-foreground/70 pl-1">
+                                {allowedCategories.length === 0
+                                    ? 'All categories count toward this bucket.'
+                                    : `${allowedCategories.length} ${allowedCategories.length === 1 ? 'category counts' : 'categories count'} toward this bucket.`}
+                            </p>
+                            <div className="flex flex-wrap gap-1.5 pt-0.5">
+                                {SYSTEM_CATEGORIES.map((cat) => {
+                                    const active = allowedCategories.includes(cat.id);
+                                    const color = CATEGORY_COLORS[cat.id] || '#8A2BE2';
+                                    return (
                                         <button
                                             type="button"
-                                            onClick={() => setAllowedCategories([])}
-                                            className="text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+                                            key={cat.id}
+                                            onClick={() => setAllowedCategories(prev =>
+                                                active ? prev.filter(c => c !== cat.id) : [...prev, cat.id],
+                                            )}
+                                            className={cn(
+                                                'inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium border transition-colors capitalize',
+                                                active
+                                                    ? 'border-transparent'
+                                                    : 'bg-secondary/10 border-white/[0.05] text-muted-foreground hover:border-white/[0.1]',
+                                            )}
+                                            style={active ? { backgroundColor: `${color}1F`, borderColor: `${color}50`, color } : undefined}
                                         >
-                                            Clear
+                                            <span className="w-3 h-3 inline-flex items-center justify-center">
+                                                {React.cloneElement(getIconForCategory(cat.id) as React.ReactElement<{ style?: React.CSSProperties }>, {
+                                                    style: { color: active ? color : undefined, width: '100%', height: '100%' },
+                                                })}
+                                            </span>
+                                            {cat.label}
                                         </button>
-                                    )}
-                                </div>
-                                <p className="text-[10px] text-muted-foreground/70 pl-1 -mt-1">
-                                    {allowedCategories.length === 0
-                                        ? 'All categories count toward this bucket.'
-                                        : `Only ${allowedCategories.length} ${allowedCategories.length === 1 ? 'category counts' : 'categories count'} toward this bucket.`}
-                                </p>
-                                <div className="flex flex-wrap gap-1.5">
-                                    {SYSTEM_CATEGORIES.map((cat) => {
-                                        const active = allowedCategories.includes(cat.id);
-                                        const color = CATEGORY_COLORS[cat.id] || '#8A2BE2';
-                                        return (
-                                            <button
-                                                type="button"
-                                                key={cat.id}
-                                                onClick={() => setAllowedCategories(prev =>
-                                                    active ? prev.filter(c => c !== cat.id) : [...prev, cat.id]
-                                                )}
-                                                className={cn(
-                                                    "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border transition-colors capitalize",
-                                                    active
-                                                        ? "border-transparent"
-                                                        : "bg-secondary/10 border-white/5 text-muted-foreground hover:border-white/10"
-                                                )}
-                                                style={active ? { backgroundColor: `${color}20`, borderColor: `${color}50`, color } : undefined}
-                                            >
-                                                <span className="w-3 h-3 inline-flex items-center justify-center">
-                                                    {React.cloneElement(getIconForCategory(cat.id) as React.ReactElement<{ style?: React.CSSProperties }>, {
-                                                        style: { color: active ? color : undefined, width: '100%', height: '100%' }
-                                                    })}
-                                                </span>
-                                                {cat.label}
-                                            </button>
-                                        );
-                                    })}
-                                </div>
+                                    );
+                                })}
                             </div>
                         </div>
 
                         <Button
                             onClick={handleAction}
                             disabled={isProcessing}
-                            className="w-full h-12 rounded-2xl bg-cyan-500 hover:bg-cyan-600 text-white font-bold shadow-lg shadow-cyan-500/20 mt-4 text-sm"
+                            className="w-full h-11 rounded-xl bg-cyan-400 hover:bg-cyan-300 text-cyan-950 font-semibold mt-2 disabled:opacity-60"
                         >
-                            {isProcessing ? 'Processing...' : editingBucket ? 'Save Changes' : 'Create Bucket'}
+                            {isProcessing ? 'Saving…' : editingBucket ? 'Save changes' : 'Create bucket'}
                         </Button>
                     </div>
                 </div>

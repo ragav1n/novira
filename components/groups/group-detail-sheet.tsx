@@ -4,7 +4,6 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { format, parseISO } from 'date-fns';
 import { ArrowRight, Plus, Home, Plane, Heart, FileText } from 'lucide-react';
@@ -34,17 +33,15 @@ interface RecentTransaction {
     payer_name: string;
 }
 
-const getTypeIcon = (type?: string) => {
-    switch (type) {
-        case 'home': return Home;
-        case 'trip': return Plane;
-        case 'couple': return Heart;
-        default: return FileText;
-    }
-};
+const TYPE_TOKENS = {
+    home: { icon: Home, bg: 'bg-emerald-400/[0.08]', text: 'text-emerald-400' },
+    trip: { icon: Plane, bg: 'bg-sky-400/[0.08]', text: 'text-sky-400' },
+    couple: { icon: Heart, bg: 'bg-rose-400/[0.08]', text: 'text-rose-400' },
+    other: { icon: FileText, bg: 'bg-primary/[0.08]', text: 'text-primary' },
+} as const;
 
 export function GroupDetailSheet({
-    group, currentUserId, pendingSplits, currency, formatCurrency, convertAmount, open, onOpenChange
+    group, currentUserId, pendingSplits, currency, formatCurrency, convertAmount, open, onOpenChange,
 }: GroupDetailSheetProps) {
     const router = useRouter();
     const [transactions, setTransactions] = useState<RecentTransaction[]>([]);
@@ -57,8 +54,6 @@ export function GroupDetailSheet({
         setLoadingTx(true);
 
         (async () => {
-            // Fetch enough rows to find 10 non-settlement transactions even if recent
-            // history is dominated by settlements. 50 is a generous cushion.
             const { data, error } = await supabase
                 .from('transactions')
                 .select('id, description, amount, currency, date, user_id, is_settlement, profile:profiles(full_name)')
@@ -98,7 +93,6 @@ export function GroupDetailSheet({
             });
             setTransactions(rows);
 
-            // Total spent across the entire group, excluding settlement transactions.
             const { data: totals } = await supabase
                 .from('transactions')
                 .select('amount, currency, is_settlement')
@@ -126,138 +120,120 @@ export function GroupDetailSheet({
     const myCredits = groupDebts.filter(p => p.to === currentUserId);
     const otherDebts = groupDebts.filter(p => p.from !== currentUserId && p.to !== currentUserId);
 
-    const Icon = getTypeIcon(group.type);
+    const tokens = TYPE_TOKENS[(group.type as keyof typeof TYPE_TOKENS) || 'other'] ?? TYPE_TOKENS.other;
+    const Icon = tokens.icon;
 
     return (
         <Sheet open={open} onOpenChange={onOpenChange}>
             <SheetContent
                 side="bottom"
-                className="rounded-t-3xl border-t border-white/10 bg-card/95 backdrop-blur-xl max-h-[88vh] overflow-y-auto"
+                className="rounded-t-[28px] border-t border-white/[0.08] bg-card/95 backdrop-blur-2xl max-h-[88vh] overflow-y-auto p-0"
             >
-                <SheetHeader className="px-5 pt-5">
+                <SheetHeader className="px-5 pt-5 pb-3 text-left">
                     <div className="flex items-center gap-3">
-                        <div className={cn(
-                            'w-11 h-11 rounded-2xl flex items-center justify-center border shrink-0',
-                            group.type === 'home' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500' :
-                                group.type === 'trip' ? 'bg-sky-500/10 border-sky-500/20 text-sky-500' :
-                                    group.type === 'couple' ? 'bg-rose-500/10 border-rose-500/20 text-rose-500' :
-                                        'bg-primary/10 border-primary/20 text-primary'
-                        )}>
-                            <Icon className="w-5 h-5" />
+                        <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center shrink-0', tokens.bg)}>
+                            <Icon className={cn('w-[18px] h-[18px]', tokens.text)} />
                         </div>
-                        <div className="min-w-0">
-                            <SheetTitle className="truncate text-base">{group.name}</SheetTitle>
-                            <SheetDescription className="text-[11px]">
-                                {group.members.length} member{group.members.length !== 1 ? 's' : ''} · Total spent {formatCurrency(totalSpent)}
+                        <div className="min-w-0 flex-1">
+                            <SheetTitle className="truncate text-[15px] font-semibold tracking-tight">{group.name}</SheetTitle>
+                            <SheetDescription className="text-[11px] mt-0.5">
+                                {group.members.length} member{group.members.length !== 1 ? 's' : ''} · {formatCurrency(totalSpent)} total
                             </SheetDescription>
                         </div>
                     </div>
                 </SheetHeader>
 
-                <div className="px-5 py-4 space-y-5">
+                <div className="px-5 py-3 space-y-5">
                     {/* Per-member balance block */}
-                    <div className="space-y-2">
-                        <h3 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest px-1">Balances in this group</h3>
+                    <section className="space-y-2">
+                        <h3 className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground/60 px-1">
+                            Who owes who
+                        </h3>
                         {groupDebts.length === 0 ? (
-                            <div className="rounded-2xl border border-white/5 bg-secondary/10 p-4 text-center">
-                                <p className="text-xs text-muted-foreground">All settled up in this group.</p>
+                            <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4 text-center">
+                                <p className="text-[12px] text-muted-foreground">All settled in this group.</p>
                             </div>
                         ) : (
-                            <div className="space-y-1.5">
+                            <ul className="space-y-1">
                                 {myPayments.map((p, i) => (
-                                    <div key={`me-pays-${i}`} className="flex items-center justify-between p-3 rounded-2xl bg-rose-500/5 border border-rose-500/15">
-                                        <p className="text-xs">
-                                            <span className="font-bold">You</span>
-                                            <ArrowRight className="w-3 h-3 inline mx-1.5 text-muted-foreground" />
-                                            <span className="font-bold">{p.toName}</span>
-                                        </p>
-                                        <span className="text-sm font-bold text-rose-500">{formatCurrency(p.amount)}</span>
-                                    </div>
+                                    <DebtRow key={`me-pays-${i}`} from="You" to={p.toName} amount={formatCurrency(p.amount)} tone="negative" />
                                 ))}
                                 {myCredits.map((p, i) => (
-                                    <div key={`me-receives-${i}`} className="flex items-center justify-between p-3 rounded-2xl bg-emerald-500/5 border border-emerald-500/15">
-                                        <p className="text-xs">
-                                            <span className="font-bold">{p.fromName}</span>
-                                            <ArrowRight className="w-3 h-3 inline mx-1.5 text-muted-foreground" />
-                                            <span className="font-bold">You</span>
-                                        </p>
-                                        <span className="text-sm font-bold text-emerald-500">{formatCurrency(p.amount)}</span>
-                                    </div>
+                                    <DebtRow key={`me-receives-${i}`} from={p.fromName} to="You" amount={formatCurrency(p.amount)} tone="positive" />
                                 ))}
                                 {otherDebts.map((p, i) => (
-                                    <div key={`others-${i}`} className="flex items-center justify-between p-3 rounded-2xl bg-secondary/10 border border-white/5">
-                                        <p className="text-xs">
-                                            <span className="font-bold text-muted-foreground">{p.fromName}</span>
-                                            <ArrowRight className="w-3 h-3 inline mx-1.5 text-muted-foreground" />
-                                            <span className="font-bold text-muted-foreground">{p.toName}</span>
-                                        </p>
-                                        <span className="text-sm font-bold text-muted-foreground">{formatCurrency(p.amount)}</span>
-                                    </div>
+                                    <DebtRow key={`others-${i}`} from={p.fromName} to={p.toName} amount={formatCurrency(p.amount)} tone="neutral" />
                                 ))}
-                            </div>
+                            </ul>
                         )}
-                    </div>
+                    </section>
 
-                    {/* Members list */}
-                    <div className="space-y-2">
-                        <h3 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest px-1">Members</h3>
-                        <div className="flex flex-wrap gap-2">
+                    {/* Members */}
+                    <section className="space-y-2">
+                        <h3 className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground/60 px-1">
+                            Members
+                        </h3>
+                        <div className="flex flex-wrap gap-1.5">
                             {group.members.map((m) => (
-                                <Badge
+                                <span
                                     key={m.user_id}
-                                    variant="secondary"
-                                    className="rounded-full pl-1 pr-2.5 py-0.5 text-[11px] gap-1.5"
+                                    className="inline-flex items-center gap-1.5 pl-1 pr-2.5 py-0.5 rounded-full bg-secondary/15 border border-white/[0.06] text-[11px]"
                                 >
                                     <Avatar className="w-4 h-4">
                                         <AvatarImage src={m.avatar_url || ''} />
                                         <AvatarFallback className="text-[7px]">{m.full_name?.substring(0, 1) || '?'}</AvatarFallback>
                                     </Avatar>
                                     {m.user_id === currentUserId ? 'You' : (m.full_name || 'Member')}
-                                </Badge>
+                                </span>
                             ))}
                         </div>
-                    </div>
+                    </section>
 
                     {/* Recent activity */}
-                    <div className="space-y-2">
-                        <h3 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest px-1">Recent activity</h3>
+                    <section className="space-y-2">
+                        <h3 className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground/60 px-1">
+                            Recent activity
+                        </h3>
                         {loadingTx ? (
-                            <div className="space-y-2">
+                            <div className="space-y-1.5">
                                 {[0, 1, 2].map(i => (
-                                    <div key={i} className="h-12 rounded-2xl bg-secondary/20 animate-pulse" />
+                                    <div key={i} className="h-11 rounded-xl bg-secondary/15 animate-pulse" />
                                 ))}
                             </div>
                         ) : transactions.length === 0 ? (
-                            <div className="rounded-2xl border border-dashed border-white/10 bg-secondary/5 p-5 text-center">
-                                <p className="text-xs text-muted-foreground">No expenses yet in this group.</p>
+                            <div className="rounded-xl border border-dashed border-white/[0.08] p-5 text-center">
+                                <p className="text-[12px] text-muted-foreground">No expenses yet in this group.</p>
                             </div>
                         ) : (
-                            <div className="space-y-1.5">
+                            <ul className="rounded-xl border border-white/[0.06] overflow-hidden divide-y divide-white/[0.04]">
                                 {transactions.map((tx) => (
-                                    <div key={tx.id} className="flex items-center justify-between p-3 rounded-2xl bg-secondary/10 border border-white/5">
+                                    <li
+                                        key={tx.id}
+                                        className="flex items-center justify-between gap-3 px-3 py-2 bg-white/[0.025]"
+                                    >
                                         <div className="min-w-0">
-                                            <p className="text-xs font-bold truncate">{tx.description || 'Expense'}</p>
+                                            <p className="text-[12px] font-semibold truncate">{tx.description || 'Expense'}</p>
                                             <p className="text-[10px] text-muted-foreground">
                                                 {tx.payer_name} · {format(parseISO(tx.date.slice(0, 10)), 'MMM d')}
                                             </p>
                                         </div>
-                                        <span className="text-xs font-bold whitespace-nowrap ml-2">
+                                        <span className="text-[12px] font-bold tabular-nums whitespace-nowrap">
                                             {formatCurrency(tx.amount, tx.currency)}
                                         </span>
-                                    </div>
+                                    </li>
                                 ))}
-                            </div>
+                            </ul>
                         )}
-                    </div>
+                    </section>
                 </div>
 
-                <div className="sticky bottom-0 left-0 right-0 px-5 py-4 bg-card/95 border-t border-white/5 backdrop-blur-xl">
+                <div className="sticky bottom-0 px-5 py-4 bg-card/95 border-t border-white/[0.06] backdrop-blur-2xl">
                     <Button
                         onClick={() => {
                             onOpenChange(false);
                             router.push(`/add?groupId=${group.id}`);
                         }}
-                        className="w-full h-11 rounded-2xl bg-primary hover:bg-primary/90 text-white font-bold gap-2"
+                        className="w-full h-11 rounded-xl bg-primary hover:bg-primary/90 text-white font-semibold gap-1.5"
                     >
                         <Plus className="w-4 h-4" />
                         Add expense to this group
@@ -265,5 +241,34 @@ export function GroupDetailSheet({
                 </div>
             </SheetContent>
         </Sheet>
+    );
+}
+
+function DebtRow({ from, to, amount, tone }: { from: string; to: string; amount: string; tone: 'positive' | 'negative' | 'neutral' }) {
+    return (
+        <li
+            className={cn(
+                'flex items-center justify-between gap-3 px-3 py-2 rounded-xl border',
+                tone === 'negative' && 'bg-rose-400/[0.04] border-rose-400/15',
+                tone === 'positive' && 'bg-emerald-400/[0.04] border-emerald-400/15',
+                tone === 'neutral' && 'bg-white/[0.025] border-white/[0.06]',
+            )}
+        >
+            <p className="text-[12px] flex items-center gap-1.5 min-w-0">
+                <span className={cn('font-semibold truncate', tone === 'neutral' && 'text-muted-foreground')}>{from}</span>
+                <ArrowRight className="w-3 h-3 text-muted-foreground/60 shrink-0" />
+                <span className={cn('font-semibold truncate', tone === 'neutral' && 'text-muted-foreground')}>{to}</span>
+            </p>
+            <span
+                className={cn(
+                    'text-[13px] font-bold tabular-nums shrink-0',
+                    tone === 'negative' && 'text-rose-300',
+                    tone === 'positive' && 'text-emerald-300',
+                    tone === 'neutral' && 'text-muted-foreground',
+                )}
+            >
+                {amount}
+            </span>
+        </li>
     );
 }

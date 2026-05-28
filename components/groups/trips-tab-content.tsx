@@ -4,9 +4,6 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link';
 import { format, parseISO, differenceInCalendarDays } from 'date-fns';
 import { Plane, Plus, Calendar as CalendarIcon, MapPin, Edit2 } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
 import { useUserPreferences } from '@/components/providers/user-preferences-provider';
 import { useActiveTrip } from '@/components/providers/active-trip-provider';
@@ -42,6 +39,10 @@ export function TripsTabContent() {
             const list = await TripService.getTripsForUser(userId, activeWorkspaceId);
             if (fetchGenRef.current !== myGen) return;
             setTrips(list);
+            // Render the trip cards as soon as the list resolves; totals fill in
+            // a beat later. Waiting for both queries to finish before hiding the
+            // skeleton makes the tab feel slow on a clean cache.
+            setLoading(false);
 
             if (list.length === 0) {
                 setTripTotals({});
@@ -106,24 +107,24 @@ export function TripsTabContent() {
     const openEdit = (trip: Trip) => { setEditing(trip); setFormOpen(true); };
 
     return (
-        <div className="space-y-4">
-            <div className="flex justify-end">
-                <Button
-                    size="sm"
-                    variant="ghost"
+        <div className="space-y-5">
+            <div className="flex justify-end -mt-1">
+                <button
+                    type="button"
                     onClick={openCreate}
                     disabled={loading}
-                    className="text-sky-300 hover:text-sky-200 hover:bg-sky-500/10 disabled:opacity-50 rounded-full px-3"
                     aria-label="New trip"
+                    className="inline-flex items-center gap-1 h-7 px-3 rounded-full text-[11px] font-semibold text-sky-300 hover:text-sky-200 hover:bg-sky-400/10 disabled:opacity-50 transition-colors"
                 >
-                    <Plus className="w-4 h-4 mr-1" /> New trip
-                </Button>
+                    <Plus className="w-3.5 h-3.5" />
+                    New trip
+                </button>
             </div>
 
             {loading ? (
-                <div className="space-y-3">
-                    <div className="h-24 rounded-3xl bg-secondary/10 animate-pulse" />
-                    <div className="h-24 rounded-3xl bg-secondary/10 animate-pulse" />
+                <div className="space-y-2">
+                    <div className="h-[88px] rounded-2xl bg-secondary/10 animate-pulse" />
+                    <div className="h-[88px] rounded-2xl bg-secondary/10 animate-pulse" />
                 </div>
             ) : trips.length === 0 ? (
                 <EmptyState onCreate={openCreate} />
@@ -157,10 +158,10 @@ function Section({
     if (trips.length === 0) return null;
     return (
         <section className="space-y-2">
-            <h2 className="text-[11px] uppercase tracking-wider text-muted-foreground font-bold px-1">
-                {title}
+            <h2 className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground/60 px-1">
+                {title} · {trips.length}
             </h2>
-            <div className="space-y-3">
+            <div className="space-y-2">
                 {trips.map(t => (
                     <TripCard
                         key={t.id}
@@ -192,28 +193,36 @@ function TripCard({
     const status = bucketOf(trip);
 
     return (
-        <Card className="bg-card/40 border-white/5 backdrop-blur-xl hover:bg-card/60 hover:border-white/10 transition-all">
-            <CardContent className="p-4">
-                <div className="flex items-start justify-between gap-2 mb-2">
+        <article className="relative overflow-hidden rounded-2xl border border-white/10 ring-1 ring-inset ring-sky-400/15 bg-white/[0.035] hover:bg-white/[0.055] transition-colors shadow-[inset_0_1px_0_rgba(255,255,255,0.06),_0_6px_16px_-8px_rgba(0,0,0,0.55)]">
+            <span className="absolute left-0 top-3 bottom-3 w-[2px] rounded-r bg-sky-400" aria-hidden="true" />
+            <div className="p-4 pl-[18px]">
+                <div className="flex items-start justify-between gap-3">
                     <Link href={`/trips/${trip.id}`} className="flex-1 min-w-0">
-                        <h3 className="text-lg font-bold truncate">{trip.name}</h3>
-                        <div className="flex flex-wrap items-center gap-2 mt-1 text-[11px] text-muted-foreground">
-                            <span className="inline-flex items-center gap-1">
-                                <CalendarIcon className="w-3 h-3" aria-hidden="true" />
-                                {format(start, 'MMM d')} – {format(end, 'MMM d, yyyy')}
-                            </span>
-                            {trip.base_location && (
-                                <span className="inline-flex items-center gap-1">
-                                    <MapPin className="w-3 h-3" aria-hidden="true" />
-                                    {trip.base_location}
-                                </span>
-                            )}
+                        <div className="flex items-center gap-2 min-w-0">
+                            <div className="w-10 h-10 rounded-xl bg-sky-400/[0.08] text-sky-400 flex items-center justify-center shrink-0">
+                                <Plane className="w-[18px] h-[18px]" />
+                            </div>
+                            <div className="min-w-0">
+                                <h3 className="text-[15px] font-semibold tracking-tight truncate">{trip.name}</h3>
+                                <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5 text-[11px] text-muted-foreground">
+                                    <span className="inline-flex items-center gap-1">
+                                        <CalendarIcon className="w-3 h-3" aria-hidden="true" />
+                                        {format(start, 'MMM d')} – {format(end, 'MMM d, yyyy')}
+                                    </span>
+                                    {trip.base_location && (
+                                        <span className="inline-flex items-center gap-1">
+                                            <MapPin className="w-3 h-3" aria-hidden="true" />
+                                            {trip.base_location}
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
                         </div>
                     </Link>
                     <button
                         onClick={(e) => { e.preventDefault(); e.stopPropagation(); onEdit(trip); }}
                         aria-label={`Edit ${trip.name}`}
-                        className="shrink-0 w-8 h-8 rounded-full bg-secondary/30 hover:bg-secondary/50 flex items-center justify-center transition-colors"
+                        className="shrink-0 h-8 w-8 inline-flex items-center justify-center rounded-full text-muted-foreground/60 hover:text-foreground hover:bg-secondary/30 transition-colors"
                     >
                         <Edit2 className="w-3.5 h-3.5" />
                     </button>
@@ -221,40 +230,54 @@ function TripCard({
 
                 {status !== 'upcoming' && (
                     <div className="mt-3 space-y-1.5">
-                        <div className="flex justify-between text-[11px]">
+                        <div className="flex items-center justify-between text-[11px]">
                             <span className="text-muted-foreground">
                                 {status === 'active' ? `Day ${elapsed} of ${totalDays}` : `${totalDays} days`}
                             </span>
-                            <span className="font-bold text-sky-300 tabular-nums">{formatCurrency(total, trip.home_currency ?? undefined)}</span>
+                            <span className="font-bold text-sky-300 tabular-nums">
+                                {formatCurrency(total, trip.home_currency ?? undefined)}
+                            </span>
                         </div>
-                        <Progress value={progress} className="h-1.5 bg-black/30" indicatorClassName={cn(status === 'active' ? 'bg-sky-400' : 'bg-white/20')} />
+                        <div className="h-[3px] w-full bg-white/[0.04] rounded-full overflow-hidden">
+                            <div
+                                className={cn('h-full rounded-full', status === 'active' ? 'bg-sky-400' : 'bg-white/20')}
+                                style={{ width: `${progress}%` }}
+                            />
+                        </div>
                     </div>
                 )}
                 {status === 'upcoming' && (
-                    <p className="mt-2 text-[11px] text-muted-foreground">
+                    <p className="mt-3 text-[11px] text-muted-foreground">
                         Starts in {Math.max(0, differenceInCalendarDays(start, today))} days
                     </p>
                 )}
-            </CardContent>
-        </Card>
+            </div>
+        </article>
     );
 }
 
 function EmptyState({ onCreate }: { onCreate: () => void }) {
     return (
-        <Card className="bg-card/40 border-white/5 backdrop-blur-xl">
-            <CardContent className="p-8 text-center space-y-3">
-                <div className="mx-auto w-12 h-12 rounded-2xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center">
-                    <Plane className="w-6 h-6 text-sky-300" aria-hidden="true" />
-                </div>
-                <h3 className="font-bold">No trips yet</h3>
-                <p className="text-sm text-muted-foreground max-w-xs mx-auto">
-                    Create a trip to auto-tag expenses while you&apos;re away, and get a summary of every dollar spent.
+        <div className="rounded-2xl border border-dashed border-white/[0.14] bg-white/[0.02] p-6 space-y-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+            <div className="space-y-1.5">
+                <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground/70">
+                    No trips yet
                 </p>
-                <Button onClick={onCreate} className="mt-2">
-                    <Plus className="w-4 h-4 mr-1" /> New trip
-                </Button>
-            </CardContent>
-        </Card>
+                <h3 className="text-base font-semibold tracking-tight">
+                    Plan one and Novira will auto-tag.
+                </h3>
+                <p className="text-[12px] text-muted-foreground leading-relaxed max-w-xs">
+                    Create a trip and any expense while you&apos;re away gets tagged automatically,
+                    with a clean summary at the end.
+                </p>
+            </div>
+            <button
+                onClick={onCreate}
+                className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-full bg-sky-400 text-sky-950 text-[12px] font-semibold hover:bg-sky-300 transition-colors"
+            >
+                <Plus className="w-3.5 h-3.5" />
+                New trip
+            </button>
+        </div>
     );
 }
