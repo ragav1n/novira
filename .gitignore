@@ -46,4 +46,5 @@ next-env.d.ts
 
 # ai assistant config
 .claude
+.playwright-mcp
 
