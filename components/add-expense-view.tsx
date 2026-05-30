@@ -413,10 +413,14 @@ export function AddExpenseView() {
     // user can see what's currently picked even if it sits off-screen on first paint.
     useEffect(() => {
         if (!formState.paymentMethod) return;
-        const btn = paymentScrollRef.current?.querySelector<HTMLButtonElement>(
+        const container = paymentScrollRef.current;
+        const btn = container?.querySelector<HTMLButtonElement>(
             `button[data-payment-method="${formState.paymentMethod}"]`
         );
-        btn?.scrollIntoView({ inline: 'center', block: 'nearest' });
+        if (!container || !btn) return;
+        // Horizontal-only centering — avoid scrollIntoView, which would also scroll
+        // the page vertically and push Quick Pins to the top on first paint.
+        container.scrollLeft = btn.offsetLeft - (container.clientWidth - btn.clientWidth) / 2;
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
