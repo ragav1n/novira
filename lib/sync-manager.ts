@@ -372,16 +372,17 @@ async function runSyncLoop(): Promise<void> {
                     );
 
                     if (result.success) {
+                        const realTxId = (result as { data?: { id?: string } }).data?.id;
+                        // Use the transaction's user_id over `currentUserId` so a
+                        // sign-out racing the sync loop doesn't leave follow-up work skipped.
+                        const ownerId = (transaction as { user_id?: string })?.user_id;
+                        const idempotent = (result as { idempotent?: boolean }).idempotent;
                         // Upload any queued offline receipt against the freshly-created row.
                         // Failures here don't block markSynced — the transaction is safe on
                         // the server. The Blob is deleted either way: on success it's no
                         // longer needed, on failure the user re-attaches from their photo
                         // library via the row's detail view (orphans would just leak IDB).
                         if (hasOfflineReceipt) {
-                            const realTxId = (result as { data?: { id?: string } }).data?.id;
-                            // Use the transaction's user_id over `currentUserId` so a
-                            // sign-out racing the sync loop doesn't leave the upload skipped.
-                            const ownerId = (transaction as { user_id?: string })?.user_id;
                             if (realTxId && ownerId) {
                                 try {
                                     const blob = await getOfflineReceipt(item.id);
@@ -418,6 +419,50 @@ async function runSyncLoop(): Promise<void> {
                         window.dispatchEvent(new CustomEvent('novira-mutation-synced', {
                             detail: { id: item.id, type: item.type, data: item.data, result }
                         }));
+
+                        // Notify each split participant once the row is on the server.
+                        // Postgres-changes on `splits` isn't reliable for the receiving
+                        // user (publication / RLS quirks), so a broadcast guarantees their
+                        // "You owe / owed" tiles update without a refresh; the push
+                        // fan-out reaches debtors whose app is closed. Skip on idempotent
+                        // re-syncs — the row (and its notifications) already went out.
+                        if (!idempotent && ownerId && splitRecords && splitRecords.length > 0) {
+                            for (const split of splitRecords) {
+                                if (!split.user_id || split.user_id === ownerId) continue;
+                                const ch = supabase.channel(`split-notify-${split.user_id}`);
+                                // SUBSCRIBED fires the broadcast and disposes after `.send`
+                                // settles; terminal states dispose immediately. A 5s safety
+                                // timer frees the channel even if no status callback fires.
+                                let disposed = false;
+                                const dispose = () => {
+                                    if (disposed) return;
+                                    disposed = true;
+                                    clearTimeout(safety);
+                                    supabase.removeChannel(ch);
+                                };
+                                const safety = setTimeout(dispose, 5000);
+                                ch.subscribe((status) => {
+                                    if (status === 'SUBSCRIBED') {
+                                        ch.send({
+                                            type: 'broadcast',
+                                            event: 'split-added',
+                                            payload: { fromUserId: ownerId },
+                                        }).finally(dispose);
+                                    } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+                                        dispose();
+                                    }
+                                });
+                            }
+
+                            if (realTxId) {
+                                fetch('/api/push/notify-split', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ transaction_id: realTxId }),
+                                    credentials: 'same-origin',
+                                }).catch(() => { /* best-effort */ });
+                            }
+                        }
                     } else {
                         throw new Error('Failed to create transaction via sync');
                     }

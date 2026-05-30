@@ -396,39 +396,12 @@ export function useDashboardData(
     useEffect(() => {
         if (!userId) return;
 
-        // Handle case where expense was added before this component mounted (post-navigation)
+        // Handle case where expense was added before this component mounted
+        // (post-navigation). The just-added row renders optimistically from the
+        // offline queue via loadPendingFromQueue; loadTx reconciles against the
+        // server, and the queue's synced event swaps the pending row for the real one.
         if (sessionStorage.getItem('novira_expense_added')) {
             sessionStorage.removeItem('novira_expense_added');
-            // Inject the optimistic row immediately so the dashboard renders with it
-            // before the network fetch lands. Realtime / mount-time refetch reconcile by id.
-            try {
-                const raw = sessionStorage.getItem('novira_just_created_tx');
-                if (raw) {
-                    sessionStorage.removeItem('novira_just_created_tx');
-                    const stashed = JSON.parse(raw) as Transaction;
-                    if (stashed?.id) {
-                        const inWorkspace = activeWorkspaceId
-                            ? stashed.group_id === activeWorkspaceId
-                            : stashed.user_id === userId;
-                        if (inWorkspace) {
-                            setServerTransactions(prev => {
-                                if (prev.some(t => t.id === stashed.id)) return prev;
-                                const inserted = [stashed, ...prev];
-                                inserted.sort((a, b) => {
-                                    const dateCompare = b.date.localeCompare(a.date);
-                                    if (dateCompare !== 0) return dateCompare;
-                                    return b.created_at.localeCompare(a.created_at);
-                                });
-                                return inserted;
-                            });
-                        }
-                    }
-                }
-            } catch (error) {
-                if (process.env.NODE_ENV === 'development') {
-                    console.error('Error injecting stashed transaction:', error);
-                }
-            }
             loadTxRef.current?.(userId, activeWorkspaceId);
             loadPendingFromQueue();
         }

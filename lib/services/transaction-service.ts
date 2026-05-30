@@ -137,6 +137,51 @@ export const TransactionService = {
         return rate || 1;
     },
 
+    /**
+     * Enqueue a transaction for background sync instead of writing it synchronously.
+     * This is the path the add-expense form takes for *every* submit (online and
+     * offline) so the UI can navigate away instantly — `enqueueMutation` fires
+     * `attemptSync()` right away when online, so the RPC still runs immediately,
+     * just off the critical path. The sync loop (sync-manager) owns the actual
+     * `createTransaction` RPC, idempotency dedupe, retry/backoff, and receipt upload.
+     */
+    async queueTransaction(params: {
+        transaction: TransactionRecord;
+        splits?: SplitRecord[];
+        recurring?: RecurringRecord | null;
+        offlineReceiptFile?: File | Blob | null;
+    }) {
+        const { transaction, splits, recurring, offlineReceiptFile } = params;
+        // Pre-generate the queue id so the Blob and queue entry share one key.
+        // Without a shared id we'd have to re-read the queue post-enqueue to
+        // discover what id was assigned — a races-with-other-tabs hazard.
+        const queueId = crypto.randomUUID();
+        let receiptDropped = false;
+        if (offlineReceiptFile) {
+            try {
+                await saveOfflineReceipt(queueId, offlineReceiptFile);
+            } catch (e) {
+                receiptDropped = true;
+                if (!(e instanceof ReceiptQuotaError)) {
+                    console.warn('[TransactionService] saveOfflineReceipt failed:', e);
+                }
+            }
+        }
+        await enqueueMutation(
+            'ADD_FULL_TRANSACTION',
+            {
+                transaction,
+                splitRecords: splits,
+                recurringRecord: recurring,
+                hasOfflineReceipt: !!offlineReceiptFile && !receiptDropped,
+            },
+            { id: queueId },
+        );
+        // `offline` drives the toast copy in the caller: queued-while-online reads
+        // as "added", queued-while-offline as "will sync later".
+        return { success: true, offline: !navigator.onLine, receiptDropped };
+    },
+
     async createTransaction(params: {
         transaction: TransactionRecord;
         splits?: SplitRecord[];
@@ -145,34 +190,10 @@ export const TransactionService = {
     }) {
         const { transaction, splits, recurring, offlineReceiptFile } = params;
 
-        // OFFLINE GUARD
+        // OFFLINE GUARD — the sync loop calls this method while online to perform
+        // the real RPC, so this branch only triggers on a direct offline call.
         if (!navigator.onLine) {
-            // Pre-generate the queue id so the Blob and queue entry share one key.
-            // Without a shared id we'd have to re-read the queue post-enqueue to
-            // discover what id was assigned — a races-with-other-tabs hazard.
-            const queueId = crypto.randomUUID();
-            let receiptDropped = false;
-            if (offlineReceiptFile) {
-                try {
-                    await saveOfflineReceipt(queueId, offlineReceiptFile);
-                } catch (e) {
-                    receiptDropped = true;
-                    if (!(e instanceof ReceiptQuotaError)) {
-                        console.warn('[TransactionService] saveOfflineReceipt failed:', e);
-                    }
-                }
-            }
-            await enqueueMutation(
-                'ADD_FULL_TRANSACTION',
-                {
-                    transaction,
-                    splitRecords: splits,
-                    recurringRecord: recurring,
-                    hasOfflineReceipt: !!offlineReceiptFile && !receiptDropped,
-                },
-                { id: queueId },
-            );
-            return { success: true, offline: true, receiptDropped };
+            return this.queueTransaction({ transaction, splits, recurring, offlineReceiptFile });
         }
 
         try {

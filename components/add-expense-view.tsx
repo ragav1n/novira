@@ -497,7 +497,7 @@ export function AddExpenseView() {
                         <button
                             onClick={onSubmit}
                             disabled={loading}
-                            className="px-3 py-1.5 rounded-full bg-primary/15 border border-primary/30 text-primary text-sm font-semibold disabled:opacity-50 hover:bg-primary/20 transition-colors active:scale-[0.95]"
+                            className="inline-flex items-center justify-center min-h-[40px] px-4 rounded-full bg-primary/15 border border-primary/30 text-primary text-sm font-semibold disabled:opacity-50 hover:bg-primary/20 transition-colors active:scale-[0.95]"
                         >
                             {loading ? 'Saving...' : 'Save'}
                         </button>

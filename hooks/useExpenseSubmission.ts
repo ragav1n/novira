@@ -5,12 +5,11 @@ import { Haptics, NotificationType } from '@capacitor/haptics';
 import { TransactionService } from '@/lib/services/transaction-service';
 import { TripService } from '@/lib/services/trip-service';
 import { invalidateTransactionCaches } from '@/lib/sw-cache';
-import { uploadReceipt, validateReceiptFile } from '@/lib/receipt-storage';
-import { supabase } from '@/lib/supabase';
+import { validateReceiptFile } from '@/lib/receipt-storage';
 import { useActiveTrip } from '@/components/providers/active-trip-provider';
 import { useUserPreferences } from '@/components/providers/user-preferences-provider';
 import type { AppRouterInstance } from 'next/dist/shared/lib/app-router-context.shared-runtime';
-import type { Transaction, TransactionRecord, SplitRecord, RecurringRecord } from '@/types/transaction';
+import type { TransactionRecord, SplitRecord, RecurringRecord } from '@/types/transaction';
 import { getErrorMessage, getErrorName } from '@/lib/error-utils';
 
 interface ExpenseSubmissionParams {
@@ -128,26 +127,6 @@ async function buildSplitRecords(
     }
 }
 
-// Network blips, cold sessions, and load-balancer hiccups are the most common
-// reasons a first submit fails. The atomic RPC dedupes by `idempotency_key`,
-// so a single retry on transport-layer errors is safe — Postgres constraint
-// failures, RLS denials, and explicit RAISEs surface user-meaningful errors
-// and must NOT be retried (the user needs to see them).
-function isTransientError(err: unknown): boolean {
-    if (!err || typeof err !== 'object') return false;
-    const e = err as { message?: string; code?: string; details?: string; name?: string };
-    if (e.name === 'QueueFullError') return false;
-    if (e.code) {
-        const c = String(e.code);
-        if (c.startsWith('23') || c.startsWith('42') || c.startsWith('P0')) return false;
-        if (c.startsWith('PGRST') && !e.details) return true;
-    }
-    const msg = String(e.message || '').toLowerCase();
-    if (e.name === 'TypeError' && /fetch|network|load failed/.test(msg)) return true;
-    if (/timeout|abort/.test(msg)) return true;
-    return false;
-}
-
 function buildRecurringRecord(
     userId: string,
     description: string,
@@ -215,15 +194,17 @@ export function useExpenseSubmission() {
     const [loading, setLoading] = useState(false);
     const { activeTrip } = useActiveTrip();
     const { activeWorkspaceId } = useUserPreferences();
-    // Locked once a submission has reached the navigation step. Guards the brief
-    // window between clearing the loading spinner and the page actually unmounting
-    // — without it a determined double-tap could re-enter handleSubmit.
-    const submittedRef = useRef(false);
+    // Synchronous re-entry guard. Set before the first await so a fast double-tap
+    // can't slip a second submit through the window before React commits the
+    // disabled button. Cleared on every pre-navigation early return; left locked
+    // on the success path since the page unmounts on navigation.
+    const inFlightRef = useRef(false);
 
     const handleSubmit = async (params: ExpenseSubmissionParams) => {
-        if (submittedRef.current) return;
+        if (inFlightRef.current) return;
+        inFlightRef.current = true;
         const {
-            userId, isNative, router, currency, resetForm, userProfile,
+            userId, isNative, router, currency, resetForm,
             amount, description, date, selectedCategory, txCurrency,
             selectedGroupId, selectedBucketId, excludeFromAllowance,
             placeName, placeAddress, placeLat, placeLng,
@@ -232,11 +213,15 @@ export function useExpenseSubmission() {
             isIncome = false, receiptFile, selectedAccountId,
         } = params;
 
-        if (!validateExpenseForm(amount, description, date)) return;
+        if (!validateExpenseForm(amount, description, date)) {
+            inFlightRef.current = false;
+            return;
+        }
         if (receiptFile) {
             const v = validateReceiptFile(receiptFile);
             if (!v.valid) {
                 toast.error(v.reason);
+                inFlightRef.current = false;
                 return;
             }
         }
@@ -244,19 +229,9 @@ export function useExpenseSubmission() {
         const idempotencyKey = crypto.randomUUID();
         setLoading(true);
         try {
-            // Warm the auth session before the RPC fires. On a freshly opened app
-            // the token can still be mid-refresh; calling getSession() forces the
-            // SDK to resolve that race before create_transaction_atomic. Cheap when
-            // already warm (~10ms), pays off on the cold "first submit fails" case.
-            // Inside the try so the spinner is already visible during the warm-up.
-            try {
-                await supabase.auth.getSession();
-            } catch {
-                // Non-fatal — downstream errors will surface real auth problems.
-            }
-
             if (!userId) {
                 toast.error('You must be logged in');
+                inFlightRef.current = false;
                 router.push('/signin');
                 return;
             }
@@ -268,7 +243,8 @@ export function useExpenseSubmission() {
             const isToday = date && format(date, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
             const sameWorkspace = (selectedGroupId ?? null) === (activeWorkspaceId ?? null);
             // Trip resolution and exchange-rate lookup are independent — run them
-            // in parallel so a cold network only hits one wall-clock wait.
+            // in parallel. Both are instant in the common case (same-currency rate
+            // is 1, cached rates hit localStorage, today's trip is already cached).
             const tripPromise = isToday && sameWorkspace
                 ? Promise.resolve(activeTrip?.auto_tag_enabled ? activeTrip : null)
                 : TripService.getActiveTripForDate(userId, date!, selectedGroupId);
@@ -316,6 +292,7 @@ export function useExpenseSubmission() {
                 : await buildSplitRecords(amount, userId, isSplitEnabled, selectedGroupId, selectedFriendIds, splitMode, customAmounts);
             if (splitResult.error) {
                 toast.error(splitResult.error);
+                inFlightRef.current = false;
                 setLoading(false);
                 return;
             }
@@ -324,20 +301,16 @@ export function useExpenseSubmission() {
                 ? buildRecurringRecord(userId, description, amount, selectedCategory, txCurrency, selectedGroupId, paymentMethod, frequency, date!, excludeFromAllowance, isSplitEnabled, selectedFriendIds, notes, selectedBucketId, placeName, placeAddress, placeLat, placeLng, cleanTags, isIncome)
                 : null;
 
-            const createPayload = {
+            // Queue the write and navigate immediately. The atomic RPC, receipt
+            // upload, and split notifications all run in the background via the
+            // sync loop (which starts instantly when online). The dashboard renders
+            // the queued row optimistically and reconciles by id once it lands.
+            const result = await TransactionService.queueTransaction({
                 transaction: transactionRecord,
                 splits: splitResult.records,
                 recurring: recurringRecordToInsert,
                 offlineReceiptFile: receiptFile ?? null,
-            };
-            let result;
-            try {
-                result = await TransactionService.createTransaction(createPayload);
-            } catch (firstErr) {
-                if (!isTransientError(firstErr)) throw firstErr;
-                await new Promise(r => setTimeout(r, 600));
-                result = await TransactionService.createTransaction(createPayload);
-            }
+            });
 
             if (result.success) {
                 if (isNative) {
@@ -352,153 +325,29 @@ export function useExpenseSubmission() {
                         style: { background: 'rgba(14, 165, 233, 0.1)', border: '1px solid rgba(14, 165, 233, 0.2)', color: '#38BDF8' }
                     });
                 } else {
-                    toast.success('Expense added successfully!');
+                    toast.success('Expense added');
+                    invalidateTransactionCaches();
                 }
 
-                // Receipt storage was full while offline — the row queues but the
-                // file is dropped. Warn the user so they can re-attach later.
-                if (result.offline && receiptFile && result.receiptDropped) {
+                // Receipt storage was full — the row queues but the file is dropped.
+                // Warn the user so they can re-attach later.
+                if (result.receiptDropped && receiptFile) {
                     toast("Receipt storage is full — attach again once synced.", {
                         icon: '⚠️',
                         style: { background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.2)', color: '#FBBF24' }
                     });
                 }
 
-                const typedResult = result as { data?: { id?: string }; idempotent?: boolean };
-                const createdId = typedResult.data?.id;
-
                 resetForm();
-                if (!result.offline) {
-                    invalidateTransactionCaches();
-
-                    // Stash the just-created row so the dashboard can render it
-                    // immediately on mount, before its network fetch returns. Realtime
-                    // and the mount-time refetch will reconcile by id. Receipt path is
-                    // intentionally undefined here — the background upload below will
-                    // patch it and the Realtime UPDATE listener will swap the row in.
-                    // Skip on idempotent retries — the row is already on the server
-                    // and likely already shown elsewhere; re-stashing risks visual churn.
-                    if (!typedResult.idempotent && createdId && typeof sessionStorage !== 'undefined') {
-                        const stashed: Transaction = {
-                            id: createdId,
-                            description: transactionRecord.description,
-                            amount: transactionRecord.amount,
-                            category: transactionRecord.category,
-                            date: transactionRecord.date,
-                            created_at: new Date().toISOString(),
-                            user_id: transactionRecord.user_id,
-                            currency: transactionRecord.currency,
-                            exchange_rate: transactionRecord.exchange_rate,
-                            base_currency: transactionRecord.base_currency,
-                            converted_amount: transactionRecord.converted_amount,
-                            is_recurring: transactionRecord.is_recurring,
-                            bucket_id: transactionRecord.bucket_id ?? undefined,
-                            exclude_from_allowance: transactionRecord.exclude_from_allowance,
-                            payment_method: transactionRecord.payment_method,
-                            place_name: transactionRecord.place_name,
-                            place_address: transactionRecord.place_address ?? undefined,
-                            place_lat: transactionRecord.place_lat ?? undefined,
-                            place_lng: transactionRecord.place_lng ?? undefined,
-                            tags: transactionRecord.tags,
-                            group_id: transactionRecord.group_id,
-                            account_id: transactionRecord.account_id ?? undefined,
-                            receipt_path: undefined,
-                            splits: (splitResult.records ?? []).map(s => ({ user_id: s.user_id, amount: s.amount })),
-                            profile: userProfile,
-                        };
-                        try {
-                            sessionStorage.setItem('novira_just_created_tx', JSON.stringify(stashed));
-                        } catch {
-                            // sessionStorage quota or serialization error — non-fatal
-                        }
-                    }
-                }
                 sessionStorage.setItem('novira_expense_added', 'true');
                 window.dispatchEvent(new Event('novira:expense-added'));
-
-                // Navigate immediately. Receipt upload, split broadcasts, and Web
-                // Push fan-out happen in the background — the user sees the
-                // dashboard with the optimistic row right away. submittedRef locks
-                // re-entry during the brief gap between clearing the spinner and
-                // the page actually unmounting.
-                submittedRef.current = true;
+                // Leave inFlightRef locked — the page unmounts on navigation.
                 setLoading(false);
                 router.push('/');
-
-                if (!result.offline) {
-                    void (async () => {
-                        // Receipt upload — the row already exists on the server,
-                        // so we patch receipt_path after the file lands. Realtime
-                        // UPDATE on the dashboard picks up the change automatically.
-                        if (receiptFile && createdId && !typedResult.idempotent) {
-                            try {
-                                const { path } = await uploadReceipt(userId, createdId, receiptFile);
-                                const { error: updErr } = await supabase
-                                    .from('transactions')
-                                    .update({ receipt_path: path })
-                                    .eq('id', createdId);
-                                if (updErr) throw updErr;
-                            } catch (uploadErr) {
-                                console.error('[useExpenseSubmission] receipt upload failed', uploadErr);
-                                toast('Expense saved, but receipt upload failed. Re-attach from the transaction details.', {
-                                    icon: '⚠️',
-                                    style: { background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.2)', color: '#FBBF24' }
-                                });
-                            }
-                        }
-
-                        // Notify each split participant in real time. Postgres-changes on
-                        // `splits` isn't reliable for the receiving user (publication / RLS
-                        // quirks), so a broadcast guarantees their "You owe / owed" tiles
-                        // update without a refresh.
-                        if (splitResult.records && splitResult.records.length > 0) {
-                            for (const split of splitResult.records) {
-                                if (!split.user_id || split.user_id === userId) continue;
-                                const ch = supabase.channel(`split-notify-${split.user_id}`);
-                                // Track terminal-state cleanup. SUBSCRIBED fires the broadcast and
-                                // disposes after `.send` settles; CHANNEL_ERROR / TIMED_OUT / CLOSED
-                                // dispose immediately. A 5s safety timer guarantees the channel is
-                                // freed even if no status callback fires (rare socket quirks).
-                                let disposed = false;
-                                const dispose = () => {
-                                    if (disposed) return;
-                                    disposed = true;
-                                    clearTimeout(safety);
-                                    supabase.removeChannel(ch);
-                                };
-                                const safety = setTimeout(dispose, 5000);
-                                ch.subscribe((status) => {
-                                    if (status === 'SUBSCRIBED') {
-                                        ch.send({
-                                            type: 'broadcast',
-                                            event: 'split-added',
-                                            payload: { fromUserId: userId },
-                                        }).finally(dispose);
-                                    } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
-                                        dispose();
-                                    }
-                                });
-                            }
-
-                            // The broadcast above only reaches debtors whose app is open.
-                            // Fire a Web Push fan-out so closed apps still get a notification.
-                            if (createdId) {
-                                fetch('/api/push/notify-split', {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ transaction_id: createdId }),
-                                    credentials: 'same-origin',
-                                }).catch(() => { /* best-effort */ });
-                            }
-                        }
-                    })();
-                }
             }
-
         } catch (error) {
-            // Allow the user to retry after a failure — the submission lock only
-            // applies when we've successfully navigated.
-            submittedRef.current = false;
+            // Allow the user to retry after a failure.
+            inFlightRef.current = false;
             if (isNative) {
                 Haptics.notification({ type: NotificationType.Error }).catch(() => { });
             }
