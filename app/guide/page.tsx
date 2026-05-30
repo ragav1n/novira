@@ -7,7 +7,7 @@ const GUIDE_URL = `${SITE_URL}/guide`;
 
 export const metadata: Metadata = {
   title: 'User guide',
-  description: 'Everything Novira can do — a complete, friendly walkthrough of every feature, with live animated demos.',
+  description: 'Everything Novira can do: a complete, friendly walkthrough of every feature, with live animated demos.',
   alternates: { canonical: '/guide' },
   openGraph: {
     title: 'Novira User Guide',
@@ -35,7 +35,7 @@ const HOW_TO_LD = {
   '@type': 'HowTo',
   name: 'How to use Novira',
   description:
-    'Sign up, log expenses, split bills, track recurring subscriptions, save toward goals, and more — the complete Novira walkthrough.',
+    'Sign up, log expenses, split bills, track recurring subscriptions, save toward goals, and more. The complete Novira walkthrough.',
   url: GUIDE_URL,
   totalTime: 'PT15M',
   step: GUIDE_SECTIONS.map((s) => ({
@@ -52,7 +52,7 @@ const FAQ_LD = {
   mainEntity: [
     {
       '@type': 'Question',
-      name: 'The app feels slow or shows old data — what should I do?',
+      name: 'The app feels slow or shows old data. What should I do?',
       acceptedAnswer: {
         '@type': 'Answer',
         text:
@@ -65,16 +65,16 @@ const FAQ_LD = {
       acceptedAnswer: {
         '@type': 'Answer',
         text:
-          'Make sure you’ve added Novira to your home screen — push notifications need that. Then turn the master toggle on under Settings → Notifications, and confirm your phone’s system notification settings allow Novira. Quiet hours might also be silencing them.',
+          'Make sure you’ve added Novira to your home screen. Push notifications need that. Then turn the master toggle on under Settings → Notifications, and confirm your phone’s system notification settings allow Novira. Quiet hours might also be silencing them.',
       },
     },
     {
       '@type': 'Question',
-      name: 'An offline expense isn’t syncing — how do I fix it?',
+      name: 'An offline expense isn’t syncing. How do I fix it?',
       acceptedAnswer: {
         '@type': 'Answer',
         text:
-          'Open Settings → Data Management → Sync status. Anything that failed to send lives there with a Try Again button. If retrying doesn’t help, the message usually explains why — most often it’s a permissions issue.',
+          'Open Settings → Data Management → Sync status. Anything that failed to send lives there with a Try Again button. If retrying doesn’t help, the message usually explains why, most often a permissions issue.',
       },
     },
     {
@@ -101,7 +101,7 @@ const FAQ_LD = {
       acceptedAnswer: {
         '@type': 'Answer',
         text:
-          '26 currencies — INR, USD, EUR, GBP, CHF, SGD, VND, TWD, JPY, KRW, HKD, MYR, PHP, THB, CAD, AUD, MXN, BRL, IDR, AED, CNY, RUB, ZAR, TRY, NZD, SEK. Each transaction can be in any of them with live exchange rates.',
+          '26 currencies: INR, USD, EUR, GBP, CHF, SGD, VND, TWD, JPY, KRW, HKD, MYR, PHP, THB, CAD, AUD, MXN, BRL, IDR, AED, CNY, RUB, ZAR, TRY, NZD, SEK. Each transaction can be in any of them with live exchange rates.',
       },
     },
     {

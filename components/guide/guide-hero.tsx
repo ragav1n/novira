@@ -38,10 +38,10 @@ export function GuideHero() {
             </span>
           </h1>
           <p className="mt-4 max-w-xl text-base leading-relaxed text-foreground/85 sm:text-lg">
-            A friendly, complete walkthrough — from your first transaction to splitting a trip, detecting subscriptions, and exporting your bills to your calendar. Skim with the table of contents or read top-to-bottom.
+            A friendly, complete walkthrough, from your first transaction to splitting a trip, detecting subscriptions, and exporting your bills to your calendar. Skim with the table of contents or read top-to-bottom.
           </p>
 
-          {/* Recently shipped — small badge row that links into the relevant section */}
+          {/* Recently shipped - small badge row that links into the relevant section */}
           <motion.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}

@@ -201,7 +201,7 @@ export function Component({ isSignUp = false }: { isSignUp?: boolean }) {
   return (
     <div className="w-full min-h-[100dvh] relative flex items-center justify-center bg-transparent">
 
-      {/* Opacity is intentionally not animated here — the route template
+      {/* Opacity is intentionally not animated here - the route template
           already cross-fades pages, and stacking another opacity animation
           on top causes a visible "blink" because the two multiply
           (template_opacity × card_opacity). We keep only the y-translate so
@@ -771,7 +771,7 @@ export function Component({ isSignUp = false }: { isSignUp?: boolean }) {
                   type="button"
                   disabled={isLoading}
                   onClick={async () => {
-                    // Same submission lock as the email/password path — guards against
+                    // Same submission lock as the email/password path - guards against
                     // double-firing in the brief window before disabled={isLoading} commits.
                     if (isSubmittingRef.current || isLoading) return;
                     isSubmittingRef.current = true;
@@ -792,7 +792,7 @@ export function Component({ isSignUp = false }: { isSignUp?: boolean }) {
                         },
                       });
                       if (error) throw error;
-                      // On success the browser is redirecting to Google — leave the lock held.
+                      // On success the browser is redirecting to Google - leave the lock held.
                     } catch (error) {
                       console.error("Google Auth error:", error);
                       const msg = error instanceof Error ? error.message : 'Authentication failed';

@@ -24,7 +24,7 @@ const STEPS: Step[] = [
     {
         icon: <Plus className="w-6 h-6" />,
         title: 'Add your first expense',
-        body: 'Track what you spend. Tap the + to log a transaction — the form remembers your context so the second time is faster.',
+        body: 'Track what you spend. Tap the + to log a transaction, and the form remembers your context so the second time is faster.',
         cta: 'Add expense',
         onCta: (router) => router.push('/add'),
     },

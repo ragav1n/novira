@@ -34,15 +34,15 @@ const SECTIONS = [
 
 type FeatureVisual = 'chart' | 'gauge';
 const FEATURES: { icon: React.ComponentType<{ style?: React.CSSProperties; className?: string }>; title: string; desc: string; span?: 1 | 2; visual?: FeatureVisual }[] = [
-  { icon: BarChart3, title: 'Rich analytics',     desc: 'Beautiful charts and a What-If simulator that quantifies cuts against your goals — by category, place, time, or person.', span: 2, visual: 'chart' },
+  { icon: BarChart3, title: 'Rich analytics',     desc: 'Beautiful charts and a What-If simulator that quantifies cuts against your goals, by category, place, time, or person.', span: 2, visual: 'chart' },
   { icon: Globe,     title: 'Any currency',       desc: '26 supported currencies with live exchange rates, per-transaction conversion, and a base-currency that holds steady over time.' },
-  { icon: Repeat,    title: 'Recurring detection', desc: 'Spots subscriptions automatically — and quietly flags silent price hikes before they pile up.' },
+  { icon: Repeat,    title: 'Recurring detection', desc: 'Spots subscriptions automatically, and quietly flags silent price hikes before they pile up.' },
   { icon: Calendar,  title: 'Smart budgets',      desc: 'Weighted-pace forecasting (last-7-day rate mixed with month-to-date) nudges you before you overspend.', span: 2, visual: 'gauge' },
-  { icon: Zap,       title: 'Bank imports',       desc: 'Drop an HDFC or SBI statement and Novira parses it in seconds — smart duplicate detection included.' },
-  { icon: FileText,  title: 'Clean exports',      desc: 'Multi-page PDFs, CSV, and an ICS bill schedule — your accountant, tax software, and calendar will thank you.' },
+  { icon: Zap,       title: 'Bank imports',       desc: 'Drop an HDFC or SBI statement and Novira parses it in seconds, with smart duplicate detection included.' },
+  { icon: FileText,  title: 'Clean exports',      desc: 'Multi-page PDFs, CSV, and an ICS bill schedule. Your accountant, tax software, and calendar will thank you.' },
   { icon: Smartphone, title: 'Install anywhere',  desc: 'One-tap install on iPhone, Android, Mac, and Windows. Own home-screen icon, runs offline, no app store.' },
-  { icon: Hand,      title: 'Gesture-first',      desc: 'Swipe to edit or delete, pull to refresh, drag to reorder your dashboard — Novira gets faster the more you use it.' },
-  { icon: Bell,      title: 'Bills & nudges',     desc: 'Opt-in push for bills, budget warnings, bucket deadlines, and daily or weekly digests — with quiet hours.', span: 2 },
+  { icon: Hand,      title: 'Gesture-first',      desc: 'Swipe to edit or delete, pull to refresh, drag to reorder your dashboard. Novira gets faster the more you use it.' },
+  { icon: Bell,      title: 'Bills & nudges',     desc: 'Opt-in push for bills, budget warnings, bucket deadlines, and daily or weekly digests, with quiet hours.', span: 2 },
 ];
 
 const TXNS = [
@@ -60,14 +60,13 @@ const fadeUp = (delay = 0) => ({
 
 function Tag({ children }: { children: React.ReactNode }) {
   return (
-    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, fontSize: 13, fontWeight: 500 }}>
-      <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#8A2BE2', boxShadow: '0 0 10px #8A2BE2', flexShrink: 0 }} />
+    <div style={{ display: 'inline-flex', alignItems: 'center', fontSize: 13, fontWeight: 500, color: 'rgba(255,255,255,0.62)', textTransform: 'uppercase', letterSpacing: '0.14em' }}>
       {children}
     </div>
   );
 }
 
-// ─── Hero "New" pill — rotating ticker of distinctive Novira features ─────────
+// ─── Hero "New" pill - rotating ticker of distinctive Novira features ─────────
 const HERO_TICKER_ITEMS: { icon: React.ComponentType<{ className?: string }>; label: string }[] = [
   { icon: Sparkles, label: 'AI receipt scan' },
   { icon: FileText, label: 'Bank statement imports' },
@@ -242,7 +241,7 @@ function PhoneMockup() {
     { pos: { top: '8%', left: '-8%' }, anim: 'orbA 7s ease-in-out infinite', bg: 'linear-gradient(135deg, #7B39FC, #C084FC)', label: 'D', text: <>Daniel owes you <b>₹840</b></> },
     { pos: { top: '28%', right: '-16%' }, anim: 'orbB 8s ease-in-out infinite', bg: 'linear-gradient(135deg, #34d399, #10b981)', label: '✓', text: <>Synced <b>12 txns</b></> },
     { pos: { bottom: '24%', left: '-14%' }, anim: 'orbC 9s ease-in-out infinite', bg: 'linear-gradient(135deg, #EC4899, #F472B6)', label: '₹', text: <>Categorized <b>Groceries</b></> },
-    { pos: { bottom: '6%', right: '-8%' }, anim: 'orbD 7.5s ease-in-out infinite', bg: 'linear-gradient(135deg, #FBBF24, #F59E0B)', label: '!', text: <>Budget on track — <b>62%</b></> },
+    { pos: { bottom: '6%', right: '-8%' }, anim: 'orbD 7.5s ease-in-out infinite', bg: 'linear-gradient(135deg, #FBBF24, #F59E0B)', label: '!', text: <>Budget on track, <b>62%</b></> },
   ];
   return (
     <div style={{ position: 'relative', height: 620, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -485,7 +484,7 @@ function ScanVisual() {
       <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
         <div className="scan-laser-beam" />
       </div>
-      {/* result card — old compact corner card with new step-based field fill */}
+      {/* result card - old compact corner card with new step-based field fill */}
       <div style={{ position: 'absolute', right: 30, bottom: 30, padding: '12px 14px', borderRadius: 14, background: 'rgba(20,10,40,0.94)', border: '1px solid rgba(164,132,215,0.5)', backdropFilter: 'blur(14px)', fontSize: 11, boxShadow: '0 10px 30px rgba(0,0,0,0.5)', animation: 'popIn 0.6s cubic-bezier(0.34,1.5,0.64,1) 0.8s both', color: '#fff' }}>
         {fields.map((f, i) => {
           const filled = step > i;
@@ -498,7 +497,7 @@ function ScanVisual() {
                 style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontWeight: 600 }}
               >
                 <span style={{ width: 4, height: 4, borderRadius: '50%', background: filled ? f.accent : 'rgba(255,255,255,0.25)', boxShadow: filled ? `0 0 6px ${f.accent}` : 'none', transition: 'all 0.3s' }} />
-                <span style={{ color: filled ? '#fff' : 'rgba(255,255,255,0.4)' }}>{filled ? f.value : '—'}</span>
+                <span style={{ color: filled ? '#fff' : 'rgba(255,255,255,0.4)' }}>{filled ? f.value : '-'}</span>
               </motion.b>
             </div>
           );
@@ -575,7 +574,7 @@ function OfflineVisual() {
         <div style={{ ...panelStyle }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
             <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#F97316' }} />
-            <span style={{ fontSize: 12, fontWeight: 600, color: '#F97316' }}>Offline — 3 queued</span>
+            <span style={{ fontSize: 12, fontWeight: 600, color: '#F97316' }}>Offline, 3 queued</span>
           </div>
           {queuedTxns.map(tx => (
             <div key={tx.name} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.05)', fontSize: 12 }}>
@@ -600,7 +599,7 @@ function OfflineVisual() {
         <div style={{ ...panelStyle }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
             <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#34d399' }} />
-            <span style={{ fontSize: 12, fontWeight: 600, color: '#34d399' }}>Synced — all good</span>
+            <span style={{ fontSize: 12, fontWeight: 600, color: '#34d399' }}>Synced, all good</span>
           </div>
           {syncedTxns.map(tx => (
             <div key={tx.name} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.05)', fontSize: 12 }}>
@@ -679,7 +678,7 @@ function MapVisual() {
 // ─── Feature anchor micro-visuals (Rich analytics, Smart budgets) ────────────
 
 function MiniChart() {
-  // Mini bar chart — 7 weekday bars, varied heights, gradient fill, with a
+  // Mini bar chart - 7 weekday bars, varied heights, gradient fill, with a
   // ghost average line. Drawn as static SVG; entrance handled by parent card.
   const bars = [42, 28, 60, 50, 78, 92, 64];
   const max = 100;
@@ -709,7 +708,7 @@ function MiniChart() {
 }
 
 function MiniGauge() {
-  // Horizontal pace gauge — track + filled segment + position marker, with a
+  // Horizontal pace gauge - track + filled segment + position marker, with a
   // small "On pace" tag below.
   const pct = 62;
   return (
@@ -741,7 +740,7 @@ export function LandingPage() {
   const deviceRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Section dot tracking — root is the scroll container, not window
+  // Section dot tracking - root is the scroll container, not window
   useEffect(() => {
     const container = scrollRef.current;
     if (!container) return;
@@ -760,7 +759,7 @@ export function LandingPage() {
     return () => io.disconnect();
   }, []);
 
-  // Device frame tilt — listen to the scroll container, not window
+  // Device frame tilt - listen to the scroll container, not window
   useEffect(() => {
     const container = scrollRef.current;
     if (!container) return;
@@ -816,7 +815,7 @@ export function LandingPage() {
             <span>Novira</span>
           </div>
           <nav className="hidden md:flex gap-[26px]" style={{ fontSize: 13, color: 'rgba(255,255,255,0.78)', fontWeight: 500 }}>
-            {[['sec-dash','Dashboard'],['sec-scan','AI Scan'],['sec-split','Split'],['sec-offline','Offline'],['sec-currency','Currencies'],['sec-features','Features']].map(([id, label]) => (
+            {[['sec-dash','Dashboard'],['sec-scan','AI Scan'],['sec-split','Split'],['sec-offline','Offline'],['sec-currency','Currencies'],['sec-map','Map'],['sec-features','Features']].map(([id, label]) => (
               <a key={label} href={`#${id}`}
                 onClick={e => { e.preventDefault(); document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' }); }}
                 className="hover:text-white transition-colors whitespace-nowrap cursor-pointer">{label}</a>
@@ -864,7 +863,7 @@ export function LandingPage() {
 
             {/* Nav links */}
             <nav className="flex-1 flex flex-col justify-center px-8 gap-0.5">
-              {([['sec-hero','Home'],['sec-dash','Dashboard'],['sec-scan','AI Scan'],['sec-split','Split'],['sec-offline','Offline'],['sec-currency','Currencies'],['sec-features','Features']] as [string,string][]).map(([id, label], i) => (
+              {([['sec-hero','Home'],['sec-dash','Dashboard'],['sec-scan','AI Scan'],['sec-split','Split'],['sec-offline','Offline'],['sec-currency','Currencies'],['sec-map','Map'],['sec-features','Features']] as [string,string][]).map(([id, label], i) => (
                 <motion.a
                   key={id}
                   initial={{ opacity: 0, x: -20 }}
@@ -942,7 +941,7 @@ export function LandingPage() {
 
                 <motion.p initial="hidden" animate="visible" variants={fadeUp(0.3)}
                   style={{ fontSize: 'clamp(15px, 1.3vw, 17px)', color: 'rgba(255,255,255,0.78)', maxWidth: 480, margin: '0 0 28px', lineHeight: 1.55 }}>
-                  Track spending, split with friends, and understand your money — in one quietly brilliant app that works anywhere, even offline.
+                  Track spending, split with friends, and understand your money, all in one app that works anywhere, even offline.
                 </motion.p>
 
                 <motion.div initial="hidden" animate="visible" variants={fadeUp(0.4)} className="flex flex-wrap items-center gap-2.5">
@@ -957,27 +956,6 @@ export function LandingPage() {
                     Read the guide
                     <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" />
                   </Link>
-                </motion.div>
-
-                <motion.div initial="hidden" animate="visible" variants={fadeUp(0.5)} className="flex items-center gap-[22px] mt-7 flex-wrap"
-                  style={{ fontSize: 12.5, fontWeight: 500 }}>
-                  {['No credit card', 'Free to start', 'Works offline'].map(label => (
-                    <span key={label} className="flex items-center gap-1.5" style={{ color: 'rgba(255,255,255,0.78)' }}>
-                      <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#34d399', boxShadow: '0 0 8px #34d399', flexShrink: 0 }} />
-                      {label}
-                    </span>
-                  ))}
-                </motion.div>
-
-                <motion.div initial="hidden" animate="visible" variants={fadeUp(0.5)} className="flex gap-7 mt-9 pt-7" style={{ borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-                  {[['26','Currencies'],['< 2s','Scan time']].map(([n,l]) => (
-                    <div key={l}>
-                      <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-0.02em', color: '#fff' }}>
-                        {n.replace(/[+s★]/g,'')}<span style={{ color: '#C084FC' }}>{n.match(/[+s★]/)?.[0]}</span>
-                      </div>
-                      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: 2 }}>{l}</div>
-                    </div>
-                  ))}
                 </motion.div>
               </div>
 
@@ -994,9 +972,8 @@ export function LandingPage() {
         <section id="sec-dash" style={{ ...snapSection, flexDirection: 'column', justifyContent: 'center', gap: 48 }}>
           <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp(0.1)}
             className="text-center" style={{ maxWidth: 820 }}>
-            <Tag>Your dashboard</Tag>
-            <h2 style={{ fontSize: 'clamp(34px, 5.5vw, 64px)', lineHeight: 1.03, letterSpacing: '-0.03em', fontWeight: 700, margin: '16px 0 0' }}>Every rupee,<br />accounted for.</h2>
-            <p style={{ color: 'rgba(255,255,255,0.78)', fontSize: 'clamp(15px, 1.4vw, 17px)', lineHeight: 1.55, margin: '14px auto 0', maxWidth: 560 }}>One screen. Your balance, your pace, your top categories, your latest moves — all live, all the time.</p>
+            <h2 style={{ fontSize: 'clamp(34px, 5.5vw, 64px)', lineHeight: 1.03, letterSpacing: '-0.03em', fontWeight: 700, margin: 0 }}>Every rupee,<br />accounted for.</h2>
+            <p style={{ color: 'rgba(255,255,255,0.78)', fontSize: 'clamp(15px, 1.4vw, 17px)', lineHeight: 1.55, margin: '14px auto 0', maxWidth: 560 }}>One screen. Your balance, your pace, your top categories, your latest moves, all live, all the time.</p>
           </motion.div>
           <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp(0.3)}
             style={{ width: '100%', maxWidth: 1200, margin: '0 auto', padding: '0 28px' }}>
@@ -1008,12 +985,11 @@ export function LandingPage() {
         <section id="sec-scan" style={snapSection}>
           <div style={{ maxWidth: 1200, width: '100%', margin: '0 auto', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 64, alignItems: 'center' }} className="two-col-grid">
             <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp(0.1)}>
-              <Tag>AI receipt scanning</Tag>
-              <h3 style={{ fontSize: 'clamp(32px, 4.5vw, 56px)', lineHeight: 1.05, letterSpacing: '-0.025em', fontWeight: 700, margin: '14px 0 18px' }}>
+              <h3 style={{ fontSize: 'clamp(32px, 4.5vw, 56px)', lineHeight: 1.05, letterSpacing: '-0.025em', fontWeight: 700, margin: '0 0 18px' }}>
                 Point. Snap.<br /><span className="landing-grad-text">Form fills itself.</span>
               </h3>
               <p style={{ color: 'rgba(255,255,255,0.78)', fontSize: 16, lineHeight: 1.6, maxWidth: 480 }}>
-                Point your camera at any receipt and Novira extracts the amount, merchant, date, category, even the store address — instantly. No typing. No copy-paste. Just tap save and move on.
+                Point your camera at any receipt and Novira extracts the amount, merchant, date, category, even the store address, instantly. No typing. No copy-paste. Just tap save and move on.
               </p>
               <div style={{ marginTop: 24 }}>
                 <AdvancedButton href="/signup">
@@ -1034,8 +1010,7 @@ export function LandingPage() {
               <SplitVisual />
             </motion.div>
             <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp(0.3)}>
-              <Tag>Split with friends</Tag>
-              <h3 style={{ fontSize: 'clamp(32px, 4.5vw, 56px)', lineHeight: 1.05, letterSpacing: '-0.025em', fontWeight: 700, margin: '14px 0 18px' }}>
+              <h3 style={{ fontSize: 'clamp(32px, 4.5vw, 56px)', lineHeight: 1.05, letterSpacing: '-0.025em', fontWeight: 700, margin: '0 0 18px' }}>
                 Settle up.<br /><span className="landing-grad-text">Stay friends.</span>
               </h3>
               <p style={{ color: 'rgba(255,255,255,0.78)', fontSize: 16, lineHeight: 1.6, maxWidth: 480 }}>
@@ -1049,9 +1024,8 @@ export function LandingPage() {
         <section id="sec-offline" style={{ ...snapSection, flexDirection: 'column', gap: 40 }}>
           <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp(0.1)}
             className="text-center" style={{ maxWidth: 820 }}>
-            <Tag>Works anywhere</Tag>
-            <h2 style={{ fontSize: 'clamp(34px, 5.5vw, 64px)', lineHeight: 1.03, letterSpacing: '-0.03em', fontWeight: 700, margin: '16px 0 0' }}>Offline?<br /><span className="landing-grad-text">Still on.</span></h2>
-            <p style={{ color: 'rgba(255,255,255,0.78)', fontSize: 'clamp(15px, 1.4vw, 17px)', lineHeight: 1.55, margin: '14px auto 0', maxWidth: 560 }}>Add expenses on a plane, in a tunnel, at a mountain café with one bar. Novira saves everything locally and syncs the moment you're back — no data lost, no duplicates, no drama.</p>
+            <h2 style={{ fontSize: 'clamp(34px, 5.5vw, 64px)', lineHeight: 1.03, letterSpacing: '-0.03em', fontWeight: 700, margin: 0 }}>Offline?<br /><span className="landing-grad-text">Still on.</span></h2>
+            <p style={{ color: 'rgba(255,255,255,0.78)', fontSize: 'clamp(15px, 1.4vw, 17px)', lineHeight: 1.55, margin: '14px auto 0', maxWidth: 560 }}>Add expenses on a plane, in a tunnel, at a mountain café with one bar. Novira saves everything locally and syncs the moment you're back. No data lost, no duplicates, no drama.</p>
           </motion.div>
           <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp(0.3)} style={{ width: '100%', maxWidth: 1200, padding: '0 28px' }}>
             <OfflineVisual />
@@ -1062,12 +1036,11 @@ export function LandingPage() {
         <section id="sec-currency" style={snapSection}>
           <div style={{ maxWidth: 1500, width: '100%', margin: '0 auto', display: 'grid', gridTemplateColumns: '1fr 1.6fr', gap: 64, alignItems: 'center' }} className="two-col-grid">
             <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp(0.1)}>
-              <Tag>26 currencies</Tag>
-              <h3 style={{ fontSize: 'clamp(32px, 4.5vw, 56px)', lineHeight: 1.05, letterSpacing: '-0.025em', fontWeight: 700, margin: '14px 0 18px' }}>
+              <h3 style={{ fontSize: 'clamp(32px, 4.5vw, 56px)', lineHeight: 1.05, letterSpacing: '-0.025em', fontWeight: 700, margin: '0 0 18px' }}>
                 One app,<br /><span className="landing-grad-text">every currency.</span>
               </h3>
               <p style={{ color: 'rgba(255,255,255,0.78)', fontSize: 16, lineHeight: 1.6, maxWidth: 480 }}>
-                Spend rupees on a Mumbai train, euros at a Berlin café, yen at a Tokyo bar — Novira converts everything to your base currency with live rates so your budget never lies to you.
+                Spend rupees on a Mumbai train, euros at a Berlin café, yen at a Tokyo bar. Novira converts everything to your base currency with live rates so your budget never lies to you.
               </p>
               <div className="flex items-center gap-[22px] mt-7 flex-wrap" style={{ fontSize: 12.5, fontWeight: 500 }}>
                 {['26 currencies', 'Live rates', 'Auto-convert'].map(label => (
@@ -1105,8 +1078,7 @@ export function LandingPage() {
               <MapVisual />
             </motion.div>
             <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeUp(0.3)}>
-              <Tag>Location-aware</Tag>
-              <h3 style={{ fontSize: 'clamp(32px, 4.5vw, 56px)', lineHeight: 1.05, letterSpacing: '-0.025em', fontWeight: 700, margin: '14px 0 18px' }}>
+              <h3 style={{ fontSize: 'clamp(32px, 4.5vw, 56px)', lineHeight: 1.05, letterSpacing: '-0.025em', fontWeight: 700, margin: '0 0 18px' }}>
                 Where your<br /><span className="landing-grad-text">money goes.</span>
               </h3>
               <p style={{ color: 'rgba(255,255,255,0.78)', fontSize: 16, lineHeight: 1.6, maxWidth: 480 }}>
@@ -1207,7 +1179,7 @@ export function LandingPage() {
               </div>
             </motion.div>
 
-            {/* Onboarding preview — feels like the first three screens of the product */}
+            {/* Onboarding preview - feels like the first three screens of the product */}
             <motion.div
               initial="hidden"
               whileInView="visible"
@@ -1222,7 +1194,7 @@ export function LandingPage() {
               {[
                 { n: '01', t: 'Create your account', s: 'Email and a password. No card.' },
                 { n: '02', t: 'Add your first expense', s: 'Snap a receipt or type it in.' },
-                { n: '03', t: 'See your week', s: 'Buckets, pace, top categories — live.' },
+                { n: '03', t: 'See your week', s: 'Buckets, pace, top categories, live.' },
               ].map((step, i) => (
                 <motion.div
                   key={step.n}
