@@ -129,7 +129,6 @@ export function AddExpenseView() {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const cameraInputRef = useRef<HTMLInputElement>(null);
     const amountInputRef = useRef<HTMLInputElement>(null);
-    const paymentScrollRef = useRef<HTMLDivElement>(null);
     const scanAbortRef = useRef<AbortController | null>(null);
     const [scanning, setScanning] = React.useState(false);
     const [errors, setErrors] = React.useState<ExpenseFormErrors>({});
@@ -407,21 +406,6 @@ export function AddExpenseView() {
                 { enableHighAccuracy: true, timeout: 8000 }
             );
         }
-    }, []);
-
-    // One-shot: center the pre-selected payment method in the scroller so the
-    // user can see what's currently picked even if it sits off-screen on first paint.
-    useEffect(() => {
-        if (!formState.paymentMethod) return;
-        const container = paymentScrollRef.current;
-        const btn = container?.querySelector<HTMLButtonElement>(
-            `button[data-payment-method="${formState.paymentMethod}"]`
-        );
-        if (!container || !btn) return;
-        // Horizontal-only centering — avoid scrollIntoView, which would also scroll
-        // the page vertically and push Quick Pins to the top on first paint.
-        container.scrollLeft = btn.offsetLeft - (container.clientWidth - btn.clientWidth) / 2;
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     // Prime the exchange rate cache before the user submits. Same-currency
@@ -1243,17 +1227,7 @@ export function AddExpenseView() {
                     </div>
                     <div className="space-y-2">
                         <p className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest">Payment Method</p>
-                        <div
-                            className="relative -mx-5"
-                            style={{
-                                maskImage: 'linear-gradient(to right, transparent, black 20px, black calc(100% - 28px), transparent)',
-                                WebkitMaskImage: 'linear-gradient(to right, transparent, black 20px, black calc(100% - 28px), transparent)',
-                            }}
-                        >
-                            <div
-                                ref={paymentScrollRef}
-                                className="flex gap-2 overflow-x-auto px-5 pb-2 snap-x snap-mandatory custom-scrollbar"
-                            >
+                        <div className="flex flex-wrap gap-2">
                                 {(['Cash', 'UPI', 'Debit Card', 'Credit Card', 'Bank Transfer'] as const).map((method) => {
                                     const isSelected = formState.paymentMethod === method;
                                     const color = PAYMENT_METHOD_COLORS[method];
@@ -1265,14 +1239,13 @@ export function AddExpenseView() {
                                         <button
                                             key={method}
                                             type="button"
-                                            data-payment-method={method}
                                             aria-pressed={isSelected}
                                             onClick={() => {
                                                 if (isNative) Haptics.impact({ style: ImpactStyle.Light }).catch(() => { });
                                                 formState.setPaymentMethod(method);
                                             }}
                                             className={cn(
-                                                "flex items-center gap-2 px-3.5 py-2.5 rounded-full border whitespace-nowrap shrink-0 snap-start transition-colors active:scale-[0.96]",
+                                                "flex items-center gap-2 px-3.5 py-2.5 rounded-full border whitespace-nowrap transition-colors active:scale-[0.96]",
                                                 !isSelected && "bg-secondary/10 border-white/5 text-muted-foreground hover:bg-secondary/20 hover:text-foreground"
                                             )}
                                             style={isSelected ? {
@@ -1286,7 +1259,6 @@ export function AddExpenseView() {
                                         </button>
                                     );
                                 })}
-                            </div>
                         </div>
                     </div>
                 </div>
