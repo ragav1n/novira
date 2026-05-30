@@ -42,20 +42,25 @@ export const BucketService = {
     },
 
     /**
-     * Fetches every transaction belonging to a bucket plus the contributor profiles,
+     * Fetches the bucket's transactions (most recent first) plus the contributor profiles,
      * so the detail view can render per-category, per-currency, and per-member breakdowns
-     * without further round-trips.
+     * without further round-trips. Bounded by `limit` to avoid loading thousands of rows at
+     * once; returns `truncated` so the caller can disclose that the breakdown is partial.
      */
-    async getBucketTransactions(bucketId: string) {
+    async getBucketTransactions(bucketId: string, limit = 500) {
         const { data, error } = await supabase
             .from('transactions')
             .select('id, description, amount, category, date, created_at, user_id, currency, exchange_rate, base_currency, bucket_id, group_id, place_name, place_address, place_lat, place_lng, tags, notes, profile:profiles(full_name, avatar_url), splits(user_id, amount, is_paid, profile:profiles(full_name, avatar_url))')
             .eq('bucket_id', bucketId)
             .order('date', { ascending: false })
-            .order('created_at', { ascending: false });
+            .order('created_at', { ascending: false })
+            .limit(limit + 1);
 
         if (error) throw error;
-        return data;
+
+        const rows = data || [];
+        const truncated = rows.length > limit;
+        return { transactions: truncated ? rows.slice(0, limit) : rows, truncated };
     },
 
     async createBucket(data: Partial<Bucket> & { group_id?: string | null }, userId: string) {

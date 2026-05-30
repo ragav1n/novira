@@ -42,6 +42,7 @@ interface Props {
 export function BucketDetailSheet({ bucket, spent, open, onOpenChange }: Props) {
     const { formatCurrency, convertAmount, currency } = useUserPreferences();
     const [transactions, setTransactions] = useState<DetailTx[]>([]);
+    const [truncated, setTruncated] = useState(false);
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
@@ -50,8 +51,11 @@ export function BucketDetailSheet({ bucket, spent, open, onOpenChange }: Props) 
         setLoading(true);
         (async () => {
             try {
-                const data = await BucketService.getBucketTransactions(bucket.id);
-                if (!cancelled) setTransactions((data || []) as DetailTx[]);
+                const { transactions: data, truncated } = await BucketService.getBucketTransactions(bucket.id);
+                if (!cancelled) {
+                    setTransactions((data || []) as DetailTx[]);
+                    setTruncated(truncated);
+                }
             } catch (error) {
                 console.error('Error fetching bucket transactions:', error);
             } finally {
@@ -249,6 +253,12 @@ export function BucketDetailSheet({ bucket, spent, open, onOpenChange }: Props) 
                         </div>
                     ) : (
                         <>
+                            {truncated && (
+                                <p className="text-[11px] text-amber-300/80 bg-amber-400/[0.06] border border-amber-400/15 rounded-lg px-3 py-2">
+                                    Showing the 500 most recent transactions. The breakdown below reflects this subset.
+                                </p>
+                            )}
+
                             {/* Category breakdown */}
                             <section className="space-y-2.5">
                                 <h4 className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground/60 pl-1">
