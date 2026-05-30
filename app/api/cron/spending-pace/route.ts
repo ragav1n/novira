@@ -2,7 +2,7 @@ import 'server-only';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient as createServiceClient } from '@supabase/supabase-js';
 import { isInQuietHours } from '@/lib/push-quiet-hours';
-import { authorizeCron } from '@/lib/server/push';
+import { authorizeCron, fmtMoney } from '@/lib/server/push';
 import { logSend } from '@/lib/server/send-log';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const webpush = require('web-push') as typeof import('web-push');
@@ -47,14 +47,6 @@ interface PushSubRow {
     endpoint: string;
     p256dh: string;
     auth: string;
-}
-
-const CURRENCY_SYMBOLS: Record<string, string> = {
-    USD: '$', EUR: '€', INR: '₹', GBP: '£', JPY: '¥', AUD: 'A$', CAD: 'C$', CHF: 'Fr',
-    CNY: '¥', SGD: 'S$', HKD: 'HK$', THB: '฿', PHP: '₱', KRW: '₩', AED: 'AED'
-};
-function fmt(amount: number, ccy: string): string {
-    return `${CURRENCY_SYMBOLS[ccy.toUpperCase()] || ''}${Math.round(amount).toLocaleString()}`;
 }
 
 export async function GET(request: NextRequest) {
@@ -170,7 +162,7 @@ export async function GET(request: NextRequest) {
 
             const payload = JSON.stringify({
                 title: 'Pacing over budget',
-                body: `${fmt(total, baseCcy)} mid-month — projected to overshoot by ${fmt(overshoot, baseCcy)} (+${overshootPct}%).`,
+                body: `${fmtMoney(total, baseCcy)} spent so far this month — on track to go ${fmtMoney(overshoot, baseCcy)} (+${overshootPct}%) over your budget.`,
                 url: '/dashboard',
                 icon: '/Novira.png'
             });

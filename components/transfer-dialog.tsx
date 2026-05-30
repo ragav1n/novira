@@ -35,7 +35,7 @@ interface TransferDialogProps {
 
 export function TransferDialog({ open, onOpenChange }: TransferDialogProps) {
     const { accounts } = useAccounts();
-    const { convertAmount } = useUserPreferences();
+    const { convertAmount, formatCurrency } = useUserPreferences();
     const active = useMemo(() => accounts.filter(a => !a.archived_at), [accounts]);
 
     const [fromId, setFromId] = useState<string>('');
@@ -122,7 +122,7 @@ export function TransferDialog({ open, onOpenChange }: TransferDialogProps) {
             }
             invalidateTransactionCaches();
             window.dispatchEvent(new Event('novira:expense-added'));
-            toast.success(`Transferred ${fromAccount.currency} ${parsedAmount}`);
+            toast.success(`Transferred ${formatCurrency(parsedAmount, fromAccount.currency)}`);
             onOpenChange(false);
         } catch (e) {
             console.error('[TransferDialog] failed', e);

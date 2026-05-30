@@ -768,7 +768,7 @@ export function AddExpenseView() {
                                         dictationWatchdogRef.current = setTimeout(() => {
                                             dictationWatchdogRef.current = null;
                                             if (!mountedRef.current || dictationGotSpeechRef.current) return;
-                                            toast('No audio detected — check for a microphone prompt in the address bar. Incognito windows often block voice input; try a normal window.', { icon: '🎤', duration: 7000 });
+                                            toast("No audio detected — check the mic permission, and try a normal (non-incognito) window.", { icon: '🎤', duration: 6000 });
                                         }, 8000);
                                     } else {
                                         // Browser couldn't start recognition — onError already notified.

@@ -326,7 +326,7 @@ export function SyncIndicator() {
                                                                 </span>
                                                             </div>
                                                             <div className="text-[11px] text-muted-foreground mt-0.5 break-words">
-                                                                {item.errorReason || meta.summary}
+                                                                {meta.summary}
                                                             </div>
                                                         </div>
                                                         <div className="flex items-center gap-1 shrink-0">

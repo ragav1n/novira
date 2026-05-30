@@ -14,6 +14,12 @@ export interface SettlementBalance {
     staleCount: number;
     /** Dominant currency on the unpaid splits — picked as the most frequent (count). */
     currency: string;
+    /**
+     * True when the unpaid splits span more than one currency. Summed amounts
+     * across currencies are meaningless, so callers should show counts (not a
+     * single-currency total) when this is set.
+     */
+    mixedCurrency: boolean;
 }
 
 interface DebtRow {
@@ -108,5 +114,6 @@ export async function loadSettlementBalance(
         staleIOwe,
         staleCount: staleIOweCount + staleOwedToMeCount,
         currency,
+        mixedCurrency: currencyCounts.size > 1,
     };
 }

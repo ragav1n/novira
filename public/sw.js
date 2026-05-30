@@ -125,7 +125,7 @@ self.addEventListener('message', (event) => {
 
 // Push Notifications
 self.addEventListener('push', (event) => {
-    let payload = { title: 'Novira', body: 'You have a new notification', icon: '/Novira.png', url: '/' };
+    let payload = { title: 'Novira', body: 'Open Novira to see what\'s new', icon: '/Novira.png', url: '/' };
     if (event.data) {
         try { payload = { ...payload, ...JSON.parse(event.data.text()) }; } catch {}
     }

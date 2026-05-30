@@ -2,7 +2,7 @@ import 'server-only';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient as createServiceClient } from '@supabase/supabase-js';
 import { isInQuietHours } from '@/lib/push-quiet-hours';
-import { authorizeCron, processInBatches } from '@/lib/server/push';
+import { authorizeCron, fmtMoney, processInBatches } from '@/lib/server/push';
 import { logSend } from '@/lib/server/send-log';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const webpush = require('web-push') as typeof import('web-push');
@@ -43,17 +43,11 @@ interface PushSubRow {
     auth: string;
 }
 
-const CURRENCY_SYMBOLS: Record<string, string> = {
-    USD: '$', EUR: '€', INR: '₹', GBP: '£', SGD: 'S$', JPY: '¥', AUD: 'A$', CAD: 'C$', AED: 'AED'
-};
-
 function formatBillNotification(t: RecurringTemplateRow, daysUntil: number) {
-    const symbol = CURRENCY_SYMBOLS[t.currency?.toUpperCase()] || t.currency || '';
-    const amount = `${symbol}${Number(t.amount).toLocaleString()}`;
     const when = daysUntil === 0 ? 'today' : daysUntil === 1 ? 'tomorrow' : `in ${daysUntil} days`;
     return {
         title: `${t.description} due ${when}`,
-        body: amount,
+        body: fmtMoney(Number(t.amount), t.currency || 'USD'),
     };
 }
 

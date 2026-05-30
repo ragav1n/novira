@@ -172,8 +172,8 @@ export async function POST(request: NextRequest) {
 
         const moneyText = fmtMoney(agg.total, agg.currency);
         const title = agg.count === 1 ? `New split: ${moneyText}` : `${agg.count} new splits: ${moneyText}`;
-        const descPart = agg.desc ? `${agg.desc} — ` : '';
-        const body = `${descPart}owed to ${creatorName}`;
+        const descPart = agg.desc ? `${agg.desc}: ` : '';
+        const body = `${descPart}you owe ${creatorName} ${moneyText}`;
 
         const delivered = await sendToUser(
             supabase,

@@ -146,18 +146,25 @@ export async function GET(request: NextRequest) {
         for (const [c, n] of agg.currencyCounts.entries()) {
             if (n > topCount) { topCcy = c; topCount = n; }
         }
+        // Summed amounts across currencies are meaningless — when the user's
+        // stale splits span more than one currency, lead with counts instead.
+        const mixedCurrency = agg.currencyCounts.size > 1;
+        const totalSplits = agg.owedCount + agg.oweCount;
 
         let title: string;
         let body: string;
-        if (agg.owedToMe > 0 && agg.iOwe > 0) {
+        if (mixedCurrency) {
             title = 'Time to settle up';
-            body = `${fmtMoney(agg.owedToMe, topCcy)} owed to you · ${fmtMoney(agg.iOwe, topCcy)} to pay across ${agg.owedCount + agg.oweCount} splits.`;
+            body = `${totalSplits} ${totalSplits === 1 ? 'split has' : 'splits have'} been unpaid for ${STALE_AFTER_DAYS}+ days.`;
+        } else if (agg.owedToMe > 0 && agg.iOwe > 0) {
+            title = 'Time to settle up';
+            body = `You're owed ${fmtMoney(agg.owedToMe, topCcy)} and owe ${fmtMoney(agg.iOwe, topCcy)} across ${totalSplits} splits.`;
         } else if (agg.owedToMe > 0) {
-            title = `${fmtMoney(agg.owedToMe, topCcy)} owed to you`;
-            body = `${agg.owedCount} ${agg.owedCount === 1 ? 'split has' : 'splits have'} been sitting unpaid for ${STALE_AFTER_DAYS}+ days.`;
+            title = `You're owed ${fmtMoney(agg.owedToMe, topCcy)}`;
+            body = `${agg.owedCount} ${agg.owedCount === 1 ? 'split has' : 'splits have'} been unpaid for ${STALE_AFTER_DAYS}+ days.`;
         } else if (agg.iOwe > 0) {
-            title = `${fmtMoney(agg.iOwe, topCcy)} to settle up`;
-            body = `${agg.oweCount} ${agg.oweCount === 1 ? 'split' : 'splits'} you owe ${agg.oweCount === 1 ? 'has' : 'have'} been pending for ${STALE_AFTER_DAYS}+ days.`;
+            title = `You owe ${fmtMoney(agg.iOwe, topCcy)}`;
+            body = `${agg.oweCount} ${agg.oweCount === 1 ? 'split has' : 'splits have'} been pending for ${STALE_AFTER_DAYS}+ days.`;
         } else {
             return;
         }

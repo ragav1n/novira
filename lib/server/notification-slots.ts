@@ -221,21 +221,28 @@ function daysInMonth(yyyymmdd: string): number {
 }
 
 /**
- * "$24 owed / $12 to pay" — collapses to a single direction when the other side
- * is zero, and returns null when there's nothing meaningful to surface.
+ * Direction-explicit settlement line — e.g. "You're owed $24 · you owe $12".
+ * Collapses to a single direction when the other side is zero. When the unpaid
+ * splits span multiple currencies a summed amount would be wrong, so it reports
+ * counts instead. Returns null when there's nothing meaningful to surface.
  */
 function settlementSnippet(ctx: SlotContext): string | null {
     const s = ctx.settlement;
     if (s.unpaidCount === 0) return null;
     const ccy = s.currency;
+
+    if (s.mixedCurrency) {
+        const n = s.unpaidCount;
+        return `${n} unpaid ${n === 1 ? 'split' : 'splits'} to settle up`;
+    }
     if (s.owedToMe > 0 && s.iOwe > 0) {
-        return `${fmtMoney(s.owedToMe, ccy)} owed · ${fmtMoney(s.iOwe, ccy)} to pay`;
+        return `You're owed ${fmtMoney(s.owedToMe, ccy)} · you owe ${fmtMoney(s.iOwe, ccy)}`;
     }
     if (s.owedToMe > 0) {
-        return `${fmtMoney(s.owedToMe, ccy)} owed to you`;
+        return `You're owed ${fmtMoney(s.owedToMe, ccy)}`;
     }
     if (s.iOwe > 0) {
-        return `${fmtMoney(s.iOwe, ccy)} to settle up`;
+        return `You owe ${fmtMoney(s.iOwe, ccy)}`;
     }
     return null;
 }
@@ -274,7 +281,9 @@ export function composeMorning(ctx: SlotContext): PushPayload | null {
     } else if (billTomorrow) {
         parts.push(`${billTomorrow.description} due tomorrow`);
     } else if (ctx.nearestBucket && ctx.nearestBucket.daysOut <= 3) {
-        parts.push(`${ctx.nearestBucket.name} ends in ${ctx.nearestBucket.daysOut}d`);
+        const d = ctx.nearestBucket.daysOut;
+        const when = d === 0 ? 'ends today' : d === 1 ? 'ends tomorrow' : `ends in ${d} days`;
+        parts.push(`${ctx.nearestBucket.name} ${when}`);
     }
 
     // Streak is the most "positive reinforcement" angle for the start-of-day
@@ -287,7 +296,9 @@ export function composeMorning(ctx: SlotContext): PushPayload | null {
 
     return {
         title: 'Good morning',
-        body: parts.join(' · '),
+        // Cap at the 3 most useful facts — a single notification line gets
+        // truncated by the OS past that, and four "·"-joined items read as a dump.
+        body: parts.slice(0, 3).join(' · '),
         url: '/dashboard',
     };
 }
@@ -324,16 +335,16 @@ export function composeMidday(ctx: SlotContext): PushPayload | null {
     let title: string;
     let body: string;
     if (delta > budget * 0.05) {
-        title = 'Pacing over budget';
+        title = 'Spending ahead of pace';
         body = runRate.isExceeding
-            ? `${fmtMoney(Math.abs(delta), baseCcy)} over · projecting ${fmtMoney(runRate.projectedSpend, baseCcy)} by month-end.`
-            : `${fmtMoney(Math.abs(delta), baseCcy)} over the daily curve so far this month.`;
+            ? `${fmtMoney(Math.abs(delta), baseCcy)} ahead of your budget pace — on track for ${fmtMoney(runRate.projectedSpend, baseCcy)} by month-end.`
+            : `${fmtMoney(Math.abs(delta), baseCcy)} ahead of your budget pace so far this month.`;
     } else if (delta < -budget * 0.05) {
-        title = 'On a strong pace';
-        body = `${fmtMoney(Math.abs(delta), baseCcy)} under the daily curve so far this month.`;
+        title = 'Under budget so far';
+        body = `${fmtMoney(Math.abs(delta), baseCcy)} under your budget pace so far this month.`;
     } else {
         title = 'Right on pace';
-        body = `${fmtMoney(ctx.mtdSpend, baseCcy)} spent month-to-date.`;
+        body = `${fmtMoney(ctx.mtdSpend, baseCcy)} spent so far this month.`;
     }
 
     return { title, body, url: '/analytics' };

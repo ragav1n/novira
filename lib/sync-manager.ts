@@ -484,6 +484,7 @@ async function runSyncLoop(): Promise<void> {
                             // Permanent failure: RLS violation, not found, or other 4xx.
                             // Note: RLS-filtered deletes succeed with 0 rows (no error), so this branch
                             // is only hit on actual rejection.
+                            console.error(`[sync-manager] ${item.type} permanently failed:`, reason);
                             queue = markFailed(queue, item.id, reason, 'permanent');
                             window.dispatchEvent(new CustomEvent('novira-mutation-failed-permanent', {
                                 detail: { id: item.id, type: item.type, data: item.data, reason }
@@ -515,6 +516,7 @@ async function runSyncLoop(): Promise<void> {
                     if (error) {
                         const { permanent, reason } = classifyPgError(error);
                         if (permanent) {
+                            console.error(`[sync-manager] ${item.type} permanently failed:`, reason);
                             queue = markFailed(queue, item.id, reason, 'permanent');
                             window.dispatchEvent(new CustomEvent('novira-mutation-failed-permanent', {
                                 detail: { id: item.id, type: item.type, data: item.data, reason }
@@ -535,6 +537,7 @@ async function runSyncLoop(): Promise<void> {
                 if (item.type === 'ADD_FULL_TRANSACTION') {
                     const { permanent, reason } = classifyAddError(e);
                     if (permanent) {
+                        console.error(`[sync-manager] ${item.type} permanently failed:`, reason);
                         queue = markFailed(queue, item.id, reason, 'permanent');
                         window.dispatchEvent(new CustomEvent('novira-mutation-failed-permanent', {
                             detail: { id: item.id, type: item.type, data: item.data, reason }

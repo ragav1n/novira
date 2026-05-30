@@ -22,9 +22,20 @@ export const CURRENCY_SYMBOLS: Record<string, string> = {
     CNY: 'CN¥', RUB: '₽', ZAR: 'R', TRY: '₺', NZD: 'NZ$', SEK: 'kr'
 };
 
+// Currencies conventionally shown without minor units. Mirrors the client-side
+// list in user-preferences-provider.tsx so push copy matches the in-app numbers.
+const ZERO_DECIMAL_CURRENCIES = new Set(['VND', 'IDR', 'JPY', 'KRW', 'INR', 'TWD', 'THB', 'PHP']);
+
 export function fmtMoney(amount: number, ccy: string): string {
-    const symbol = CURRENCY_SYMBOLS[ccy.toUpperCase()] || ccy;
-    return `${symbol}${Math.round(amount).toLocaleString()}`;
+    const code = ccy.toUpperCase();
+    const symbol = CURRENCY_SYMBOLS[code] || code;
+    const digits = ZERO_DECIMAL_CURRENCIES.has(code) ? 0 : 2;
+    const formatted = new Intl.NumberFormat('en-US', {
+        minimumFractionDigits: digits,
+        maximumFractionDigits: digits,
+    }).format(Math.abs(amount));
+    // Minus belongs before the unit ("-$100", not "$-100").
+    return `${amount < 0 ? '-' : ''}${symbol}${formatted}`;
 }
 
 export interface PushPayload {
