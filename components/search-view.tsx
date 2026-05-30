@@ -580,7 +580,7 @@ export function SearchView() {
                     >
                         <ChevronLeft className="w-5 h-5" aria-hidden="true" />
                     </button>
-                    <h2 className="absolute inset-0 flex items-center justify-center pointer-events-none text-[15px] font-semibold tracking-tight">
+                    <h2 className="absolute inset-0 flex items-center justify-center pointer-events-none text-lg font-semibold tracking-tight">
                         Search &amp; filter
                     </h2>
                     <div className="flex items-center gap-1.5 ml-auto z-10">

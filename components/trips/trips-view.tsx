@@ -29,7 +29,7 @@ export function TripsView() {
                 >
                     <ArrowLeft className="w-5 h-5" />
                 </Button>
-                <h1 className="text-xl font-bold flex items-center gap-2">
+                <h1 className="text-lg font-bold flex items-center gap-2">
                     <Plane className="w-5 h-5 text-sky-300" aria-hidden="true" />
                     Trips
                 </h1>
