@@ -191,6 +191,17 @@ export function useExpenseForm(
     };
     const [smartDefaults, setSmartDefaults] = useState<SmartDefaults | null>(null);
 
+    // Smart defaults derived from the typed merchant/description — most common
+    // (category, payment, bucket) across past transactions with a matching description,
+    // plus how many matched (shown as a confidence count).
+    type MerchantDefaults = {
+        category: string | null;
+        payment_method: 'Cash' | 'Debit Card' | 'Credit Card' | 'UPI' | 'Bank Transfer' | null;
+        bucket_id: string | null;
+        count: number;
+    };
+    const [merchantDefaults, setMerchantDefaults] = useState<MerchantDefaults | null>(null);
+
     // Persist the current draft. Debounced so rapid typing doesn't thrash storage.
     const draftWriteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     useEffect(() => {
@@ -366,6 +377,7 @@ export function useExpenseForm(
             setSuggestedCategory(null);
             setSuggestedBucket(null);
             setDescriptionSuggestions([]);
+            setMerchantDefaults(null);
             return;
         }
         const trimmed = description.trim();
@@ -373,6 +385,7 @@ export function useExpenseForm(
             setSuggestedCategory(null);
             setSuggestedBucket(null);
             setDescriptionSuggestions([]);
+            setMerchantDefaults(null);
             return;
         }
         let cancelled = false;
@@ -393,19 +406,42 @@ export function useExpenseForm(
                     setSuggestedCategory(null);
                     setSuggestedBucket(null);
                     setDescriptionSuggestions([]);
+                    setMerchantDefaults(null);
                     return;
                 }
 
                 const catTally = new Map<string, number>();
                 const bucketTally = new Map<string, number>();
+                const payTally = new Map<string, number>();
                 for (const r of data) {
                     if (r.category) catTally.set(r.category, (catTally.get(r.category) || 0) + 1);
                     if (r.bucket_id) bucketTally.set(r.bucket_id, (bucketTally.get(r.bucket_id) || 0) + 1);
+                    if (r.payment_method) payTally.set(r.payment_method, (payTally.get(r.payment_method) || 0) + 1);
                 }
                 const topCat = [...catTally.entries()].sort((a, b) => b[1] - a[1])[0];
                 setSuggestedCategory(topCat && topCat[0] !== selectedCategory ? topCat[0] : null);
                 const topBucket = [...bucketTally.entries()].sort((a, b) => b[1] - a[1])[0];
                 setSuggestedBucket(topBucket && topBucket[0] !== selectedBucketId ? topBucket[0] : null);
+
+                // Consolidated "Usual for [merchant]" chip: most common category / payment /
+                // bucket across the matches, surfacing only fields that differ from the current
+                // form values. Needs at least 2 matches to be a meaningful signal.
+                const topPay = [...payTally.entries()].sort((a, b) => b[1] - a[1])[0];
+                const ALLOWED_PAY = ['Cash', 'Debit Card', 'Credit Card', 'UPI', 'Bank Transfer'] as const;
+                const payCandidate = topPay && (ALLOWED_PAY as readonly string[]).includes(topPay[0])
+                    ? (topPay[0] as MerchantDefaults['payment_method'])
+                    : null;
+                if (data.length >= 2) {
+                    const next: MerchantDefaults = {
+                        category: topCat && topCat[0] !== selectedCategory ? topCat[0] : null,
+                        payment_method: payCandidate && payCandidate !== paymentMethod ? payCandidate : null,
+                        bucket_id: topBucket && topBucket[0] !== selectedBucketId ? topBucket[0] : null,
+                        count: data.length,
+                    };
+                    setMerchantDefaults(next.category || next.payment_method || next.bucket_id ? next : null);
+                } else {
+                    setMerchantDefaults(null);
+                }
 
                 // Top 3 distinct descriptions (case-insensitive)
                 const seen = new Set<string>();
@@ -425,7 +461,7 @@ export function useExpenseForm(
             }
         }, 300);
         return () => { cancelled = true; clearTimeout(timer); };
-    }, [description, userId, selectedCategory, selectedBucketId]);
+    }, [description, userId, selectedCategory, selectedBucketId, paymentMethod]);
 
     // Place-based smart defaults: when user picks a place (or it's auto-set by scan/Quick Pin),
     // fetch the most common category/payment/bucket for that exact place_name and surface
@@ -560,6 +596,7 @@ export function useExpenseForm(
         setSuggestedBucket(null);
         setDescriptionSuggestions([]);
         setSmartDefaults(null);
+        setMerchantDefaults(null);
         setReceiptFile(null);
         setSelectedAccountId(primaryAccount?.id ?? null);
         if (typeof window !== 'undefined') {
@@ -596,6 +633,7 @@ export function useExpenseForm(
         suggestedBucket, setSuggestedBucket,
         descriptionSuggestions, setDescriptionSuggestions,
         smartDefaults, setSmartDefaults,
+        merchantDefaults, setMerchantDefaults,
         receiptFile, setReceiptFile,
         selectedAccountId, setSelectedAccountId,
         resetForm

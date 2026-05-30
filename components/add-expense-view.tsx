@@ -840,38 +840,52 @@ export function AddExpenseView() {
                     {errors.description && (
                         <p id="expense-description-error" role="alert" aria-live="polite" className="text-xs text-destructive font-medium">{errors.description}</p>
                     )}
-                    {formState.suggestedCategory && (
-                        <div className="flex items-center justify-between gap-3 px-3 py-2 rounded-2xl border border-primary/20 bg-primary/10">
-                            <div className="flex items-center gap-2 min-w-0">
-                                <Sparkles className="w-3.5 h-3.5 text-primary shrink-0" aria-hidden="true" />
-                                <p className="text-[11px] text-primary/90 font-medium truncate">
-                                    Try category <span className="font-bold text-primary capitalize">{formState.suggestedCategory}</span>
-                                </p>
+                    {formState.merchantDefaults && formState.description.trim().length >= 2 && (!formState.smartDefaults || !formState.placeName) && (() => {
+                        const md = formState.merchantDefaults!;
+                        const bucket = md.bucket_id ? buckets.find(b => b.id === md.bucket_id && !b.is_archived) : null;
+                        const parts: string[] = [];
+                        if (md.category) parts.push(md.category);
+                        if (md.payment_method) parts.push(md.payment_method);
+                        if (bucket) parts.push(bucket.name);
+                        if (parts.length === 0) return null;
+                        return (
+                            <div className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-2xl border border-primary/20 bg-primary/10">
+                                <div className="flex items-center gap-2 min-w-0">
+                                    <Sparkles className="w-3.5 h-3.5 text-primary shrink-0" aria-hidden="true" />
+                                    <p className="text-[11px] text-primary/90 font-medium truncate">
+                                        Usual for <span className="font-bold text-primary">{formState.description.trim()}</span>: {parts.map((p, i) => (
+                                            <span key={i} className="font-bold text-primary capitalize">{p}{i < parts.length - 1 ? ' · ' : ''}</span>
+                                        ))}
+                                        <span className="text-primary/60 font-normal"> · from {md.count} past</span>
+                                    </p>
+                                </div>
+                                <div className="flex items-center gap-2 shrink-0">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            if (isNative) Haptics.impact({ style: ImpactStyle.Light }).catch(() => { });
+                                            if (md.category) formState.setSelectedCategory(md.category);
+                                            if (md.payment_method) formState.setPaymentMethod(md.payment_method);
+                                            if (md.bucket_id) formState.setSelectedBucketId(md.bucket_id);
+                                            formState.setMerchantDefaults(null);
+                                        }}
+                                        aria-label="Apply usual merchant defaults"
+                                        className="text-[11px] font-bold text-primary hover:text-primary/80 px-2 py-1 rounded-full bg-primary/15 border border-primary/30 transition-colors active:scale-[0.96]"
+                                    >
+                                        Apply
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => formState.setMerchantDefaults(null)}
+                                        aria-label="Dismiss merchant suggestion"
+                                        className="text-primary/70 hover:text-primary/90 p-1 rounded-full active:scale-[0.92] transition-transform duration-100"
+                                    >
+                                        <X className="w-3 h-3" />
+                                    </button>
+                                </div>
                             </div>
-                            <div className="flex items-center gap-2 shrink-0">
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        if (isNative) Haptics.impact({ style: ImpactStyle.Light }).catch(() => { });
-                                        formState.setSelectedCategory(formState.suggestedCategory!);
-                                        formState.setSuggestedCategory(null);
-                                    }}
-                                    aria-label={`Apply suggested category: ${formState.suggestedCategory}`}
-                                    className="text-[11px] font-bold text-primary hover:text-primary/80 px-2 py-1 rounded-full bg-primary/15 border border-primary/30 transition-colors active:scale-[0.96]"
-                                >
-                                    Apply
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => formState.setSuggestedCategory(null)}
-                                    aria-label="Dismiss category suggestion"
-                                    className="text-primary/70 hover:text-primary/90 p-1 rounded-full active:scale-[0.92] transition-transform duration-100"
-                                >
-                                    <X className="w-3 h-3" />
-                                </button>
-                            </div>
-                        </div>
-                    )}
+                        );
+                    })()}
 
                     {formState.descriptionSuggestions.length > 0 && (
                         <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-hide">
@@ -901,6 +915,7 @@ export function AddExpenseView() {
                                             formState.setDescriptionSuggestions([]);
                                             formState.setSuggestedCategory(null);
                                             formState.setSuggestedBucket(null);
+                                            formState.setMerchantDefaults(null);
                                         }}
                                         className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/10 bg-secondary/20 hover:bg-secondary/40 transition-colors shrink-0"
                                         aria-label={`Use previous: ${s.description}`}
@@ -1094,42 +1109,6 @@ export function AddExpenseView() {
                 />
 
                 {/* Personal Bucket Selection */}
-                {formState.suggestedBucket && (() => {
-                    const sb = buckets.find(b => b.id === formState.suggestedBucket && !b.is_archived);
-                    if (!sb) return null;
-                    return (
-                        <div className="flex items-center justify-between gap-3 px-3 py-2 rounded-2xl border border-cyan-500/20 bg-cyan-500/10">
-                            <div className="flex items-center gap-2 min-w-0">
-                                <Sparkles className="w-3.5 h-3.5 text-cyan-400 shrink-0" aria-hidden="true" />
-                                <p className="text-[11px] text-cyan-200/90 font-medium truncate">
-                                    Try bucket <span className="font-bold text-cyan-300">{sb.name}</span>
-                                </p>
-                            </div>
-                            <div className="flex items-center gap-2 shrink-0">
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        if (isNative) Haptics.impact({ style: ImpactStyle.Light }).catch(() => { });
-                                        formState.setSelectedBucketId(sb.id);
-                                        formState.setSuggestedBucket(null);
-                                    }}
-                                    aria-label={`Apply suggested bucket: ${sb.name}`}
-                                    className="text-[11px] font-bold text-cyan-300 hover:text-cyan-200 px-2 py-1 rounded-full bg-cyan-400/15 border border-cyan-400/30 transition-colors active:scale-[0.96]"
-                                >
-                                    Apply
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => formState.setSuggestedBucket(null)}
-                                    aria-label="Dismiss bucket suggestion"
-                                    className="text-cyan-300/70 hover:text-cyan-200 p-1 rounded-full active:scale-[0.92] transition-transform duration-100"
-                                >
-                                    <X className="w-3 h-3" />
-                                </button>
-                            </div>
-                        </div>
-                    );
-                })()}
                 <BucketSelector
                     buckets={buckets}
                     selectedBucketId={formState.selectedBucketId}
