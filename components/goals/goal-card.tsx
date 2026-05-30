@@ -7,7 +7,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import {
     DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+} from '@/components/ui/material-ui-dropdown-menu';
 import { cn } from '@/lib/utils';
 import {
     daysUntilDeadline, requiredMonthlyContribution, monthlyVelocity,
@@ -179,13 +179,13 @@ export function GoalCard({ goal, deposits, formatCurrency, onAddDeposit, onEdit,
                                 </button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="w-44 rounded-2xl bg-card/95 backdrop-blur-xl border-white/10">
-                                <DropdownMenuItem onClick={() => onOpenHistory(goal)} className="gap-2 cursor-pointer">
+                                <DropdownMenuItem delayDuration={0} onClick={() => onOpenHistory(goal)} className="gap-2 cursor-pointer">
                                     <History className="w-4 h-4" /> View History
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => onEdit(goal)} className="gap-2 cursor-pointer">
+                                <DropdownMenuItem delayDuration={0} onClick={() => onEdit(goal)} className="gap-2 cursor-pointer">
                                     <Edit2 className="w-4 h-4" /> Edit Goal
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => onDelete(goal)} className="gap-2 cursor-pointer text-rose-400 focus:text-rose-400 focus:bg-rose-500/10">
+                                <DropdownMenuItem delayDuration={0} onClick={() => onDelete(goal)} className="gap-2 cursor-pointer text-rose-400 focus:text-rose-400 focus:bg-rose-500/10">
                                     <Trash2 className="w-4 h-4" /> Delete
                                 </DropdownMenuItem>
                             </DropdownMenuContent>

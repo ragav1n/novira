@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import {
     DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+} from '@/components/ui/material-ui-dropdown-menu';
 import { BulkAssignByPaymentDialog } from './bulk-assign-by-payment-dialog';
 import { supabase } from '@/lib/supabase';
 import { useUserPreferences } from '@/components/providers/user-preferences-provider';
@@ -425,12 +425,13 @@ export function AccountsSection({ defaultCurrency, formatCurrency }: Props) {
                                     </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
-                                    <DropdownMenuItem onClick={() => openEdit(a)} className="gap-2">
+                                    <DropdownMenuItem delayDuration={0} onClick={() => openEdit(a)} className="gap-2">
                                         <Pencil className="w-3.5 h-3.5" />
                                         Edit
                                     </DropdownMenuItem>
                                     {!a.is_primary && (
                                         <DropdownMenuItem
+                                            delayDuration={0}
                                             onClick={() => setPrimary(a.id).catch(() => toast.error('Failed to set primary'))}
                                             className="gap-2"
                                         >
@@ -439,12 +440,13 @@ export function AccountsSection({ defaultCurrency, formatCurrency }: Props) {
                                         </DropdownMenuItem>
                                     )}
                                     {usesBalanceFraming && (
-                                        <DropdownMenuItem onClick={() => setReconciling(a)} className="gap-2">
+                                        <DropdownMenuItem delayDuration={0} onClick={() => setReconciling(a)} className="gap-2">
                                             <Scale className="w-3.5 h-3.5" />
                                             Reconcile
                                         </DropdownMenuItem>
                                     )}
                                     <DropdownMenuItem
+                                        delayDuration={0}
                                         onClick={() => archiveAccount(a.id, true).catch(() => toast.error('Failed to archive'))}
                                         className="gap-2"
                                     >

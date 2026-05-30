@@ -8,7 +8,7 @@ import { History, MoreVertical, Users, RefreshCcw, Ban, MapPin, Pencil, Trash2, 
 import type { Transaction } from '@/types/transaction';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+} from '@/components/ui/material-ui-dropdown-menu';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import { motion, useMotionValue, animate, useReducedMotion } from 'framer-motion';
@@ -386,6 +386,7 @@ export const TransactionRow = memo(function TransactionRow({
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="bg-card/98 backdrop-blur-xl border-white/10 rounded-xl shadow-2xl min-w-[140px]">
                 <DropdownMenuItem
+                  delayDuration={0}
                   onClick={(e) => { e.stopPropagation(); onHistory(); }}
                   className="rounded-lg cursor-pointer gap-2 text-[13px]"
                 >
@@ -394,6 +395,7 @@ export const TransactionRow = memo(function TransactionRow({
                 </DropdownMenuItem>
                 {tx.receipt_path && onViewReceipt && (
                   <DropdownMenuItem
+                    delayDuration={0}
                     onClick={(e) => { e.stopPropagation(); onViewReceipt(); }}
                     className="rounded-lg cursor-pointer gap-2 text-[13px]"
                   >
@@ -404,6 +406,7 @@ export const TransactionRow = memo(function TransactionRow({
                 {canEdit && !isSettlement && !hasSplits && (
                   <>
                     <DropdownMenuItem
+                      delayDuration={0}
                       onClick={(e) => { e.stopPropagation(); onEdit(); }}
                       className="rounded-lg cursor-pointer gap-2 text-[13px]"
                     >
@@ -411,6 +414,7 @@ export const TransactionRow = memo(function TransactionRow({
                       Edit
                     </DropdownMenuItem>
                     <DropdownMenuItem
+                      delayDuration={0}
                       onClick={(e) => { e.stopPropagation(); onDelete(); }}
                       className="rounded-lg cursor-pointer text-destructive focus:text-destructive gap-2 text-[13px]"
                     >
