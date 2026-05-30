@@ -3,7 +3,6 @@
 import { useUserPreferences, type Currency } from '@/components/providers/user-preferences-provider';
 import { BudgetAlertManager } from '@/components/budget-alert-manager';
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
-import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { Tag, Plane, Home, Gift, Car, Utensils, ShoppingCart, Heart, Gamepad2, School, Laptop, Music, Users, Plus } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -41,11 +40,6 @@ import { useDashboardState } from '@/hooks/useDashboardState';
 import { useDashboardStats } from '@/hooks/useDashboardStats';
 import { useUpcomingRecurring } from '@/hooks/useUpcomingRecurring';
 import { useDashboardLayout } from '@/hooks/useDashboardLayout';
-
-const NetWorthCard = dynamic(
-    () => import('./dashboard/net-worth-card').then(m => m.NetWorthCard),
-    { ssr: false },
-);
 
 // Accepts #RGB, #RRGGBB, or #RRGGBBAA and returns helpers for emitting a solid
 // `rgb(...)` or an arbitrary-alpha `rgb(... / a)`. Returns null for malformed
@@ -446,7 +440,6 @@ export function DashboardView() {
                     weekdaySpending={weekdaySpending}
                     showWeekdaySpending={dashboardLayout.weekday_spending}
                 />
-                {!activeWorkspaceId && <NetWorthCard />}
                 {dashboardLayout.transaction_list && (
                 <TransactionListSection
                     isBucketFocused={isBucketFocused}

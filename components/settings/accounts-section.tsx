@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
     Plus, Pencil, Archive, ArchiveRestore, Trash2, Star, StarOff, Scale, Wand2, MoreVertical,
     Wallet, Landmark, PiggyBank, CreditCard, Smartphone, CircleDollarSign,
@@ -28,7 +28,6 @@ import {
 import { CurrencyDropdown } from '@/components/ui/currency-dropdown';
 import { toast } from '@/utils/haptics';
 import { useAccounts } from '@/components/providers/accounts-provider';
-import { computeNetWorth } from '@/lib/account-balances';
 import { type Account, type AccountType, ACCOUNT_TYPE_LABELS } from '@/types/account';
 
 const TYPE_ICONS: Record<AccountType, React.ComponentType<{ className?: string; style?: React.CSSProperties }>> = {
@@ -104,22 +103,14 @@ export function AccountsSection({ defaultCurrency, formatCurrency }: Props) {
     // wallets can show their actual holdings instead of one collapsed total.
     const [perCurrency, setPerCurrency] = useState<Record<string, Record<string, number>>>({});
     // Flips true after the first balance RPC resolves. Until then per-account
-    // balances and the net-worth total are withheld so neither flashes an
-    // opening-only figure before activity is in.
+    // balances are withheld so they don't flash an opening-only figure before
+    // activity is in.
     const [balancesReady, setBalancesReady] = useState(false);
     const [reconciling, setReconciling] = useState<Account | null>(null);
     const [bulkAssignOpen, setBulkAssignOpen] = useState(false);
 
     const active = accounts.filter(a => !a.archived_at);
     const archived = accounts.filter(a => !!a.archived_at);
-
-    // Net worth across tracked accounts (cards, wallets, anything with an
-    // opening balance) — spent-only cash/checking accounts are excluded so the
-    // total stays truthful. Reuses the same per-account activity already fetched.
-    const netWorth = useMemo(
-        () => computeNetWorth(accounts, activity, convertAmount, baseCurrency),
-        [accounts, activity, convertAmount, baseCurrency],
-    );
 
     const fetchBalances = useCallback(async () => {
         if (!userId) return;
@@ -282,15 +273,6 @@ export function AccountsSection({ defaultCurrency, formatCurrency }: Props) {
                 history but disappear from pickers.
             </p>
 
-            {balancesReady && netWorth.trackedCount > 0 && (
-                <div className="flex items-center justify-between rounded-xl bg-secondary/10 border border-white/5 px-3.5 py-2.5">
-                    <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">Net worth</span>
-                    <span className={`text-[15px] font-bold tabular-nums ${netWorth.netWorth < 0 ? 'text-rose-300' : 'text-foreground'}`}>
-                        {formatCurrency(netWorth.netWorth)}
-                    </span>
-                </div>
-            )}
-
             <div className="bg-secondary/5 rounded-xl border border-white/5 divide-y divide-white/5 min-h-[48px]">
                 {loading && (
                     <div className="p-4 text-center text-xs text-muted-foreground/60">Loading…</div>
@@ -330,8 +312,8 @@ export function AccountsSection({ defaultCurrency, formatCurrency }: Props) {
                         .reduce((acc, [curr, val]) => acc + convertAmount(val, curr, baseCurrency), 0);
                     // Once balances have loaded, show the balance even with no
                     // activity (e.g. a new card with only opening debt) — missing
-                    // activity means zero, which is what the net-worth total assumes.
-                    // Before load it stays undefined so the row doesn't flash.
+                    // activity means zero. Before load it stays undefined so the
+                    // row doesn't flash.
                     const computedBalance = balancesReady ? openingInBase + (activityVal ?? 0) : undefined;
 
                     // Primary label per type:
