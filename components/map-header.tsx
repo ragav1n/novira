@@ -2,31 +2,43 @@ import React, { ReactNode } from 'react';
 import { MapPin, X } from 'lucide-react';
 
 interface MapHeaderProps {
-    transactionCount: number;
+    summary: { total: string; places: number; topPlace: string | null };
     onClose: () => void;
     children?: ReactNode;
 }
 
-export function MapHeader({ transactionCount, onClose, children }: MapHeaderProps) {
+export function MapHeader({ summary, onClose, children }: MapHeaderProps) {
     return (
         <div className="absolute top-0 left-0 right-0 z-20 flex flex-col sm:flex-row items-center justify-between p-4 sm:p-6 bg-gradient-to-b from-background/90 via-background/40 to-transparent pointer-events-none">
             <div className="w-full sm:w-auto flex items-center justify-between gap-3 pointer-events-auto">
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 min-w-0">
                     <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center border border-primary/30 backdrop-blur-md shrink-0">
                         <MapPin className="w-5 h-5 text-primary" />
                     </div>
                     <div className="min-w-0">
                         <h2 className="text-lg font-black tracking-tight truncate">Expense Map</h2>
-                        <p className="text-[11px] text-muted-foreground font-medium">
-                            {transactionCount} location{transactionCount !== 1 ? 's' : ''} tagged
+                        <p className="text-[11px] text-muted-foreground font-medium truncate">
+                            {summary.places > 0 ? (
+                                <>
+                                    <span className="text-foreground font-bold">{summary.total}</span>
+                                    {' · '}
+                                    {summary.places} place{summary.places !== 1 ? 's' : ''}
+                                    {summary.topPlace && (
+                                        <span className="hidden sm:inline"> · top: {summary.topPlace}</span>
+                                    )}
+                                </>
+                            ) : (
+                                'No spending in this range'
+                            )}
                         </p>
                     </div>
                 </div>
-                
+
                 {/* Mobile-only Close */}
                 <button
                     onClick={onClose}
-                    className="sm:hidden w-10 h-10 rounded-full bg-card/60 backdrop-blur-md flex items-center justify-center border border-white/10 hover:bg-white/10 transition-colors pointer-events-auto shrink-0"
+                    className="sm:hidden w-10 h-10 rounded-full bg-card/60 backdrop-blur-md flex items-center justify-center border border-white/10 hover:bg-white/10 transition-colors pointer-events-auto shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                    aria-label="Close map"
                 >
                     <X className="w-5 h-5" />
                 </button>
@@ -38,6 +50,7 @@ export function MapHeader({ transactionCount, onClose, children }: MapHeaderProp
             <button
                 onClick={onClose}
                 className="hidden sm:flex w-10 h-10 rounded-full bg-card/60 backdrop-blur-md items-center justify-center border border-white/10 hover:bg-white/10 transition-colors pointer-events-auto shrink-0"
+                aria-label="Close map"
             >
                 <X className="w-5 h-5" />
             </button>

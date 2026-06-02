@@ -37,6 +37,7 @@ import { WelcomeModal } from '@/components/welcome-modal';
 import { FeatureAnnouncementModal } from '@/components/feature-announcement-modal';
 import { LATEST_FEATURE_ANNOUNCEMENT } from '@/lib/feature-flags';
 import { UIBoundary } from '@/components/boundaries/ui-boundary';
+import { useMapTransactions } from '@/hooks/useMapTransactions';
 
 const LocationPicker = dynamic(
     () => import('@/components/ui/location-picker').then(mod => mod.LocationPicker),
@@ -135,6 +136,13 @@ export function DashboardDialogs({
     const editableAccounts = React.useMemo(
         () => allAccounts.filter(a => !a.archived_at),
         [allAccounts],
+    );
+    // The map should show the full geo-tagged history, not the dashboard's paginated
+    // slice. Fetch on open; fall back to the loaded list while loading / offline.
+    const { mapTransactions, loading: mapLoading, truncated: mapTruncated } = useMapTransactions(
+        userId,
+        activeWorkspaceId,
+        isMapOpen,
     );
     return (
         <>
@@ -341,7 +349,9 @@ export function DashboardDialogs({
                     <ExpenseMapView
                         isOpen={isMapOpen}
                         onClose={() => setIsMapOpen(false)}
-                        transactions={transactions}
+                        transactions={mapTransactions ?? transactions}
+                        isLoading={mapLoading && !mapTransactions}
+                        truncated={mapTruncated}
                         formatCurrency={formatCurrency}
                         convertAmount={convertAmount}
                         currency={currency}

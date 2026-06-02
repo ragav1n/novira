@@ -1,6 +1,5 @@
 import { useMemo } from 'react';
 import { parseISO } from 'date-fns';
-import { CATEGORY_COLORS } from '@/lib/categories';
 import { Transaction } from '@/components/expense-map-view';
 
 // Controls how finely lat/lng is snapped to group nearby transactions into the same pin.
@@ -9,8 +8,7 @@ const LOCATION_SNAP_PRECISION = 5000;
 
 // Radius of each tower polygon in degrees (~3m on the ground). Kept small so pins don't overlap.
 const TOWER_POLYGON_RADIUS = 0.00003;
-
-// Number of sides for tower polygons. Reduced from 32 for faster generation.
+// Number of sides for tower polygons.
 const TOWER_POLYGON_SIDES = 24;
 
 // Helper for radial offsets (approx meters to degrees)
@@ -26,7 +24,7 @@ export function useMapData(
     convertAmount: (amount: number, fromCurrency: string, toCurrency: string) => number,
     baseCurrency: string
 ) {
-    // 1. Data Transformation: location matching
+    // Group transactions by snapped location.
     const locationGroups = useMemo(() => {
         const groups = new Map<string, {
             lat: number,
@@ -39,7 +37,7 @@ export function useMapData(
 
         filteredTransactions.forEach(tx => {
             const key = `${(Math.round(tx.place_lat! * LOCATION_SNAP_PRECISION) / LOCATION_SNAP_PRECISION).toFixed(4)},${(Math.round(tx.place_lng! * LOCATION_SNAP_PRECISION) / LOCATION_SNAP_PRECISION).toFixed(4)}`;
-            
+
             // Convert to base currency for aggregation!
             const amountInBase = convertAmount(Number(tx.amount), tx.currency || 'USD', baseCurrency);
 
@@ -57,7 +55,7 @@ export function useMapData(
             group.transactions.push(tx);
             group.totalAmount += amountInBase;
             group.categories.set(tx.category, (group.categories.get(tx.category) || 0) + amountInBase);
-            
+
             if (tx.date > group.latestTx.date) {
                 group.latestTx = tx;
             }
@@ -65,7 +63,7 @@ export function useMapData(
         return groups;
     }, [filteredTransactions, convertAmount, baseCurrency]);
 
-    // 2. Data Transformation: 3D Geometry
+    // 3D spending towers — one extruded polygon per category at each location.
     const towerFeatures = useMemo(() => {
         type TowerProps = { amount: number; category: string; topMerchant: string; count: number; sparkline: string; txIds: string };
         const features: GeoJSON.Feature<GeoJSON.Polygon, TowerProps>[] = [];
@@ -73,53 +71,45 @@ export function useMapData(
             const cats = Array.from(group.categories.entries()).sort((a, b) => a[1] - b[1]);
             const totalCategories = cats.length;
             const clusterRadius = totalCategories > 1 ? 20 : 0;
-            
+
             cats.forEach(([category, amountInBase], idx) => {
-                let center = [group.lng, group.lat];
-                
                 const angle = totalCategories > 1 ? (idx / totalCategories) * 2 * Math.PI : 0;
                 const offsetX = Math.cos(angle) * clusterRadius;
                 const offsetY = Math.sin(angle) * clusterRadius;
-                
-                center = getGridOffsetCoords(group.lng, group.lat, offsetX, offsetY);
+                const center = getGridOffsetCoords(group.lng, group.lat, offsetX, offsetY);
 
-                const radius = TOWER_POLYGON_RADIUS;
-                const sides = TOWER_POLYGON_SIDES;
                 const coordinates = [];
-                for (let i = 0; i < sides; i++) {
-                    const ang = (i * 360) / sides;
-                    const rad = (ang * Math.PI) / 180;
+                for (let i = 0; i < TOWER_POLYGON_SIDES; i++) {
+                    const rad = ((i * 360) / TOWER_POLYGON_SIDES) * Math.PI / 180;
                     coordinates.push([
-                        center[0] + (radius / Math.cos(center[1] * Math.PI / 180)) * Math.cos(rad),
-                        center[1] + radius * Math.sin(rad)
+                        center[0] + (TOWER_POLYGON_RADIUS / Math.cos(center[1] * Math.PI / 180)) * Math.cos(rad),
+                        center[1] + TOWER_POLYGON_RADIUS * Math.sin(rad)
                     ]);
                 }
                 coordinates.push(coordinates[0]);
 
-                const txsInCategory = group.transactions.filter(t => t.category === category).sort((a, b) => parseISO(a.date).getTime() - parseISO(b.date).getTime());
-                const count = txsInCategory.length;
-                
+                const txsInCategory = group.transactions
+                    .filter(t => t.category === category)
+                    .sort((a, b) => parseISO(a.date).getTime() - parseISO(b.date).getTime());
+
                 const merchantMap = new Map<string, number>();
                 txsInCategory.forEach(t => {
                     const tAmountInBase = convertAmount(Number(t.amount), t.currency || 'USD', baseCurrency);
                     merchantMap.set(t.description, (merchantMap.get(t.description) || 0) + tAmountInBase);
                 });
                 const topMerchant = Array.from(merchantMap.entries()).sort((a, b) => b[1] - a[1])[0]?.[0] || 'Unknown';
-                
-                const amountsInBase = txsInCategory.map(t => convertAmount(Number(t.amount), t.currency || 'USD', baseCurrency));
-                const sparkline = amountsInBase.slice(-10);
-                const txIds = txsInCategory.map(t => t.id).join(',');
+                const sparkline = txsInCategory.map(t => convertAmount(Number(t.amount), t.currency || 'USD', baseCurrency)).slice(-10);
 
                 features.push({
                     type: 'Feature',
                     geometry: { type: 'Polygon', coordinates: [coordinates] },
-                    properties: { 
-                        amount: amountInBase, 
-                        category: category.toLowerCase(), 
-                        topMerchant, 
-                        count,
+                    properties: {
+                        amount: amountInBase,
+                        category: category.toLowerCase(),
+                        topMerchant,
+                        count: txsInCategory.length,
                         sparkline: JSON.stringify(sparkline),
-                        txIds
+                        txIds: txsInCategory.map(t => t.id).join(','),
                     }
                 });
             });
@@ -127,45 +117,21 @@ export function useMapData(
         return features;
     }, [locationGroups, convertAmount, baseCurrency]);
 
-    // 3. Data Transformation: Lines (per-day trails)
-    const trailFeatures = useMemo(() => {
-        const userColors = ['#00ffff', '#F472B6', '#F9C74F', '#10B981', '#6366F1', '#A855F7'];
-        const userColorMap = new Map<string, string>();
-        let colorIdx = 0;
+    // Top places ranked by spend (for the summary panel + headline stats)
+    const topPlaces = useMemo(() => {
+        return Array.from(locationGroups.values())
+            .map(g => ({
+                lat: g.lat,
+                lng: g.lng,
+                placeName: g.latestTx.place_name || g.latestTx.place_address || 'Unknown place',
+                total: g.totalAmount,
+                count: g.transactions.length,
+                topCategory: Array.from(g.categories.entries()).sort((a, b) => b[1] - a[1])[0]?.[0] || 'others',
+            }))
+            .sort((a, b) => b.total - a.total);
+    }, [locationGroups]);
 
-        const hexToRgba = (hex: string, alpha: number) => {
-            const r = parseInt(hex.slice(1, 3), 16);
-            const g = parseInt(hex.slice(3, 5), 16);
-            const b = parseInt(hex.slice(5, 7), 16);
-            return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-        };
-
-        // Group by user + calendar day so each day's journey is its own trail
-        const dayTrails: Record<string, Transaction[]> = {};
-        filteredTransactions.forEach(tx => {
-            const day = tx.date.slice(0, 10); // YYYY-MM-DD
-            const key = `${tx.user_id}__${day}`;
-            if (!dayTrails[key]) dayTrails[key] = [];
-            dayTrails[key].push(tx);
-        });
-
-        return Object.entries(dayTrails).map(([key, txs]) => {
-            if (txs.length < 2) return null;
-            const uid = key.split('__')[0];
-            if (!userColorMap.has(uid)) {
-                userColorMap.set(uid, userColors[colorIdx++ % userColors.length]);
-            }
-            const color = userColorMap.get(uid)!;
-            const sorted = [...txs].sort((a, b) => a.created_at < b.created_at ? -1 : 1);
-            return {
-                type: 'Feature' as const,
-                geometry: { type: 'LineString' as const, coordinates: sorted.map(tx => [tx.place_lng!, tx.place_lat!]) },
-                properties: { user_id: uid, date: key.split('__')[1], color, halo: hexToRgba(color, 0.5) }
-            };
-        }).filter(Boolean);
-    }, [filteredTransactions]);
-
-    // Point Features (for heatmap, distinct from 3D)
+    // Per-transaction point features (used for the heatmap).
     const pointFeatures = useMemo(() => {
         return filteredTransactions.map(tx => {
             const amountInBase = convertAmount(Number(tx.amount), tx.currency || 'USD', baseCurrency);
@@ -180,7 +146,16 @@ export function useMapData(
     return {
         locationGroups,
         towerFeatures,
-        trailFeatures,
-        pointFeatures
+        pointFeatures,
+        topPlaces
     };
 }
+
+export type TopPlace = {
+    lat: number;
+    lng: number;
+    placeName: string;
+    total: number;
+    count: number;
+    topCategory: string;
+};
