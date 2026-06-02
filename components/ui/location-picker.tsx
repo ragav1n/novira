@@ -76,7 +76,7 @@ interface MapboxFeature {
     id: string;
     text?: string;
     place_name?: string;
-    properties?: { maki?: string };
+    properties?: { maki?: string; name?: string; full_address?: string; place_formatted?: string };
     geometry: { coordinates: [number, number] };
 }
 
@@ -97,6 +97,26 @@ interface GooglePlaceNearby {
     displayName?: { text?: string };
     formattedAddress?: string;
     location?: { latitude?: number; longitude?: number };
+    types?: string[];
+    primaryType?: string;
+}
+
+// Nearest-POI candidate produced by reverse resolution (Google or Mapbox)
+interface PoiCandidate {
+    id: string;
+    name: string;
+    address: string;
+    lat: number;
+    lng: number;
+    maki?: string;
+    distance: number;
+}
+
+interface DropPinResult {
+    name: string;
+    address: string;
+    lat: number;
+    lng: number;
 }
 
 // ── Maki → emoji map (no extra bundle, works perfectly on mobile) ───────────
@@ -122,54 +142,164 @@ const getMakiEmoji = (maki?: string): string => {
     return MAKI_EMOJI[maki] || '';
 };
 
+// getDistance returns kilometers — show metres under 1 km, else one-decimal km
+const fmtDistance = (km: number): string => (km < 1 ? `${Math.round(km * 1000)}m` : `${km.toFixed(1)}km`);
+
+// Map Google Place types → a maki key so reverse-POI candidates can show an emoji
+const googleTypeToMaki = (primaryType?: string, types?: string[]): string | undefined => {
+    const all = [primaryType, ...(types ?? [])].filter(Boolean) as string[];
+    for (const t of all) {
+        if (t.includes('restaurant') || t.includes('meal')) return 'restaurant';
+        if (t.includes('cafe') || t.includes('coffee')) return 'cafe';
+        if (t.includes('bar') || t.includes('pub')) return 'bar';
+        if (t.includes('bakery')) return 'bakery';
+        if (t.includes('supermarket') || t.includes('grocery')) return 'grocery';
+        if (t.includes('store') || t.includes('shop') || t.includes('clothing')) return 'shop';
+        if (t.includes('pharmacy') || t.includes('drugstore')) return 'pharmacy';
+        if (t.includes('hospital') || t.includes('doctor')) return 'hospital';
+        if (t.includes('dentist')) return 'dentist';
+        if (t.includes('bank') || t.includes('atm')) return 'bank';
+        if (t.includes('gas_station')) return 'gas-station';
+        if (t.includes('parking')) return 'parking';
+        if (t.includes('lodging') || t.includes('hotel')) return 'hotel';
+        if (t.includes('university') || t.includes('college')) return 'university';
+        if (t.includes('school')) return 'school';
+        if (t.includes('library')) return 'library';
+        if (t.includes('museum')) return 'museum';
+        if (t.includes('gym') || t.includes('fitness')) return 'gym';
+        if (t.includes('park')) return 'park';
+        if (t.includes('movie') || t.includes('cinema')) return 'cinema';
+        if (t.includes('worship') || t.includes('church') || t.includes('mosque') || t.includes('temple') || t.includes('synagogue')) return 'place-of-worship';
+        if (t.includes('airport')) return 'airport';
+        if (t.includes('train') || t.includes('subway')) return 'train-station';
+        if (t.includes('bus')) return 'bus';
+    }
+    return undefined;
+};
+
 // ── REST reverse-geocoding ────────────────────────────────────────────────
 
-async function reverseGeocodeRest(
+// Resolves a dropped pin to the nearest shop/building (POI) plus a short list of
+// nearby candidates so the user can correct a wrong auto-pick. Prefers Google
+// Places (New) nearest-business search; falls back to the modern Mapbox Search
+// Box reverse endpoint, then to a plain address, then to raw coords.
+async function reverseResolvePoi(
     lat: number,
     lng: number,
-    googleKey?: string,
-    mapboxKey?: string,
-): Promise<{ name: string; address: string } | null> {
+    opts: { googleKey?: string; mapboxKey?: string; signal?: AbortSignal },
+): Promise<{ result: DropPinResult; candidates: PoiCandidate[] } | null> {
+    const { googleKey, mapboxKey, signal } = opts;
+    const coordsName = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+
     if (googleKey) {
         try {
-            const res = await fetch(
-                `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${googleKey}`,
-            );
+            const res = await fetch('https://places.googleapis.com/v1/places:searchNearby', {
+                method: 'POST',
+                signal,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Goog-Api-Key': googleKey,
+                    'X-Goog-FieldMask': 'places.id,places.displayName,places.formattedAddress,places.location,places.types,places.primaryType',
+                },
+                body: JSON.stringify({
+                    locationRestriction: { circle: { center: { latitude: lat, longitude: lng }, radius: 100 } },
+                    rankPreference: 'DISTANCE',
+                    languageCode: 'en',
+                }),
+            });
             if (res.ok) {
                 const data = await res.json();
-                const r = data.results?.[0];
-                if (r) {
-                    return {
-                        name: r.address_components?.[0]?.long_name || (r.formatted_address?.split(',')[0]?.trim() ?? 'Current Location'),
-                        address: r.formatted_address || `${lat.toFixed(4)}, ${lng.toFixed(4)}`,
-                    };
+                const candidates: PoiCandidate[] = ((data.places || []) as GooglePlaceNearby[])
+                    .map((p) => {
+                        const pLat = p.location?.latitude;
+                        const pLng = p.location?.longitude;
+                        if (pLat == null || pLng == null) return null;
+                        return {
+                            id: p.id,
+                            name: p.displayName?.text || p.formattedAddress?.split(',')[0]?.trim() || 'Unknown',
+                            address: p.formattedAddress || coordsName,
+                            lat: pLat,
+                            lng: pLng,
+                            maki: googleTypeToMaki(p.primaryType, p.types),
+                            distance: getDistance(lat, lng, pLat, pLng),
+                        } as PoiCandidate;
+                    })
+                    .filter((c): c is PoiCandidate => c !== null)
+                    .sort((a, b) => a.distance - b.distance)
+                    .slice(0, 6);
+                if (candidates.length > 0) {
+                    const top = candidates[0];
+                    return { result: { name: top.name, address: top.address, lat: top.lat, lng: top.lng }, candidates };
                 }
             }
         } catch (err) {
-            console.warn('[location] reverse geocode failed (google)', err);
+            if ((err as { name?: string })?.name === 'AbortError') return null;
+            console.warn('[location] reverse resolve failed (google)', err);
         }
     }
+
     if (mapboxKey) {
         try {
             const res = await fetch(
-                `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?` +
-                new URLSearchParams({ access_token: mapboxKey, limit: '1', types: 'poi,address,place,neighborhood' }),
+                `https://api.mapbox.com/search/searchbox/v1/reverse?` +
+                new URLSearchParams({ longitude: String(lng), latitude: String(lat), access_token: mapboxKey, types: 'poi', limit: '6', language: 'en' }),
+                { signal },
             );
             if (res.ok) {
                 const data = await res.json();
-                const f = data.features?.[0];
-                if (f) {
-                    return {
-                        name: f.text || f.place_name?.split(',')[0]?.trim() || 'Current Location',
-                        address: f.place_name || `${lat.toFixed(4)}, ${lng.toFixed(4)}`,
-                    };
+                const candidates: PoiCandidate[] = ((data.features || []) as MapboxFeature[])
+                    .map((f) => {
+                        const coords = f.geometry?.coordinates;
+                        if (!coords) return null;
+                        const props = f.properties || {};
+                        const fLat = coords[1];
+                        const fLng = coords[0];
+                        return {
+                            id: f.id,
+                            name: props.name || f.text || 'Unknown',
+                            address: props.full_address || props.place_formatted || f.place_name || coordsName,
+                            lat: fLat,
+                            lng: fLng,
+                            maki: props.maki,
+                            distance: getDistance(lat, lng, fLat, fLng),
+                        } as PoiCandidate;
+                    })
+                    .filter((c): c is PoiCandidate => c !== null)
+                    .sort((a, b) => a.distance - b.distance)
+                    .slice(0, 6);
+                if (candidates.length > 0) {
+                    const top = candidates[0];
+                    return { result: { name: top.name, address: top.address, lat: top.lat, lng: top.lng }, candidates };
                 }
             }
         } catch (err) {
-            console.warn('[location] reverse geocode failed (mapbox)', err);
+            if ((err as { name?: string })?.name === 'AbortError') return null;
+            console.warn('[location] reverse resolve failed (mapbox poi)', err);
+        }
+
+        // No POI nearby — fall back to a plain address for the dropped point
+        try {
+            const res = await fetch(
+                `https://api.mapbox.com/search/searchbox/v1/reverse?` +
+                new URLSearchParams({ longitude: String(lng), latitude: String(lat), access_token: mapboxKey, types: 'address', limit: '1', language: 'en' }),
+                { signal },
+            );
+            if (res.ok) {
+                const data = await res.json();
+                const f = (data.features || [])[0] as MapboxFeature | undefined;
+                if (f) {
+                    const props = f.properties || {};
+                    const name = props.full_address || props.place_formatted || props.name || f.place_name || coordsName;
+                    return { result: { name, address: props.full_address || props.place_formatted || name, lat, lng }, candidates: [] };
+                }
+            }
+        } catch (err) {
+            if ((err as { name?: string })?.name === 'AbortError') return null;
+            console.warn('[location] reverse resolve failed (mapbox address)', err);
         }
     }
-    return null;
+
+    return { result: { name: coordsName, address: coordsName, lat, lng }, candidates: [] };
 }
 
 // ── Single-retry fetch (transient network/5xx) ─────────────────────────────
@@ -240,9 +370,13 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
     const [isLocating, setIsLocating] = useState(false);
     const [isLoadingNearby, setIsLoadingNearby] = useState(false);
     const [dropPinMode, setDropPinMode] = useState(false);
-    const [dropPinLabel, setDropPinLabel] = useState<string | null>(null);
+    const [dropPinResult, setDropPinResult] = useState<DropPinResult | null>(null);
+    const [dropPinCandidates, setDropPinCandidates] = useState<PoiCandidate[]>([]);
+    const [dropPinSelectedId, setDropPinSelectedId] = useState<string | null>(null);
     const dropPinMapRef = useRef<mapboxgl.Map | null>(null);
     const dropPinGeocodeRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const dropPinAbortRef = useRef<AbortController | null>(null);
+    const isProgrammaticMoveRef = useRef(false);
     const hasLocation = !!placeName;
     const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
     const googleMapsKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY;
@@ -319,16 +453,19 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
     useEffect(() => {
         if (!isExpanded) {
             setDropPinMode(false);
-            setDropPinLabel(null);
+            setDropPinResult(null);
+            setDropPinCandidates([]);
+            setDropPinSelectedId(null);
+            dropPinAbortRef.current?.abort();
         }
     }, [isExpanded]);
 
     // Callback ref — fires with the real DOM node the moment React mounts/unmounts.
-    // Uses bundled Mapbox GL (no script load) + REST reverse geocoding for speed.
+    // Uses bundled Mapbox GL (no script load) + nearest-POI reverse resolution.
     const dropPinMapInit = useCallback((node: HTMLDivElement | null) => {
         if (!node) {
             if (dropPinGeocodeRef.current) clearTimeout(dropPinGeocodeRef.current);
-            toast.dismiss('drop-pin-location');
+            dropPinAbortRef.current?.abort();
             dropPinMapRef.current?.remove();
             dropPinMapRef.current = null;
             return;
@@ -343,11 +480,17 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
         const debounceReverseGeocode = (lat: number, lng: number) => {
             if (dropPinGeocodeRef.current) clearTimeout(dropPinGeocodeRef.current);
             dropPinGeocodeRef.current = setTimeout(async () => {
-                const r = await reverseGeocodeRest(lat, lng, googleMapsKey, mapboxToken);
-                if (r) {
-                    setDropPinLabel(r.address);
-                    toast('📍 ' + r.name, { id: 'drop-pin-location' });
-                }
+                dropPinAbortRef.current?.abort();
+                dropPinAbortRef.current = new AbortController();
+                const r = await reverseResolvePoi(lat, lng, {
+                    googleKey: googleMapsKey,
+                    mapboxKey: mapboxToken,
+                    signal: dropPinAbortRef.current.signal,
+                });
+                if (!r) return; // aborted → keep last good result
+                setDropPinResult(r.result);
+                setDropPinCandidates(r.candidates);
+                setDropPinSelectedId(r.candidates[0]?.id ?? null);
             }, 500);
         };
 
@@ -374,7 +517,12 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                 map.addLayer({ id: 'user-loc-dot', type: 'circle', source: 'user-loc', paint: { 'circle-radius': 6, 'circle-color': '#a78bfa', 'circle-stroke-width': 2.5, 'circle-stroke-color': '#ffffff' } });
             }
         });
-        map.on('moveend', () => { const c = map.getCenter(); debounceReverseGeocode(c.lat, c.lng); });
+        map.on('moveend', () => {
+            // Skip the auto-pick refresh when we flew the map programmatically (chip tap)
+            if (isProgrammaticMoveRef.current) { isProgrammaticMoveRef.current = false; return; }
+            const c = map.getCenter();
+            debounceReverseGeocode(c.lat, c.lng);
+        });
     }, [googleMapsKey, mapboxToken]);
 
     const handleDropPinRecenter = useCallback(() => {
@@ -856,9 +1004,9 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                 place_address: `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`,
                 place_lat: latitude, place_lng: longitude,
             };
-            const r = await reverseGeocodeRest(latitude, longitude, googleMapsKey, mapboxToken);
+            const r = await reverseResolvePoi(latitude, longitude, { googleKey: googleMapsKey, mapboxKey: mapboxToken });
             const loc: LocationData = r
-                ? { place_name: r.name, place_address: r.address, place_lat: latitude, place_lng: longitude }
+                ? { place_name: r.result.name, place_address: r.result.address, place_lat: latitude, place_lng: longitude }
                 : fallback;
             onChange(loc);
             saveToRecent(loc);
@@ -1012,7 +1160,7 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                 </button>
                 {mapboxToken && (
                     <button type="button"
-                        onClick={() => { setDropPinMode(v => !v); setDropPinLabel(null); }}
+                        onClick={() => { setDropPinMode(v => !v); setDropPinResult(null); setDropPinCandidates([]); setDropPinSelectedId(null); }}
                         className={cn(
                             "h-[72px] flex flex-col items-center justify-center gap-2 px-2 rounded-2xl border transition-all touch-manipulation",
                             dropPinMode
@@ -1039,7 +1187,7 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                     className="rounded-2xl border border-rose-500/20 overflow-hidden">
                     <div className="relative">
                         {/* Map container — callback ref fires with real node so mapboxgl gets proper dimensions */}
-                        <div ref={dropPinMapInit} className="w-full h-[240px]" />
+                        <div ref={dropPinMapInit} className="w-full h-[340px]" />
                         {/* Recenter button */}
                         {lastPosition && (
                             <button
@@ -1063,10 +1211,10 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                         {/* Location label */}
                         <div className="absolute bottom-2 left-2 right-2 pointer-events-none">
                             <div className="bg-black/70 backdrop-blur-md rounded-xl px-3 py-2 border border-white/10 min-h-[36px] flex flex-col justify-center">
-                                {dropPinLabel ? (
+                                {dropPinResult ? (
                                     <>
-                                        <p className="text-[11px] font-semibold text-white line-clamp-1">{dropPinLabel.split(',')[0]}</p>
-                                        <p className="text-[10px] text-white/50 line-clamp-1 mt-0.5">{dropPinLabel.split(',').slice(1).join(',').trim()}</p>
+                                        <p className="text-[11px] font-semibold text-white line-clamp-1">{dropPinResult.name}</p>
+                                        <p className="text-[10px] text-white/50 line-clamp-1 mt-0.5">{dropPinResult.address}</p>
                                     </>
                                 ) : (
                                     <p className="text-[11px] text-white/30 animate-pulse">Finding location…</p>
@@ -1074,28 +1222,64 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                             </div>
                         </div>
                     </div>
+                    {/* Nearby POI candidates — tap to correct a wrong auto-pick */}
+                    {dropPinCandidates.length > 0 && (
+                        <div className="flex gap-1.5 overflow-x-auto no-scrollbar px-2 py-2 border-t border-rose-500/10">
+                            {dropPinCandidates.map((c) => {
+                                const active = c.id === dropPinSelectedId;
+                                const emoji = getMakiEmoji(c.maki);
+                                return (
+                                    <button
+                                        key={c.id}
+                                        type="button"
+                                        onClick={() => {
+                                            toast.haptic(ImpactStyle.Light);
+                                            setDropPinSelectedId(c.id);
+                                            setDropPinResult({ name: c.name, address: c.address, lat: c.lat, lng: c.lng });
+                                            const map = dropPinMapRef.current;
+                                            if (map) {
+                                                isProgrammaticMoveRef.current = true;
+                                                map.flyTo({ center: [c.lng, c.lat], zoom: Math.max(map.getZoom(), 16) });
+                                                // Safety reset: a no-op flyTo (chip already at center) never fires moveend
+                                                window.setTimeout(() => { isProgrammaticMoveRef.current = false; }, 700);
+                                            }
+                                        }}
+                                        className={cn(
+                                            "shrink-0 flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-medium border transition-colors touch-manipulation",
+                                            active
+                                                ? "bg-rose-500/20 border-rose-500/40 text-rose-200"
+                                                : "bg-white/5 border-white/10 text-white/70 active:bg-white/10"
+                                        )}>
+                                        {emoji && <span className="text-xs leading-none">{emoji}</span>}
+                                        <span className="line-clamp-1 max-w-[140px]">{c.name}</span>
+                                        <span className="text-white/40">{fmtDistance(c.distance)}</span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    )}
                     {/* Confirm button */}
                     <button type="button"
                         onClick={() => {
-                            if (!dropPinMapRef.current) return;
-                            const c = dropPinMapRef.current.getCenter();
-                            const lat = c.lat;
-                            const lng = c.lng;
+                            const selected = dropPinCandidates.find(c => c.id === dropPinSelectedId);
+                            const center = dropPinMapRef.current?.getCenter();
+                            const lat = selected?.lat ?? dropPinResult?.lat ?? center?.lat ?? null;
+                            const lng = selected?.lng ?? dropPinResult?.lng ?? center?.lng ?? null;
+                            if (lat == null || lng == null) return;
                             const loc: LocationData = {
-                                place_name: dropPinLabel?.split(',')[0]?.trim() ?? `${lat.toFixed(5)}, ${lng.toFixed(5)}`,
-                                place_address: dropPinLabel ?? null,
+                                place_name: dropPinResult?.name ?? `${lat.toFixed(5)}, ${lng.toFixed(5)}`,
+                                place_address: dropPinResult?.address ?? null,
                                 place_lat: lat,
                                 place_lng: lng,
                             };
                             onChange(loc);
                             saveToRecent(loc);
-                            toast.dismiss('drop-pin-location');
                             setDropPinMode(false);
                             setIsExpanded(false);
                             setQuery('');
                             setPredictions([]);
                         }}
-                        disabled={!dropPinLabel}
+                        disabled={!dropPinResult}
                         className="w-full h-12 flex items-center justify-center gap-2 bg-rose-500/10 border-t border-rose-500/20 text-rose-400 font-bold text-sm disabled:opacity-40 active:bg-rose-500/20 transition-colors touch-manipulation">
                         <MapPin className="w-4 h-4" />
                         Use this location
