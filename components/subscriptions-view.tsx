@@ -123,10 +123,14 @@ export function SubscriptionsView() {
                     const { data } = await q;
                     if (!data || data.length === 0) return;
                     const last = data[0];
-                    const lastAmt = Number(last.amount);
+                    const rawLast = Number(last.amount);
                     const tplAmt = Number(t.amount);
-                    if (!lastAmt || !tplAmt) return;
-                    if ((last.currency || 'USD').toUpperCase() !== (t.currency || 'USD').toUpperCase()) return;
+                    if (!rawLast || !tplAmt) return;
+                    // Normalize the charge into the template's currency before comparing —
+                    // otherwise a charge logged in a different currency mixes scales and the
+                    // percentage is meaningless.
+                    const tplCurr = t.currency || currency;
+                    const lastAmt = convertAmount(rawLast, last.currency || tplCurr, tplCurr);
                     const pct = ((lastAmt - tplAmt) / tplAmt) * 100;
                     results[t.id] = {
                         lastAmount: lastAmt,
@@ -140,7 +144,7 @@ export function SubscriptionsView() {
             if (!cancelled) setLastCharges(results);
         })();
         return () => { cancelled = true; };
-    }, [templates, userId, activeWorkspaceId]);
+    }, [templates, userId, activeWorkspaceId, convertAmount, currency]);
 
     const handleApplyPriceChange = async () => {
         if (!updateTarget) return;
@@ -463,7 +467,7 @@ export function SubscriptionsView() {
                         </div>
 
                         {loading ? (
-                            <div className="space-y-3">
+                            <div className="space-y-3" role="status" aria-label="Loading subscriptions">
                                 <div className="h-20 w-full rounded-3xl bg-secondary/10 animate-pulse" />
                                 <div className="h-20 w-full rounded-3xl bg-secondary/10 animate-pulse" />
                                 <div className="h-20 w-full rounded-3xl bg-secondary/10 animate-pulse" />

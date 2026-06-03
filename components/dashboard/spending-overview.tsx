@@ -355,7 +355,7 @@ export const SpendingOverview = React.memo(function SpendingOverview({
                                     : formatCurrency(Math.abs(remaining), bucketCurrency)}
                             </span>
                         </div>
-                        <Progress value={progress} className="h-2 bg-black/30" indicatorClassName={cn(remaining < 0 ? "bg-red-400" : "bg-white")} />
+                        <Progress value={progress} aria-label={`Budget used: ${Math.round(progress)}%`} className="h-2 bg-black/30" indicatorClassName={cn(remaining < 0 ? "bg-red-400" : "bg-white")} />
                         {!isBucketFocused && (lastMonthCarryover > 0 || incomeThisMonth > 0) && (
                             <div className="flex flex-wrap items-center gap-1.5 self-start">
                                 {incomeThisMonth > 0 && (

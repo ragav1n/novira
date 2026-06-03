@@ -6,7 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 
 export function DashboardSkeleton() {
     return (
-        <div className="space-y-6 pb-20">
+        <div className="space-y-6 pb-20" role="status" aria-label="Loading">
             {/* Header Skeleton */}
             <div className="flex items-center justify-between pt-2 pb-4">
                 <div className="flex items-center gap-2">

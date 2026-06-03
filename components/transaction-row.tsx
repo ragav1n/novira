@@ -189,14 +189,14 @@ export const TransactionRow = memo(function TransactionRow({
         <div className="absolute inset-y-0 right-0 flex items-stretch gap-px bg-black/10">
           <button
             onClick={() => { closeSwipe(); onEdit(); }}
-            className="w-16 flex items-center justify-center bg-indigo-500 text-white active:brightness-90 hover:brightness-110 transition-[filter]"
+            className="w-16 flex items-center justify-center bg-indigo-500 text-white active:brightness-90 hover:brightness-110 transition-[filter] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/70"
             aria-label="Edit transaction"
           >
             <Pencil className="w-5 h-5" strokeWidth={1.75} />
           </button>
           <button
             onClick={() => { closeSwipe(); onDelete(); }}
-            className="w-16 flex items-center justify-center bg-rose-500 text-white active:brightness-90 hover:brightness-110 transition-[filter] rounded-r-xl"
+            className="w-16 flex items-center justify-center bg-rose-500 text-white active:brightness-90 hover:brightness-110 transition-[filter] rounded-r-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/70"
             aria-label="Delete transaction"
           >
             <Trash2 className="w-5 h-5" strokeWidth={1.75} />
@@ -307,7 +307,7 @@ export const TransactionRow = memo(function TransactionRow({
                 <button
                   type="button"
                   onClick={(e) => { e.stopPropagation(); onViewReceipt(); }}
-                  className="shrink-0 ml-0.5 p-0.5 -m-0.5 rounded text-sky-300/70 hover:text-sky-300 transition-colors"
+                  className="shrink-0 ml-0.5 p-2 -m-1.5 rounded text-sky-300/70 hover:text-sky-300 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60"
                   aria-label="View attached receipt"
                 >
                   <Paperclip className="w-3 h-3" />
@@ -320,7 +320,7 @@ export const TransactionRow = memo(function TransactionRow({
                     <button
                       type="button"
                       onClick={(e) => e.stopPropagation()}
-                      className="shrink-0 ml-0.5 p-0.5 -m-0.5 rounded text-amber-300/70 hover:text-amber-300 transition-colors"
+                      className="shrink-0 ml-0.5 p-2 -m-1.5 rounded text-amber-300/70 hover:text-amber-300 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/60"
                       aria-label="Show note"
                     >
                       <StickyNote className="w-3 h-3" />
@@ -362,8 +362,9 @@ export const TransactionRow = memo(function TransactionRow({
                           router.push(`/search?tag=${encodeURIComponent(t)}`);
                           window.dispatchEvent(new CustomEvent('novira:apply-tag-filter', { detail: { tag: t } }));
                         }}
-                        className="shrink-0 text-[10px] font-bold leading-none px-1.5 py-[2px] rounded border tabular-nums hover:brightness-110 transition-[filter]"
+                        className="shrink-0 text-[10px] font-bold leading-none px-1.5 py-[2px] rounded border tabular-nums hover:brightness-110 transition-[filter] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
                         style={{ backgroundColor: c.bg, borderColor: c.border, color: c.text }}
+                        aria-label={`Filter by tag ${t}`}
                       >
                         #{t}
                       </button>
@@ -379,8 +380,9 @@ export const TransactionRow = memo(function TransactionRow({
             {/* Right: dropdown */}
             <DropdownMenu>
               <DropdownMenuTrigger
-                className="shrink-0 p-1 rounded-full hover:bg-white/10 text-white/20 hover:text-white/50 transition-colors"
+                className="shrink-0 flex items-center justify-center min-h-[36px] min-w-[36px] -my-2 rounded-full hover:bg-white/10 text-white/20 hover:text-white/50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
                 onClick={(e) => e.stopPropagation()}
+                aria-label="Transaction options"
               >
                 <MoreVertical className="w-3.5 h-3.5" />
               </DropdownMenuTrigger>

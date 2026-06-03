@@ -201,6 +201,7 @@ export function GoalCard({ goal, deposits, formatCurrency, onAddDeposit, onEdit,
                     <div className="relative">
                         <Progress
                             value={progress}
+                            aria-label={`${goal.name}: ${Math.round(progress)}% of goal saved`}
                             className="h-2.5 bg-black/30"
                             indicatorClassName={tokens.indicator}
                         />

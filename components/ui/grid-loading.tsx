@@ -23,8 +23,8 @@ export default function UniqueLoading({
 
   if (variant === "squares") {
     return (
-      <div className={cn("relative", containerSizes[size], className)}>
-        <div className="grid grid-cols-3 gap-1 w-full h-full">
+      <div className={cn("relative", containerSizes[size], className)} role="status" aria-label={text}>
+        <div className="grid grid-cols-3 gap-1 w-full h-full" aria-hidden="true">
           {Array.from({ length: 9 }).map((_, i) => (
             <div
               key={i}

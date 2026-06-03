@@ -4,7 +4,7 @@ import { Card, CardContent } from '@/components/ui/card';
 
 export function AnalyticsSkeleton() {
     return (
-        <div className="space-y-6">
+        <div className="space-y-6" role="status" aria-label="Loading analytics">
             {/* Hero block placeholder */}
             <div className="rounded-3xl bg-gradient-to-br from-secondary/15 to-secondary/5 p-5 sm:p-6 space-y-4">
                 <div className="h-3 w-40 bg-secondary/20 rounded animate-pulse" />

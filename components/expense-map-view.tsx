@@ -725,6 +725,22 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency, 
                                 );
                             })}
                         </div>
+                        {/* Heatmap intensity legend */}
+                        {viewMode === 'heatmap' && (
+                            <div
+                                className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-card/60 backdrop-blur-md border border-white/10 shadow-lg pointer-events-auto w-fit text-[10px] font-bold uppercase tracking-wider text-muted-foreground"
+                                role="img"
+                                aria-label="Heatmap colour shows spending density, from low (purple) to high (yellow)"
+                            >
+                                <span>Less</span>
+                                <span
+                                    className="h-2 w-20 rounded-full"
+                                    style={{ background: 'linear-gradient(90deg, rgba(80,0,180,0.6), rgba(180,0,180,0.8), rgba(255,40,100,0.9), rgba(255,120,20,1), rgba(255,220,0,1))' }}
+                                    aria-hidden="true"
+                                />
+                                <span>More</span>
+                            </div>
+                        )}
                     </div>
                 )}
 

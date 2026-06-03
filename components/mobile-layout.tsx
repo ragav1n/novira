@@ -251,7 +251,7 @@ function DesktopTopNav({
                                 variants={expandedChildVariants}
                                 onClick={(e) => { e.stopPropagation(); onNavigate(route); }}
                                 className={cn(
-                                    'flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-medium transition-colors whitespace-nowrap',
+                                    'flex items-center gap-1.5 px-2.5 py-2 min-h-[40px] rounded-full text-xs font-medium transition-colors whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60',
                                     isActive
                                         ? cn(activeBg, activeText)
                                         : 'text-muted-foreground hover:text-foreground hover:bg-white/5'

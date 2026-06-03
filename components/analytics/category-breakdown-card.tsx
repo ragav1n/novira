@@ -36,7 +36,7 @@ function CategoryBreakdownCardInner({ title, categoryBreakdown, categorizedBreak
             </div>
             <Card className="bg-card/40 border-none shadow-none backdrop-blur-md overflow-hidden">
                 <CardContent className="p-4 flex flex-col sm:flex-row items-center justify-start gap-6">
-                    <div className="w-36 h-36 relative flex-shrink-0">
+                    <div className="w-36 h-36 relative flex-shrink-0" aria-hidden="true">
                         {categoryBreakdown.length > 0 ? (
                             <BasePieChart
                                 data={categoryBreakdown}

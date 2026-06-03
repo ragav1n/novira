@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import { CATEGORY_COLORS, getCategoryLabel } from '@/lib/categories';
 import { supabase } from '@/lib/supabase';
 import { AnalyticsTooltip } from '@/components/analytics/analytics-tooltip';
+import { ChartDataTable } from '@/components/analytics/chart-data-table';
 import type { DateRange } from '@/hooks/useAnalyticsData';
 import { computeWeightedRunRate } from '@/lib/utils/run-rate';
 import type { WorkspaceTheme } from '@/hooks/useWorkspaceTheme';
@@ -151,6 +152,9 @@ function SpendingTrendCardInner({
 
                 <div
                     className="h-[160px] w-full rounded-xl relative"
+                    {...(activeCategories.length > 0
+                        ? { role: 'img', 'aria-label': 'Spending trend chart. Use the data table below for exact figures.' }
+                        : {})}
                     style={{
                         backgroundImage: `radial-gradient(ellipse 80% 60% at 50% 100%, ${themeHex.base}14 0%, transparent 70%)`,
                     }}
@@ -238,6 +242,22 @@ function SpendingTrendCardInner({
                             </span>
                         )}
                     </div>
+                )}
+
+                {activeCategories.length > 0 && (
+                    <ChartDataTable
+                        caption="Spending trend by period and category"
+                        columns={[
+                            { key: 'month', label: 'Period' },
+                            ...activeCategories.map(cat => ({ key: cat, label: getCategoryLabel(cat) })),
+                        ]}
+                        rows={forecastChartData as unknown as Record<string, unknown>[]}
+                        formatValue={(key, value) =>
+                            key === 'month'
+                                ? String(value ?? '')
+                                : typeof value === 'number' ? formatCurrency(Math.round(value)) : '—'
+                        }
+                    />
                 )}
             </CardContent>
         </Card>

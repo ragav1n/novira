@@ -1,6 +1,6 @@
 export function SearchSkeleton() {
     return (
-        <div className="space-y-1.5">
+        <div className="space-y-1.5" role="status" aria-label="Loading search results">
             <div className="px-2 pt-2 pb-1.5">
                 <div className="h-[10px] w-20 bg-white/[0.06] rounded animate-pulse" />
             </div>

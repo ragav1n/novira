@@ -147,7 +147,7 @@ const DropdownMenuContent = React.forwardRef<React.ElementRef<typeof DropdownMen
             ...props.style,
           } as React.CSSProperties}
           className={cn(
-            "m3-content z-50 rounded-xl bg-popover/95 backdrop-blur-xl text-popover-foreground shadow-[0px_8px_32px_rgba(0,0,0,0.12)] border border-border/20 outline-none overflow-hidden relative py-0",
+            "m3-content z-[200] rounded-xl bg-popover/95 backdrop-blur-xl text-popover-foreground shadow-[0px_8px_32px_rgba(0,0,0,0.12)] border border-border/20 outline-none overflow-hidden relative py-0",
             "origin-[var(--radix-dropdown-menu-content-transform-origin)]",
             className
           )}

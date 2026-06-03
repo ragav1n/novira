@@ -45,7 +45,7 @@ function PaymentBreakdownCardInner({ paymentBreakdown, categorizedPayment, forma
             </div>
             <Card className="bg-card/40 border-none shadow-none backdrop-blur-md overflow-hidden">
                 <CardContent className="p-4 flex flex-col sm:flex-row items-center justify-start gap-6">
-                    <div className="w-32 h-32 relative flex-shrink-0">
+                    <div className="w-32 h-32 relative flex-shrink-0" aria-hidden="true">
                         {paymentBreakdown.length > 0 ? (
                             <BasePieChart
                                 data={paymentBreakdown}

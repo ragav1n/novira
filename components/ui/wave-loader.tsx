@@ -45,8 +45,10 @@ export function WaveLoader({
     return (
         <div
             className={cn(waveLoaderVariants({ messagePlacement }), className)}
+            role="status"
+            aria-label={message || "Loading"}
         >
-            <div className={cn("flex gap-1 items-center justify-center")}>
+            <div className={cn("flex gap-1 items-center justify-center")} aria-hidden="true">
                 {Array(bars)
                     .fill(undefined)
                     .map((_, index) => (

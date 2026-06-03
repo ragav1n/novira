@@ -215,6 +215,20 @@ body.focus-bucket {
     @apply bg-background text-foreground antialiased;
   }
 
+  /* Keyboard-focus fallback. Any interactive element that lacks its own
+     focus-visible styling still gets a visible ring for keyboard users.
+     Tailwind utilities (e.g. the shadcn Button's `outline-none
+     focus-visible:ring-*`) live in a later cascade layer and override this,
+     so styled controls keep their bespoke rings and only bare elements pick
+     up the fallback. */
+  button:focus-visible,
+  [role="button"]:focus-visible,
+  a:focus-visible,
+  summary:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 1px;
+  }
+
   /* Hide number input spinners globally */
   input::-webkit-outer-spin-button,
   input::-webkit-inner-spin-button {
@@ -605,4 +619,22 @@ body.focus-bucket {
 
   .m3-content[data-state="open"] .m3-item-enter { opacity: 0; animation: m3-item-cinematic 350ms cubic-bezier(0.1, 0.8, 0.2, 1) forwards; animation-delay: calc(var(--m3-stagger, 0) * 30ms + 40ms); }
   .m3-content[data-state="closed"] .m3-item-enter { animation: m3-item-exit 200ms cubic-bezier(0.4, 0, 1, 1) forwards; }
+}
+
+/* ── Reduced motion ──────────────────────────────────────────────────────────
+   Honor the OS "reduce motion" setting for CSS animations and transitions.
+   Framer Motion is handled separately via <MotionConfig reducedMotion="user">;
+   this catches what JS can't reach — the inline-styled landing animations
+   (phoneFloat / orbs / haloPulse / receiptFloat / popIn …), the ShinyButton,
+   and the page-in transition. !important is required to beat inline styles.
+   Loading spinners are exempt so loading feedback is never lost. */
+@media (prefers-reduced-motion: reduce) {
+  *:not(.animate-spin):not([class*="animate-spin"]),
+  *:not(.animate-spin):not([class*="animate-spin"])::before,
+  *:not(.animate-spin):not([class*="animate-spin"])::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

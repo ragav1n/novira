@@ -40,6 +40,7 @@ import { useDashboardState } from '@/hooks/useDashboardState';
 import { useDashboardStats } from '@/hooks/useDashboardStats';
 import { useUpcomingRecurring } from '@/hooks/useUpcomingRecurring';
 import { useDashboardLayout } from '@/hooks/useDashboardLayout';
+import { isLightColor, darkenHex } from '@/lib/contrast';
 
 // Accepts #RGB, #RRGGBB, or #RRGGBBAA and returns helpers for emitting a solid
 // `rgb(...)` or an arbitrary-alpha `rgb(... / a)`. Returns null for malformed
@@ -184,7 +185,14 @@ export function DashboardView() {
                 // rows or hand-edited config can produce #RGB or #RRGGBBAA. Normalize
                 // to `rgb(r g b / a)` via parseHex so the derived shades always
                 // render as a valid color regardless of input shape.
-                const base = parseHex(focusedBucketColor);
+                // The bucket color fills the hero card's top-left corner at full
+                // strength, behind fixed white text. A light user-chosen color would
+                // tank that contrast, so darken light colors toward the dark card base
+                // (hue preserved) before deriving the gradient stops.
+                const safeColor = isLightColor(focusedBucketColor)
+                    ? (darkenHex(focusedBucketColor, 0.5) ?? focusedBucketColor)
+                    : focusedBucketColor;
+                const base = parseHex(safeColor);
                 if (base) {
                     body.style.setProperty('--workspace-accent', base.solid);
                     body.style.setProperty('--focus-card-from', base.solid);

@@ -600,10 +600,10 @@ export function GoalsView() {
 
                 <div className="space-y-4">
                     {loading ? (
-                        <>
+                        <div role="status" aria-label="Loading goals" className="space-y-4">
                             <div className="h-32 w-full rounded-3xl bg-secondary/10 animate-pulse" />
                             <div className="h-32 w-full rounded-3xl bg-secondary/10 animate-pulse" />
-                        </>
+                        </div>
                     ) : goals.length === 0 ? (
                         <div className="text-center py-16 px-4 border border-dashed border-white/10 rounded-3xl bg-card/20 backdrop-blur-sm">
                             <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 border ${themeConfig.bgLight} ${themeConfig.border}`}>

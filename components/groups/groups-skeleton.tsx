@@ -2,7 +2,7 @@ import React from 'react';
 
 export function GroupsSkeleton() {
     return (
-        <div className="space-y-7 animate-pulse">
+        <div className="space-y-7 animate-pulse" role="status" aria-label="Loading">
             {/* Net-position hero skeleton */}
             <div className="space-y-3">
                 <div className="h-2.5 w-24 rounded bg-secondary/30" />

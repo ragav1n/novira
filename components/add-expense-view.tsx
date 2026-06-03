@@ -487,7 +487,7 @@ export function AddExpenseView() {
                                 router.back();
                             }}
                             aria-label="Go back"
-                            className="p-2 rounded-full bg-secondary/30 hover:bg-secondary/50 transition-colors active:scale-[0.92]"
+                            className="flex items-center justify-center min-h-[44px] min-w-[44px] rounded-full bg-secondary/30 hover:bg-secondary/50 transition-colors active:scale-[0.92] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
                         >
                             <ChevronLeft className="w-5 h-5" />
                         </button>
@@ -497,7 +497,7 @@ export function AddExpenseView() {
                         <button
                             onClick={onSubmit}
                             disabled={loading}
-                            className="inline-flex items-center justify-center min-h-[40px] px-4 rounded-full bg-primary/15 border border-primary/30 text-primary text-sm font-semibold disabled:opacity-50 hover:bg-primary/20 transition-colors active:scale-[0.95]"
+                            className="inline-flex items-center justify-center min-h-[44px] px-4 rounded-full bg-primary/15 border border-primary/30 text-primary text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed hover:bg-primary/20 transition-colors active:scale-[0.95] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
                         >
                             {loading ? 'Saving...' : 'Save'}
                         </button>
@@ -539,7 +539,7 @@ export function AddExpenseView() {
                         onClick={() => cameraInputRef.current?.click()}
                         disabled={scanning}
                         aria-label="Scan receipt — take a photo"
-                        className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl border border-primary/30 bg-primary/10 hover:bg-primary/20 transition-all disabled:opacity-50 group active:scale-[0.99]"
+                        className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl border border-primary/30 bg-primary/10 hover:bg-primary/20 transition-all disabled:opacity-50 group active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
                     >
                         <div className="w-9 h-9 rounded-xl bg-primary/20 border border-primary/30 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
                             <Camera className="w-4 h-4 text-primary" />
@@ -554,7 +554,7 @@ export function AddExpenseView() {
                         onClick={() => fileInputRef.current?.click()}
                         disabled={scanning}
                         aria-label="Choose a receipt image from your gallery"
-                        className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-[12px] font-semibold text-muted-foreground hover:text-primary hover:bg-primary/5 transition-all disabled:opacity-50 active:scale-[0.99]"
+                        className="w-full flex items-center justify-center gap-2 px-4 py-2.5 min-h-[44px] rounded-xl text-[12px] font-semibold text-muted-foreground hover:text-primary hover:bg-primary/5 transition-all disabled:opacity-50 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
                     >
                         <ImageIcon className="w-3.5 h-3.5" />
                         Or choose from gallery
@@ -870,7 +870,7 @@ export function AddExpenseView() {
                                             formState.setMerchantDefaults(null);
                                         }}
                                         aria-label="Apply usual merchant defaults"
-                                        className="text-[11px] font-bold text-primary hover:text-primary/80 px-2 py-1 rounded-full bg-primary/15 border border-primary/30 transition-colors active:scale-[0.96]"
+                                        className="text-[11px] font-bold text-primary hover:text-primary/80 px-3 py-1.5 min-h-[36px] rounded-full bg-primary/15 border border-primary/30 transition-colors active:scale-[0.96] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
                                     >
                                         Apply
                                     </button>
@@ -878,7 +878,7 @@ export function AddExpenseView() {
                                         type="button"
                                         onClick={() => formState.setMerchantDefaults(null)}
                                         aria-label="Dismiss merchant suggestion"
-                                        className="text-primary/70 hover:text-primary/90 p-1 rounded-full active:scale-[0.92] transition-transform duration-100"
+                                        className="flex items-center justify-center min-h-[36px] min-w-[36px] text-primary/70 hover:text-primary/90 rounded-full active:scale-[0.92] transition-transform duration-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
                                     >
                                         <X className="w-3 h-3" />
                                     </button>
@@ -1077,7 +1077,8 @@ export function AddExpenseView() {
                                         if (sd.bucket_id) formState.setSelectedBucketId(sd.bucket_id);
                                         formState.setSmartDefaults(null);
                                     }}
-                                    className="text-[11px] font-bold text-amber-300 hover:text-amber-200 px-2 py-1 rounded-full bg-amber-400/15 border border-amber-400/30 transition-colors active:scale-[0.96]"
+                                    aria-label="Apply suggested defaults"
+                                    className="text-[11px] font-bold text-amber-300 hover:text-amber-200 px-3 py-1.5 min-h-[36px] rounded-full bg-amber-400/15 border border-amber-400/30 transition-colors active:scale-[0.96] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/60"
                                 >
                                     Apply
                                 </button>
@@ -1085,7 +1086,7 @@ export function AddExpenseView() {
                                     type="button"
                                     onClick={() => formState.setSmartDefaults(null)}
                                     aria-label="Dismiss suggestion"
-                                    className="text-amber-300/70 hover:text-amber-200 p-1 rounded-full active:scale-[0.92] transition-transform duration-100"
+                                    className="flex items-center justify-center min-h-[36px] min-w-[36px] text-amber-300/70 hover:text-amber-200 rounded-full active:scale-[0.92] transition-transform duration-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/60"
                                 >
                                     <X className="w-3 h-3" />
                                 </button>
