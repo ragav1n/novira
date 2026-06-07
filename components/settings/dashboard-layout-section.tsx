@@ -2,10 +2,16 @@
 
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
-import { TrendingUp, RotateCw, PieChart, Receipt, RotateCcw, BarChart3 } from 'lucide-react';
+import { TrendingUp, RotateCw, PieChart, Receipt, RotateCcw, BarChart3, Wallet } from 'lucide-react';
 import { useDashboardLayout, type DashboardCardId } from '@/hooks/useDashboardLayout';
 
 const CARDS: { id: DashboardCardId; label: string; description: string; icon: React.ReactNode }[] = [
+    {
+        id: 'safe_to_spend',
+        label: 'Safe to spend',
+        description: 'Daily allowance after setting aside upcoming bills',
+        icon: <Wallet className="w-4 h-4" />,
+    },
     {
         id: 'cashflow_forecast',
         label: 'Cashflow forecast',

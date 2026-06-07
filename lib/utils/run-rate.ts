@@ -47,3 +47,40 @@ export function computeWeightedRunRate({
         overshoot: hasBudget ? Math.max(0, projectedSpend - budget) : 0,
     };
 }
+
+// Prescriptive "safe to spend per day" for the rest of the month. Unlike the
+// run-rate projection (which extrapolates past spending), this sets aside the
+// money already committed to upcoming bills, then spreads what's left evenly
+// across the remaining days — telling the user what they can actually spend.
+
+export interface SafeToSpendInput {
+    remaining: number;          // displayBudget - totalSpent
+    committedUpcoming: number;  // upcoming recurring bills due this month, in display currency
+    daysInMonth: number;
+    currentDayOfMonth: number;
+}
+
+export interface SafeToSpendOutput {
+    daysRemaining: number;      // includes today
+    committedUpcoming: number;
+    afterCommitments: number;   // remaining - committedUpcoming (can be negative)
+    dailyAllowance: number;     // max(0, afterCommitments / daysRemaining)
+    billsExceedBudget: boolean; // afterCommitments < 0
+}
+
+export function computeSafeToSpend({
+    remaining,
+    committedUpcoming,
+    daysInMonth,
+    currentDayOfMonth,
+}: SafeToSpendInput): SafeToSpendOutput {
+    const daysRemaining = Math.max(1, daysInMonth - currentDayOfMonth + 1);
+    const afterCommitments = remaining - committedUpcoming;
+    return {
+        daysRemaining,
+        committedUpcoming,
+        afterCommitments,
+        dailyAllowance: Math.max(0, afterCommitments / daysRemaining),
+        billsExceedBudget: afterCommitments < 0,
+    };
+}

@@ -40,6 +40,7 @@ import { useDashboardState } from '@/hooks/useDashboardState';
 import { useDashboardStats } from '@/hooks/useDashboardStats';
 import { useUpcomingRecurring } from '@/hooks/useUpcomingRecurring';
 import { useDashboardLayout } from '@/hooks/useDashboardLayout';
+import { computeSafeToSpend } from '@/lib/utils/run-rate';
 import { isLightColor, darkenHex } from '@/lib/contrast';
 
 // Accepts #RGB, #RRGGBB, or #RRGGBBAA and returns helpers for emitting a solid
@@ -259,6 +260,24 @@ export function DashboardView() {
         bucketCurrency, currency, convertAmount, monthlyBudget: currentWorkspaceBudget, buckets
     });
 
+    // Prescriptive daily allowance for the monthly-allowance view: spreads the
+    // remaining budget (minus bills still due this month) across the days left.
+    // Bucket focus already shows its own /day figure, so this is allowance-only.
+    const safeToSpend = useMemo(() => {
+        if (isBucketFocused || !runRateData || displayBudget <= 0) return null;
+        const committedUpcoming = upcomingRecurring.reduce((sum, it) => {
+            const txCurr = (it.currency || 'USD').toUpperCase();
+            if (txCurr === bucketCurrency) return sum + it.amount;
+            return sum + convertAmount(it.amount, txCurr, bucketCurrency);
+        }, 0);
+        return computeSafeToSpend({
+            remaining,
+            committedUpcoming,
+            daysInMonth: runRateData.daysInMonth,
+            currentDayOfMonth: runRateData.currentDayOfMonth,
+        });
+    }, [isBucketFocused, runRateData, displayBudget, upcomingRecurring, bucketCurrency, convertAmount, remaining]);
+
     const effectiveCalculateUserShare = useCallback((tx: Transaction, uid: string | null) => {
         if (!activeWorkspaceId || !activeWorkspaceGroup) return calculateUserShare(tx, uid);
         
@@ -419,6 +438,7 @@ export function DashboardView() {
                     isCoupleWorkspace={isCoupleWorkspace}
                     isHomeWorkspace={isHomeWorkspace}
                     runRateData={runRateData}
+                    safeToSpend={dashboardLayout.safe_to_spend ? safeToSpend : null}
                     cashflowForecast={dashboardLayout.cashflow_forecast ? cashflowForecast : null}
                     dashboardFocus={dashboardFocus}
                     setDashboardFocus={setDashboardFocus}

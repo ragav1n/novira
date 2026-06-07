@@ -15,7 +15,9 @@ import { Bucket } from '@/components/providers/buckets-provider';
 import { toast } from '@/utils/haptics';
 import { UpcomingRecurringCard } from './upcoming-recurring-card';
 import { WeekdaySpendingCard } from './weekday-spending-card';
+import { SafeToSpendCard } from './safe-to-spend-card';
 import type { UpcomingCharge } from '@/hooks/useUpcomingRecurring';
+import type { SafeToSpendOutput } from '@/lib/utils/run-rate';
 
 // Recharts is the heaviest dep on the dashboard; defer it until the donut and
 // forecast are actually rendered (they're conditional, so many dashboards skip).
@@ -66,6 +68,7 @@ interface SpendingOverviewProps {
     isCoupleWorkspace: boolean;
     isHomeWorkspace: boolean;
     runRateData: RunRateData | null;
+    safeToSpend: SafeToSpendOutput | null;
     cashflowForecast: CashflowForecastData | null;
     dashboardFocus: string;
     setDashboardFocus: (focus: string) => void;
@@ -126,6 +129,7 @@ export const SpendingOverview = React.memo(function SpendingOverview({
     isCoupleWorkspace,
     isHomeWorkspace,
     runRateData,
+    safeToSpend,
     cashflowForecast,
     dashboardFocus,
     setDashboardFocus,
@@ -431,6 +435,17 @@ export const SpendingOverview = React.memo(function SpendingOverview({
                 </div>
                 Add Funds
             </motion.button>
+
+            {/* Safe to Spend */}
+            {safeToSpend && !isBucketFocused && (
+                <SafeToSpendCard
+                    safeToSpend={safeToSpend}
+                    formatCurrency={formatCurrency}
+                    bucketCurrency={bucketCurrency}
+                    isCoupleWorkspace={isCoupleWorkspace}
+                    isHomeWorkspace={isHomeWorkspace}
+                />
+            )}
 
             {/* Run Rate Widget */}
             {runRateData && !isBucketFocused && runRateData.currentDayOfMonth >= 5 && runRateData.dailyAverage > 0 && (

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
 export type DashboardCardId =
+    | 'safe_to_spend'
     | 'cashflow_forecast'
     | 'upcoming_recurring'
     | 'category_donut'
@@ -12,6 +13,7 @@ export type DashboardLayout = Record<DashboardCardId, boolean>;
 const STORAGE_KEY = 'novira_dashboard_layout';
 
 export const DEFAULT_DASHBOARD_LAYOUT: DashboardLayout = {
+    safe_to_spend: true,
     cashflow_forecast: true,
     upcoming_recurring: true,
     category_donut: true,
