@@ -1,4 +1,12 @@
 {
+    "redirects": [
+        {
+            "source": "/:path*",
+            "has": [{ "type": "host", "value": "www.novira.one" }],
+            "destination": "https://novira.one/:path*",
+            "permanent": true
+        }
+    ],
     "crons": [
         { "path": "/api/cron/daily",     "schedule": "30 2 * * *" },
         { "path": "/api/cron/periodic",  "schedule": "30 3 * * *" },
