@@ -29,6 +29,27 @@ export async function GET(request: NextRequest) {
 
         const { error } = await supabase.auth.exchangeCodeForSession(code)
         if (!error) return redirectResponse
+
+        // Surface the real reason in Vercel runtime logs. The classic
+        // first-attempt-fails/second-succeeds OAuth bug is a missing or stale PKCE
+        // code-verifier cookie — log whether one was actually present on this request.
+        const hadVerifier = cookieStore
+            .getAll()
+            .some((c) => c.name.startsWith('sb-') && c.name.includes('code-verifier'))
+        console.error('[auth/callback] exchangeCodeForSession failed', {
+            name: error.name,
+            message: error.message,
+            code: (error as { code?: string }).code,
+            status: (error as { status?: number }).status,
+            hadCodeVerifierCookie: hadVerifier,
+        })
+    } else {
+        // No ?code= means the provider returned an error param or hash/implicit
+        // tokens instead of an authorization code — log it so it isn't invisible.
+        console.error('[auth/callback] missing authorization code', {
+            error: searchParams.get('error'),
+            errorDescription: searchParams.get('error_description'),
+        })
     }
 
     return NextResponse.redirect(new URL('/signin?error=auth_code_error', origin))

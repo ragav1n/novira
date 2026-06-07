@@ -777,9 +777,12 @@ export function Component({ isSignUp = false }: { isSignUp?: boolean }) {
                     isSubmittingRef.current = true;
                     setIsLoading(true);
                     try {
-                      // Ensure redirectTo is a fully qualified URL
-                      const appUrl = (process.env.NEXT_PUBLIC_APP_URL || window.location.origin).replace(/\/$/, '');
-                      const redirectTo = `${appUrl}/auth/callback`;
+                      // Always redirect back to the SAME origin the PKCE code-verifier
+                      // cookie was just written on. Using NEXT_PUBLIC_APP_URL here can point
+                      // the callback at a different host (e.g. the bare *.vercel.app vs the
+                      // custom domain), where the verifier cookie doesn't exist — making the
+                      // very first exchangeCodeForSession fail.
+                      const redirectTo = `${window.location.origin}/auth/callback`;
 
                       const { error } = await supabase.auth.signInWithOAuth({
                         provider: 'google',
