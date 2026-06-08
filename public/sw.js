@@ -273,6 +273,21 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
+    // The installed PWA can be anchored on www.novira.one — the manifest start_url
+    // is relative, so it inherits whatever origin it was installed from. Vercel
+    // 308-redirects www → apex for SEO, but if this SW follows that redirect
+    // internally (redirect: 'follow') the document stays on www while every
+    // /_next/static chunk it references then 308s cross-origin and fails to load
+    // (ChunkLoadError → blank "client-side exception"). Surface a real top-level
+    // redirect instead so the whole document context moves to the apex, where all
+    // assets are same-origin and the apex SW takes over. Placed after the auth-route
+    // guard so the cookie-sensitive callback flow keeps its native (un-intercepted)
+    // handling.
+    if (request.mode === 'navigate' && url.hostname === 'www.novira.one') {
+        event.respondWith(Response.redirect('https://novira.one' + url.pathname + url.search, 302));
+        return;
+    }
+
     // --- 1. Supabase Auth Layer (Must always be Network-First) ---
     if (url.hostname.includes('supabase.co') && url.pathname.includes('/auth/v1/')) {
         event.respondWith(
