@@ -81,7 +81,10 @@ export default function ForgotPassword() {
         setIsLoading(true);
 
         try {
-            const appUrl = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '') || window.location.origin;
+            // Use the current origin (not NEXT_PUBLIC_APP_URL) so the recovery link
+            // lands on the same host the PKCE verifier cookie was written on — cookies
+            // are host-only, so a www/apex mismatch breaks the exchange.
+            const appUrl = window.location.origin;
             const { error } = await supabase.auth.resetPasswordForEmail(email, {
                 redirectTo: `${appUrl}/update-password`,
             });

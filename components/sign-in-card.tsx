@@ -154,7 +154,11 @@ export function Component({ isSignUp = false }: { isSignUp?: boolean }) {
           password,
           options: {
             data: { full_name: name },
-            emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '') || (typeof window !== 'undefined' ? window.location.origin : '')}/auth/callback`,
+            // Land the confirmation callback on the SAME origin the PKCE verifier
+            // cookie was just written on (cookies are host-only). NEXT_PUBLIC_APP_URL
+            // can point at a different host (www vs apex), where the verifier doesn't
+            // exist — making exchangeCodeForSession fail. Mirror the OAuth path.
+            emailRedirectTo: `${typeof window !== 'undefined' ? window.location.origin : ''}/auth/callback`,
           },
         });
 
