@@ -31,6 +31,7 @@ let isSyncingLoopActive = false;
 let currentUserId: string | null = null;
 let legacyMigrationDone = false;
 let broadcastChannel: BroadcastChannel | null = null;
+let retryTimer: ReturnType<typeof setTimeout> | null = null;
 
 function queueKey(): string | null {
     if (!currentUserId) return null;
@@ -90,6 +91,8 @@ export async function setQueueUser(userId: string | null): Promise<void> {
     // empty queue so the indicator clears immediately. On user-switch, load the
     // new user's queue from IDB.
     if (userId !== previous) {
+        // Drop any backoff timer armed for the previous user's queue.
+        clearRetryTimer();
         let next: SyncPayload[] = [];
         if (userId) {
             try { next = (await get<SyncPayload[]>(QUEUE_KEY_PREFIX + userId)) || []; } catch { next = []; }
@@ -286,6 +289,38 @@ async function withSyncLock(body: () => Promise<void>): Promise<void> {
     }
 }
 
+function clearRetryTimer() {
+    if (retryTimer) {
+        clearTimeout(retryTimer);
+        retryTimer = null;
+    }
+}
+
+/**
+ * Self-drive the exponential backoff: after a sync pass leaves items pending
+ * with a future `nextRetryAt`, schedule a single timer for the soonest one so
+ * the loop re-fires on its own. Without this the backoff schedule only advances
+ * incidentally (next enqueue / online event / app reload), stranding items that
+ * hit a transient failure while the user stays online and idle.
+ */
+function scheduleRetry(queue: SyncPayload[]) {
+    if (typeof window === 'undefined') return;
+    const now = Date.now();
+    let soonest = Infinity;
+    for (const item of queue) {
+        if (item.status === 'pending' && item.nextRetryAt && item.nextRetryAt > now) {
+            if (item.nextRetryAt < soonest) soonest = item.nextRetryAt;
+        }
+    }
+    clearRetryTimer();
+    if (soonest === Infinity) return;
+    const delay = Math.max(0, soonest - now);
+    retryTimer = setTimeout(() => {
+        retryTimer = null;
+        attemptSync();
+    }, delay);
+}
+
 // 3. Process the Queue
 export async function attemptSync() {
     if (isSyncingLoopActive) return;
@@ -340,7 +375,12 @@ async function runSyncLoop(): Promise<void> {
         (!item.nextRetryAt || item.nextRetryAt <= now)
     );
 
-    if (pendingItems.length === 0) return;
+    if (pendingItems.length === 0) {
+        // Nothing runnable right now, but items may be waiting out a backoff
+        // window — make sure a timer is set so they retry on their own.
+        scheduleRetry(queue);
+        return;
+    }
     if (!navigator.onLine) return;
 
     // Notify UI we are actively syncing
@@ -566,6 +606,11 @@ async function runSyncLoop(): Promise<void> {
         queue = removeSynced(queue);
         await writeQueue(queue);
         dispatchQueueUpdated(queue);
+
+        // Items that hit a transient failure this pass are now pending with a
+        // future nextRetryAt — arm a timer so the backoff schedule advances even
+        // if the user stays online and idle.
+        scheduleRetry(queue);
 
         // After offline-queued mutations land on the server, the SW's SWR cache for
         // transaction reads is stale until next refresh. Invalidate so the next read
