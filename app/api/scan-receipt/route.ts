@@ -14,6 +14,10 @@ const MAX_IMAGE_BYTES = 5 * 1024 * 1024 // 5MB raw
 const RATE_CFG = { max: 30, windowMs: 24 * 60 * 60 * 1000 }
 
 export async function POST(req: NextRequest) {
+  if (!process.env.ANTHROPIC_API_KEY) {
+    return NextResponse.json({ error: 'Receipt scanning is not configured (missing ANTHROPIC_API_KEY).' }, { status: 503 })
+  }
+
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -21,19 +25,25 @@ export async function POST(req: NextRequest) {
   const limit = checkRateLimit('scan-receipt', user.id, RATE_CFG)
   if (!limit.allowed) return rateLimitResponse(limit, RATE_CFG, `Daily scan limit reached (${RATE_CFG.max}/day).`)
 
-  const { imageBase64, mimeType } = await req.json()
+  let parsedBody: { imageBase64?: unknown; mimeType?: unknown }
+  try {
+    parsedBody = await req.json()
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+  }
+  const { imageBase64, mimeType } = parsedBody
 
-  if (!imageBase64 || !mimeType) {
+  if (typeof imageBase64 !== 'string' || typeof mimeType !== 'string') {
     return NextResponse.json({ error: 'Missing image data' }, { status: 400 })
   }
 
-  if (!SUPPORTED_TYPES.includes(mimeType)) {
+  if (!SUPPORTED_TYPES.includes(mimeType as SupportedMediaType)) {
     return NextResponse.json(
       { error: `Unsupported image type. Use one of: ${SUPPORTED_TYPES.join(', ')}` },
       { status: 400 }
     )
   }
-  const mediaType: SupportedMediaType = mimeType
+  const mediaType: SupportedMediaType = mimeType as SupportedMediaType
 
   const approxBytes = Math.floor((imageBase64.length * 3) / 4)
   if (approxBytes > MAX_IMAGE_BYTES) {
@@ -88,7 +98,8 @@ Category definitions — pick the best match:
     ],
   })
 
-  const text = message.content[0].type === 'text' ? message.content[0].text : ''
+  const firstBlock = message.content[0]
+  const text = firstBlock?.type === 'text' ? firstBlock.text : ''
   const cleaned = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim()
   let parsed: unknown
   try {
