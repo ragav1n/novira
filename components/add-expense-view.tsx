@@ -454,26 +454,24 @@ export function AddExpenseView() {
 
     return (
         <>
-        {scanning && createPortal(
-            <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(8px)', backgroundColor: 'rgba(12,8,30,0.85)' }}
-            >
-                <UniqueLoading variant="squares" size="lg" />
-                <p className="mt-6 text-sm font-semibold text-foreground">Scanning receipt...</p>
-                <p className="mt-1 text-xs text-muted-foreground">Reading your receipt</p>
-            </motion.div>,
+        {typeof document !== 'undefined' && createPortal(
+            <AnimatePresence>
+                {scanning && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(8px)', backgroundColor: 'rgba(12,8,30,0.85)' }}
+                    >
+                        <UniqueLoading variant="squares" size="lg" />
+                        <p className="mt-6 text-sm font-semibold text-foreground">Scanning receipt...</p>
+                        <p className="mt-1 text-xs text-muted-foreground">Reading your receipt</p>
+                    </motion.div>
+                )}
+            </AnimatePresence>,
             document.body
         )}
-        <motion.div
-            initial={{ opacity: 0, scale: 0.98 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.98 }}
-            transition={{ duration: 0.2, ease: "easeOut" }}
-            className="relative"
-        >
+        <div className="relative">
             <div className={cn(
                 "p-5 space-y-6 max-w-md lg:max-w-4xl mx-auto pt-4 pb-[calc(8rem+env(safe-area-inset-bottom))] lg:pb-12 relative min-h-screen z-10"
             )}>
@@ -934,7 +932,8 @@ export function AddExpenseView() {
                     )}
                 </div>
 
-                <div className="space-y-3 min-h-[105px]"> {/* Slightly increased and stabilized height for Quick Pins */}
+                {/* Height is only reserved while pins exist — an empty reservation left a dead gap in the form */}
+                <div className={cn("space-y-3", sortedSuggestions.length > 0 && "min-h-[105px]")}>
                     <div className="flex items-center gap-1.5 ml-1 h-4">
                         <AnimatePresence>
                             {sortedSuggestions.length > 0 && (
@@ -1244,10 +1243,13 @@ export function AddExpenseView() {
                 </div>
 
                 {/* Exclude from Allowance Toggle */}
-                <div className="flex items-center justify-between gap-4">
-                    <div className="min-w-0">
-                        <p className="text-sm font-medium">Exclude from Allowance</p>
-                        <p className="text-[11px] text-muted-foreground">Don't count against your monthly limit</p>
+                <div className="flex items-center justify-between gap-4 p-4 rounded-2xl bg-secondary/10 border border-white/5">
+                    <div className="flex items-center gap-2 min-w-0">
+                        <PiggyBank className="w-5 h-5 text-cyan-500 shrink-0" />
+                        <div className="min-w-0">
+                            <p className="text-sm font-medium">Exclude from Allowance</p>
+                            <p className="text-[11px] text-muted-foreground">Don't count against your monthly limit</p>
+                        </div>
                     </div>
                     <Switch
                         checked={formState.excludeFromAllowance}
@@ -1352,7 +1354,7 @@ export function AddExpenseView() {
                     ) : 'Add Expense'}
                 </Button>
             </div>
-        </motion.div>
+        </div>
         <VoiceReviewModal
             parsed={parsedExpense}
             currentCurrency={formState.txCurrency}

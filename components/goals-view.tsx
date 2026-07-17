@@ -472,13 +472,7 @@ export function GoalsView() {
     };
 
     return (
-        <motion.div
-            initial={{ opacity: 0, scale: 0.98 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.98 }}
-            transition={{ type: 'spring', stiffness: 220, damping: 28, mass: 0.9 }}
-            className="relative min-h-[100dvh] w-full bg-[radial-gradient(ellipse_90%_60%_at_50%_-10%,_rgba(138,43,226,0.18),_transparent_60%)]"
-        >
+        <div className="relative min-h-[100dvh] w-full bg-[radial-gradient(ellipse_90%_60%_at_50%_-10%,_rgba(138,43,226,0.18),_transparent_60%)]">
             <div className="p-5 space-y-7 max-w-md lg:max-w-2xl mx-auto relative pb-24 lg:pb-8 z-10">
                 <div className="relative flex items-center gap-3 min-h-[40px]">
                     <button
@@ -949,6 +943,6 @@ export function GoalsView() {
                 formatCurrency={formatCurrency}
                 onChanged={loadGoals}
             />
-        </motion.div>
+        </div>
     );
 }

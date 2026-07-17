@@ -81,6 +81,7 @@ class Renderer {
 
   reset() {
     const { gl, program, vs, fs } = this;
+    if (this.buffer) { gl.deleteBuffer(this.buffer); this.buffer = null; }
     if (!program) return;
     if (vs) { gl.detachShader(program, vs); gl.deleteShader(vs); }
     if (fs) { gl.detachShader(program, fs); gl.deleteShader(fs); }

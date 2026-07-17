@@ -23,6 +23,7 @@ import { AddFriendDialog } from './groups/add-friend-dialog';
 import { ReceiptViewerDialog } from './receipt-viewer-dialog';
 import { useReceiptViewer } from '@/hooks/useReceiptViewer';
 import { OnboardingModal } from './onboarding-modal';
+import { LATEST_FEATURE_ANNOUNCEMENT } from '@/lib/feature-flags';
 
 
 
@@ -147,9 +148,17 @@ export function DashboardView() {
     }, [userId, loading, transactions.length, activeWorkspaceId]);
     const closeOnboarding = useCallback(() => {
         setIsOnboardingOpen(false);
+        setActiveModal(null);
         if (!userId) return;
-        try { localStorage.setItem(`novira:onboarded:${userId}`, '1'); } catch (err) { console.error(err); }
-    }, [userId]);
+        // The first-run tour supersedes the returning-user welcome and the
+        // feature announcement — a brand-new account shouldn't get three
+        // modals in a row, and every "new" feature is new to them anyway.
+        try {
+            localStorage.setItem(`novira:onboarded:${userId}`, '1');
+            localStorage.setItem(`welcome_seen_${userId}`, 'true');
+            localStorage.setItem(`last_seen_feature_id_${userId}`, LATEST_FEATURE_ANNOUNCEMENT.id);
+        } catch (err) { console.error(err); }
+    }, [userId, setActiveModal]);
 
     // Reset category filter when the user switches focus or workspace —
     // a stale "Groceries" filter shouldn't carry across buckets/workspaces.
@@ -534,7 +543,7 @@ export function DashboardView() {
                     transactions={transactions}
                     formatCurrency={formatCurrency}
                     convertAmount={convertAmount}
-                    activeModal={activeModal}
+                    activeModal={isOnboardingOpen ? null : activeModal}
                     setActiveModal={setActiveModal}
                     isAddFundsOpen={isAddFundsOpen}
                     setIsAddFundsOpen={setIsAddFundsOpen}

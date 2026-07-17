@@ -296,22 +296,6 @@ export function Component({ isSignUp = false }: { isSignUp?: boolean }) {
                 }}
               />
 
-                    {/* Password Requirements Checklist - Stabilized layout */}
-                    <div className="min-h-[120px]">
-                      <AnimatePresence>
-                        {isSignUp && (focusedInput === "password" || password.length > 0) && (
-                          <motion.div
-                            initial={{ opacity: 0, height: 0 }}
-                            animate={{ opacity: 1, height: 'auto' }}
-                            exit={{ opacity: 0, height: 0 }}
-                            className="mt-2 text-left"
-                          >
-                            <PasswordRequirements password={password} />
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                    </div>
-
               {/* Bottom light beam - enhanced glow */}
               <motion.div
                 className="absolute bottom-0 right-0 h-[3px] w-[50%] bg-gradient-to-r from-transparent via-white to-transparent opacity-70"
@@ -636,6 +620,24 @@ export function Component({ isSignUp = false }: { isSignUp?: boolean }) {
                     </div>
                   </motion.div>
 
+                  {/* Password requirements checklist (signup) - reserved space keeps the card from jumping */}
+                  {isSignUp && (
+                    <div className="min-h-[120px]">
+                      <AnimatePresence>
+                        {(focusedInput === "password" || password.length > 0) && (
+                          <motion.div
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: 'auto' }}
+                            exit={{ opacity: 0, height: 0 }}
+                            className="mt-2 text-left overflow-hidden"
+                          >
+                            <PasswordRequirements password={password} />
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  )}
+
                   {/* Confirm password input for signup */}
                   {isSignUp && (
                     <motion.div
@@ -707,6 +709,8 @@ export function Component({ isSignUp = false }: { isSignUp?: boolean }) {
                   whileTap={{ scale: 0.98 }}
                   type="submit"
                   disabled={isLoading}
+                  aria-label={isSignUp ? 'Create Account' : 'Sign In'}
+                  aria-busy={isLoading}
                   className="w-full relative group/button mt-5"
                 >
                   {/* Button glow effect - cosmic purple */}

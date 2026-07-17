@@ -369,6 +369,14 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
         setUser(currentUser);
         setUserId(currentUser?.id ?? null);
 
+        // Friendlier greeting fallback than the literal "User" for accounts
+        // without a profile name — a loaded profile full_name overrides this.
+        if (currentUser?.email) {
+            const local = currentUser.email.split('@')[0];
+            const pretty = local.charAt(0).toUpperCase() + local.slice(1);
+            setFullName(prev => (prev === 'User' ? pretty : prev));
+        }
+
         // Bind the offline-sync queue to this user before any mutation. On logout
         // (currentUser=null) this clears the in-memory queue binding and dispatches
         // an empty queue-updated event so the indicator clears. Awaited because

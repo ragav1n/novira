@@ -161,7 +161,8 @@ function SpendingTrendCardInner({
                 >
                     {activeCategories.length > 0 ? (
                         <ResponsiveContainer width="100%" height="100%">
-                            <LineChart data={forecastChartData} margin={{ top: 8, right: 6, bottom: 0, left: 6 }}>
+                            {/* 16px side margins keep the first/last tick labels from clipping at the card edge */}
+                            <LineChart data={forecastChartData} margin={{ top: 8, right: 16, bottom: 0, left: 16 }}>
                                 <XAxis
                                     dataKey="month"
                                     axisLine={false}

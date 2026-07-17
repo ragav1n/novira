@@ -12,7 +12,6 @@ import { useReceiptViewer } from '@/hooks/useReceiptViewer';
 import { useAccounts } from '@/components/providers/accounts-provider';
 import { Transaction } from '@/types/transaction';
 import { enqueueMutation } from '@/lib/sync-manager';
-import { motion } from 'framer-motion';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
@@ -563,13 +562,7 @@ export function SearchView() {
     }, [selectedIds.size, filteredTransactions]);
 
     return (
-        <motion.div
-            initial={{ opacity: 0, scale: 0.98 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.98 }}
-            transition={{ type: 'spring', stiffness: 220, damping: 28, mass: 0.9 }}
-            className="relative min-h-[100dvh] w-full h-full bg-[radial-gradient(ellipse_90%_60%_at_50%_-10%,_rgba(138,43,226,0.18),_transparent_60%)]"
-        >
+        <div className="relative min-h-[100dvh] w-full h-full bg-[radial-gradient(ellipse_90%_60%_at_50%_-10%,_rgba(138,43,226,0.18),_transparent_60%)]">
             <div className="p-5 space-y-7 max-w-md lg:max-w-2xl mx-auto relative pb-24 lg:pb-8 h-full flex flex-col z-10">
                 {/* Header */}
                 <div className="relative flex items-center gap-3 shrink-0 min-h-[40px]">
@@ -1018,6 +1011,6 @@ export function SearchView() {
                 onOpenChange={receiptViewer.setOpen}
                 receiptPath={receiptViewer.path}
             />
-        </motion.div>
+        </div>
     );
 }

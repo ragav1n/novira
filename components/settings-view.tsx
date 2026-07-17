@@ -6,7 +6,6 @@ import { useRouter } from 'next/navigation';
 import { useUserPreferences } from '@/components/providers/user-preferences-provider';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { supabase } from '@/lib/supabase';
-import { motion } from 'framer-motion';
 import { useBucketsList } from '@/components/providers/buckets-provider';
 import { useGroups } from '@/components/providers/groups-provider';
 import { useSyncQueueState } from '@/hooks/use-sync-queue-state';
@@ -99,13 +98,7 @@ export function SettingsView() {
     };
 
     return (
-        <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
-            className="relative min-h-screen"
-        >
+        <div className="relative min-h-screen">
             <div className="p-5 space-y-6 max-w-md lg:max-w-4xl mx-auto relative">
                 <SettingsHeader />
 
@@ -327,6 +320,6 @@ export function SettingsView() {
                     title={dataExport.exportType === 'csv' ? 'Export CSV' : 'Export PDF'}
                 />
             </div>
-        </motion.div>
+        </div>
     );
 }

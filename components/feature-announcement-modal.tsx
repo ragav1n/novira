@@ -67,10 +67,11 @@ export function FeatureAnnouncementModal({ showAnnouncement = false, userId, onC
         setMounted(true);
     }, []);
 
+    // Track the prop both ways — latching open-only would keep this modal
+    // alive underneath whichever surface suppressed it (e.g. the first-run
+    // onboarding tour), so it would pop up the moment that surface closed.
     useEffect(() => {
-        if (showAnnouncement) {
-            setIsOpen(true);
-        }
+        setIsOpen(showAnnouncement);
     }, [showAnnouncement]);
 
     const handleClose = () => {

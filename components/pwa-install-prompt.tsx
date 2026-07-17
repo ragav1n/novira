@@ -19,14 +19,20 @@ export function PWAInstallPrompt() {
     useEffect(() => {
         // Don't show if already installed (standalone mode)
         if (window.matchMedia('(display-mode: standalone)').matches) return;
-        // Skip if dismissed within the last 14 days. Persisting in localStorage
-        // (not sessionStorage) keeps the dismiss across tab closes.
-        const dismissedAt = Number(localStorage.getItem(DISMISS_KEY));
-        if (Number.isFinite(dismissedAt) && dismissedAt > 0 && Date.now() - dismissedAt < DISMISS_TTL_MS) return;
+        // Dismissals persist in localStorage (not sessionStorage) for 14 days so
+        // the banner stays gone across tab closes.
+        const isDismissed = () => {
+            const dismissedAt = Number(localStorage.getItem(DISMISS_KEY));
+            return Number.isFinite(dismissedAt) && dismissedAt > 0 && Date.now() - dismissedAt < DISMISS_TTL_MS;
+        };
+        if (isDismissed()) return;
 
         let timer: ReturnType<typeof setTimeout> | null = null;
         const handler = (e: Event) => {
             e.preventDefault();
+            // Chrome re-fires beforeinstallprompt on SPA route changes, so a
+            // dismissal made after mount must be re-checked at fire time
+            if (isDismissed()) return;
             setDeferredPrompt(e as BeforeInstallPromptEvent);
             // Small delay so the page settles before showing the banner
             timer = setTimeout(() => setIsVisible(true), 3000);

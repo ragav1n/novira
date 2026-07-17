@@ -25,7 +25,7 @@ const baseTemplate: RecurringTemplate = {
     amount: 15.99,
     currency: 'USD',
     frequency: 'monthly',
-    next_occurrence: isoDate(addDays(new Date(), 3)),
+    next_occurrence: isoDate(addDays(FIXED_NOW, 3)),
     category: 'entertainment',
     is_active: true,
     created_at: '2026-01-01',
@@ -39,7 +39,7 @@ const baseGoal: SavingsGoal = {
     target_amount: 2000,
     current_amount: 800,
     currency: 'EUR',
-    deadline: isoDate(addDays(new Date(), 30)),
+    deadline: isoDate(addDays(FIXED_NOW, 30)),
     icon: 'plane',
     color: 'emerald',
 };
@@ -54,8 +54,8 @@ const baseBucket: Bucket = {
     color: 'emerald',
     is_archived: false,
     created_at: '2026-01-01',
-    start_date: isoDate(addDays(new Date(), 10)),
-    end_date: isoDate(addDays(new Date(), 17)),
+    start_date: isoDate(addDays(FIXED_NOW, 10)),
+    end_date: isoDate(addDays(FIXED_NOW, 17)),
     currency: 'EUR',
 };
 
@@ -106,7 +106,7 @@ describe('buildIcs — recurring templates', () => {
     it('skips a paused template (pause_until in the future)', () => {
         const paused: RecurringTemplate = {
             ...baseTemplate,
-            metadata: { pause_until: isoDate(addDays(new Date(), 14)) },
+            metadata: { pause_until: isoDate(addDays(FIXED_NOW, 14)) },
         };
         const ics = buildIcs({ recurringTemplates: [paused], goals: [], buckets: [] });
         expect(ics).not.toContain('BEGIN:VEVENT');
@@ -115,7 +115,7 @@ describe('buildIcs — recurring templates', () => {
     it('includes a paused template if pause_until is in the past', () => {
         const expired: RecurringTemplate = {
             ...baseTemplate,
-            metadata: { pause_until: isoDate(addDays(new Date(), -3)) },
+            metadata: { pause_until: isoDate(addDays(FIXED_NOW, -3)) },
         };
         const ics = buildIcs({ recurringTemplates: [expired], goals: [], buckets: [] });
         expect(ics).toContain('BEGIN:VEVENT');
@@ -124,7 +124,7 @@ describe('buildIcs — recurring templates', () => {
     it('emits a separate Trial Ends event when metadata.trial_ends_at is set', () => {
         const trial: RecurringTemplate = {
             ...baseTemplate,
-            metadata: { trial_ends_at: isoDate(addDays(new Date(), 7)) },
+            metadata: { trial_ends_at: isoDate(addDays(FIXED_NOW, 7)) },
         };
         const ics = buildIcs({ recurringTemplates: [trial], goals: [], buckets: [] });
         // Two events: the recurring one + the trial-end one
@@ -160,14 +160,14 @@ describe('buildIcs — savings goals', () => {
     });
 
     it('skips past-deadline goals', () => {
-        const past = { ...baseGoal, deadline: isoDate(addDays(new Date(), -1)) };
+        const past = { ...baseGoal, deadline: isoDate(addDays(FIXED_NOW, -1)) };
         const ics = buildIcs({ recurringTemplates: [], goals: [past], buckets: [] });
         expect(ics).not.toContain('BEGIN:VEVENT');
     });
 
     it('skips reminder events whose dates are already past', () => {
         // Deadline 2 days out — the 7-day reminder is already past, only main + 1-day fire.
-        const soon = { ...baseGoal, deadline: isoDate(addDays(new Date(), 2)) };
+        const soon = { ...baseGoal, deadline: isoDate(addDays(FIXED_NOW, 2)) };
         const ics = buildIcs({ recurringTemplates: [], goals: [soon], buckets: [] });
         const eventCount = (ics.match(/BEGIN:VEVENT/g) || []).length;
         expect(eventCount).toBe(2);
@@ -203,7 +203,7 @@ describe('buildIcs — buckets', () => {
     });
 
     it('skips past buckets', () => {
-        const past = { ...baseBucket, end_date: isoDate(addDays(new Date(), -1)) };
+        const past = { ...baseBucket, end_date: isoDate(addDays(FIXED_NOW, -1)) };
         const ics = buildIcs({ recurringTemplates: [], goals: [], buckets: [past] });
         expect(ics).not.toContain('BEGIN:VEVENT');
     });

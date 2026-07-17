@@ -1,6 +1,12 @@
 import Link from 'next/link';
+import type { Metadata } from 'next';
 import { ChevronLeft } from 'lucide-react';
 import { ContentReveal, RevealItem } from '@/components/content-reveal';
+
+export const metadata: Metadata = {
+    title: 'Terms of Service',
+    alternates: { canonical: '/terms' },
+};
 
 export default function TermsOfService() {
     return (

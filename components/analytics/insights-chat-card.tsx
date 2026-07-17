@@ -270,7 +270,7 @@ export function InsightsChatCard({ dateRange, customStart, customEnd, bucketId, 
                     </div>
                     <div className="flex-1 min-w-0">
                         <p className="text-[13px] font-bold">Ask about your spending</p>
-                        <p className="text-[11px] text-muted-foreground/80 truncate">Get a quick answer grounded in this view&apos;s data.</p>
+                        <p className="text-[11px] text-muted-foreground/80">Get a quick answer grounded in this view&apos;s data.</p>
                     </div>
                     <button
                         onClick={() => setOpen(true)}

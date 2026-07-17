@@ -330,11 +330,6 @@ export const SpendingOverview = React.memo(function SpendingOverview({
                                 </div>
                             )}
                         </div>
-                        <div className="w-10 h-10 shrink-0 rounded-full bg-white/20 flex items-center justify-center shadow-sm">
-                            <span className="text-xl font-bold text-white">
-                                {CURRENCY_SYMBOLS[bucketCurrency] || '$'}
-                            </span>
-                        </div>
                     </div>
                     <div className="space-y-2">
                         <div className="flex justify-between text-xs font-medium text-white/80 gap-2">
@@ -359,7 +354,8 @@ export const SpendingOverview = React.memo(function SpendingOverview({
                                     : formatCurrency(Math.abs(remaining), bucketCurrency)}
                             </span>
                         </div>
-                        <Progress value={progress} aria-label={`Budget used: ${Math.round(progress)}%`} className="h-2 bg-black/30" indicatorClassName={cn(remaining < 0 ? "bg-red-400" : "bg-white")} />
+                        {/* Floor the bar at 2% so any spending at all stays visible */}
+                        <Progress value={progress > 0 ? Math.max(progress, 2) : 0} aria-label={`Budget used: ${Math.round(progress)}%`} className="h-2 bg-black/30" indicatorClassName={cn(remaining < 0 ? "bg-red-400" : "bg-white")} />
                         {!isBucketFocused && (lastMonthCarryover > 0 || incomeThisMonth > 0) && (
                             <div className="flex flex-wrap items-center gap-1.5 self-start">
                                 {incomeThisMonth > 0 && (
@@ -581,23 +577,23 @@ export const SpendingOverview = React.memo(function SpendingOverview({
                 mirrored layout. */}
             <div className="rounded-2xl bg-card/60 border border-white/5 shadow-[inset_0_1px_0_rgb(255_255_255_/0.06)] grid grid-cols-2 divide-x divide-white/5 overflow-hidden">
                 <div className="p-4 flex items-center gap-3 min-w-0">
-                    <div className="w-9 h-9 rounded-xl bg-emerald-500/15 flex items-center justify-center shrink-0">
-                        <ArrowDownLeft className="w-4 h-4 text-emerald-400" />
+                    <div className={cn("w-9 h-9 rounded-xl flex items-center justify-center shrink-0", balances.totalOwedToMe > 0 ? "bg-emerald-500/15" : "bg-white/5")}>
+                        <ArrowDownLeft className={cn("w-4 h-4", balances.totalOwedToMe > 0 ? "text-emerald-400" : "text-muted-foreground/60")} />
                     </div>
                     <div className="min-w-0">
                         <p className="text-[11px] text-muted-foreground font-medium">Owed to you</p>
-                        <p className="text-base font-bold text-emerald-300 tabular-nums truncate">
+                        <p className={cn("text-base font-bold tabular-nums truncate", balances.totalOwedToMe > 0 ? "text-emerald-300" : "text-foreground/60")}>
                             {formatCurrency(balances.totalOwedToMe, baseCurrency)}
                         </p>
                     </div>
                 </div>
                 <div className="p-4 flex items-center gap-3 min-w-0">
-                    <div className="w-9 h-9 rounded-xl bg-rose-500/15 flex items-center justify-center shrink-0">
-                        <ArrowUpRight className="w-4 h-4 text-rose-400" />
+                    <div className={cn("w-9 h-9 rounded-xl flex items-center justify-center shrink-0", balances.totalOwed > 0 ? "bg-rose-500/15" : "bg-white/5")}>
+                        <ArrowUpRight className={cn("w-4 h-4", balances.totalOwed > 0 ? "text-rose-400" : "text-muted-foreground/60")} />
                     </div>
                     <div className="min-w-0">
                         <p className="text-[11px] text-muted-foreground font-medium">You owe</p>
-                        <p className="text-base font-bold text-rose-300 tabular-nums truncate">
+                        <p className={cn("text-base font-bold tabular-nums truncate", balances.totalOwed > 0 ? "text-rose-300" : "text-foreground/60")}>
                             {formatCurrency(balances.totalOwed, baseCurrency)}
                         </p>
                     </div>

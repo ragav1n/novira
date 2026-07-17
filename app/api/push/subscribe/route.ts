@@ -14,7 +14,23 @@ export async function POST(request: NextRequest) {
         if (!limit.allowed) return rateLimitResponse(limit, RATE_CFG);
 
         const subscription = await request.json();
-        if (!subscription?.endpoint) {
+        if (!subscription?.endpoint || typeof subscription.endpoint !== 'string') {
+            return NextResponse.json({ error: 'Invalid subscription' }, { status: 400 });
+        }
+        // The server later POSTs to this URL via web-push — only accept public
+        // https endpoints with the browser-provided crypto keys attached.
+        let endpointUrl: URL;
+        try {
+            endpointUrl = new URL(subscription.endpoint);
+        } catch {
+            return NextResponse.json({ error: 'Invalid subscription' }, { status: 400 });
+        }
+        const host = endpointUrl.hostname;
+        const isLocalHost = host === 'localhost' || host === '::1' || /^127\.|^10\.|^192\.168\.|^169\.254\./.test(host);
+        if (endpointUrl.protocol !== 'https:' || isLocalHost || subscription.endpoint.length > 1024) {
+            return NextResponse.json({ error: 'Invalid subscription' }, { status: 400 });
+        }
+        if (typeof subscription.keys?.p256dh !== 'string' || typeof subscription.keys?.auth !== 'string') {
             return NextResponse.json({ error: 'Invalid subscription' }, { status: 400 });
         }
 

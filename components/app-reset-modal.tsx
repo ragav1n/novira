@@ -17,6 +17,10 @@ export function AppResetModal() {
         setMounted(true);
         if (typeof window === 'undefined') return;
         if (localStorage.getItem(STORAGE_KEY)) return;
+        // Migration prompt only makes sense on the deployed origins — on
+        // localhost/LAN dev it just blocks every page behind a z-[1000] overlay.
+        const host = window.location.hostname;
+        if (host === 'localhost' || host === '127.0.0.1' || host.endsWith('.local')) return;
 
         // Skip the migration modal when there's nothing to migrate from — a fresh
         // origin (e.g. first visit to novira.one in incognito) has no caches and

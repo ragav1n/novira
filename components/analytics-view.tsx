@@ -23,7 +23,6 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { motion } from 'framer-motion';
 import { Transaction } from '@/types/transaction';
 import { supabase } from '@/lib/supabase';
 import { toast, ImpactStyle } from '@/utils/haptics';
@@ -339,19 +338,13 @@ export function AnalyticsView() {
         : 0;
 
     return (
-        <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 8 }}
-            transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-            className="relative min-h-[100dvh]"
-        >
+        <div className="relative min-h-[100dvh]">
             <div className={cn(
                 'p-5 space-y-5 max-w-md lg:max-w-5xl mx-auto relative transition-all duration-300',
                 loading ? 'opacity-50 blur-[2px] pointer-events-none' : 'opacity-100 blur-0'
             )}>
                 {/* Sticky Header — slim: back / title / period badge + total chip when scrolled */}
-                <div className="sticky top-0 z-20 -mx-5 px-5 py-2">
+                <div className="sticky top-0 z-20 -mx-5 px-5 py-2 bg-background/85 backdrop-blur-xl border-b border-white/[0.05]">
                     <div className="flex items-center justify-between relative min-h-[40px]">
                         <button
                             onClick={() => router.back()}
@@ -748,6 +741,6 @@ export function AnalyticsView() {
                     </>
                 )}
             </div>
-        </motion.div>
+        </div>
     );
 }
