@@ -28,19 +28,21 @@ interface ExpandableTabsProps {
     activeIndex?: number | null;
 }
 
-// Horizontal padding floors at 0.6rem. Combined with the 18px icon and the
-// min-w-[44px] on the button this keeps every tab at a usable target — the old
-// 0.2rem/0.35rem values collapsed unselected tabs to roughly 24-29px wide.
+// Nine tabs plus a separator is already at the width budget for a 390px screen, so
+// horizontal padding can't be widened to reach a 44px target without pushing tabs off
+// the edge. Only the floor is raised (0.2rem -> 0.35rem) so unselected tabs stop
+// shrinking when another tab is tapped; vertical height and accessible names are
+// handled on the button itself. A real 44px target needs fewer tabs, not more padding.
 const buttonVariants = {
     initial: {
         gap: 0,
-        paddingLeft: "0.6rem",
-        paddingRight: "0.6rem",
+        paddingLeft: "0.35rem",
+        paddingRight: "0.35rem",
     },
     animate: ({ isSelected }: { isSelected: boolean; hasSelected: boolean }) => ({
         gap: isSelected ? "0.5rem" : 0,
-        paddingLeft: isSelected ? "0.85rem" : "0.6rem",
-        paddingRight: isSelected ? "0.85rem" : "0.6rem",
+        paddingLeft: isSelected ? "0.85rem" : "0.35rem",
+        paddingRight: isSelected ? "0.85rem" : "0.35rem",
     }),
 };
 
@@ -127,9 +129,7 @@ export function ExpandableTabs({
                         variants={buttonVariants}
                         initial="initial"
                         animate="animate"
-                        // Matches the label-visibility condition below so the padding
-                        // expands for whichever tab is actually showing its name.
-                        custom={{ isSelected: selected === index || isActiveRoute, hasSelected: selected !== null }}
+                        custom={{ isSelected: selected === index, hasSelected: selected !== null }}
                         onClick={() => handleSelect(index)}
                         transition={transition}
                         aria-current={isActiveRoute ? 'page' : undefined}
@@ -138,7 +138,7 @@ export function ExpandableTabs({
                         aria-label={tab.title}
                         title={tab.title}
                         className={cn(
-                            "relative flex items-center justify-center rounded-xl min-h-[40px] min-w-[44px] py-1.5 sm:py-2 text-xs sm:text-sm font-medium transition-colors duration-300 shrink-0",
+                            "relative flex items-center justify-center rounded-xl min-h-[40px] py-1.5 sm:py-2 text-xs sm:text-sm font-medium transition-colors duration-300 shrink-0",
                             isHighlighted
                                 ? cn("bg-muted", activeColor)
                                 : "text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -146,11 +146,7 @@ export function ExpandableTabs({
                     >
                         <Icon size={18} aria-hidden="true" />
                         <AnimatePresence initial={false}>
-                            {/* Show the label for the tab you're actually on, not only
-                                the one you just tapped — `selected` is transient tap
-                                state that clears after 5s, which left the routed tab
-                                as an unlabelled glyph. */}
-                            {(selected === index || isActiveRoute) && (
+                            {selected === index && (
                                 <motion.span
                                     variants={spanVariants}
                                     initial="initial"

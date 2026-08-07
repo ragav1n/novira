@@ -547,19 +547,32 @@ export function GoalsView() {
                     </div>
                 </div>
 
-                <section className="space-y-2 text-center">
-                    <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground/70">
-                        Total saved
-                    </p>
-                    <h2 className={cn('text-[40px] leading-none font-bold tracking-tight tabular-nums', themeConfig.text)}>
-                        {formatCurrency(totalSaved)}
-                    </h2>
-                    <p className="text-[11px] text-muted-foreground/70">
-                        {goals.length} {goals.length === 1 ? 'goal' : 'goals'}
-                        {achievedGoals.length > 0 && ` · ${achievedGoals.length} achieved`}
-                        {dueSoonCount > 0 && ` · ${dueSoonCount} due soon`}
-                    </p>
-                </section>
+                {/* "$0.00 saved · 0 goals" is a claim about the user's money. Suppress it
+                    while loading and after a failed fetch — otherwise the header keeps
+                    asserting zero right above an error card saying we couldn't load. */}
+                {!loadError && (
+                    <section className="space-y-2 text-center">
+                        <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground/70">
+                            Total saved
+                        </p>
+                        {loading ? (
+                            <div className="flex justify-center py-1">
+                                <div className="h-10 w-40 rounded-2xl bg-secondary/20 animate-pulse" />
+                            </div>
+                        ) : (
+                            <>
+                                <h2 className={cn('text-[40px] leading-none font-bold tracking-tight tabular-nums', themeConfig.text)}>
+                                    {formatCurrency(totalSaved)}
+                                </h2>
+                                <p className="text-[11px] text-muted-foreground/70">
+                                    {goals.length} {goals.length === 1 ? 'goal' : 'goals'}
+                                    {achievedGoals.length > 0 && ` · ${achievedGoals.length} achieved`}
+                                    {dueSoonCount > 0 && ` · ${dueSoonCount} due soon`}
+                                </p>
+                            </>
+                        )}
+                    </section>
+                )}
 
                 {goals.length > 0 && (
                     <div className="rounded-3xl bg-card/40 backdrop-blur-xl border border-white/[0.06] p-2.5 space-y-2">

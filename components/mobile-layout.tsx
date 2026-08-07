@@ -646,6 +646,13 @@ export function MobileLayout({ children, defaultIsDesktop = false }: { children:
                 }}
                 duration={3000}
                 visibleToasts={3}
+                // Sonner renders bottom-centre at z-99999, directly over the floating
+                // bottom nav — an error toast swallowed nav taps for its full 4s.
+                // Offset clears the nav (bottom-6 + ~48px tall) plus the safe area.
+                // `mobileOffset` is the one that applies under 600px; `offset` alone is
+                // ignored there, which is exactly the viewport where the nav floats.
+                offset={showNav && !showDesktop ? 'calc(6.5rem + env(safe-area-inset-bottom))' : undefined}
+                mobileOffset={showNav && !showDesktop ? { bottom: 'calc(6.5rem + env(safe-area-inset-bottom))' } : undefined}
                 richColors
                 closeButton
             />
