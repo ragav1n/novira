@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
-    ChevronLeft, Search, Tag, Plane, Home, Gift,
+    Search, Tag, Plane, Home, Gift,
     Car, Utensils, ShoppingCart, Heart, Gamepad2, School, Laptop, Music,
     X, RefreshCcw, Ban, CheckSquare, Bookmark, BookmarkPlus, Clock,
 } from 'lucide-react';
@@ -34,6 +34,7 @@ import { SearchFilterSheet } from '@/components/search/search-filter-sheet';
 import { SearchResultsList } from '@/components/search/search-results-list';
 import { SearchBulkActionBar } from '@/components/search/search-bulk-action-bar';
 import { RecategorizeSheet } from '@/components/search/recategorize-sheet';
+import { ViewHeader } from '@/components/ui/view-header';
 
 const bucketIcons: Record<string, React.ElementType> = {
     Tag, Plane, Home, Gift, Car, Utensils, ShoppingCart,
@@ -620,20 +621,13 @@ export function SearchView() {
 
     return (
         <div className="relative min-h-[100dvh] w-full h-full bg-[radial-gradient(ellipse_90%_60%_at_50%_-10%,_rgba(138,43,226,0.18),_transparent_60%)]">
-            <div className="p-5 space-y-7 max-w-md lg:max-w-2xl mx-auto relative lg:pb-8 h-full flex flex-col z-10">
-                {/* Header */}
-                <div className="relative flex items-center gap-3 shrink-0 min-h-[40px]">
-                    <button
-                        onClick={() => router.back()}
-                        aria-label="Go back"
-                        className="p-2 -ml-2 rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary/30 transition-colors shrink-0 z-10"
-                    >
-                        <ChevronLeft className="w-5 h-5" aria-hidden="true" />
-                    </button>
-                    <h2 className="absolute inset-0 flex items-center justify-center pointer-events-none text-lg font-semibold tracking-tight">
-                        Search &amp; filter
-                    </h2>
-                    <div className="flex items-center gap-1.5 ml-auto z-10">
+            <div className="p-5 space-y-6 max-w-md lg:max-w-2xl mx-auto relative lg:pb-8 h-full flex flex-col z-10">
+                <ViewHeader
+                    title="Search & filter"
+                    onBack
+                    className="shrink-0"
+                    right={
+                        <>
                         <button
                             onClick={() => bulkMode ? exitBulkMode() : setBulkMode(true)}
                             aria-label={bulkMode ? 'Exit selection mode' : 'Enter selection mode'}
@@ -670,8 +664,9 @@ export function SearchView() {
                             setSelectedPayments={setSelectedPayments}
                             onReset={resetFilters}
                         />
-                    </div>
-                </div>
+                        </>
+                    }
+                />
 
                 {/* Hero — total when filters yielded results, quiet intro only when truly idle */}
                 {filterStats && (activeFilterCount > 0 || debouncedSearchQuery) ? (
@@ -740,7 +735,7 @@ export function SearchView() {
                         // Delay so a tap on a history row registers before blur closes the dropdown.
                         onBlur={() => setTimeout(() => setInputFocused(false), 150)}
                         className={cn(
-                            'pl-10 pr-10 h-11 rounded-2xl bg-secondary/15 border-white/[0.06] text-[14px]',
+                            'pl-10 pr-10 h-11 rounded-xl bg-secondary/15 border-white/[0.06] text-[14px]',
                             themeConfig.ring
                         )}
                     />
@@ -761,7 +756,7 @@ export function SearchView() {
                         </button>
                     ) : null}
                     {inputFocused && searchQuery === '' && history.length > 0 && (
-                        <div className="absolute top-full left-0 right-0 mt-1.5 z-40 rounded-2xl bg-card/95 backdrop-blur-xl border border-white/[0.06] shadow-2xl overflow-hidden">
+                        <div className="absolute top-full left-0 right-0 mt-1.5 z-40 rounded-xl bg-card/95 backdrop-blur-xl border border-white/[0.06] shadow-2xl overflow-hidden">
                             <div className="px-3 py-2 text-[10px] uppercase tracking-[0.18em] font-medium text-muted-foreground/70 border-b border-white/[0.04]">
                                 Recent
                             </div>

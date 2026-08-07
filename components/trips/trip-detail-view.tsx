@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { format, parseISO, differenceInCalendarDays } from 'date-fns';
-import { ArrowLeft, Calendar as CalendarIcon, MapPin, Edit2, Plane, Receipt, TrendingUp, Hash, Coins } from 'lucide-react';
+import { Calendar as CalendarIcon, MapPin, Edit2, Plane, Receipt, TrendingUp, Hash, Coins } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useUserPreferences } from '@/components/providers/user-preferences-provider';
@@ -15,6 +15,7 @@ import { supabase } from '@/lib/supabase';
 import { CATEGORIES, CATEGORY_COLORS, getCategoryLabel } from '@/lib/categories';
 import type { Trip } from '@/types/trip';
 import { cn } from '@/lib/utils';
+import { ViewHeader } from '@/components/ui/view-header';
 
 type TxRow = {
     id: string;
@@ -150,22 +151,17 @@ export function TripDetailView({ tripId }: { tripId: string }) {
     const end = parseISO(trip.end_date);
 
     return (
-        <div className="flex flex-col min-h-[100dvh] p-5 max-w-md mx-auto space-y-5 pb-32">
-            <div className="flex items-center justify-between pt-2 gap-3">
-                <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={handleBack}
-                    aria-label="Back to trips"
-                    className="rounded-full w-10 h-10"
-                >
-                    <ArrowLeft className="w-5 h-5" />
-                </Button>
-                <h1 className="text-lg font-bold truncate flex-1 text-center">{trip.name}</h1>
-                <Button size="icon" variant="ghost" onClick={() => setEditOpen(true)} aria-label="Edit trip" className="rounded-full w-10 h-10">
-                    <Edit2 className="w-4 h-4" />
-                </Button>
-            </div>
+        <div className="flex flex-col min-h-[100dvh] p-5 max-w-md lg:max-w-2xl mx-auto space-y-6 pb-32">
+            <ViewHeader
+                title={trip.name}
+                onBack={handleBack}
+                className="pt-2"
+                right={
+                    <Button size="icon" variant="ghost" onClick={() => setEditOpen(true)} aria-label="Edit trip" className="rounded-full w-10 h-10">
+                        <Edit2 className="w-4 h-4" />
+                    </Button>
+                }
+            />
 
             <Card className="bg-card/40 border-white/5 backdrop-blur-xl">
                 <CardContent className="p-5 space-y-3">
@@ -307,7 +303,7 @@ export function TripDetailView({ tripId }: { tripId: string }) {
 
 function Kpi({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
     return (
-        <div className="rounded-2xl bg-secondary/10 border border-white/5 p-2.5">
+        <div className="rounded-xl bg-secondary/10 border border-white/5 p-2.5">
             <div className="flex items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
                 {icon}
                 <span className="truncate">{label}</span>

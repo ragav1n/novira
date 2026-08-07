@@ -6,7 +6,7 @@ import { useSafeBack } from '@/hooks/useSafeBack';
 import { useDropzone } from 'react-dropzone';
 import Papa from 'papaparse';
 import { parse, isValid, format } from 'date-fns';
-import { Upload, ChevronRight, Check, AlertCircle, X, ArrowLeft, FileSpreadsheet, Loader2 } from 'lucide-react';
+import { Upload, ChevronRight, ChevronLeft, Check, AlertCircle, X, FileSpreadsheet, Loader2 } from 'lucide-react';
 import { toast } from '@/utils/haptics';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
@@ -483,11 +483,19 @@ export function ImportView() {
     };
 
     return (
-        <div className="p-5 max-w-2xl mx-auto space-y-6">
+        <div className="p-5 max-w-md lg:max-w-2xl mx-auto space-y-6">
             <div className="flex items-center gap-4">
-                <Button variant="ghost" size="icon" aria-label="Go back" onClick={goBack}>
-                    <ArrowLeft className="w-5 h-5" />
-                </Button>
+                {/* Left-aligned with a subtitle, so this keeps its own layout rather than
+                    adopting ViewHeader — but the back affordance matches every other
+                    screen: 44px target, ChevronLeft, same chip treatment. `size="icon"`
+                    alone is 36px. */}
+                <button
+                    aria-label="Go back"
+                    onClick={goBack}
+                    className="min-h-[44px] min-w-[44px] -ml-2 inline-flex items-center justify-center rounded-full bg-secondary/30 hover:bg-secondary/50 text-muted-foreground hover:text-foreground transition-colors shrink-0"
+                >
+                    <ChevronLeft className="w-5 h-5" aria-hidden="true" />
+                </button>
                 <div>
                     <h1 className="text-2xl font-bold">Import Transactions</h1>
                     <p className="text-sm text-muted-foreground">Upload your bank statement (CSV or Excel)</p>

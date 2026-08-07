@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
 import {
     addDays,
     addMonths,
@@ -28,6 +27,7 @@ import { getCategoryLabel, CATEGORY_COLORS } from '@/lib/categories';
 import { ScheduleSheet } from '@/components/calendar/schedule-sheet';
 import { toast } from '@/utils/haptics';
 import { useConfirm } from '@/components/ui/confirm-dialog';
+import { ViewHeader } from '@/components/ui/view-header';
 
 type EventKind = 'recurring' | 'goal' | 'bucket-end' | 'one-off';
 
@@ -112,7 +112,6 @@ function expandRecurring(row: RecurringRow, fromStr: string, untilStr: string): 
 }
 
 export function CalendarView() {
-    const router = useRouter();
     const { userId, formatCurrency, convertAmount, currency, activeWorkspaceId } = useUserPreferences();
     const { theme: themeConfig } = useWorkspaceTheme();
     const { buckets } = useBucketsList();
@@ -439,19 +438,11 @@ export function CalendarView() {
 
     return (
         <div className="relative min-h-[100dvh] w-full bg-[radial-gradient(ellipse_90%_60%_at_50%_-10%,_rgba(138,43,226,0.18),_transparent_60%)]">
-            <div className="p-5 space-y-7 max-w-md lg:max-w-2xl mx-auto relative lg:pb-8 z-10">
-                <div className="relative flex items-center gap-3 min-h-[40px]">
-                    <button
-                        onClick={() => router.back()}
-                        aria-label="Go back"
-                        className="p-2 -ml-2 rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary/30 transition-colors shrink-0 z-10"
-                    >
-                        <ChevronLeft className="w-5 h-5" aria-hidden="true" />
-                    </button>
-                    <h2 className="absolute inset-0 flex items-center justify-center pointer-events-none text-lg font-semibold tracking-tight">
-                        Cash Flow
-                    </h2>
-                    <div className="flex items-center gap-1.5 ml-auto z-10">
+            <div className="p-5 space-y-6 max-w-md lg:max-w-2xl mx-auto relative lg:pb-8 z-10">
+                <ViewHeader
+                    title="Cash Flow"
+                    onBack
+                    right={
                         <button
                             onClick={() => setScheduleOpen(true)}
                             aria-label="Schedule event"
@@ -460,8 +451,8 @@ export function CalendarView() {
                         >
                             <Plus className="w-[18px] h-[18px]" />
                         </button>
-                    </div>
-                </div>
+                    }
+                />
 
                 <section className="space-y-3 text-center">
                     <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground/70">
@@ -484,7 +475,7 @@ export function CalendarView() {
                         </div>
                     ) : loading ? (
                         <div className="flex justify-center py-2">
-                            <div className="h-10 w-44 rounded-2xl bg-secondary/20 animate-pulse" />
+                            <div className="h-10 w-44 rounded-xl bg-secondary/20 animate-pulse" />
                         </div>
                     ) : (
                     <div className="flex items-end justify-center gap-3 flex-wrap">
@@ -643,11 +634,11 @@ export function CalendarView() {
                     </div>
                     {loading ? (
                         <div className="space-y-2">
-                            <div className="h-14 rounded-2xl bg-secondary/10 animate-pulse" />
-                            <div className="h-14 rounded-2xl bg-secondary/10 animate-pulse" />
+                            <div className="h-14 rounded-xl bg-secondary/10 animate-pulse" />
+                            <div className="h-14 rounded-xl bg-secondary/10 animate-pulse" />
                         </div>
                     ) : loadError ? (
-                        <div className="text-center py-8 border border-dashed border-white/[0.08] rounded-2xl text-muted-foreground/70 text-[11px]">
+                        <div className="text-center py-8 border border-dashed border-white/[0.08] rounded-xl text-muted-foreground/70 text-[11px]">
                             Couldn&apos;t load this day.
                             <button
                                 onClick={() => load()}
@@ -657,7 +648,7 @@ export function CalendarView() {
                             </button>
                         </div>
                     ) : selectedEvents.length === 0 ? (
-                        <div className="flex flex-col items-center gap-3 py-8 border border-dashed border-white/[0.08] rounded-2xl">
+                        <div className="flex flex-col items-center gap-3 py-8 border border-dashed border-white/[0.08] rounded-xl">
                             <p className="text-muted-foreground/70 text-[11px]">Nothing scheduled.</p>
                             <button
                                 onClick={() => setScheduleOpen(true)}
@@ -681,7 +672,7 @@ export function CalendarView() {
                                 <div
                                     key={e.id}
                                     className={cn(
-                                        'flex items-center gap-3 px-3 py-2.5 rounded-2xl bg-card/40 border border-white/[0.06] backdrop-blur-sm',
+                                        'flex items-center gap-3 px-3 py-2.5 rounded-xl bg-card/40 border border-white/[0.06] backdrop-blur-sm',
                                         e.isCompleted && 'opacity-50'
                                     )}
                                 >

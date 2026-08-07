@@ -1,16 +1,16 @@
 'use client';
 
 import { motion, AnimatePresence } from 'framer-motion';
+import { SOFT } from '@/lib/motion';
 import React, { useEffect, useRef, useState, useCallback, useMemo, useDeferredValue } from 'react';
 import Link from 'next/link';
 import { useUserPreferences } from '@/components/providers/user-preferences-provider';
 import { useWorkspaceTheme } from '@/hooks/useWorkspaceTheme';
 import { supabase } from '@/lib/supabase';
 import { useRefreshRequest } from '@/hooks/useRefreshRequest';
-import { Calendar, ChevronLeft, BookOpen } from 'lucide-react';
+import { Calendar, BookOpen } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { differenceInCalendarDays, parseISO } from 'date-fns';
-import { useRouter } from 'next/navigation';
 import { toast } from '@/utils/haptics';
 import type { SubscriptionMetadata } from '@/types/transaction';
 import { RecurringDetectCard } from '@/components/recurring-detect-card';
@@ -25,11 +25,11 @@ import { SubscriptionRow } from '@/components/subscriptions/subscription-row';
 import { InactiveSubscriptions } from '@/components/subscriptions/inactive-subscriptions';
 import { PriceChangeDialog, CancelSubscriptionDialog } from '@/components/subscriptions/subscription-dialogs';
 import { EditSubscriptionDialog } from '@/components/subscriptions/edit-subscription-dialog';
+import { ViewHeader } from '@/components/ui/view-header';
 
 export function SubscriptionsView() {
     const { userId, formatCurrency, convertAmount, currency, activeWorkspaceId } = useUserPreferences();
     const { theme: themeConfig } = useWorkspaceTheme();
-    const router = useRouter();
 
     const [templates, setTemplates] = useState<Tpl[]>([]);
     const [loading, setLoading] = useState(true);
@@ -425,19 +425,8 @@ export function SubscriptionsView() {
     return (
         <>
             <div className="relative min-h-[100dvh] w-full bg-[radial-gradient(ellipse_90%_60%_at_50%_-10%,_rgba(138,43,226,0.18),_transparent_60%)]">
-                <div className="p-5 space-y-7 max-w-md lg:max-w-2xl mx-auto relative lg:pb-8 z-10">
-                    <div className="relative flex items-center gap-3 min-h-[40px]">
-                        <button
-                            onClick={() => router.back()}
-                            aria-label="Go back"
-                            className="p-2 -ml-2 rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary/30 transition-colors shrink-0 z-10"
-                        >
-                            <ChevronLeft className="w-5 h-5" aria-hidden="true" />
-                        </button>
-                        <h2 className="absolute inset-0 flex items-center justify-center pointer-events-none text-lg font-semibold tracking-tight">
-                            Subscriptions
-                        </h2>
-                    </div>
+                <div className="p-5 space-y-6 max-w-md lg:max-w-2xl mx-auto relative lg:pb-8 z-10">
+                    <ViewHeader title="Subscriptions" onBack />
 
                     {/* While loading, the card would confidently render "$0.00 · 0 active"
                         and then snap to the real figures. A skeleton makes no claim. */}
@@ -536,8 +525,8 @@ export function SubscriptionsView() {
                                         layout
                                         initial={{ opacity: 0, y: 8, scale: 0.98 }}
                                         animate={{ opacity: 1, y: 0, scale: 1 }}
-                                        exit={{ opacity: 0, y: -8, scale: 0.97 }}
-                                        transition={{ type: 'spring', stiffness: 260, damping: 26 }}
+                                        exit={{ opacity: 0, y: -8, scale: 0.98 }}
+                                        transition={SOFT}
                                     >
                                         <SubscriptionRow
                                             template={template}

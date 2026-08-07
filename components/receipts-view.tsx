@@ -2,9 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { useSafeBack } from '@/hooks/useSafeBack';
-import { ChevronLeft, Paperclip, FileWarning, FileText, ImageOff, WifiOff } from 'lucide-react';
+import { Paperclip, FileWarning, FileText, ImageOff, WifiOff } from 'lucide-react';
 import { parseISO } from 'date-fns';
 import { supabase } from '@/lib/supabase';
 import { useRefreshRequest } from '@/hooks/useRefreshRequest';
@@ -15,6 +14,7 @@ import { useReceiptViewer } from '@/hooks/useReceiptViewer';
 import { useFormattedDate } from '@/utils/format-date';
 import { toast } from '@/utils/haptics';
 import { cn } from '@/lib/utils';
+import { ViewHeader } from '@/components/ui/view-header';
 
 /** Server-side cap on the grid. Surfaced in the header only when it actually bites. */
 const RECEIPT_LIMIT = 300;
@@ -29,7 +29,6 @@ interface ReceiptRow {
 }
 
 export function ReceiptsView() {
-    const router = useRouter();
     const goBack = useSafeBack('/');
     const { userId, formatCurrency, activeWorkspaceId } = useUserPreferences();
     const [rows, setRows] = useState<ReceiptRow[]>([]);
@@ -109,22 +108,15 @@ export function ReceiptsView() {
     return (
         <div className="relative min-h-[100dvh] w-full">
             <div className="p-5 space-y-6 max-w-md lg:max-w-4xl mx-auto relative lg:pb-8">
-                <div className="flex items-center justify-between relative min-h-[40px]">
-                    <button
-                        onClick={goBack}
-                        className="min-h-[44px] min-w-[44px] -m-1 inline-flex items-center justify-center rounded-full bg-secondary/30 hover:bg-secondary/50 transition-colors shrink-0 z-10"
-                        aria-label="Go back"
-                    >
-                        <ChevronLeft className="w-5 h-5" />
-                    </button>
-                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                        <h2 className="text-lg font-semibold flex items-center gap-2">
+                <ViewHeader
+                    onBack={goBack}
+                    title={
+                        <span className="inline-flex items-center gap-2">
                             <Paperclip className="w-4 h-4 text-primary" aria-hidden="true" />
                             Receipts
-                        </h2>
-                    </div>
-                    <div className="w-9 shrink-0 z-10" />
-                </div>
+                        </span>
+                    }
+                />
 
                 {!loading && !loadError && rows.length > 0 && (
                     <p className="text-[11px] text-muted-foreground/70 text-center">
@@ -145,12 +137,12 @@ export function ReceiptsView() {
                 {loading ? (
                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                         {Array.from({ length: 6 }).map((_, i) => (
-                            <div key={i} className="aspect-square rounded-2xl bg-secondary/10 animate-pulse" />
+                            <div key={i} className="aspect-square rounded-xl bg-secondary/10 animate-pulse" />
                         ))}
                     </div>
                 ) : loadError ? (
                     <div className="text-center py-20 space-y-3">
-                        <div className="w-12 h-12 rounded-2xl bg-secondary/30 flex items-center justify-center mx-auto">
+                        <div className="w-12 h-12 rounded-xl bg-secondary/30 flex items-center justify-center mx-auto">
                             <WifiOff className="w-5 h-5 text-muted-foreground/70" />
                         </div>
                         <p className="text-sm font-bold">Couldn&apos;t load your receipts</p>
@@ -166,7 +158,7 @@ export function ReceiptsView() {
                     </div>
                 ) : rows.length === 0 ? (
                     <div className="text-center py-20 space-y-3">
-                        <div className="w-12 h-12 rounded-2xl bg-secondary/30 flex items-center justify-center mx-auto">
+                        <div className="w-12 h-12 rounded-xl bg-secondary/30 flex items-center justify-center mx-auto">
                             <ImageOff className="w-5 h-5 text-muted-foreground/70" />
                         </div>
                         <p className="text-sm font-bold">No receipts yet</p>
@@ -221,11 +213,11 @@ function ReceiptCell({
     return (
         <button
             onClick={onOpen}
-            className="text-left group focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 rounded-2xl"
+            className="text-left group focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 rounded-xl"
             aria-label={`Open receipt for ${row.description}`}
         >
             <div className={cn(
-                "aspect-square rounded-2xl border border-white/5 bg-secondary/15 overflow-hidden relative flex items-center justify-center",
+                "aspect-square rounded-xl border border-white/5 bg-secondary/15 overflow-hidden relative flex items-center justify-center",
                 "group-hover:border-white/15 transition-colors"
             )}>
                 {isPdf ? (

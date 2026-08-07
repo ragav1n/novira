@@ -18,7 +18,7 @@ export function TripsView() {
     }, [router]);
 
     return (
-        <div className="flex flex-col min-h-[100dvh] p-5 space-y-6 max-w-md mx-auto pb-32">
+        <div className="flex flex-col min-h-[100dvh] p-5 space-y-6 max-w-md lg:max-w-2xl mx-auto pb-32">
             <div className="flex items-center justify-between pt-2 gap-3">
                 <Button
                     variant="ghost"

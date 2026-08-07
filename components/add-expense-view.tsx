@@ -2,9 +2,10 @@
 
 import React, { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronLeft, CreditCard, Utensils, Car, Zap, ShoppingBag, HeartPulse, Clapperboard, Wallet, Banknote, HelpCircle, Calendar as CalendarIcon, Home, School, LayoutGrid, Building2, MapPin, Shirt, ShoppingCart, LocateFixed, ScanSearch, Sparkles, Camera, Image as ImageIcon, Plane, X, FileText, Loader2 } from 'lucide-react';
+import { CreditCard, Utensils, Car, Zap, ShoppingBag, HeartPulse, Clapperboard, Wallet, Banknote, HelpCircle, Calendar as CalendarIcon, Home, School, LayoutGrid, Building2, MapPin, Shirt, ShoppingCart, LocateFixed, ScanSearch, Sparkles, Camera, Image as ImageIcon, Plane, X, FileText, Loader2 } from 'lucide-react';
 import UniqueLoading from '@/components/ui/grid-loading';
 import { AnimatePresence, motion } from 'framer-motion';
+import { QUICK_FADE } from '@/lib/motion';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { useIsNative } from '@/hooks/use-native';
@@ -26,15 +27,15 @@ import dynamic from 'next/dynamic';
 
 const LocationPicker = dynamic(
     () => import('@/components/ui/location-picker').then(mod => mod.LocationPicker),
-    { ssr: false, loading: () => <div className="h-[72px] rounded-2xl bg-secondary/10 animate-pulse" /> }
+    { ssr: false, loading: () => <div className="h-[72px] rounded-xl bg-secondary/10 animate-pulse" /> }
 );
 const SplitExpenseSection = dynamic(
     () => import('./add-expense/split-expense-section').then(mod => mod.SplitExpenseSection),
-    { ssr: false, loading: () => <div className="h-16 rounded-2xl bg-secondary/10 animate-pulse" /> }
+    { ssr: false, loading: () => <div className="h-16 rounded-xl bg-secondary/10 animate-pulse" /> }
 );
 const RecurringExpenseSection = dynamic(
     () => import('./add-expense/recurring-expense-section').then(mod => mod.RecurringExpenseSection),
-    { ssr: false, loading: () => <div className="h-16 rounded-2xl bg-secondary/10 animate-pulse" /> }
+    { ssr: false, loading: () => <div className="h-16 rounded-xl bg-secondary/10 animate-pulse" /> }
 );
 
 import { CategorySelector, BucketSelector } from './add-expense/selectors';
@@ -67,6 +68,7 @@ import type { GeocodedPlace } from '@/lib/geocode-place';
 import { VoiceReviewModal } from './add-expense/voice-review-modal';
 import { Mic, MicOff, Users } from 'lucide-react';
 import { useRecentSplitPartner } from '@/hooks/useRecentSplitPartner';
+import { ViewHeader } from '@/components/ui/view-header';
 
 const dropdownCategories = SYSTEM_CATEGORIES.map(cat => ({
     id: cat.id,
@@ -478,28 +480,22 @@ export function AddExpenseView() {
 
                 {/* Header */}
                 <div className="space-y-2">
-                    <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3 min-h-[40px]">
-                        <button
-                            onClick={() => {
-                                if (isNative) Haptics.impact({ style: ImpactStyle.Light }).catch(() => { });
-                                router.back();
-                            }}
-                            aria-label="Go back"
-                            className="flex items-center justify-center min-h-[44px] min-w-[44px] rounded-full bg-secondary/30 hover:bg-secondary/50 transition-colors active:scale-[0.92] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
-                        >
-                            <ChevronLeft className="w-5 h-5" />
-                        </button>
-                        <h2 className="text-lg font-bold text-center truncate leading-tight">
-                            Add Expense
-                        </h2>
-                        <button
-                            onClick={onSubmit}
-                            disabled={loading}
-                            className="inline-flex items-center justify-center min-h-[44px] px-4 rounded-full bg-primary/15 border border-primary/30 text-primary text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed hover:bg-primary/20 transition-colors active:scale-[0.95] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
-                        >
-                            {loading ? 'Saving...' : 'Save'}
-                        </button>
-                    </div>
+                    <ViewHeader
+                        title="Add Expense"
+                        onBack={() => {
+                            if (isNative) Haptics.impact({ style: ImpactStyle.Light }).catch(() => { });
+                            router.back();
+                        }}
+                        right={
+                            <button
+                                onClick={onSubmit}
+                                disabled={loading}
+                                className="inline-flex items-center justify-center min-h-[44px] px-4 rounded-full bg-primary/15 border border-primary/30 text-primary text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed hover:bg-primary/20 transition-colors active:scale-[0.95] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+                            >
+                                {loading ? 'Saving...' : 'Save'}
+                            </button>
+                        }
+                    />
                     {formState.selectedBucketId && (() => {
                         const b = buckets.find(x => x.id === formState.selectedBucketId);
                         if (!b) return null;
@@ -537,7 +533,7 @@ export function AddExpenseView() {
                         onClick={() => cameraInputRef.current?.click()}
                         disabled={scanning}
                         aria-label="Scan receipt — take a photo"
-                        className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl border border-primary/30 bg-primary/10 hover:bg-primary/20 transition-all disabled:opacity-50 group active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+                        className="w-full flex items-center gap-3 px-4 py-3 rounded-xl border border-primary/30 bg-primary/10 hover:bg-primary/20 transition-all disabled:opacity-50 group active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
                     >
                         <div className="w-9 h-9 rounded-xl bg-primary/20 border border-primary/30 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
                             <Camera className="w-4 h-4 text-primary" />
@@ -776,7 +772,7 @@ export function AddExpenseView() {
                                 aria-label={isDictating ? 'Stop voice input' : 'Voice input'}
                                 aria-pressed={isDictating}
                                 className={cn(
-                                    "shrink-0 w-14 h-14 rounded-2xl border flex items-center justify-center transition-colors",
+                                    "shrink-0 w-14 h-14 rounded-xl border flex items-center justify-center transition-colors",
                                     isDictating
                                         ? "bg-rose-500/15 border-rose-500/40 text-rose-300"
                                         : "bg-secondary/10 border-white/10 text-muted-foreground hover:text-foreground"
@@ -792,10 +788,10 @@ export function AddExpenseView() {
                                 initial={{ opacity: 0, y: -6, height: 0 }}
                                 animate={{ opacity: 1, y: 0, height: 'auto' }}
                                 exit={{ opacity: 0, y: -6, height: 0 }}
-                                transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+                                transition={QUICK_FADE}
                                 className="overflow-hidden"
                             >
-                                <div className="flex items-center gap-2.5 px-3 py-2 rounded-2xl border border-rose-500/25 bg-rose-500/[0.06] backdrop-blur-sm">
+                                <div className="flex items-center gap-2.5 px-3 py-2 rounded-xl border border-rose-500/25 bg-rose-500/[0.06] backdrop-blur-sm">
                                     {/* Soundwave indicator — 4 bars scaling vertically out of phase */}
                                     <div className="flex items-center gap-[2px] shrink-0 h-4" aria-hidden="true">
                                         {[0, 0.12, 0.24, 0.36].map((delay, i) => (
@@ -847,7 +843,7 @@ export function AddExpenseView() {
                         if (bucket) parts.push(bucket.name);
                         if (parts.length === 0) return null;
                         return (
-                            <div className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-2xl border border-primary/20 bg-primary/10">
+                            <div className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl border border-primary/20 bg-primary/10">
                                 <div className="flex items-center gap-2 min-w-0">
                                     <Sparkles className="w-3.5 h-3.5 text-primary shrink-0" aria-hidden="true" />
                                     <p className="text-[11px] text-primary/90 font-medium truncate">
@@ -980,7 +976,7 @@ export function AddExpenseView() {
                                                     formState.setSuggestedLocations(prev => prev.filter(l => l.name !== loc.name));
                                                 }}
                                                 className={cn(
-                                                    "flex items-center gap-3 px-4 py-3 rounded-2xl border whitespace-nowrap transition-all relative overflow-hidden group/pin shrink-0 snap-start",
+                                                    "flex items-center gap-3 px-4 py-3 rounded-xl border whitespace-nowrap transition-all relative overflow-hidden group/pin shrink-0 snap-start",
                                                     loc.type === 'last' ? "bg-primary/10 border-primary/20 text-primary shadow-[0_4px_12px_rgba(138,43,226,0.1)]" :
                                                     loc.type === 'category' ? "bg-cyan-500/10 border-cyan-500/20 text-cyan-500 shadow-[0_4px_12px_rgba(6,182,212,0.1)]" :
                                                     "bg-secondary/20 border-white/5 text-muted-foreground hover:bg-secondary/30"
@@ -1057,7 +1053,7 @@ export function AddExpenseView() {
                     if (bucket) parts.push(bucket.name);
                     if (parts.length === 0) return null;
                     return (
-                        <div className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-2xl border border-amber-500/20 bg-amber-500/10">
+                        <div className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl border border-amber-500/20 bg-amber-500/10">
                             <div className="flex items-center gap-2 min-w-0">
                                 <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
                                 <p className="text-[11px] text-amber-200/90 font-medium truncate">
@@ -1243,7 +1239,7 @@ export function AddExpenseView() {
                 </div>
 
                 {/* Exclude from Allowance Toggle */}
-                <div className="flex items-center justify-between gap-4 p-4 rounded-2xl bg-secondary/10 border border-white/5">
+                <div className="flex items-center justify-between gap-4 p-4 rounded-xl bg-secondary/10 border border-white/5">
                     <div className="flex items-center gap-2 min-w-0">
                         <PiggyBank className="w-5 h-5 text-cyan-500 shrink-0" />
                         <div className="min-w-0">
@@ -1273,7 +1269,7 @@ export function AddExpenseView() {
                                 formState.setSelectedGroupId(null);
                                 formState.setSelectedFriendIds([partner.id]);
                             }}
-                            className="w-full flex items-center justify-between gap-3 px-4 py-3 rounded-2xl bg-primary/10 border border-primary/25 hover:bg-primary/15 transition-colors text-left active:scale-[0.99]"
+                            className="w-full flex items-center justify-between gap-3 px-4 py-3 rounded-xl bg-primary/10 border border-primary/25 hover:bg-primary/15 transition-colors text-left active:scale-[0.99]"
                             aria-label={`Quick split 50/50 with ${partner.full_name}`}
                         >
                             <div className="flex items-center gap-3 min-w-0">

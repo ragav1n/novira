@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 
 import React, { useCallback, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ChevronLeft, Plus, UserPlus } from 'lucide-react';
+import { Plus, UserPlus } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from '@/lib/utils';
 import { useGroups } from './providers/groups-provider';
@@ -21,6 +21,7 @@ import { FriendsTabContent } from './groups/friends-tab-content';
 import { SettlementsTabContent } from './groups/settlements-tab-content';
 import { TripsTabContent } from './groups/trips-tab-content';
 import { GroupsSkeleton } from './groups/groups-skeleton';
+import { ViewHeader } from '@/components/ui/view-header';
 
 const VALID_TABS = ['groups', 'personal', 'friends', 'trips', 'settlements'] as const;
 type GroupsTab = typeof VALID_TABS[number];
@@ -76,42 +77,35 @@ export function GroupsView() {
 
     return (
         <div className="relative min-h-[100dvh] w-full bg-[radial-gradient(ellipse_90%_60%_at_50%_-10%,_rgba(138,43,226,0.18),_transparent_60%)]">
-            <div className="p-5 space-y-7 max-w-md lg:max-w-2xl mx-auto relative lg:pb-8">
-                {/* Header */}
-                <div className="relative flex items-center gap-3 min-h-[40px]">
-                    <button
-                        onClick={() => router.back()}
-                        aria-label="Go back"
-                        className="min-h-[44px] min-w-[44px] -ml-2 inline-flex items-center justify-center rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary/30 transition-colors shrink-0 z-10"
-                    >
-                        <ChevronLeft className="w-5 h-5" aria-hidden="true" />
-                    </button>
-                    <h1 className="absolute inset-0 flex items-center justify-center pointer-events-none text-lg font-semibold tracking-tight">
-                        Groups &amp; friends
-                    </h1>
-                    <div className="flex items-center gap-1.5 ml-auto z-10">
-                        <AddFriendDialog userId={userId} open={addFriendOpen} onOpenChange={setAddFriendOpen} />
-                        <GroupCreationDialog open={createGroupOpen} onOpenChange={setCreateGroupOpen} />
-                        {showGroupHeaderActions && (
-                            <>
-                                <button
-                                    onClick={() => setAddFriendOpen(true)}
-                                    aria-label="Add friend"
-                                    className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-full text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
-                                >
-                                    <UserPlus className="w-[18px] h-[18px]" aria-hidden="true" />
-                                </button>
-                                <button
-                                    onClick={() => setCreateGroupOpen(true)}
-                                    aria-label="Create group"
-                                    className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-full text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
-                                >
-                                    <Plus className="w-[18px] h-[18px]" aria-hidden="true" />
-                                </button>
-                            </>
-                        )}
-                    </div>
-                </div>
+            <div className="p-5 space-y-6 max-w-md lg:max-w-2xl mx-auto relative lg:pb-8">
+                <ViewHeader
+                    title="Groups & friends"
+                    onBack
+                    right={
+                        <>
+                            <AddFriendDialog userId={userId} open={addFriendOpen} onOpenChange={setAddFriendOpen} />
+                            <GroupCreationDialog open={createGroupOpen} onOpenChange={setCreateGroupOpen} />
+                            {showGroupHeaderActions && (
+                                <>
+                                    <button
+                                        onClick={() => setAddFriendOpen(true)}
+                                        aria-label="Add friend"
+                                        className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-full text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+                                    >
+                                        <UserPlus className="w-[18px] h-[18px]" aria-hidden="true" />
+                                    </button>
+                                    <button
+                                        onClick={() => setCreateGroupOpen(true)}
+                                        aria-label="Create group"
+                                        className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-full text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+                                    >
+                                        <Plus className="w-[18px] h-[18px]" aria-hidden="true" />
+                                    </button>
+                                </>
+                            )}
+                        </>
+                    }
+                />
 
                 {showSkeleton ? (
                     <GroupsSkeleton />
@@ -357,7 +351,7 @@ function FirstTimeBlock({
             <div className="grid grid-cols-2 gap-2">
                 <button
                     onClick={onAddFriend}
-                    className="group flex flex-col gap-2 p-4 rounded-2xl bg-white/[0.035] border border-white/10 hover:border-primary/30 hover:bg-primary/[0.06] transition-colors text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]"
+                    className="group flex flex-col gap-2 p-4 rounded-xl bg-white/[0.035] border border-white/10 hover:border-primary/30 hover:bg-primary/[0.06] transition-colors text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]"
                 >
                     <UserPlus className="w-4 h-4 text-primary" aria-hidden="true" />
                     <span className="text-[13px] font-semibold">Add a friend</span>
@@ -365,7 +359,7 @@ function FirstTimeBlock({
                 </button>
                 <button
                     onClick={onCreateGroup}
-                    className="group flex flex-col gap-2 p-4 rounded-2xl bg-white/[0.035] border border-white/10 hover:border-primary/30 hover:bg-primary/[0.06] transition-colors text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]"
+                    className="group flex flex-col gap-2 p-4 rounded-xl bg-white/[0.035] border border-white/10 hover:border-primary/30 hover:bg-primary/[0.06] transition-colors text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]"
                 >
                     <Plus className="w-4 h-4 text-primary" aria-hidden="true" />
                     <span className="text-[13px] font-semibold">Create a group</span>

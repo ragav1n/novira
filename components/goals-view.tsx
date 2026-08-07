@@ -1,6 +1,7 @@
 'use client';
 
 import { motion, AnimatePresence } from 'framer-motion';
+import { SOFT } from '@/lib/motion';
 
 import React, { useCallback, useEffect, useMemo, useRef, useState, useDeferredValue } from 'react';
 import Link from 'next/link';
@@ -9,12 +10,11 @@ import { useWorkspaceTheme } from '@/hooks/useWorkspaceTheme';
 import { supabase } from '@/lib/supabase';
 import { useRefreshRequest } from '@/hooks/useRefreshRequest';
 import {
-    Target, Plus, ChevronLeft, Calendar, PiggyBank, Search, X, ArrowUpDown, Check,
+    Target, Plus, Calendar, PiggyBank, Search, X, ArrowUpDown, Check,
     ChevronDown, BookOpen, WifiOff,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format, parseISO } from 'date-fns';
-import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
@@ -41,6 +41,7 @@ const GoalHistorySheet = dynamic(
 );
 import { IconColorPicker } from '@/components/goals/icon-color-picker';
 import { resolveGoalColor, resolveGoalIcon } from '@/lib/goal-styles';
+import { ViewHeader } from '@/components/ui/view-header';
 
 type SortBy = 'deadline' | 'progress' | 'remaining' | 'name' | 'recent';
 type FilterKey = 'all' | 'in-progress' | 'due-soon' | 'overdue';
@@ -62,7 +63,6 @@ const FILTER_LABELS: Record<FilterKey, string> = {
 
 export function GoalsView() {
     const { userId, formatCurrency, currency, activeWorkspaceId, convertAmount } = useUserPreferences();
-    const router = useRouter();
     const { theme: themeConfig } = useWorkspaceTheme('emerald');
 
     const [goals, setGoals] = useState<SavingsGoal[]>([]);
@@ -520,19 +520,11 @@ export function GoalsView() {
 
     return (
         <div className="relative min-h-[100dvh] w-full bg-[radial-gradient(ellipse_90%_60%_at_50%_-10%,_rgba(138,43,226,0.18),_transparent_60%)]">
-            <div className="p-5 space-y-7 max-w-md lg:max-w-2xl mx-auto relative lg:pb-8 z-10">
-                <div className="relative flex items-center gap-3 min-h-[40px]">
-                    <button
-                        onClick={() => router.back()}
-                        aria-label="Go back"
-                        className="min-h-[44px] min-w-[44px] -ml-2 inline-flex items-center justify-center rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary/30 transition-colors shrink-0 z-10"
-                    >
-                        <ChevronLeft className="w-5 h-5" aria-hidden="true" />
-                    </button>
-                    <h1 className="absolute inset-0 flex items-center justify-center pointer-events-none text-lg font-semibold tracking-tight">
-                        Savings Goals
-                    </h1>
-                    <div className="ml-auto z-10">
+            <div className="p-5 space-y-6 max-w-md lg:max-w-2xl mx-auto relative lg:pb-8 z-10">
+                <ViewHeader
+                    title="Savings Goals"
+                    onBack
+                    right={
                         <button
                             onClick={openAddModal}
                             aria-label="Add savings goal"
@@ -544,8 +536,8 @@ export function GoalsView() {
                             <Plus className="w-3.5 h-3.5" aria-hidden="true" />
                             New
                         </button>
-                    </div>
-                </div>
+                    }
+                />
 
                 {/* "$0.00 saved · 0 goals" is a claim about the user's money. Suppress it
                     while loading and after a failed fetch — otherwise the header keeps
@@ -557,7 +549,7 @@ export function GoalsView() {
                         </p>
                         {loading ? (
                             <div className="flex justify-center py-1">
-                                <div className="h-10 w-40 rounded-2xl bg-secondary/20 animate-pulse" />
+                                <div className="h-10 w-40 rounded-xl bg-secondary/20 animate-pulse" />
                             </div>
                         ) : (
                             <>
@@ -713,14 +705,17 @@ export function GoalsView() {
                     ) : (
                         <>
                             <AnimatePresence initial={false} mode="popLayout">
-                                {activeGoals.map((goal, i) => (
+                                {activeGoals.map((goal) => (
                                     <motion.div
                                         key={goal.id}
                                         layout
                                         initial={{ opacity: 0, y: 8, scale: 0.98 }}
                                         animate={{ opacity: 1, y: 0, scale: 1 }}
                                         exit={{ opacity: 0, y: -8, scale: 0.98 }}
-                                        transition={{ type: 'spring', stiffness: 260, damping: 26, delay: Math.min(i * 0.04, 0.24) }}
+                                        // No index stagger: `layout` makes this transition fire on
+                                        // reorders too, so a per-index delay made resorting the list
+                                        // ripple instead of move. Matches subscriptions-view.
+                                        transition={SOFT}
                                     >
                                         <GoalCard
                                             goal={goal}
@@ -758,7 +753,7 @@ export function GoalsView() {
                                     <CollapsibleTrigger asChild>
                                         <button
                                             type="button"
-                                            className="w-full flex items-center justify-between gap-2 px-4 py-3 rounded-2xl bg-card/40 backdrop-blur-xl border border-white/[0.06] text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors"
+                                            className="w-full flex items-center justify-between gap-2 px-4 py-3 rounded-xl bg-card/40 backdrop-blur-xl border border-white/[0.06] text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors"
                                         >
                                             <span>Achieved ({achievedGoals.length})</span>
                                             <ChevronDown className={cn('w-4 h-4 transition-transform', showAchieved && 'rotate-180')} aria-hidden="true" />
@@ -851,7 +846,7 @@ export function GoalsView() {
                         </div>
                         <div className="space-y-1.5">
                             <Label className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">Appearance</Label>
-                            <div className="rounded-2xl bg-secondary/10 border border-white/5 p-3">
+                            <div className="rounded-xl bg-secondary/10 border border-white/5 p-3">
                                 <IconColorPicker
                                     icon={goalIcon}
                                     color={goalColor}

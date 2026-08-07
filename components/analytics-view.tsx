@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
-import { ChevronLeft, ChartLine, Plus } from 'lucide-react';
+import { ChartLine, Plus } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
@@ -33,18 +33,18 @@ import { AnalyticsHero } from '@/components/analytics/analytics-hero';
 import { SectionLabel } from '@/components/analytics/section-label';
 const SpendingTrendCard = dynamic(
     () => import('@/components/analytics/spending-trend-card').then(m => m.SpendingTrendCard),
-    { ssr: false, loading: () => <div className="h-[260px] w-full animate-pulse rounded-2xl bg-card/40" /> }
+    { ssr: false, loading: () => <div className="h-[260px] w-full animate-pulse rounded-xl bg-card/40" /> }
 );
 import { WeekdayChartCard } from '@/components/analytics/weekday-chart-card';
 import { TopMerchantsCard } from '@/components/analytics/top-merchants-card';
 import { LargestTransactionsCard } from '@/components/analytics/largest-transactions-card';
 const CategoryBreakdownCard = dynamic(
     () => import('@/components/analytics/category-breakdown-card').then(m => m.CategoryBreakdownCard),
-    { ssr: false, loading: () => <div className="h-[220px] w-full animate-pulse rounded-2xl bg-card/40" /> }
+    { ssr: false, loading: () => <div className="h-[220px] w-full animate-pulse rounded-xl bg-card/40" /> }
 );
 const PaymentBreakdownCard = dynamic(
     () => import('@/components/analytics/payment-breakdown-card').then(m => m.PaymentBreakdownCard),
-    { ssr: false, loading: () => <div className="h-[220px] w-full animate-pulse rounded-2xl bg-card/40" /> }
+    { ssr: false, loading: () => <div className="h-[220px] w-full animate-pulse rounded-xl bg-card/40" /> }
 );
 import { RecurringSplitCard } from '@/components/analytics/recurring-split-card';
 import { TagsFilterCard } from '@/components/analytics/tags-filter-card';
@@ -53,6 +53,7 @@ import { LocationInsightsCard } from '@/components/analytics/location-insights-c
 import { InsightsChatCard } from '@/components/analytics/insights-chat-card';
 import { LazyMount } from '@/components/analytics/lazy-mount';
 import { WhatIfCard } from '@/components/analytics/what-if-card';
+import { ViewHeader } from '@/components/ui/view-header';
 
 function BucketIcon({ icon, className }: { icon?: string; className?: string }) {
     const el = getIconForCategory(icon || 'Tag') as React.ReactElement<{ className?: string }>;
@@ -354,23 +355,16 @@ export function AnalyticsView() {
     return (
         <div className="relative min-h-[100dvh]">
             <div className={cn(
-                'p-5 space-y-5 max-w-md lg:max-w-5xl mx-auto relative transition-all duration-300',
+                'p-5 space-y-6 max-w-md lg:max-w-4xl mx-auto relative transition-all duration-300',
                 loading ? 'opacity-50 blur-[2px] pointer-events-none' : 'opacity-100 blur-0'
             )}>
                 {/* Sticky Header — slim: back / title / period badge + total chip when scrolled */}
                 <div className="sticky top-0 z-20 -mx-5 px-5 py-2 bg-background/85 backdrop-blur-xl border-b border-white/[0.05]">
-                    <div className="flex items-center justify-between relative min-h-[40px]">
-                        <button
-                            onClick={() => router.back()}
-                            aria-label="Back"
-                            className="p-1.5 rounded-full bg-secondary/30 hover:bg-secondary/50 transition-colors shrink-0 z-10"
-                        >
-                            <ChevronLeft className="w-5 h-5" />
-                        </button>
-                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none gap-2">
-                            <h2 className="text-lg font-semibold truncate text-center leading-tight">Analytics</h2>
-                        </div>
-                        <div className="flex items-center gap-1.5 shrink-0 z-10">
+                    <ViewHeader
+                        title="Analytics"
+                        onBack
+                        right={
+                            <>
                             {!loading && totalSpentInRange > 0 && (
                                 <span className={cn(
                                     'text-[10px] font-bold tabular-nums px-2 py-0.5 rounded-md border',
@@ -384,8 +378,9 @@ export function AnalyticsView() {
                             <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-secondary/30 text-muted-foreground">
                                 {dateRange === 'ALL' ? 'All' : dateRange}
                             </span>
-                        </div>
-                    </div>
+                            </>
+                        }
+                    />
                 </div>
 
                 {/* Filters Row */}
@@ -542,7 +537,7 @@ export function AnalyticsView() {
                                     <CardContent className="p-4 flex items-center justify-between">
                                         <div className="flex items-center gap-3">
                                             <div className={cn(
-                                                'w-10 h-10 rounded-2xl flex items-center justify-center border',
+                                                'w-10 h-10 rounded-xl flex items-center justify-center border',
                                                 themeConfig.bgMedium,
                                                 themeConfig.text,
                                                 themeConfig.borderMedium,
@@ -570,7 +565,7 @@ export function AnalyticsView() {
                         {transactions.length === 0 ? (
                             <Card className="bg-card/40 border-white/5 shadow-none">
                                 <CardContent className="p-8 flex flex-col items-center justify-center text-center space-y-3">
-                                    <div className="w-12 h-12 rounded-2xl bg-secondary/30 flex items-center justify-center mb-1">
+                                    <div className="w-12 h-12 rounded-xl bg-secondary/30 flex items-center justify-center mb-1">
                                         <ChartLine className="w-5 h-5 text-muted-foreground/70" />
                                     </div>
                                     <p className="text-sm font-bold">No transactions in this range</p>
