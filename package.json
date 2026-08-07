@@ -1,12 +1,12 @@
 {
   "name": "novira",
-  "version": "2.103.0",
+  "version": "2.103.1",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "node scripts/inject-sw-version.js && next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage"
@@ -104,6 +104,8 @@
     "@types/react-dropzone": "^4.2.2",
     "@types/web-push": "^3.6.4",
     "baseline-browser-mapping": "^2.9.19",
+    "eslint": "^9.39.5",
+    "eslint-config-next": "^16.3.0",
     "jsdom": "^29.0.1",
     "postcss": "^8.5",
     "tailwindcss": "^4.1.9",

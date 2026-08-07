@@ -3,7 +3,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient as createServiceClient } from '@supabase/supabase-js';
 import { authorizeCron } from '@/lib/server/push';
 import { generateRecap, VALID_PERIOD_RE } from '@/lib/recap-generator';
-// eslint-disable-next-line @typescript-eslint/no-require-imports
 const webpush = require('web-push') as typeof import('web-push');
 
 export const maxDuration = 60;

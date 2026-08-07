@@ -4,7 +4,6 @@ import { createClient as createServiceClient } from '@supabase/supabase-js';
 import { isInQuietHours } from '@/lib/push-quiet-hours';
 import { authorizeCron } from '@/lib/server/push';
 import { logSend } from '@/lib/server/send-log';
-// eslint-disable-next-line @typescript-eslint/no-require-imports
 const webpush = require('web-push') as typeof import('web-push');
 
 /**

@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { safeEqual } from '@/lib/server/secrets';
 import { checkRateLimit, rateLimitResponse } from '@/lib/server/rate-limit';
-// eslint-disable-next-line @typescript-eslint/no-require-imports
 const webpush = require('web-push') as typeof import('web-push');
 import { createClient as createServiceClient } from '@supabase/supabase-js';
 
