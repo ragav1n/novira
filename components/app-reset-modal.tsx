@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import { MODAL } from '@/lib/motion';
 import { Wrench, ShieldCheck, LogIn, Settings as SettingsIcon, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -121,7 +122,7 @@ export function AppResetModal() {
                         initial={{ opacity: 0, scale: 0.9, y: 30 }}
                         animate={{ opacity: 1, scale: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.9, y: 30 }}
-                        transition={{ type: 'spring', stiffness: 300, damping: 30, mass: 0.8 }}
+                        transition={MODAL}
                         className="relative w-full max-w-sm bg-[#0D0D0F]/98 backdrop-blur-xl border border-white/10 rounded-[2.5rem] shadow-[0_0_80px_-15px_rgba(138,43,226,0.4)] overflow-hidden z-[1100] mx-4 flex flex-col max-h-[90dvh]"
                     >
                         {/* Glows */}
@@ -135,7 +136,7 @@ export function AppResetModal() {
                                 initial={{ scale: 0.6, opacity: 0 }}
                                 animate={{ scale: 1, opacity: 1 }}
                                 transition={{ type: 'spring', stiffness: 300, damping: 20, delay: 0.1 }}
-                                className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/20 to-purple-500/20 flex items-center justify-center border border-white/10"
+                                className="w-16 h-16 rounded-xl bg-gradient-to-br from-primary/20 to-purple-500/20 flex items-center justify-center border border-white/10"
                             >
                                 <Wrench className="w-7 h-7 text-primary" />
                             </motion.div>
@@ -166,19 +167,19 @@ export function AppResetModal() {
                                 transition={{ delay: 0.3 }}
                                 className="w-full space-y-3 text-left"
                             >
-                                <div className="flex items-start gap-3 p-3 rounded-2xl bg-white/5 border border-white/10">
+                                <div className="flex items-start gap-3 p-3 rounded-xl bg-white/5 border border-white/10">
                                     <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
                                     <p className="text-xs text-white/70 leading-relaxed">
                                         Your data is safe. This only clears the app&apos;s local cache, not your account or transactions.
                                     </p>
                                 </div>
-                                <div className="flex items-start gap-3 p-3 rounded-2xl bg-white/5 border border-white/10">
+                                <div className="flex items-start gap-3 p-3 rounded-xl bg-white/5 border border-white/10">
                                     <LogIn className="w-4 h-4 text-sky-400 shrink-0 mt-0.5" />
                                     <p className="text-xs text-white/70 leading-relaxed">
                                         You&apos;ll be signed back in with everything intact. Takes less than a second.
                                     </p>
                                 </div>
-                                <div className="flex items-start gap-3 p-3 rounded-2xl bg-white/5 border border-white/10">
+                                <div className="flex items-start gap-3 p-3 rounded-xl bg-white/5 border border-white/10">
                                     <SettingsIcon className="w-4 h-4 text-violet-400 shrink-0 mt-0.5" />
                                     <p className="text-xs text-white/70 leading-relaxed">
                                         If the app ever feels off, you can run this again from Settings &rsaquo; Reset App.
@@ -195,7 +196,7 @@ export function AppResetModal() {
                                 <Button
                                     onClick={handleReset}
                                     disabled={resetting}
-                                    className="w-full bg-white text-black hover:bg-white/90 font-black h-14 rounded-2xl shadow-xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] text-sm tracking-widest uppercase disabled:opacity-70 disabled:hover:scale-100"
+                                    className="w-full bg-white text-black hover:bg-white/90 font-black h-14 rounded-xl shadow-xl transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] text-sm tracking-widest uppercase disabled:opacity-70 disabled:hover:scale-100"
                                 >
                                     {resetting ? (
                                         <span className="flex items-center gap-2">

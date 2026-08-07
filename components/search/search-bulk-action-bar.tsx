@@ -6,6 +6,7 @@
 // embeds its own category/bucket/account pickers.
 
 import { motion, AnimatePresence } from 'framer-motion';
+import { SHEET } from '@/lib/motion';
 import { CheckSquare, Tag, Trash2, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -36,7 +37,7 @@ export function SearchBulkActionBar({
                     initial={{ y: 60, opacity: 0 }}
                     animate={{ y: 0, opacity: 1 }}
                     exit={{ y: 60, opacity: 0 }}
-                    transition={{ type: 'spring', stiffness: 280, damping: 28 }}
+                    transition={SHEET}
                     className="fixed bottom-20 lg:bottom-6 left-1/2 -translate-x-1/2 z-[80] flex items-center gap-2 px-3 py-2 rounded-full bg-card/90 backdrop-blur-xl border border-white/[0.06] shadow-2xl max-w-[calc(100vw-1rem)] flex-wrap justify-center"
                 >
                     <span className="text-[11px] font-semibold uppercase tracking-[0.14em] px-2 text-muted-foreground/80 tabular-nums">{selectedCount} selected</span>

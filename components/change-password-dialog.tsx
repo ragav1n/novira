@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { ICON_POP } from '@/lib/motion';
 import { Lock, Eye, EyeClosed, X } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { toast } from '@/utils/haptics';
@@ -122,10 +123,10 @@ export function ChangePasswordDialog({ trigger, mode = 'change', onSuccess }: Ch
 
                 <div className="relative group">
                     {/* Card border glow - cosmic purple */}
-                    <div className="absolute -inset-[1px] rounded-2xl bg-gradient-to-r from-primary/10 via-primary/30 to-primary/10 opacity-70 blur-sm pointer-events-none" />
+                    <div className="absolute -inset-[1px] rounded-xl bg-gradient-to-r from-primary/10 via-primary/30 to-primary/10 opacity-70 blur-sm pointer-events-none" />
 
                     {/* Glass card background - cosmic theme */}
-                    <div className="relative bg-black/80 backdrop-blur-xl rounded-2xl p-6 border border-white/10 shadow-2xl overflow-hidden">
+                    <div className="relative bg-black/80 backdrop-blur-xl rounded-xl p-6 border border-white/10 shadow-2xl overflow-hidden">
 
                         {/* Close button */}
                         <button
@@ -154,7 +155,7 @@ export function ChangePasswordDialog({ trigger, mode = 'change', onSuccess }: Ch
                                     className={`relative ${focusedInput === "currentPassword" ? 'z-10' : ''}`}
                                     whileFocus={{ scale: 1.02 }}
                                     whileHover={{ scale: 1.01 }}
-                                    transition={{ type: "spring", stiffness: 400, damping: 25 }}
+                                    transition={ICON_POP}
                                 >
                                     <div className="absolute -inset-[0.5px] bg-gradient-to-r from-primary/20 via-primary/10 to-primary/20 rounded-lg opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none" />
 
@@ -194,7 +195,7 @@ export function ChangePasswordDialog({ trigger, mode = 'change', onSuccess }: Ch
                                 className={`relative ${focusedInput === "password" ? 'z-10' : ''}`}
                                 whileFocus={{ scale: 1.02 }}
                                 whileHover={{ scale: 1.01 }}
-                                transition={{ type: "spring", stiffness: 400, damping: 25 }}
+                                transition={ICON_POP}
                             >
                                 <div className="absolute -inset-[0.5px] bg-gradient-to-r from-primary/20 via-primary/10 to-primary/20 rounded-lg opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none" />
 
@@ -233,7 +234,7 @@ export function ChangePasswordDialog({ trigger, mode = 'change', onSuccess }: Ch
                                 className={`relative ${focusedInput === "confirmPassword" ? 'z-10' : ''}`}
                                 whileFocus={{ scale: 1.02 }}
                                 whileHover={{ scale: 1.01 }}
-                                transition={{ type: "spring", stiffness: 400, damping: 25 }}
+                                transition={ICON_POP}
                             >
                                 <div className="absolute -inset-[0.5px] bg-gradient-to-r from-primary/20 via-primary/10 to-primary/20 rounded-lg opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none" />
 

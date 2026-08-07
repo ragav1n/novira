@@ -3,6 +3,7 @@ import { Check, X } from 'lucide-react';
 import { PasswordStrength, validatePassword } from '@/utils/password-validation';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
+import { EASE_OUT_SOFT } from '@/lib/motion';
 
 interface PasswordRequirementsProps {
     password?: string;
@@ -33,8 +34,8 @@ export function PasswordRequirements({ password = '', showIfEmpty = false }: Pas
                     initial={{ opacity: 0, y: -10, filter: 'blur(10px)' }}
                     animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
                     exit={{ opacity: 0, y: -10, filter: 'blur(10px)' }}
-                    transition={{ duration: 0.4, ease: [0.23, 1, 0.32, 1] }}
-                    className="space-y-3 p-4 rounded-2xl bg-card/40 backdrop-blur-xl border border-white/10 shadow-xl overflow-hidden relative"
+                    transition={{ duration: 0.4, ease: EASE_OUT_SOFT }}
+                    className="space-y-3 p-4 rounded-xl bg-card/40 backdrop-blur-xl border border-white/10 shadow-xl overflow-hidden relative"
                 >
                     <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-primary/50 to-transparent" />
                     

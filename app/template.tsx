@@ -2,6 +2,7 @@
 
 import { usePathname } from 'next/navigation';
 import { motion } from 'framer-motion';
+import { EASE_OUT_SOFT } from '@/lib/motion';
 
 export default function Template({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
@@ -21,7 +22,7 @@ export default function Template({ children }: { children: React.ReactNode }) {
             exit={{ opacity: 0 }}
             transition={{
                 duration: 0.3,
-                ease: [0.23, 1, 0.32, 1],
+                ease: EASE_OUT_SOFT,
             }}
             className="flex-1 flex flex-col w-full h-full"
         >

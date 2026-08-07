@@ -5,6 +5,7 @@ import { Analytics } from '@vercel/analytics/next'
 import { SpeedInsights } from '@vercel/speed-insights/next'
 import './globals.css'
 import { MotionConfig } from 'framer-motion'
+import { SOFT } from '@/lib/motion'
 import { MobileLayout } from '@/components/mobile-layout'
 import { UserPreferencesProvider } from '@/components/providers/user-preferences-provider'
 import { GroupsProvider } from '@/components/providers/groups-provider'
@@ -93,7 +94,12 @@ export default async function RootLayout({
           Skip to main content
         </a>
         <ErrorBoundary>
-          <MotionConfig reducedMotion="user">
+          {/* `transition={SOFT}` is the house default for every motion element that
+              doesn't declare its own — without it Framer falls back to its internal
+              default, which is why sibling cards on one screen used to enter with
+              visibly different physics. Reach for a named token in lib/motion.ts
+              before overriding this. */}
+          <MotionConfig transition={SOFT} reducedMotion="user">
             <UserPreferencesProvider>
               <GroupsProvider>
                 <WorkspaceThemeProvider />

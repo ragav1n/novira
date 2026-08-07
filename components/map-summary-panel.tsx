@@ -1,5 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
+import { SHEET } from '@/lib/motion';
 import { X, Trophy } from 'lucide-react';
 import { CATEGORY_COLORS, getCategoryLabel } from '@/lib/categories';
 import type { TopPlace } from '@/hooks/useMapData';
@@ -27,8 +28,8 @@ export function MapSummaryPanel({ open, onClose, topPlaces, totalLabel, formatCu
                     initial={{ y: 320, opacity: 0 }}
                     animate={{ y: 0, opacity: 1 }}
                     exit={{ y: 320, opacity: 0 }}
-                    transition={reduceMotion ? { duration: 0 } : { type: 'spring', damping: 28, stiffness: 320 }}
-                    className="absolute bottom-4 left-4 right-4 sm:left-auto sm:right-6 sm:w-[360px] z-40 max-h-[55vh] overflow-hidden flex flex-col rounded-2xl bg-card/95 backdrop-blur-xl border border-white/10 shadow-2xl"
+                    transition={reduceMotion ? { duration: 0 } : SHEET}
+                    className="absolute bottom-4 left-4 right-4 sm:left-auto sm:right-6 sm:w-[360px] z-40 max-h-[55vh] overflow-hidden flex flex-col rounded-xl bg-card/95 backdrop-blur-xl border border-white/10 shadow-2xl"
                 >
                     <div className="p-4 border-b border-white/10 flex items-center justify-between bg-card/80 sticky top-0">
                         <div className="flex items-center gap-2 min-w-0">

@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { MODAL } from '@/lib/motion';
 import { X, ChartLine, Sparkles, PencilLine } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useUserPreferences } from '@/components/providers/user-preferences-provider';
@@ -11,7 +12,7 @@ import { RecapBody, RecapSkeleton, formatRecapPeriod, type RecapData, type Recap
 function RecapEmpty({ monthLabel, onAdd }: { monthLabel: string; onAdd: () => void }) {
     return (
         <div className="space-y-3 py-2">
-            <div className="rounded-2xl bg-secondary/30 border border-white/10 p-4 text-center space-y-1">
+            <div className="rounded-xl bg-secondary/30 border border-white/10 p-4 text-center space-y-1">
                 <p className="text-[13px] font-semibold text-foreground">Nothing to recap for {monthLabel}.</p>
                 <p className="text-[11px] text-muted-foreground">Log a few expenses and we'll have a real story for you next time.</p>
             </div>
@@ -164,7 +165,7 @@ export function MonthlyRecapModal() {
                         initial={{ y: 40, opacity: 0, scale: 0.98 }}
                         animate={{ y: 0, opacity: 1, scale: 1 }}
                         exit={{ y: 30, opacity: 0, scale: 0.98 }}
-                        transition={{ type: 'spring', damping: 24, stiffness: 280 }}
+                        transition={MODAL}
                         onClick={(e) => e.stopPropagation()}
                         className="w-full sm:max-w-lg max-h-[92vh] overflow-y-auto"
                     >
@@ -172,7 +173,7 @@ export function MonthlyRecapModal() {
                             <div className="p-5 sm:p-6 space-y-4">
                                 <div className="flex items-start justify-between gap-3">
                                     <div className="flex items-center gap-2.5">
-                                        <div className="w-10 h-10 rounded-2xl bg-primary/30 border border-primary/50 flex items-center justify-center shadow-[0_0_22px_-4px_rgba(168,85,247,0.7)]">
+                                        <div className="w-10 h-10 rounded-xl bg-primary/30 border border-primary/50 flex items-center justify-center shadow-[0_0_22px_-4px_rgba(168,85,247,0.7)]">
                                             <Sparkles className="w-[18px] h-[18px] text-primary-foreground" />
                                         </div>
                                         <div>

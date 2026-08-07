@@ -2,6 +2,7 @@ import React, { useState, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { Receipt, CheckSquare } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
+import { ROW } from '@/lib/motion';
 import { TransactionRow } from '@/components/transaction-row';
 import { BulkActionBar } from '@/components/bulk-action-bar';
 import { CATEGORY_COLORS } from '@/lib/categories';
@@ -137,9 +138,9 @@ export const TransactionList = React.memo(function TransactionList({
   if (loading && transactions.length === 0) {
     return (
       <div className="space-y-2 py-2" role="status" aria-label="Loading transactions">
-        <div className="h-16 rounded-2xl bg-secondary/10 animate-pulse" />
-        <div className="h-16 rounded-2xl bg-secondary/10 animate-pulse" />
-        <div className="h-16 rounded-2xl bg-secondary/10 animate-pulse" />
+        <div className="h-16 rounded-xl bg-secondary/10 animate-pulse" />
+        <div className="h-16 rounded-xl bg-secondary/10 animate-pulse" />
+        <div className="h-16 rounded-xl bg-secondary/10 animate-pulse" />
       </div>
     );
   }
@@ -147,7 +148,7 @@ export const TransactionList = React.memo(function TransactionList({
   if (transactions.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-14 px-6 text-center">
-        <div className="w-14 h-14 rounded-2xl bg-secondary/20 border border-white/5 flex items-center justify-center mb-3">
+        <div className="w-14 h-14 rounded-xl bg-secondary/20 border border-white/5 flex items-center justify-center mb-3">
           <Receipt className="w-6 h-6 text-muted-foreground/50" strokeWidth={1.75} />
         </div>
         <p className="text-sm font-bold text-muted-foreground/80">No transactions yet</p>
@@ -210,8 +211,11 @@ export const TransactionList = React.memo(function TransactionList({
             <motion.div
               key={tx.id}
               initial={false}
+              // `height`/`marginTop` are layout properties, but this exit only runs
+              // for a single deleted row — without the collapse the list snaps shut
+              // after the fade. Kept deliberately; don't copy it to bulk-swap lists.
               exit={{ opacity: 0, height: 0, marginTop: 0, scale: 0.97 }}
-              transition={{ duration: 0.26, ease: [0.22, 1, 0.36, 1] }}
+              transition={ROW}
               style={{ contentVisibility: 'auto', containIntrinsicSize: '0 64px', overflow: 'hidden' }}
             >
               <TransactionRow

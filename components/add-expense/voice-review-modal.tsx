@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { AnimatePresence, motion } from 'framer-motion';
+import { SHEET } from '@/lib/motion';
 import { AudioLines, Check, X, Banknote, CreditCard, Smartphone, Landmark, MapPin } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { CATEGORIES, CATEGORY_COLORS, getIconForCategory } from '@/lib/categories';
@@ -56,7 +57,7 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
 }
 
 const inputClass =
-    'w-full rounded-2xl border border-white/10 bg-secondary/10 px-3.5 py-3 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/40 focus:border-rose-400/40';
+    'w-full rounded-xl border border-white/10 bg-secondary/10 px-3.5 py-3 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/40 focus:border-rose-400/40';
 
 export function VoiceReviewModal({ parsed, currentCurrency, proximity, onApply, onDiscard }: VoiceReviewModalProps) {
     const [amount, setAmount] = useState('');
@@ -168,7 +169,7 @@ export function VoiceReviewModal({ parsed, currentCurrency, proximity, onApply, 
                                 initial={{ y: '102%' }}
                                 animate={{ y: 0 }}
                                 exit={{ y: '102%' }}
-                                transition={{ type: 'spring', stiffness: 340, damping: 34 }}
+                                transition={SHEET}
                             >
                                 {/* Rose glow bleeding from the top edge */}
                                 <div
@@ -183,10 +184,10 @@ export function VoiceReviewModal({ parsed, currentCurrency, proximity, onApply, 
 
                                 {/* Header */}
                                 <div className="relative shrink-0 flex items-center gap-3 px-5 pt-2 pb-3">
-                                    <div className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-rose-400/30 bg-gradient-to-br from-rose-500/25 to-pink-600/15">
+                                    <div className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-rose-400/30 bg-gradient-to-br from-rose-500/25 to-pink-600/15">
                                         <AudioLines className="h-5 w-5 text-rose-300" aria-hidden />
                                         <motion.span
-                                            className="absolute inset-0 rounded-2xl border border-rose-400/50"
+                                            className="absolute inset-0 rounded-xl border border-rose-400/50"
                                             animate={{ scale: [1, 1.4], opacity: [0.7, 0] }}
                                             transition={{ duration: 1.8, repeat: Infinity, ease: 'easeOut' }}
                                             aria-hidden
@@ -222,7 +223,7 @@ export function VoiceReviewModal({ parsed, currentCurrency, proximity, onApply, 
                                 >
                                     {/* Amount + currency */}
                                     <motion.div variants={itemVariants}>
-                                        <div className="rounded-2xl border border-white/10 bg-secondary/10 p-3.5 transition-colors focus-within:border-rose-400/40">
+                                        <div className="rounded-xl border border-white/10 bg-secondary/10 p-3.5 transition-colors focus-within:border-rose-400/40">
                                             <div className="flex items-center gap-2">
                                                 <span className="text-2xl font-bold text-rose-300">{symbol}</span>
                                                 <input
@@ -299,7 +300,7 @@ export function VoiceReviewModal({ parsed, currentCurrency, proximity, onApply, 
                                     {parsed.location && (
                                         <Field label="Location" hint="from voice">
                                             {geoState === 'loading' && (
-                                                <div className="flex items-center gap-2.5 rounded-2xl border border-white/10 bg-secondary/10 px-3.5 py-3">
+                                                <div className="flex items-center gap-2.5 rounded-xl border border-white/10 bg-secondary/10 px-3.5 py-3">
                                                     <div className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-rose-400/30 border-t-rose-400" />
                                                     <span className="truncate text-sm text-muted-foreground">
                                                         Finding <span className="text-foreground">“{parsed.location}”</span>…
@@ -307,7 +308,7 @@ export function VoiceReviewModal({ parsed, currentCurrency, proximity, onApply, 
                                                 </div>
                                             )}
                                             {geoState === 'done' && resolvedLoc && (
-                                                <div className="flex items-start gap-2.5 rounded-2xl border border-emerald-500/25 bg-emerald-500/5 px-3.5 py-3">
+                                                <div className="flex items-start gap-2.5 rounded-xl border border-emerald-500/25 bg-emerald-500/5 px-3.5 py-3">
                                                     <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-emerald-500/25 bg-emerald-500/15">
                                                         <MapPin className="h-3.5 w-3.5 text-emerald-400" aria-hidden />
                                                     </div>
@@ -328,7 +329,7 @@ export function VoiceReviewModal({ parsed, currentCurrency, proximity, onApply, 
                                                 </div>
                                             )}
                                             {geoState === 'notfound' && (
-                                                <div className="rounded-2xl border border-white/10 bg-secondary/10 px-3.5 py-3">
+                                                <div className="rounded-xl border border-white/10 bg-secondary/10 px-3.5 py-3">
                                                     <p className="text-sm text-muted-foreground">
                                                         Couldn't find <span className="text-foreground">“{parsed.location}”</span>
                                                     </p>
@@ -345,7 +346,7 @@ export function VoiceReviewModal({ parsed, currentCurrency, proximity, onApply, 
 
                                     {/* Tags */}
                                     <Field label="Tags" hint="optional">
-                                        <div className="flex flex-wrap items-center gap-1.5 rounded-2xl border border-white/10 bg-secondary/10 p-2 transition-colors focus-within:border-rose-400/40">
+                                        <div className="flex flex-wrap items-center gap-1.5 rounded-xl border border-white/10 bg-secondary/10 p-2 transition-colors focus-within:border-rose-400/40">
                                             <AnimatePresence initial={false}>
                                                 {tags.map(t => (
                                                     <motion.span
@@ -417,7 +418,7 @@ export function VoiceReviewModal({ parsed, currentCurrency, proximity, onApply, 
                                         type="button"
                                         onClick={onDiscard}
                                         disabled={applying}
-                                        className="h-12 flex-1 rounded-2xl border border-white/10 bg-secondary/20 text-sm font-semibold text-muted-foreground transition-colors hover:bg-secondary/30 hover:text-foreground disabled:opacity-50"
+                                        className="h-12 flex-1 rounded-xl border border-white/10 bg-secondary/20 text-sm font-semibold text-muted-foreground transition-colors hover:bg-secondary/30 hover:text-foreground disabled:opacity-50"
                                     >
                                         Discard
                                     </button>
@@ -428,7 +429,7 @@ export function VoiceReviewModal({ parsed, currentCurrency, proximity, onApply, 
                                         disabled={applying}
                                         whileTap={{ scale: 0.97 }}
                                         className={cn(
-                                            'relative h-12 flex-[1.5] overflow-hidden rounded-2xl text-sm font-bold text-white shadow-lg transition-colors',
+                                            'relative h-12 flex-[1.5] overflow-hidden rounded-xl text-sm font-bold text-white shadow-lg transition-colors',
                                             applying
                                                 ? 'bg-emerald-500 shadow-emerald-500/20'
                                                 : 'bg-gradient-to-r from-rose-500 to-pink-600 shadow-rose-500/25',
