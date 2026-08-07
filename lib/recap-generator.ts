@@ -1,5 +1,8 @@
 import 'server-only';
 import Anthropic from '@anthropic-ai/sdk';
+// JSON Schema rather than zod: the SDK's `zodOutputFormat` converts through
+// zod/v4, and this project is still on zod 3's v3 surface.
+import { jsonSchemaOutputFormat } from '@anthropic-ai/sdk/helpers/json-schema';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { getServerRatesMap } from '@/lib/server-exchange-rates';
 import { currencySymbol, fmtMoney } from '@/lib/server/currency';
@@ -33,35 +36,72 @@ interface MerchantAgg {
     count: number;
 }
 
+// The response shape is enforced by the API against this schema, so both
+// prompts below carry only the writing rules — no shape block, no "reply with
+// JSON only" instruction. Shared by the monthly and yearly runs; the per-period
+// length limits stay in the prompts, since a schema can't express them.
+const RECAP_SCHEMA = {
+    type: 'object',
+    properties: {
+        headline: {
+            type: 'string',
+            description: 'One sentence on what the period looked like and which way it moved.',
+        },
+        insights: {
+            type: 'array',
+            description: 'The 3–4 most useful insights, each covering a different angle.',
+            items: {
+                type: 'object',
+                properties: {
+                    label: { type: 'string', description: 'A 2–3 word title for the insight.' },
+                    kind: {
+                        type: 'string',
+                        enum: ['category', 'merchant', 'payment', 'frequency', 'new'],
+                        description: 'Which kind of insight this is.',
+                    },
+                    subject: {
+                        type: 'string',
+                        description: 'The category, merchant, or payment-method name this insight is about, lowercased and copied verbatim from the payload. Empty string when kind is frequency.',
+                    },
+                    detail: {
+                        type: 'string',
+                        description: 'One sentence carrying the specific numbers behind the insight.',
+                    },
+                },
+                required: ['label', 'kind', 'subject', 'detail'],
+                additionalProperties: false,
+            },
+        },
+        takeaway: {
+            type: 'string',
+            description: 'One specific, doable suggestion tied to one of the insights.',
+        },
+    },
+    required: ['headline', 'insights', 'takeaway'],
+    additionalProperties: false,
+} as const;
+
+// `transform: false` sends the schema verbatim. The SDK's default transform
+// keeps only an allowlist of keywords and folds the rest into the description —
+// `enum` is not on that list, so the "kind" values would reach the model as a
+// prose hint instead of a constraint the API enforces.
+const RECAP_FORMAT = jsonSchemaOutputFormat(RECAP_SCHEMA, { transform: false });
+type RecapNarrativeRaw = ReturnType<typeof RECAP_FORMAT.parse>;
+
 // Shared by both prompts. The yearly prompt used to say "same rules as the
 // monthly recap" — but the model only ever sees one of the two, so those rules
 // were never actually delivered on a yearly run.
 const SHARED_RULES = `Output rules:
-- Respond with a single JSON object. No markdown fences, no prose before or after it.
 - Every figure you cite must come from the payload. Never invent a merchant, category, or amount, and never round a number to a tidier one.
 - Wrap every number in "detail" and "takeaway" — amounts, percentages, counts — in **double asterisks**. The client renders those bold and nothing else. Example: "Food hit **₹13,202** across **31** orders — **36%** of everything you spent."
 - Write amounts using the "currencySymbol" given in the payload.
-- "kind" must be exactly one of: category, merchant, payment, frequency, new.
 - "subject" must appear verbatim in the payload — a category name, merchant name, or payment-method name, lowercased. It becomes a search filter, so it has to match. Use an empty string when "kind" is "frequency".
 - Second person, direct. No emojis, no markdown beyond the bold numbers, no moralising, no praise.
 - Every insight should tell the user something the total alone doesn't. Skip anything they can already see on the card.`;
 
 const SYSTEM_PROMPT_MONTH = `You are the analyst behind Novira's monthly recap. The user just closed out a calendar month. You get a JSON payload: this month's total and transaction count, every category total and count, top merchants with totals and visit counts, payment-method splits, and the same set for the previous month.
 
-Respond with a single JSON object in exactly this shape:
-
-{
-  "headline": "<one sentence, ≤14 words: what the month looked like and which way it moved>",
-  "insights": [
-    {
-      "label": "<2–3 word title>",
-      "kind": "<category|merchant|payment|frequency|new>",
-      "subject": "<lowercase value from the payload; empty string when kind is frequency>",
-      "detail": "<one sentence, ≤18 words, carrying the specific numbers>"
-    }
-  ],
-  "takeaway": "<one specific, doable suggestion tied to one of the insights, ≤24 words>"
-}
+Length limits: "headline" ≤14 words, each "detail" ≤18 words, "takeaway" ≤24 words.
 
 Pick the 3–4 most useful insights. Variety beats repetition — don't spend two of them on the same category. Candidates:
 1. The category that rose most — name it, the amount, and the % change vs last month.
@@ -80,20 +120,7 @@ ${SHARED_RULES}`;
 
 const SYSTEM_PROMPT_YEAR = `You are the analyst behind Novira's yearly recap. The user just closed out a calendar year. You get a JSON payload covering the whole year against the previous one — totals, category breakdowns, top merchants, payment-method splits, plus per-month totals in "byMonth" so you can see peaks and seasonality.
 
-Respond with a single JSON object in exactly this shape:
-
-{
-  "headline": "<one sentence, ≤14 words: what the year looked like and which way it moved>",
-  "insights": [
-    {
-      "label": "<2–3 word title>",
-      "kind": "<category|merchant|payment|frequency|new>",
-      "subject": "<lowercase value from the payload; empty string when kind is frequency>",
-      "detail": "<one sentence, ≤20 words, carrying the specific numbers>"
-    }
-  ],
-  "takeaway": "<one specific, doable suggestion tied to one of the insights, ≤24 words>"
-}
+Length limits: "headline" ≤14 words, each "detail" ≤20 words, "takeaway" ≤24 words.
 
 Pick the 4 most striking insights. Candidates:
 1. The largest category — total and share of the year's spend.
@@ -218,21 +245,6 @@ function aggregate(txs: TxRow[], userId: string, baseCurrency: string, liveRates
     };
 }
 
-function extractJson(raw: string): unknown {
-    if (!raw) return null;
-    let s = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
-    const first = s.indexOf('{');
-    const last = s.lastIndexOf('}');
-    if (first !== -1 && last !== -1 && last > first) {
-        s = s.slice(first, last + 1);
-    }
-    try {
-        return JSON.parse(s);
-    } catch {
-        return null;
-    }
-}
-
 export interface RecapInsight {
     label: string;
     kind?: string;
@@ -265,35 +277,29 @@ interface RecapNarrative {
     takeaway: string;
 }
 
-const VALID_KINDS = new Set(['category', 'merchant', 'payment', 'frequency', 'new']);
 const MAX_INSIGHTS = 4;
 
 /**
- * Accept the model's prose only if every field the card renders is present and
- * non-empty, then clamp it to what the card is laid out for. A model that
- * returns eight insights or a blank detail line would otherwise render as a
- * wall of half-filled rows.
+ * The schema guarantees the keys, their types, and that "kind" is one of the
+ * five the card knows how to render. What it can't say is "non-empty" or "at
+ * most four" — a blank detail line or eight insights would still render as a
+ * wall of half-filled rows, so those are enforced here.
  */
-function readNarrative(v: unknown): RecapNarrative | null {
-    if (!v || typeof v !== 'object') return null;
-    const o = v as Record<string, unknown>;
-    const headline = typeof o.headline === 'string' ? o.headline.trim() : '';
-    const takeaway = typeof o.takeaway === 'string' ? o.takeaway.trim() : '';
-    if (!headline || !takeaway || !Array.isArray(o.insights)) return null;
+function readNarrative(v: RecapNarrativeRaw): RecapNarrative | null {
+    const headline = v.headline.trim();
+    const takeaway = v.takeaway.trim();
+    if (!headline || !takeaway) return null;
 
     const insights: RecapInsight[] = [];
-    for (const raw of o.insights as unknown[]) {
-        if (!raw || typeof raw !== 'object') continue;
-        const i = raw as Record<string, unknown>;
-        const label = typeof i.label === 'string' ? i.label.trim() : '';
-        const detail = typeof i.detail === 'string' ? i.detail.trim() : '';
+    for (const i of v.insights) {
+        const label = i.label.trim();
+        const detail = i.detail.trim();
         if (!label || !detail) continue;
-        const kind = typeof i.kind === 'string' && VALID_KINDS.has(i.kind) ? i.kind : 'category';
         insights.push({
             label,
-            kind,
+            kind: i.kind,
             // Drives the search drill-down, so it has to be a clean match.
-            subject: typeof i.subject === 'string' ? i.subject.trim().toLowerCase() : '',
+            subject: i.subject.trim().toLowerCase(),
             detail,
         });
         if (insights.length === MAX_INSIGHTS) break;
@@ -470,27 +476,37 @@ export async function generateRecap(
         }
     });
 
-    const message = await client.messages.create({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: isYear ? 1400 : 1000,
-        system: [
-            {
-                type: 'text',
-                text: isYear ? SYSTEM_PROMPT_YEAR : SYSTEM_PROMPT_MONTH,
-                cache_control: { type: 'ephemeral' }
-            }
-        ],
-        messages: [
-            {
-                role: 'user',
-                content: `Here are the aggregates as JSON:\n${userBlock}\n\nWrite the recap.`
-            }
-        ]
-    });
+    let parsed: RecapNarrative | null = null;
+    try {
+        const message = await client.messages.parse({
+            model: 'claude-haiku-4-5-20251001',
+            max_tokens: isYear ? 1400 : 1000,
+            system: [
+                {
+                    type: 'text',
+                    text: isYear ? SYSTEM_PROMPT_YEAR : SYSTEM_PROMPT_MONTH,
+                    cache_control: { type: 'ephemeral' }
+                }
+            ],
+            output_config: { format: RECAP_FORMAT },
+            messages: [
+                {
+                    role: 'user',
+                    content: `Here are the aggregates as JSON:\n${userBlock}\n\nWrite the recap.`
+                }
+            ]
+        });
+        if (message.parsed_output) parsed = readNarrative(message.parsed_output);
+    } catch (err) {
+        // A schema-shaped response can still fail to parse — hitting max_tokens
+        // truncates the JSON mid-object. That degrades to the aggregate-built
+        // narrative below rather than failing the request. A transport or
+        // rate-limit failure is a real outage and keeps propagating.
+        if (err instanceof Anthropic.APIError) throw err;
+        console.error('[recap] structured output parse failed', err);
+    }
 
-    const text = message.content[0].type === 'text' ? message.content[0].text.trim() : '';
-    const narrative = readNarrative(extractJson(text))
-        ?? fallbackNarrative(currentAgg, baseCurrency, isYear ? 'year' : 'month');
+    const narrative = parsed ?? fallbackNarrative(currentAgg, baseCurrency, isYear ? 'year' : 'month');
 
     // The headline figures are what the card renders largest, so they come
     // straight from the aggregates. Asking the model to echo them back only
