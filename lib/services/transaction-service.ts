@@ -12,6 +12,10 @@ const FRANKFURTER_SUPPORTED = [
     'NZD', 'PHP', 'PLN', 'RON', 'SEK', 'SGD', 'THB', 'TRY', 'USD', 'ZAR'
 ];
 
+// Backstop so no caller can issue a truly unbounded transaction read. Callers
+// that need a smaller page (or a deliberately larger one) pass `limit` explicitly.
+const DEFAULT_TX_LIMIT = 5000;
+
 export const TransactionService = {
     /**
      * Fetch transactions for the current user or workspace.
@@ -58,9 +62,7 @@ export const TransactionService = {
             query = query.lt('date', options.endDate);
         }
 
-        if (options.limit) {
-            query = query.limit(options.limit);
-        }
+        query = query.limit(options.limit ?? DEFAULT_TX_LIMIT);
 
         const { data, error } = await query;
         if (error) {
@@ -78,16 +80,22 @@ export const TransactionService = {
         const dateStr = format(date, 'yyyy-MM-dd');
         const cacheKey = `novira-rate-${from}-${to}-${dateStr}`;
         
-        // 1. Check local cache first
+        // 1. Check local cache first. A malformed entry must not throw — this runs
+        // inside the add-expense submit path, so a corrupt key would otherwise make
+        // every submission fail until the user cleared storage.
         if (typeof window !== 'undefined') {
-            const cached = localStorage.getItem(cacheKey);
-            if (cached) {
-                const { rate, ts } = JSON.parse(cached);
-                const isToday = format(new Date(), 'yyyy-MM-dd') === dateStr;
-                // If it's a past date, cache is permanent. If today, valid for 4 hours.
-                if (!isToday || (Date.now() - ts < 4 * 60 * 60 * 1000)) {
-                    return rate;
+            try {
+                const cached = localStorage.getItem(cacheKey);
+                if (cached) {
+                    const { rate, ts } = JSON.parse(cached);
+                    const isToday = format(new Date(), 'yyyy-MM-dd') === dateStr;
+                    // If it's a past date, cache is permanent. If today, valid for 4 hours.
+                    if (typeof rate === 'number' && (!isToday || (Date.now() - ts < 4 * 60 * 60 * 1000))) {
+                        return rate;
+                    }
                 }
+            } catch {
+                try { localStorage.removeItem(cacheKey); } catch { /* storage unavailable */ }
             }
         }
 

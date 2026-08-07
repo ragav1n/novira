@@ -34,6 +34,16 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Invalid subscription' }, { status: 400 });
         }
 
+        // An endpoint belongs to exactly one user. The upsert below conflicts on
+        // `endpoint` alone, so without this a caller who knows someone else's
+        // endpoint could reassign its user_id to themselves — silently stealing
+        // the victim's push channel. Drop any foreign claim on it first.
+        await supabase
+            .from('push_subscriptions')
+            .delete()
+            .eq('endpoint', subscription.endpoint)
+            .neq('user_id', user.id);
+
         // Upsert so re-subscriptions update the keys without duplicating
         const { error } = await supabase
             .from('push_subscriptions')

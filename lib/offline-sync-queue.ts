@@ -25,6 +25,35 @@ export function addToQueue(queue: SyncPayload[], payload: Omit<SyncPayload, 'sta
     return [...queue, { ...payload, status: 'pending', createdAt: Date.now(), retryCount: 0 }];
 }
 
+/**
+ * Wraps a read/write pair into a serialized read-modify-write.
+ *
+ * The queue has two independent writers: the sync loop, which holds work across
+ * long awaits (a 20s mutation timeout), and `enqueueMutation`, which fires
+ * whenever the user adds an expense. Letting either hold a snapshot across an
+ * await means the other's write gets overwritten — a mutation queued mid-sync
+ * used to vanish with no error and no UI trace. Every mutation runs against
+ * freshly-read state, one at a time.
+ */
+export function createSerializedMutator(
+    read: () => Promise<SyncPayload[]>,
+    write: (queue: SyncPayload[]) => Promise<void>,
+): (fn: (queue: SyncPayload[]) => SyncPayload[]) => Promise<SyncPayload[]> {
+    let chain: Promise<unknown> = Promise.resolve();
+    return function mutate(fn) {
+        const next = chain.then(async () => {
+            const fresh = await read();
+            const updated = fn(fresh);
+            await write(updated);
+            return updated;
+        });
+        // Swallow rejections on the chain itself so one failed write can't wedge
+        // every subsequent mutation. The caller still sees the original rejection.
+        chain = next.catch(() => undefined);
+        return next;
+    };
+}
+
 const MAX_RETRIES = 5;
 export const MAX_QUEUE_SIZE = 500;
 export const MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;

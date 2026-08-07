@@ -5,6 +5,7 @@ export type OnTrackStatus = 'ahead' | 'on-track' | 'behind' | 'unknown';
 export type Milestone = 0 | 25 | 50 | 75 | 100;
 
 const AVG_DAYS_PER_MONTH = 30.4375;
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 export function daysUntilDeadline(deadline: string | null | undefined): number | null {
     if (!deadline) return null;
@@ -26,13 +27,29 @@ export function requiredMonthlyContribution(goal: Pick<SavingsGoal, 'target_amou
     return remaining / months;
 }
 
-export function monthlyVelocity(deposits: SavingsDeposit[], windowDays = 90): number {
+/**
+ * Average monthly savings rate over the trailing `windowDays`.
+ *
+ * `goalCreatedAt` matters: dividing by a flat 90 days meant a two-week-old goal
+ * had its deposits spread across ~76 days it hadn't lived through, so every young
+ * goal scored "behind" no matter how well it was funded. Deposits are spread over
+ * `min(windowDays, goal age)` instead. Omitting it keeps the flat-window behavior.
+ */
+export function monthlyVelocity(
+    deposits: SavingsDeposit[],
+    windowDays = 90,
+    goalCreatedAt?: string | null,
+): number {
     if (!deposits.length) return 0;
-    const cutoff = Date.now() - windowDays * 24 * 60 * 60 * 1000;
+    const now = Date.now();
+    const cutoff = now - windowDays * MS_PER_DAY;
     const recent = deposits.filter(d => parseISO(d.created_at).getTime() >= cutoff);
     if (!recent.length) return 0;
     const sum = recent.reduce((acc, d) => acc + Number(d.amount), 0);
-    return (sum / windowDays) * AVG_DAYS_PER_MONTH;
+    const startedAt = goalCreatedAt ? parseISO(goalCreatedAt).getTime() : NaN;
+    const ageDays = Number.isFinite(startedAt) ? (now - startedAt) / MS_PER_DAY : windowDays;
+    const observedDays = Math.max(1, Math.min(windowDays, ageDays));
+    return (sum / observedDays) * AVG_DAYS_PER_MONTH;
 }
 
 export function projectedCompletionDate(

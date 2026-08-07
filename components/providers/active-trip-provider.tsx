@@ -67,7 +67,7 @@ export function ActiveTripProvider({ children }: { children: React.ReactNode }) 
             ? `group_id=eq.${activeWorkspaceId}`
             : `user_id=eq.${userId}`;
         const channel = supabase
-            .channel(`active-trip-${userId}-${activeWorkspaceId || 'personal'}`)
+            .channel(`active-trip-${userId}-${activeWorkspaceId || 'personal'}-${crypto.randomUUID()}`)
             .on(
                 'postgres_changes',
                 { event: '*', schema: 'public', table: 'trips', filter },

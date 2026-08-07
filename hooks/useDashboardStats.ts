@@ -5,6 +5,7 @@ import { CATEGORY_COLORS } from '@/lib/categories';
 import type { Currency } from '@/components/providers/user-preferences-provider';
 import type { Bucket } from '@/components/providers/buckets-provider';
 import { computeWeightedRunRate } from '@/lib/utils/run-rate';
+import { resolveAmountIn } from '@/lib/utils/resolve-amount';
 
 type SpendingCategory = {
     name: string;
@@ -147,13 +148,7 @@ export function useDashboardStats({
             }
             const myShare = calculateUserShare(tx, userId);
             if (myShare <= 0) continue;
-            const txCurr = (tx.currency || 'USD').toUpperCase();
-            const baseCurr = (tx.base_currency || '').toUpperCase();
-            const hasExchange = !!tx.exchange_rate && tx.exchange_rate !== 1;
-            const amt = txCurr === bucketCurrency
-                ? myShare
-                : (hasExchange && baseCurr === bucketCurrency ? myShare * Number(tx.exchange_rate) : convertAmount(myShare, txCurr, bucketCurrency));
-            total += amt;
+            total += resolveAmountIn(tx, myShare, bucketCurrency, convertAmount).amount;
         }
         return total;
     }, [transactions, isBucketFocused, lastMonthPrefix, currentDayOfMonth, userId, bucketCurrency, convertAmount, calculateUserShare]);
@@ -175,12 +170,7 @@ export function useDashboardStats({
             }
             const myShare = calculateUserShare(tx, userId);
             if (myShare <= 0) continue;
-            const txCurr = (tx.currency || 'USD').toUpperCase();
-            const baseCurr = (tx.base_currency || '').toUpperCase();
-            const hasExchange = !!tx.exchange_rate && tx.exchange_rate !== 1;
-            const amt = txCurr === currency
-                ? myShare
-                : (hasExchange && baseCurr === currency ? myShare * Number(tx.exchange_rate) : convertAmount(myShare, txCurr, currency));
+            const amt = resolveAmountIn(tx, myShare, currency, convertAmount).amount;
             const cat = tx.category.toLowerCase();
             byCat[cat] = (byCat[cat] ?? 0) + amt;
         }
@@ -206,14 +196,8 @@ export function useDashboardStats({
             const myShare = calculateUserShare(tx, userId);
             if (myShare <= 0) continue;
 
-            const txCurr = (tx.currency || 'USD').toUpperCase();
-            const baseCurr = (tx.base_currency || '').toUpperCase();
-            const hasExchange = !!tx.exchange_rate && tx.exchange_rate !== 1;
-
             // Total + run-rate use bucketCurrency
-            const totalAmount = txCurr === bucketCurrency
-                ? myShare
-                : (hasExchange && baseCurr === bucketCurrency ? myShare * Number(tx.exchange_rate) : convertAmount(myShare, txCurr, bucketCurrency));
+            const totalAmount = resolveAmountIn(tx, myShare, bucketCurrency, convertAmount).amount;
             totalSpent += totalAmount;
 
             const txDate = tx.date.slice(0, 10);
@@ -226,9 +210,9 @@ export function useDashboardStats({
 
             // Category breakdown — target currency depends on focus
             const cat = tx.category.toLowerCase();
-            const catAmount = txCurr === categoryTarget
-                ? myShare
-                : (hasExchange && baseCurr === categoryTarget ? myShare * Number(tx.exchange_rate) : convertAmount(myShare, txCurr, categoryTarget));
+            const catAmount = categoryTarget === bucketCurrency
+                ? totalAmount
+                : resolveAmountIn(tx, myShare, categoryTarget, convertAmount).amount;
             byCategory[cat] = (byCategory[cat] ?? 0) + catAmount;
         }
 
@@ -268,12 +252,7 @@ export function useDashboardStats({
             }
             const myShare = calculateUserShare(tx, userId);
             if (myShare <= 0) continue;
-            const txCurr = (tx.currency || 'USD').toUpperCase();
-            const baseCurr = (tx.base_currency || '').toUpperCase();
-            const hasExchange = !!tx.exchange_rate && tx.exchange_rate !== 1;
-            const amt = txCurr === bucketCurrency
-                ? myShare
-                : (hasExchange && baseCurr === bucketCurrency ? myShare * Number(tx.exchange_rate) : convertAmount(myShare, txCurr, bucketCurrency));
+            const amt = resolveAmountIn(tx, myShare, bucketCurrency, convertAmount).amount;
             // parseISO with the date-only slice avoids the project's known
             // `new Date(tx.date)` timezone bug for ISO timestamps.
             const dow = parseISO(txDate).getDay(); // 0 = Sunday
@@ -349,12 +328,7 @@ export function useDashboardStats({
         for (const tx of filteredTransactions) {
             const myShare = calculateUserShare(tx, userId);
             if (myShare <= 0) continue;
-            const txCurr = (tx.currency || 'USD').toUpperCase();
-            const baseCurr = (tx.base_currency || '').toUpperCase();
-            const hasExchange = !!tx.exchange_rate && tx.exchange_rate !== 1;
-            const amt = txCurr === bucketCurrency
-                ? myShare
-                : (hasExchange && baseCurr === bucketCurrency ? myShare * Number(tx.exchange_rate) : convertAmount(myShare, txCurr, bucketCurrency));
+            const amt = resolveAmountIn(tx, myShare, bucketCurrency, convertAmount).amount;
             const day = parseInt(tx.date.slice(8, 10), 10);
             if (!isNaN(day) && day >= 1 && day <= daysInMonth) {
                 dailyTotals[day] += amt;
@@ -447,13 +421,7 @@ export function useDashboardStats({
             }
             const myShare = calculateUserShare(tx, userId);
             if (myShare <= 0) continue;
-            const txCurr = (tx.currency || 'USD').toUpperCase();
-            const baseCurr = (tx.base_currency || '').toUpperCase();
-            const hasExchange = !!tx.exchange_rate && tx.exchange_rate !== 1;
-            const amt = txCurr === bucketCurrency
-                ? myShare
-                : (hasExchange && baseCurr === bucketCurrency ? myShare * Number(tx.exchange_rate) : convertAmount(myShare, txCurr, bucketCurrency));
-            total += amt;
+            total += resolveAmountIn(tx, myShare, bucketCurrency, convertAmount).amount;
         }
         return total;
     }, [transactions, isBucketFocused, lastMonthPrefix, userId, bucketCurrency, convertAmount, calculateUserShare]);
@@ -472,14 +440,7 @@ export function useDashboardStats({
             if (!tx || !tx.is_income) continue;
             if (!tx.date.startsWith(currentMonthPrefix)) continue;
             if (userId && tx.user_id !== userId) continue;
-            const txCurr = (tx.currency || 'USD').toUpperCase();
-            const baseCurr = (tx.base_currency || '').toUpperCase();
-            const hasExchange = !!tx.exchange_rate && tx.exchange_rate !== 1;
-            const amt = Number(tx.amount);
-            const converted = txCurr === bucketCurrency
-                ? amt
-                : (hasExchange && baseCurr === bucketCurrency ? amt * Number(tx.exchange_rate) : convertAmount(amt, txCurr, bucketCurrency));
-            total += converted;
+            total += resolveAmountIn(tx, Number(tx.amount), bucketCurrency, convertAmount).amount;
         }
         return total;
     }, [transactions, currentMonthPrefix, userId, bucketCurrency, convertAmount]);

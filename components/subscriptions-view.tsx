@@ -177,7 +177,7 @@ export function SubscriptionsView() {
         };
 
         const templatesChannel = supabase
-            .channel(`templates-changes-${userId}-${activeWorkspaceId || 'personal'}`)
+            .channel(`templates-changes-${userId}-${activeWorkspaceId || 'personal'}-${crypto.randomUUID()}`)
             .on(
                 'postgres_changes',
                 { event: 'INSERT', schema: 'public', table: 'recurring_templates', filter: `user_id=eq.${userId}` },

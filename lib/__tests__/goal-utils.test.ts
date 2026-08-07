@@ -91,6 +91,61 @@ describe('monthlyVelocity', () => {
         expect(result).toBeGreaterThan(95);
         expect(result).toBeLessThan(110);
     });
+
+    it('spreads a young goal over its actual age, not the full window', () => {
+        // Regression: a 15-day-old goal used to divide by 90 days, so a healthy
+        // deposit read as a third of its real rate and the goal scored "behind".
+        const createdAt = addDays(new Date(), -15).toISOString();
+        const deposit = addDays(new Date(), -14).toISOString();
+        const result = monthlyVelocity(
+            [{ id: 'a', goal_id: 'g', user_id: 'u', amount: 500, currency: 'USD', created_at: deposit }],
+            90,
+            createdAt,
+        );
+        // 500 over ~15 days ≈ 1015/month, not the old 500/90*30.44 ≈ 169.
+        expect(result).toBeGreaterThan(950);
+        expect(result).toBeLessThan(1080);
+    });
+
+    it('caps the denominator at the window for goals older than it', () => {
+        const createdAt = addDays(new Date(), -400).toISOString();
+        const deposit = addDays(new Date(), -10).toISOString();
+        const result = monthlyVelocity(
+            [{ id: 'a', goal_id: 'g', user_id: 'u', amount: 300, currency: 'USD', created_at: deposit }],
+            90,
+            createdAt,
+        );
+        // Full 90-day window applies: 300/90*30.44 ≈ 101.
+        expect(result).toBeGreaterThan(95);
+        expect(result).toBeLessThan(110);
+    });
+
+    it('keeps the flat-window behaviour when the goal age is unknown', () => {
+        const deposit = addDays(new Date(), -5).toISOString();
+        const withAge = monthlyVelocity(
+            [{ id: 'a', goal_id: 'g', user_id: 'u', amount: 300, currency: 'USD', created_at: deposit }],
+            90,
+        );
+        const explicitNull = monthlyVelocity(
+            [{ id: 'a', goal_id: 'g', user_id: 'u', amount: 300, currency: 'USD', created_at: deposit }],
+            90,
+            null,
+        );
+        expect(withAge).toBeCloseTo(explicitNull, 6);
+        expect(withAge).toBeGreaterThan(95);
+        expect(withAge).toBeLessThan(110);
+    });
+
+    it('rescues a well-funded young goal from a false "behind" verdict', () => {
+        const createdAt = addDays(new Date(), -20).toISOString();
+        const deposits = [
+            { id: 'a', goal_id: 'g', user_id: 'u', amount: 400, currency: 'USD', created_at: addDays(new Date(), -18).toISOString() },
+            { id: 'b', goal_id: 'g', user_id: 'u', amount: 400, currency: 'USD', created_at: addDays(new Date(), -4).toISOString() },
+        ];
+        const required = 1000; // per month
+        expect(onTrackStatus(required, monthlyVelocity(deposits, 90), true)).toBe('behind');
+        expect(onTrackStatus(required, monthlyVelocity(deposits, 90, createdAt), true)).toBe('ahead');
+    });
 });
 
 describe('requiredMonthlyContribution', () => {

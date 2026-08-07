@@ -116,7 +116,7 @@ export function AccountsProvider({ children }: { children: React.ReactNode }) {
         fetchAccounts();
 
         const channel = supabase
-            .channel(`accounts-${userId}`)
+            .channel(`accounts-${userId}-${crypto.randomUUID()}`)
             .on(
                 'postgres_changes',
                 { event: '*', schema: 'public', table: 'accounts', filter: `user_id=eq.${userId}` },

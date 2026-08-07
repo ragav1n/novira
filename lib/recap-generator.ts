@@ -285,6 +285,10 @@ export async function generateRecap(
             .gte('date', start)
             .lte('date', end)
             .eq('is_settlement', false)
+            // Income posts a positive amount and a transfer's outflow leg is
+            // positive too — without these the recap counts both as spending.
+            .eq('is_income', false)
+            .eq('is_transfer', false)
             .returns<TxRow[]>();
         if (error) throw error;
         return data || [];

@@ -47,10 +47,13 @@ export function useUpcomingRecurring(
             // rolling 7-day slice.
             const horizonStr = format(endOfMonth(today), 'yyyy-MM-dd');
 
+            // is_income is filtered server-side so the .limit(20) below applies to
+            // the rows we actually keep. Rows predating the column are NULL.
             const baseQuery = supabase
                 .from('recurring_templates')
-                .select('id, description, amount, currency, category, next_occurrence, is_active, group_id, user_id')
+                .select('id, description, amount, currency, category, next_occurrence, is_active, is_income, group_id, user_id')
                 .eq('is_active', true)
+                .or('is_income.is.null,is_income.eq.false')
                 .gte('next_occurrence', todayStr)
                 .lte('next_occurrence', horizonStr)
                 .order('next_occurrence', { ascending: true })
@@ -95,7 +98,7 @@ export function useUpcomingRecurring(
     useEffect(() => {
         if (!userId) return;
         const channel = supabase
-            .channel(`upcoming-recurring-${userId}-${activeWorkspaceId || 'personal'}`)
+            .channel(`upcoming-recurring-${userId}-${activeWorkspaceId || 'personal'}-${crypto.randomUUID()}`)
             .on(
                 'postgres_changes',
                 { event: '*', schema: 'public', table: 'recurring_templates', filter: `user_id=eq.${userId}` },

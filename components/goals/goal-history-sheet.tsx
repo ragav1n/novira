@@ -44,9 +44,9 @@ export function GoalHistorySheet({ goal, userId, open, onOpenChange, formatCurre
 
     const stats = useMemo(() => {
         const total = deposits.reduce((acc, d) => acc + Number(d.amount), 0);
-        const velocity = monthlyVelocity(deposits, 90);
+        const velocity = monthlyVelocity(deposits, 90, goal?.created_at);
         return { total, count: deposits.length, velocity };
-    }, [deposits]);
+    }, [deposits, goal?.created_at]);
 
     const monthlyChartData = useMemo(() => {
         const months: { key: string; label: string; total: number }[] = [];

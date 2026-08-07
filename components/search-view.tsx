@@ -375,7 +375,7 @@ export function SearchView() {
         };
 
         const channel = supabase
-            .channel(`search-sync-${userId}-${activeWorkspaceId || 'personal'}`)
+            .channel(`search-sync-${userId}-${activeWorkspaceId || 'personal'}-${crypto.randomUUID()}`)
             .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions', filter: txFilter }, debouncedFetch)
             .on('postgres_changes', { event: '*', schema: 'public', table: 'splits', filter: `user_id=eq.${userId}` }, debouncedFetch)
             .subscribe();

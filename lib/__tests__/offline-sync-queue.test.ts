@@ -9,6 +9,7 @@ import {
     incrementRetry,
     evictForCapacity,
     expireStaleItems,
+    createSerializedMutator,
     MAX_QUEUE_SIZE,
     MAX_AGE_MS,
     type SyncPayload,
@@ -289,5 +290,108 @@ describe('offline sync queue state machine', () => {
             queue = removeSynced(queue);
             expect(queue).toHaveLength(0);
         });
+    });
+});
+
+describe('createSerializedMutator', () => {
+    /**
+     * Stand-in for the IndexedDB-backed queue whose reads park until explicitly
+     * released. Timing-based delays aren't a valid test here: two setTimeout reads
+     * of equal length drain their continuations between timer callbacks, so they
+     * serialize by accident and an unserialized mutator would pass. Parking every
+     * read makes the overlap deterministic — release the world and see how many
+     * reads were in flight against the same stale snapshot.
+     */
+    function makeGatedStore(initial: SyncPayload[] = []) {
+        let stored: SyncPayload[] = [...initial];
+        let parked: Array<() => void> = [];
+        return {
+            get current() { return stored; },
+            read: () => new Promise<SyncPayload[]>(resolve => {
+                parked.push(() => resolve([...stored]));
+            }),
+            write: async (q: SyncPayload[]) => { stored = [...q]; },
+            releaseAll() {
+                const batch = parked;
+                parked = [];
+                batch.forEach(fn => fn());
+            },
+            /** Release parked reads until every in-flight mutation has settled. */
+            async drain(settled: Promise<unknown>) {
+                let done = false;
+                settled.then(() => { done = true }, () => { done = true });
+                for (let i = 0; i < 50 && !done; i++) {
+                    this.releaseAll();
+                    await new Promise(r => setTimeout(r, 0));
+                }
+                return settled;
+            },
+        };
+    }
+
+    it('does not lose a mutation enqueued while another is mid-flight', async () => {
+        // The sync-loop clobber: the loop held a queue snapshot across its RPC
+        // await, so an expense added in that window was overwritten on write-back
+        // and vanished with no error. An unserialized mutator resolves both reads
+        // from the same snapshot here and drops one of the two changes.
+        const store = makeGatedStore();
+        const mutate = createSerializedMutator(store.read, store.write);
+
+        await store.drain(mutate(q => addToQueue(q, { id: 'in-flight', type: 'ADD_TX', data: {} })));
+
+        const both = Promise.all([
+            mutate(q => markSynced(q, 'in-flight')),
+            mutate(q => addToQueue(q, { id: 'added-during-sync', type: 'ADD_TX', data: {} })),
+        ]);
+        await store.drain(both);
+
+        expect(store.current.map(i => i.id)).toEqual(['in-flight', 'added-during-sync']);
+        expect(store.current.find(i => i.id === 'in-flight')?.status).toBe('synced');
+        expect(store.current.find(i => i.id === 'added-during-sync')?.status).toBe('pending');
+    });
+
+    it('applies every concurrent mutation exactly once', async () => {
+        const store = makeGatedStore();
+        const mutate = createSerializedMutator(store.read, store.write);
+
+        const all = Promise.all(
+            Array.from({ length: 25 }, (_, i) =>
+                mutate(q => addToQueue(q, { id: `item-${i}`, type: 'ADD_TX', data: {} }))
+            )
+        );
+        await store.drain(all);
+
+        expect(store.current).toHaveLength(25);
+        expect(new Set(store.current.map(i => i.id)).size).toBe(25);
+    });
+
+    it('resolves each call with the queue state produced by that call', async () => {
+        const store = makeGatedStore();
+        const mutate = createSerializedMutator(store.read, store.write);
+
+        const first = mutate(q => addToQueue(q, { id: 'a', type: 'ADD_TX', data: {} }));
+        const second = mutate(q => addToQueue(q, { id: 'b', type: 'ADD_TX', data: {} }));
+        await store.drain(Promise.all([first, second]));
+
+        expect((await first).map(i => i.id)).toEqual(['a']);
+        expect((await second).map(i => i.id)).toEqual(['a', 'b']);
+    });
+
+    it('surfaces a failed write to its caller without wedging later mutations', async () => {
+        const store = makeGatedStore();
+        let failNext = true;
+        const write = async (q: SyncPayload[]) => {
+            if (failNext) { failNext = false; throw new Error('quota exceeded'); }
+            await store.write(q);
+        };
+        const mutate = createSerializedMutator(store.read, write);
+
+        const doomed = mutate(q => addToQueue(q, { id: 'doomed', type: 'ADD_TX', data: {} }));
+        await expect(store.drain(doomed)).rejects.toThrow('quota exceeded');
+
+        const ok = mutate(q => addToQueue(q, { id: 'ok', type: 'ADD_TX', data: {} }));
+        await store.drain(ok);
+        expect((await ok).map(i => i.id)).toEqual(['ok']);
+        expect(store.current.map(i => i.id)).toEqual(['ok']);
     });
 });

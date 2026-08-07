@@ -14,6 +14,7 @@ import {
     resetStaleSyncing,
     findPendingDuplicate,
     mergePendingUpdate,
+    createSerializedMutator,
     MAX_QUEUE_SIZE
 } from './offline-sync-queue';
 import { TransactionService } from './services/transaction-service';
@@ -127,6 +128,10 @@ async function writeQueue(queue: SyncPayload[]): Promise<void> {
     await set(key, queue);
 }
 
+// Every queue write goes through here. See createSerializedMutator for why a
+// plain read-then-write loses mutations enqueued mid-sync.
+const mutateQueue = createSerializedMutator(readQueue, writeQueue);
+
 function uuidv4() {
     if (typeof crypto !== 'undefined' && crypto.randomUUID) {
         return crypto.randomUUID();
@@ -191,50 +196,66 @@ export class QueueFullError extends Error {
 
 // 1. Enqueue Function
 export async function enqueueMutation(type: string, data: any, opts?: { id?: string }): Promise<string> {
-    let currentQueue = await readQueue();
+    // Pre-generated so the id has a non-nullable type; the dedupe/merge branches
+    // below overwrite it with the id of the item they folded into.
+    let resultId = opts?.id ?? uuidv4();
+    let evictedIds: string[] = [];
+    let queueFull = false;
+    let wrote = true;
 
-    // Dedup: a duplicate DELETE for the same tx id is pure waste — return the
-    // existing pending item's id so callers see the same idempotent result.
-    const dup = findPendingDuplicate(currentQueue, type, data);
-    if (dup) return dup.id;
-
-    // Merge: a newer UPDATE patch for the same tx folds into the pending one
-    // so we don't waste a round-trip and so newer field values win cleanly.
-    if (type === 'UPDATE_TRANSACTION' && data?.id) {
-        const merged = mergePendingUpdate(currentQueue, data);
-        if (merged) {
-            await writeQueue(merged.queue);
-            dispatchQueueUpdated(merged.queue);
-            if (navigator.onLine) attemptSync();
-            return merged.mergedId;
+    // Inspect + write in one serialized step. Splitting them would let the sync
+    // loop's own write land in between and clobber this enqueue.
+    const finalQueue = await mutateQueue(current => {
+        // Dedup: a duplicate DELETE for the same tx id is pure waste — return the
+        // existing pending item's id so callers see the same idempotent result.
+        const dup = findPendingDuplicate(current, type, data);
+        if (dup) {
+            resultId = dup.id;
+            wrote = false;
+            return current;
         }
-    }
 
-    // Evict oldest failed/pending items if at capacity. Currently-syncing items are preserved.
-    if (currentQueue.length >= MAX_QUEUE_SIZE) {
-        const beforeCount = currentQueue.length;
-        const beforeIds = new Set(currentQueue.map(i => i.id));
-        currentQueue = evictForCapacity(currentQueue);
-        const evictedCount = beforeCount - currentQueue.length;
-        if (evictedCount > 0) {
-            // Best-effort cleanup of orphaned offline-receipt Blobs for evicted items.
-            const keptIds = new Set(currentQueue.map(i => i.id));
-            for (const id of beforeIds) {
-                if (!keptIds.has(id)) deleteOfflineReceipt(id);
+        // Merge: a newer UPDATE patch for the same tx folds into the pending one
+        // so we don't waste a round-trip and so newer field values win cleanly.
+        if (type === 'UPDATE_TRANSACTION' && data?.id) {
+            const merged = mergePendingUpdate(current, data);
+            if (merged) {
+                resultId = merged.mergedId;
+                return merged.queue;
             }
-            window.dispatchEvent(new CustomEvent('novira-queue-evicted', { detail: { count: evictedCount } }));
-            broadcast('novira-queue-evicted', { count: evictedCount });
         }
-        if (currentQueue.length >= MAX_QUEUE_SIZE) {
-            throw new QueueFullError();
+
+        // Evict oldest failed/pending items if at capacity. Currently-syncing items are preserved.
+        let next = current;
+        if (next.length >= MAX_QUEUE_SIZE) {
+            const beforeIds = new Set(next.map(i => i.id));
+            next = evictForCapacity(next);
+            if (next.length >= MAX_QUEUE_SIZE) {
+                // Nothing evictable (everything is mid-flight) — reject the enqueue
+                // and leave the queue untouched.
+                queueFull = true;
+                wrote = false;
+                return current;
+            }
+            const keptIds = new Set(next.map(i => i.id));
+            evictedIds = [...beforeIds].filter(id => !keptIds.has(id));
         }
+
+        return addToQueue(next, { id: resultId, type, data });
+    });
+
+    if (queueFull) throw new QueueFullError();
+
+    if (evictedIds.length > 0) {
+        // Best-effort cleanup of orphaned offline-receipt Blobs for evicted items.
+        for (const id of evictedIds) deleteOfflineReceipt(id);
+        window.dispatchEvent(new CustomEvent('novira-queue-evicted', { detail: { count: evictedIds.length } }));
+        broadcast('novira-queue-evicted', { count: evictedIds.length });
     }
 
-    const id = opts?.id ?? uuidv4();
-    const newQueue = addToQueue(currentQueue, { id, type, data });
-    await writeQueue(newQueue);
-
-    dispatchQueueUpdated(newQueue);
+    if (wrote) {
+        dispatchQueueUpdated(finalQueue);
+    }
 
     if (navigator.onLine) {
         attemptSync();
@@ -243,7 +264,7 @@ export async function enqueueMutation(type: string, data: any, opts?: { id?: str
             (reg as any).sync.register('novira-sync-queue').catch(() => {});
         });
     }
-    return id;
+    return resultId;
 }
 
 /**
@@ -308,9 +329,13 @@ function scheduleRetry(queue: SyncPayload[]) {
     const now = Date.now();
     let soonest = Infinity;
     for (const item of queue) {
-        if (item.status === 'pending' && item.nextRetryAt && item.nextRetryAt > now) {
-            if (item.nextRetryAt < soonest) soonest = item.nextRetryAt;
-        }
+        if (item.status !== 'pending') continue;
+        // A pending item with no backoff (or an elapsed one) is runnable right now.
+        // That happens when it was enqueued while a sync pass was already in flight,
+        // so the pass's `pendingItems` snapshot never saw it — schedule immediately
+        // rather than leaving it until the next enqueue or online event.
+        const dueAt = item.nextRetryAt && item.nextRetryAt > now ? item.nextRetryAt : now;
+        if (dueAt < soonest) soonest = dueAt;
     }
     clearRetryTimer();
     if (soonest === Infinity) return;
@@ -341,32 +366,30 @@ async function runSyncLoop(): Promise<void> {
 
     // Recover items stranded in 'syncing' by a previous session (tab killed
     // mid-flight). Without this they're invisible to the pending filter below
-    // and never retry.
-    const recovered = resetStaleSyncing(queue);
-    if (recovered !== queue) {
-        queue = recovered;
-        await writeQueue(queue);
+    // and never retry. The pre-check keeps the common no-op pass write-free;
+    // the transform re-runs inside mutateQueue against fresh state.
+    if (resetStaleSyncing(queue) !== queue) {
+        queue = await mutateQueue(resetStaleSyncing);
         dispatchQueueUpdated(queue);
     }
 
     // Expire pending items older than 7 days so they stop retrying forever and
     // surface to the user as "Expired" in the failed list.
-    const expired = expireStaleItems(queue, now);
-    if (expired !== queue) {
-        const expiredCount = expired.filter((it, i) => queue[i]?.status === 'pending' && it.status === 'failed').length;
-        // Drop offline receipts for newly-expired items — the row will never
-        // post, so the Blob is dead weight in IDB.
-        for (let i = 0; i < expired.length; i++) {
-            if (queue[i]?.status === 'pending' && expired[i].status === 'failed') {
-                deleteOfflineReceipt(expired[i].id);
-            }
-        }
-        queue = expired;
-        await writeQueue(queue);
+    if (expireStaleItems(queue, now) !== queue) {
+        let expiredIds: string[] = [];
+        queue = await mutateQueue(q => {
+            const next = expireStaleItems(q, now);
+            const wasPending = new Set(q.filter(i => i.status === 'pending').map(i => i.id));
+            expiredIds = next.filter(i => i.status === 'failed' && wasPending.has(i.id)).map(i => i.id);
+            return next;
+        });
         dispatchQueueUpdated(queue);
-        if (expiredCount > 0) {
-            window.dispatchEvent(new CustomEvent('novira-queue-expired', { detail: { count: expiredCount } }));
-            broadcast('novira-queue-expired', { count: expiredCount });
+        if (expiredIds.length > 0) {
+            // Drop offline receipts for newly-expired items — the row will never
+            // post, so the Blob is dead weight in IDB.
+            for (const id of expiredIds) deleteOfflineReceipt(id);
+            window.dispatchEvent(new CustomEvent('novira-queue-expired', { detail: { count: expiredIds.length } }));
+            broadcast('novira-queue-expired', { count: expiredIds.length });
         }
     }
 
@@ -393,8 +416,7 @@ async function runSyncLoop(): Promise<void> {
     try {
         for (const item of pendingItems) {
             // Transition to Syncing
-            queue = startSyncing(queue, item.id);
-            await writeQueue(queue);
+            queue = await mutateQueue(q => startSyncing(q, item.id));
             dispatchQueueUpdated(queue);
 
             try {
@@ -455,7 +477,7 @@ async function runSyncLoop(): Promise<void> {
                                 }
                             }
                         }
-                        queue = markSynced(queue, item.id);
+                        queue = await mutateQueue(q => markSynced(q, item.id));
                         window.dispatchEvent(new CustomEvent('novira-mutation-synced', {
                             detail: { id: item.id, type: item.type, data: item.data, result }
                         }));
@@ -525,7 +547,7 @@ async function runSyncLoop(): Promise<void> {
                             // Note: RLS-filtered deletes succeed with 0 rows (no error), so this branch
                             // is only hit on actual rejection.
                             console.error(`[sync-manager] ${item.type} permanently failed:`, reason);
-                            queue = markFailed(queue, item.id, reason, 'permanent');
+                            queue = await mutateQueue(q => markFailed(q, item.id, reason, 'permanent'));
                             window.dispatchEvent(new CustomEvent('novira-mutation-failed-permanent', {
                                 detail: { id: item.id, type: item.type, data: item.data, reason }
                             }));
@@ -535,7 +557,7 @@ async function runSyncLoop(): Promise<void> {
                     } else {
                         // Postgres treats delete-with-no-match as success (0 rows). That's the
                         // idempotent behavior we want — already-deleted is the same as deleted now.
-                        queue = markSynced(queue, item.id);
+                        queue = await mutateQueue(q => markSynced(q, item.id));
                         window.dispatchEvent(new CustomEvent('novira-mutation-synced', {
                             detail: { id: item.id, type: item.type, data: item.data }
                         }));
@@ -557,7 +579,7 @@ async function runSyncLoop(): Promise<void> {
                         const { permanent, reason } = classifyPgError(error);
                         if (permanent) {
                             console.error(`[sync-manager] ${item.type} permanently failed:`, reason);
-                            queue = markFailed(queue, item.id, reason, 'permanent');
+                            queue = await mutateQueue(q => markFailed(q, item.id, reason, 'permanent'));
                             window.dispatchEvent(new CustomEvent('novira-mutation-failed-permanent', {
                                 detail: { id: item.id, type: item.type, data: item.data, reason }
                             }));
@@ -565,7 +587,7 @@ async function runSyncLoop(): Promise<void> {
                             throw new Error(reason);
                         }
                     } else {
-                        queue = markSynced(queue, item.id);
+                        queue = await mutateQueue(q => markSynced(q, item.id));
                         window.dispatchEvent(new CustomEvent('novira-mutation-synced', {
                             detail: { id: item.id, type: item.type, data: item.data }
                         }));
@@ -582,7 +604,6 @@ async function runSyncLoop(): Promise<void> {
                         window.dispatchEvent(new CustomEvent('novira-mutation-failed-permanent', {
                             detail: { id: item.id, type: item.type, data: item.data, reason }
                         }));
-                        await writeQueue(queue);
                         done++;
                         window.dispatchEvent(new CustomEvent('novira-sync-progress', { detail: { done, total } }));
                         broadcast('novira-sync-progress', { done, total });
@@ -593,18 +614,16 @@ async function runSyncLoop(): Promise<void> {
                 if (process.env.NODE_ENV === 'development') {
                     console.error(`[sync-manager] ${item.type} failed, will retry:`, e);
                 }
-                queue = incrementRetry(queue, item.id);
+                queue = await mutateQueue(q => incrementRetry(q, item.id));
             }
 
-            await writeQueue(queue);
             done++;
             window.dispatchEvent(new CustomEvent('novira-sync-progress', { detail: { done, total } }));
             broadcast('novira-sync-progress', { done, total });
         }
 
         // Clean up
-        queue = removeSynced(queue);
-        await writeQueue(queue);
+        queue = await mutateQueue(removeSynced);
         dispatchQueueUpdated(queue);
 
         // Items that hit a transient failure this pass are now pending with a
@@ -624,20 +643,16 @@ async function runSyncLoop(): Promise<void> {
 
 // 4. Manual Retry for Failed Items
 export async function retryFailedItem(id: string) {
-    let queue = await readQueue();
-    queue = queue.map(item => item.id === id
-        ? { ...item, status: 'pending', retryCount: 0, nextRetryAt: undefined, errorReason: undefined, failedAt: undefined, errorKind: undefined }
+    const queue = await mutateQueue(q => q.map(item => item.id === id
+        ? { ...item, status: 'pending' as const, retryCount: 0, nextRetryAt: undefined, errorReason: undefined, failedAt: undefined, errorKind: undefined }
         : item
-    );
-    await writeQueue(queue);
+    ));
     dispatchQueueUpdated(queue);
     attemptSync();
 }
 
 export async function discardFailedItem(id: string) {
-    let queue = await readQueue();
-    queue = queue.filter(item => item.id !== id);
-    await writeQueue(queue);
+    const queue = await mutateQueue(q => q.filter(item => item.id !== id));
     dispatchQueueUpdated(queue);
     // Drop any orphaned offline receipt for this item — keeps IDB clean even
     // for queue types that never had a receipt (no-op when key is absent).

@@ -58,7 +58,7 @@ export function useRecurringTemplates(userId: string | null | undefined) {
     useEffect(() => {
         if (!userId) return;
         const channel = supabase
-            .channel(`recurring-templates-${userId}`)
+            .channel(`recurring-templates-${userId}-${crypto.randomUUID()}`)
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'recurring_templates', filter: `user_id=eq.${userId}` },
                 (payload) => {
                     const row = payload.new as RecurringTemplate;

@@ -51,7 +51,7 @@ export function ProfileSection({ showBudgetAlert, onDismissBudgetAlert }: Props)
         loadProfile();
 
         const channel = supabase
-            .channel(`profile-sync-${userId}`)
+            .channel(`profile-sync-${userId}-${crypto.randomUUID()}`)
             .on(
                 'postgres_changes',
                 { event: '*', schema: 'public', table: 'profiles', filter: `id=eq.${userId}` },

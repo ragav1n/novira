@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { format, startOfMonth, endOfMonth, subMonths, subDays, parseISO, getDay, differenceInCalendarDays } from 'date-fns';
 import { CATEGORY_COLORS, getCategoryLabel } from '@/lib/categories';
 import type { Transaction } from '@/types/transaction';
+import { resolveAmountIn } from '@/lib/utils/resolve-amount';
 
 export type DateRange = '1M' | 'LM' | '3M' | '6M' | '1Y' | 'ALL' | 'CUSTOM';
 
@@ -50,6 +51,10 @@ export type LocationCluster = {
 
 const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
+// Stable identity for the no-tags case. A fresh `[]` per render would land in the
+// useMemo dep array below and recompute the whole aggregation on every render.
+const NO_TAGS: string[] = [];
+
 // Same snap precision as useMapData.ts so clusters here match the map view.
 const LOCATION_SNAP_PRECISION = 5000;
 
@@ -81,13 +86,8 @@ function convertOnce(
     currency: string,
     convertAmount: (amount: number, fromCurrency: string, toCurrency?: string) => number,
 ): { amount: number; converted: boolean } {
-    const txCurr = (tx.currency || 'USD').toUpperCase();
-    const baseCurr = (tx.base_currency || '').toUpperCase();
-    if (txCurr === currency.toUpperCase()) return { amount: share, converted: false };
-    if (tx.exchange_rate && baseCurr === currency.toUpperCase()) {
-        return { amount: share * Number(tx.exchange_rate), converted: false };
-    }
-    return { amount: convertAmount(share, txCurr, currency), converted: true };
+    const { amount, usedLiveRate } = resolveAmountIn(tx, share, currency, convertAmount);
+    return { amount, converted: usedLiveRate };
 }
 
 export function useAnalyticsData(opts: {
@@ -103,7 +103,7 @@ export function useAnalyticsData(opts: {
     activeTags?: string[];
 }) {
     const { transactions, priorTransactions, priorStart, dateRange, currency, userId, convertAmount } = opts;
-    const activeTags = opts.activeTags || [];
+    const activeTags = opts.activeTags || NO_TAGS;
 
     return useMemo(() => {
         const empty = {

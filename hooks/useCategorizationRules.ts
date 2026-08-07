@@ -42,7 +42,7 @@ export function useCategorizationRules(userId: string | null | undefined) {
         fetchRules();
 
         const channel = supabase
-            .channel(`categorization-rules-${userId}`)
+            .channel(`categorization-rules-${userId}-${crypto.randomUUID()}`)
             .on(
                 'postgres_changes',
                 { event: '*', schema: 'public', table: 'categorization_rules', filter: `user_id=eq.${userId}` },

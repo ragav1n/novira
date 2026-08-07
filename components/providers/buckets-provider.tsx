@@ -8,6 +8,7 @@ import { toast } from '@/utils/haptics';
 import { BucketService, type BucketSpendingRow } from '@/lib/services/bucket-service';
 import { reportNetworkError } from '@/lib/network-error-bus';
 import { getErrorMessage } from '@/lib/error-utils';
+import { resolveAmountIn } from '@/lib/utils/resolve-amount';
 
 export interface Bucket {
     id: string;
@@ -62,6 +63,10 @@ function computeBucketSpending(
         rateCache.set(key, rate);
         return rate;
     };
+    // Rate-cached stand-in for convertAmount so resolveAmountIn's live-rate tier
+    // doesn't re-derive the same pair once per row.
+    const cachedConvert = (amount: number, from: string, to?: string) =>
+        amount * getRate(from.toUpperCase(), (to || currency).toUpperCase());
     const spending: Record<string, number> = {};
     rows.forEach(row => {
         const bucketConfig = bucketMap.get(row.bucket_id);
@@ -70,15 +75,14 @@ function computeBucketSpending(
         const share = Number(row.share_amount);
         if (!share || share <= 0) return;
         const bucketCurrency = (bucketConfig?.currency || currency).toUpperCase();
-        const txCurrency = (row.currency || 'USD').toUpperCase();
-        let amountInBucketCurrency: number;
-        if (txCurrency === bucketCurrency) {
-            amountInBucketCurrency = share;
-        } else if (row.exchange_rate && row.base_currency?.toUpperCase() === bucketCurrency) {
-            amountInBucketCurrency = share * Number(row.exchange_rate);
-        } else {
-            amountInBucketCurrency = share * getRate(txCurrency, bucketCurrency);
-        }
+        // The aggregate returns a pre-computed share, so `amount` is that share —
+        // there's no whole-transaction converted_amount to scale from here.
+        const { amount: amountInBucketCurrency } = resolveAmountIn(
+            { amount: share, currency: row.currency, base_currency: row.base_currency, exchange_rate: row.exchange_rate },
+            share,
+            bucketCurrency,
+            cachedConvert,
+        );
         spending[row.bucket_id] = (spending[row.bucket_id] || 0) + amountInBucketCurrency;
     });
     return spending;
@@ -184,7 +188,7 @@ export function BucketsProvider({ children }: { children: React.ReactNode }) {
                 : `user_id=eq.${userId}`;
 
             const channel = supabase
-                .channel(`buckets-updates-${userId}-${activeWorkspaceId || 'personal'}`)
+                .channel(`buckets-updates-${userId}-${activeWorkspaceId || 'personal'}-${crypto.randomUUID()}`)
                 .on('postgres_changes', {
                     event: '*', schema: 'public', table: 'buckets',
                     filter: bucketFilter

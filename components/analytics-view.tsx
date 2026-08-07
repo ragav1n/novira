@@ -58,6 +58,11 @@ function BucketIcon({ icon, className }: { icon?: string; className?: string }) 
     return React.cloneElement(el, { className });
 }
 
+// Charts and aggregations get expensive past this many rows, so the ALL range
+// caps here and shows a footnote. Also drives the fetch limit so the cap is
+// actually reachable instead of being masked by the server's default page size.
+const ALL_VIEW_LIMIT = 5000;
+
 export function AnalyticsView() {
     const router = useRouter();
     const [loading, setLoading] = useState(true);
@@ -153,6 +158,9 @@ export function AnalyticsView() {
                     ...baseQuery,
                     startDate: startDate ? format(startDate, 'yyyy-MM-dd') : undefined,
                     endDate: endDate ? format(endDate, 'yyyy-MM-dd') : undefined,
+                    // Fetch one past the cap so the truncation check below can tell
+                    // "exactly at the cap" from "there's more".
+                    limit: ALL_VIEW_LIMIT + 1,
                 }),
                 priorStart && priorEnd
                     ? TransactionService.getTransactions({
@@ -166,12 +174,15 @@ export function AnalyticsView() {
             if (fetchGenRef.current !== myGen) return;
             // Income transactions belong to a separate "earning" model and shouldn't
             // appear in spending analytics (category breakdown, top merchants, trend).
-            const filteredCurrent = (current || []).filter(t => !t.is_income && !t.is_settlement);
-            const filteredPrior = (prior || []).filter(t => !t.is_income && !t.is_settlement);
+            // Transfers are two rows (outflow +amount, inflow -amount) moving money
+            // between the user's own accounts. computeShare drops the negative leg, so
+            // leaving them in would add each transfer's full amount to spending.
+            const isSpending = (t: Transaction) => !t.is_income && !t.is_settlement && !t.is_transfer;
+            const filteredCurrent = (current || []).filter(isSpending);
+            const filteredPrior = (prior || []).filter(isSpending);
 
             // ALL-view safety: at high transaction counts charts and aggregations get
             // expensive. Cap the view at the latest 5000 and surface a footnote.
-            const ALL_VIEW_LIMIT = 5000;
             let nextCurrent = filteredCurrent;
             let truncated = false;
             if (dateRange === 'ALL' && nextCurrent.length > ALL_VIEW_LIMIT) {
@@ -242,7 +253,7 @@ export function AnalyticsView() {
             : `user_id=eq.${userId}`;
 
         const channel = supabase
-            .channel(`analytics-updates-${userId}-${activeWorkspaceId || 'personal'}`)
+            .channel(`analytics-updates-${userId}-${activeWorkspaceId || 'personal'}-${crypto.randomUUID()}`)
             .on('postgres_changes', {
                 event: '*', schema: 'public', table: 'transactions', filter: txFilter
             }, () => { debouncedFetchData(); })

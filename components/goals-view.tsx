@@ -161,7 +161,7 @@ export function GoalsView() {
         if (!userId) return;
 
         const goalsChannel = supabase
-            .channel(`goals-changes-${userId}-${activeWorkspaceId || 'personal'}`)
+            .channel(`goals-changes-${userId}-${activeWorkspaceId || 'personal'}-${crypto.randomUUID()}`)
             .on(
                 'postgres_changes',
                 { event: 'INSERT', schema: 'public', table: 'savings_goals', filter: `user_id=eq.${userId}` },

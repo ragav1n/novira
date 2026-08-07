@@ -7,6 +7,7 @@ import type { Account } from '@/types/account';
 import { ACCOUNT_TYPE_LABELS } from '@/types/account';
 import type { SavingsGoal, SavingsDeposit } from '@/types/goal';
 import type { SubscriptionMetadata } from '@/types/transaction';
+import { resolveAmountIn } from '@/lib/utils/resolve-amount';
 
 // jsPDF + autoTable expose a few members the published types don't declare.
 // Narrow to just what we use so we get autocompletion and stop bypassing
@@ -460,34 +461,20 @@ function computeStats(
 
 /**
  * Resolves a transaction's display amount in the report's target currency.
- * Priority:
- *  1. tx.currency === displayCurrency → use tx.amount directly (no conversion, exact)
- *  2. tx.converted_amount stored in displayCurrency (base_currency matches) → use it (historical rate)
- *  3. tx.exchange_rate available → reconstruct amount in stored base_currency, then convert if needed
- *  4. Fallback: live-rate convertAmount
+ * Delegates to the shared ladder in `lib/utils/resolve-amount` so exports can't
+ * drift from what the dashboard, analytics, and bucket views show.
  */
 function resolveAmount(
     tx: ExportTransaction,
     currency: string,
     convertAmount: (amount: number, fromCurrency: string) => number
 ): number {
-    const txCurr = (tx.currency || currency).toUpperCase();
-    const displayCurr = currency.toUpperCase();
-
-    if (txCurr === displayCurr) return Number(tx.amount);
-
-    if (tx.converted_amount && tx.base_currency?.toUpperCase() === displayCurr) {
-        return tx.converted_amount;
-    }
-
-    if (tx.exchange_rate && tx.base_currency) {
-        const amtInStoredBase = Number(tx.amount) * tx.exchange_rate;
-        const storedBaseCurr = tx.base_currency.toUpperCase();
-        if (storedBaseCurr === displayCurr) return amtInStoredBase;
-        return convertAmount(amtInStoredBase, storedBaseCurr);
-    }
-
-    return convertAmount(Number(tx.amount), txCurr);
+    return resolveAmountIn(
+        tx,
+        Number(tx.amount),
+        currency,
+        (amount, from) => convertAmount(amount, from),
+    ).amount;
 }
 
 const CATEGORY_COLORS: Record<string, [number, number, number]> = {

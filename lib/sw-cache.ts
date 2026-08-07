@@ -35,6 +35,23 @@ function getChannel(): BroadcastChannel | null {
     return cachedChannel;
 }
 
+/**
+ * Drop every cached Supabase REST response. Called on sign-out: the SW
+ * stale-while-revalidates PostgREST GETs by URL, and RLS-only queries (e.g.
+ * `workspace_budgets`, which carries no user filter) produce byte-identical URLs
+ * across accounts — so on a shared device the next user is served the previous
+ * user's rows until revalidation lands.
+ */
+export function clearSupabaseDataCaches() {
+    if (typeof navigator === 'undefined') return;
+    // The SW's handler matches on `url.pathname.includes(pattern)`, so the REST
+    // prefix covers every table without needing a service-worker change.
+    navigator.serviceWorker?.controller?.postMessage({
+        type: 'INVALIDATE_SUPABASE_CACHE',
+        pattern: '/rest/v1/',
+    });
+}
+
 export function invalidateTransactionCaches() {
     if (typeof navigator === 'undefined') return;
     const controller = navigator.serviceWorker?.controller;

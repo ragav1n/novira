@@ -41,7 +41,7 @@ export function GoalCard({ goal, deposits, formatCurrency, onAddDeposit, onEdit,
 
     const daysLeft = daysUntilDeadline(goal.deadline);
     const required = requiredMonthlyContribution(goal);
-    const velocity = monthlyVelocity(deposits, 90);
+    const velocity = monthlyVelocity(deposits, 90, goal.created_at);
     const status = onTrackStatus(required, velocity, deposits.length > 0);
     const projected = projectedCompletionDate(goal, velocity);
 

@@ -7,7 +7,7 @@ import { User, Session } from '@supabase/supabase-js';
 import { useExchangeRates } from '@/hooks/useExchangeRates';
 import { useAppBadge } from '@/hooks/useAppBadge';
 import { setQueueUser, attemptSync } from '@/lib/sync-manager';
-import { invalidateTransactionCaches } from '@/lib/sw-cache';
+import { invalidateTransactionCaches, clearSupabaseDataCaches } from '@/lib/sw-cache';
 
 export type Currency = 'USD' | 'EUR' | 'INR' | 'GBP' | 'CHF' | 'SGD' | 'VND' | 'TWD' | 'JPY' | 'KRW' | 'HKD' | 'MYR' | 'PHP' | 'THB' | 'CAD' | 'AUD' | 'MXN' | 'BRL' | 'IDR' | 'AED' | 'CNY' | 'RUB' | 'ZAR' | 'TRY' | 'NZD' | 'SEK';
 
@@ -364,6 +364,33 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
         }
     }, []);
 
+    // Every profile-backed piece of state, back to its initial value. Kept as one
+    // list so a newly added preference can't be forgotten here and leak across a
+    // sign-out into the next account on a shared device.
+    const resetPreferencesToDefaults = useCallback(() => {
+        setCurrencyState('INR');
+        setMonthlyBudgetState(DEFAULT_BUDGETS.INR);
+        setBudgets({});
+        setBudgetAlertsEnabledState(false);
+        setBillReminderLeadDaysState(null);
+        setDigestFrequencyState('off');
+        setBucketDeadlineAlertsState(true);
+        setSpendingPaceAlertsState(true);
+        setQuietHoursStartState(null);
+        setQuietHoursEndState(null);
+        setSmartDigestsEnabledState(true);
+        setSettlementNotificationsEnabledState(true);
+        setFirstDayOfWeekState(0);
+        setDateFormatState('MDY');
+        setDefaultCategoryState(null);
+        setDefaultPaymentMethodState(null);
+        setDefaultBucketIdState(null);
+        setAvatarUrl(null);
+        setFullName('User');
+        setActiveWorkspaceId(null);
+        setWorkspaceBudgets({});
+    }, []);
+
     const handleSession = useCallback(async (session: Session | null) => {
         const currentUser = session?.user ?? null;
         setUser(currentUser);
@@ -396,16 +423,13 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
                 attemptSync();
             }
         } else {
-            // Reset preferences on logout
-            setCurrencyState('INR');
-            setBudgetAlertsEnabledState(false);
-            setMonthlyBudgetState(DEFAULT_BUDGETS.INR);
-            setBudgets({});
-            setAvatarUrl(null);
-            setActiveWorkspaceId(null);
-            setWorkspaceBudgets({});
+            resetPreferencesToDefaults();
+            // The SW caches Supabase reads by URL, and RLS-only queries key
+            // identically for every account — clear them so the next sign-in on
+            // this device can't be served the previous user's rows.
+            clearSupabaseDataCaches();
         }
-    }, [loadPreferences, processRecurringExpenses]);
+    }, [loadPreferences, processRecurringExpenses, resetPreferencesToDefaults]);
 
     // Keep ref in sync so visibilitychange handler always has latest userId without re-subscribing
     useEffect(() => {

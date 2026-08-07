@@ -1,6 +1,7 @@
 import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { getServerRatesMap } from '@/lib/server-exchange-rates';
+import { resolveAmountIn } from '@/lib/utils/resolve-amount';
 
 export type SnapshotRange =
     | { kind: 'preset'; value: '1M' | 'LM' | '3M' | '6M' | '1Y' | 'ALL' }
@@ -44,24 +45,20 @@ function convert(
     baseCurrency: string,
     liveRates: Map<string, number>,
 ): number {
-    const targetBase = baseCurrency.toUpperCase();
-    const txCurr = (tx.currency || baseCurrency).toUpperCase();
-    if (txCurr === targetBase) return share;
-    const baseCurr = (tx.base_currency || '').toUpperCase();
-    if (tx.exchange_rate && baseCurr === targetBase) {
-        // Stored rate is to current base — trust it.
-        return share * Number(tx.exchange_rate);
-    }
-    // Stored rate is to an old base (user changed base since this tx). Use a
-    // freshly fetched rate to avoid mixing units across base-currency changes.
-    const liveRate = liveRates.get(`${txCurr}->${targetBase}`);
-    if (liveRate !== undefined) return share * liveRate;
-    // No live rate (e.g. API key missing). Fall back to the stored ratio so
-    // the snapshot still returns something rather than skipping the row.
-    if (tx.converted_amount && tx.amount) {
-        return share * (Number(tx.converted_amount) / Number(tx.amount));
-    }
-    return share;
+    // Shared ladder handles same-currency and stored-rate rows. The fallback below
+    // only runs when the stored rate is unusable or points at an old base (the user
+    // changed base currency since this tx was written).
+    return resolveAmountIn(tx, share, baseCurrency, (amount, from, to) => {
+        const target = (to || baseCurrency).toUpperCase();
+        const liveRate = liveRates.get(`${from.toUpperCase()}->${target}`);
+        if (liveRate !== undefined) return amount * liveRate;
+        // No live rate (e.g. API key missing). Fall back to the stored ratio so
+        // the snapshot still returns something rather than skipping the row.
+        if (tx.converted_amount && tx.amount) {
+            return amount * (Number(tx.converted_amount) / Number(tx.amount));
+        }
+        return amount;
+    }).amount;
 }
 
 function resolveRange(range: SnapshotRange): { start: string | null; end: string | null; label: string } {
@@ -130,6 +127,11 @@ export async function buildInsightsSnapshot(
         .from('transactions')
         .select('id, amount, category, payment_method, date, place_name, description, user_id, currency, exchange_rate, base_currency, converted_amount, is_recurring, tags, bucket_id, splits(user_id, amount)')
         .eq('is_settlement', false)
+        // Income is stored with a positive amount and transfers post a positive
+        // outflow leg, so both would land in totalSpent / byCategory / the LLM
+        // sample as if they were purchases.
+        .eq('is_income', false)
+        .eq('is_transfer', false)
         .order('date', { ascending: false })
         .limit(2000);
 

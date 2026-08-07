@@ -310,8 +310,15 @@ export function useDashboardData(
             ? `group_id=eq.${activeWorkspaceId}`
             : `user_id=eq.${userId}`;
 
+        // Topic must be unique per subscription instance, not per user/workspace.
+        // This effect tears down and re-subscribes on workspace *and* account
+        // changes; reusing a fixed topic means the new channel joins while the
+        // old one with the same name is still unsubscribing, and the server
+        // never completes the join (status goes CLOSED → TIMED_OUT, silently
+        // killing realtime for the session). React StrictMode's double-invoke in
+        // dev hits this every single mount.
         const channel = supabase
-            .channel(`dashboard-sync-${userId}-${activeWorkspaceId || 'personal'}`)
+            .channel(`dashboard-sync-${userId}-${activeWorkspaceId || 'personal'}-${crypto.randomUUID()}`)
             .on(
                 'postgres_changes',
                 { event: 'INSERT', schema: 'public', table: 'transactions', filter: txFilter },
@@ -319,6 +326,12 @@ export function useDashboardData(
                     // Fetch full transaction with profile/splits joins
                     const fullTx = await fetchFullTransaction(payload.new.id);
                     if (fetchGenRef.current !== myGen) return;
+                    // Mirror loadTransactions' account scoping. The channel filter can
+                    // only narrow by user/group, so without this a row on a different
+                    // account lands in a list the account filter excludes — and then
+                    // disappears on the next refetch.
+                    const accountFilter = activeAccountIdRef.current;
+                    if (!activeWorkspaceId && accountFilter && fullTx?.account_id !== accountFilter) return;
                     if (fullTx) {
                         setServerTransactions(prev => {
                             // Avoid duplicates (e.g. from optimistic updates)
@@ -391,7 +404,12 @@ export function useDashboardData(
             window.removeEventListener('online', handleOnline);
             supabase.removeChannel(channel);
         };
-    }, [userId, activeWorkspaceId, debouncedLoadTx, fetchFullTransaction]);
+        // activeAccountId belongs here even though the subscription doesn't read it:
+        // the reset effect above bumps fetchGenRef on account switches, and every
+        // handler below early-returns on a generation mismatch. Without this dep the
+        // channel keeps a stale `myGen` and goes permanently deaf after the first
+        // account switch.
+    }, [userId, activeWorkspaceId, activeAccountId, debouncedLoadTx, fetchFullTransaction]);
 
     useEffect(() => {
         if (!userId) return;
