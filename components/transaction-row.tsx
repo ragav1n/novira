@@ -444,25 +444,29 @@ export const TransactionRow = memo(function TransactionRow({
                     View receipt
                   </DropdownMenuItem>
                 )}
+                {/* Kept as two sibling conditionals rather than one wrapped in a
+                    fragment: DropdownMenuContent clones every child to inject a
+                    `--m3-stagger` style, and cloning a Fragment with `style` logs
+                    "Invalid prop `style` supplied to React.Fragment" on every open. */}
                 {canEdit && !isSettlement && !hasSplits && (
-                  <>
-                    <DropdownMenuItem
-                      delayDuration={0}
-                      onClick={(e) => { e.stopPropagation(); onEdit(); }}
-                      className="rounded-lg cursor-pointer gap-2 text-[13px]"
-                    >
-                      <Pencil className="w-3.5 h-3.5" />
-                      Edit
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      delayDuration={0}
-                      onClick={(e) => { e.stopPropagation(); onDelete(); }}
-                      className="rounded-lg cursor-pointer text-destructive focus:text-destructive gap-2 text-[13px]"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                      Delete
-                    </DropdownMenuItem>
-                  </>
+                  <DropdownMenuItem
+                    delayDuration={0}
+                    onClick={(e) => { e.stopPropagation(); onEdit(); }}
+                    className="rounded-lg cursor-pointer gap-2 text-[13px]"
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                    Edit
+                  </DropdownMenuItem>
+                )}
+                {canEdit && !isSettlement && !hasSplits && (
+                  <DropdownMenuItem
+                    delayDuration={0}
+                    onClick={(e) => { e.stopPropagation(); onDelete(); }}
+                    className="rounded-lg cursor-pointer text-destructive focus:text-destructive gap-2 text-[13px]"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    Delete
+                  </DropdownMenuItem>
                 )}
               </DropdownMenuContent>
             </DropdownMenu>

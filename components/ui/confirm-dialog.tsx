@@ -5,6 +5,7 @@ import {
     AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
     AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { cn } from '@/lib/utils';
 
 export interface ConfirmRequest {
     title: string;
@@ -53,23 +54,28 @@ export function useConfirm() {
             // Not dismissible mid-flight, so the action can't be abandoned halfway.
             onOpenChange={(open) => { if (!open && !busy) setRequest(null); }}
         >
-            <AlertDialogContent>
+            {/* The shared AlertDialog primitive sits at z-50 while Dialog is z-[100]
+                (overlay) / z-[110] (content). A confirm opened from inside a Dialog —
+                group settings, trip form, goal history — therefore rendered *underneath*
+                its parent's overlay and was completely unclickable. Same workaround
+                bulk-action-bar already uses for its own confirm. */}
+            <AlertDialogContent className="z-[200]">
                 <AlertDialogHeader>
                     <AlertDialogTitle>{request?.title}</AlertDialogTitle>
                     <AlertDialogDescription>{request?.description}</AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                    <AlertDialogCancel disabled={busy}>
+                    <AlertDialogCancel disabled={busy} className="min-h-[44px]">
                         {request?.cancelLabel ?? 'Cancel'}
                     </AlertDialogCancel>
                     <AlertDialogAction
                         disabled={busy}
                         aria-busy={busy}
-                        className={
-                            (request?.destructive ?? true)
-                                ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90'
-                                : undefined
-                        }
+                        className={cn(
+                            'min-h-[44px]',
+                            (request?.destructive ?? true) &&
+                                'bg-destructive text-destructive-foreground hover:bg-destructive/90',
+                        )}
                         onClick={(e) => { e.preventDefault(); handleConfirm(); }}
                     >
                         {busy ? 'Working…' : (request?.confirmLabel ?? 'Confirm')}
