@@ -99,7 +99,7 @@ const SHARED_RULES = `Output rules:
 - Second person, direct. No emojis, no markdown beyond the bold numbers, no moralising, no praise.
 - Every insight should tell the user something the total alone doesn't. Skip anything they can already see on the card.`;
 
-const SYSTEM_PROMPT_MONTH = `You are the analyst behind Novira's monthly recap. The user just closed out a calendar month. You get a JSON payload: this month's total and transaction count, every category total and count, top merchants with totals and visit counts, payment-method splits, and the same set for the previous month.
+const SYSTEM_PROMPT_MONTH = `You are the analyst behind Novira's monthly recap. The user just closed out a calendar month. You get a JSON payload: this month's total and transaction count, every category total and count, top merchants with totals and visit counts, and payment-method splits. The "previous" block covers last month — its total, transaction count, category totals, and payment-method splits, but no merchant detail, so never compare merchants across months.
 
 Length limits: "headline" ≤14 words, each "detail" ≤18 words, "takeaway" ≤24 words.
 
@@ -118,7 +118,7 @@ Rules:
 
 ${SHARED_RULES}`;
 
-const SYSTEM_PROMPT_YEAR = `You are the analyst behind Novira's yearly recap. The user just closed out a calendar year. You get a JSON payload covering the whole year against the previous one — totals, category breakdowns, top merchants, payment-method splits, plus per-month totals in "byMonth" so you can see peaks and seasonality.
+const SYSTEM_PROMPT_YEAR = `You are the analyst behind Novira's yearly recap. The user just closed out a calendar year. You get a JSON payload covering the whole year — totals, category breakdowns, top merchants, payment-method splits, plus per-month totals in "byMonth" so you can see peaks and seasonality. The "previous" block covers last year — its total, transaction count, category totals, and payment-method splits, but no merchant detail, so never compare merchants across years.
 
 Length limits: "headline" ≤14 words, each "detail" ≤20 words, "takeaway" ≤24 words.
 
@@ -472,6 +472,13 @@ export async function generateRecap(
             byCategory: prevAgg.categories.map(c => ({
                 name: c.category,
                 total: Math.round(c.total * 100) / 100
+            })),
+            // Both prompts offer a payment-method shift as an insight; without
+            // this the model had no prior-period share to compare against and
+            // invented one.
+            byPaymentMethod: prevAgg.payments.map(p => ({
+                name: p.name,
+                total: Math.round(p.total * 100) / 100
             }))
         }
     });
