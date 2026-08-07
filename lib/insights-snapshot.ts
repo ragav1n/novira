@@ -2,6 +2,7 @@ import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { getServerRatesMap } from '@/lib/server-exchange-rates';
 import { resolveAmountIn } from '@/lib/utils/resolve-amount';
+import { currencySymbol } from '@/lib/server/currency';
 
 export type SnapshotRange =
     | { kind: 'preset'; value: '1M' | 'LM' | '3M' | '6M' | '1Y' | 'ALL' }
@@ -93,7 +94,14 @@ function resolveRange(range: SnapshotRange): { start: string | null; end: string
 
 export interface InsightsSnapshot {
     period: string;
+    /** ISO date the range starts on; null for "all time". */
+    rangeStart: string | null;
+    /** ISO date the range ends on; null for "all time". */
+    rangeEnd: string | null;
+    /** ISO date on the server, so the model can resolve "last week", "yesterday". */
+    today: string;
     baseCurrency: string;
+    currencySymbol: string;
     totalSpent: number;
     txCount: number;
     byCategory: { category: string; total: number; count: number }[];
@@ -218,7 +226,11 @@ export async function buildInsightsSnapshot(
     const round = (n: number) => Math.round(n * 100) / 100;
     return {
         period: label,
+        rangeStart: start,
+        rangeEnd: end,
+        today: new Date().toISOString().slice(0, 10),
         baseCurrency,
+        currencySymbol: currencySymbol(baseCurrency),
         totalSpent: round(totalSpent),
         txCount,
         byCategory: Array.from(byCategory.entries())

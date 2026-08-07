@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { ChartLine, Sparkles, Repeat, Tags, Store, Wallet, Lightbulb } from 'lucide-react';
 import { format } from 'date-fns';
 import { HolographicCard } from '@/components/ui/holographic-card';
-import { RecapBody, RecapSkeleton, type RecapData, type RecapAnalyzed } from '@/components/recap/recap-card';
+import { RecapBody, RecapSkeleton, formatRecapPeriod, isYearlyPeriod, type RecapData, type RecapAnalyzed } from '@/components/recap/recap-card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/utils/haptics';
 
@@ -94,11 +94,8 @@ export function MonthlyRecapCard({ currency, formatCurrency }: Props) {
 
     useEffect(() => () => recapAbortRef.current?.abort(), []);
 
-    const recapMonthLabel = useMemo(() => {
-        if (!recapMonth) return null;
-        const [y, m] = recapMonth.split('-').map(Number);
-        return format(new Date(y, m - 1, 1), 'MMMM yyyy');
-    }, [recapMonth]);
+    const recapMonthLabel = useMemo(() => formatRecapPeriod(recapMonth) || null, [recapMonth]);
+    const viewingYear = isYearlyPeriod(recapMonth);
 
     useEffect(() => {
         let cancelled = false;
@@ -131,8 +128,12 @@ export function MonthlyRecapCard({ currency, formatCurrency }: Props) {
                             <ChartLine className="w-[18px] h-[18px] text-primary-foreground" />
                         </div>
                         <div className="min-w-0">
-                            <h3 className="font-bold text-[12px] uppercase tracking-wider text-foreground">Monthly Recap</h3>
-                            <p className="text-[10px] text-muted-foreground font-medium truncate">A look at last month's spending</p>
+                            <h3 className="font-bold text-[12px] uppercase tracking-wider text-foreground">
+                                {viewingYear ? 'Yearly Recap' : 'Monthly Recap'}
+                            </h3>
+                            <p className="text-[10px] text-muted-foreground font-medium truncate">
+                                {viewingYear ? 'A look back at the whole year' : "A look at last month's spending"}
+                            </p>
                         </div>
                     </div>
                     {availableMonths.length > 0 ? (
@@ -144,14 +145,11 @@ export function MonthlyRecapCard({ currency, formatCurrency }: Props) {
                                 <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                                {availableMonths.map((m) => {
-                                    const [y, mm] = m.split('-').map(Number);
-                                    return (
-                                        <SelectItem key={m} value={m} className="text-[11px]">
-                                            {format(new Date(y, mm - 1, 1), 'MMMM yyyy')}
-                                        </SelectItem>
-                                    );
-                                })}
+                                {availableMonths.map((m) => (
+                                    <SelectItem key={m} value={m} className="text-[11px]">
+                                        {formatRecapPeriod(m)}
+                                    </SelectItem>
+                                ))}
                             </SelectContent>
                         </Select>
                     ) : recapMonthLabel ? (
@@ -167,6 +165,7 @@ export function MonthlyRecapCard({ currency, formatCurrency }: Props) {
                     <RecapBody
                         recap={recap}
                         analyzed={recapMeta}
+                        period={recapMonth}
                         formatCurrency={formatCurrency}
                         onInsightClick={(subject, kind) => {
                             if (!recapMonth || !subject) return;

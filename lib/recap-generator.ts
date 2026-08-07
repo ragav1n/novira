@@ -2,6 +2,7 @@ import 'server-only';
 import Anthropic from '@anthropic-ai/sdk';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { getServerRatesMap } from '@/lib/server-exchange-rates';
+import { currencySymbol, fmtMoney } from '@/lib/server/currency';
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -32,75 +33,81 @@ interface MerchantAgg {
     count: number;
 }
 
-const SYSTEM_PROMPT_MONTH = `You are a sharp personal finance coach embedded in Novira. The user just finished a calendar month of spending. You'll receive a JSON payload with: this month's total + transaction count, every category total + count, top merchants with totals + visit counts, payment-method splits, and the same set for the previous month for comparison.
+// Shared by both prompts. The yearly prompt used to say "same rules as the
+// monthly recap" — but the model only ever sees one of the two, so those rules
+// were never actually delivered on a yearly run.
+const SHARED_RULES = `Output rules:
+- Respond with a single JSON object. No markdown fences, no prose before or after it.
+- Every figure you cite must come from the payload. Never invent a merchant, category, or amount, and never round a number to a tidier one.
+- Wrap every number in "detail" and "takeaway" — amounts, percentages, counts — in **double asterisks**. The client renders those bold and nothing else. Example: "Food hit **₹13,202** across **31** orders — **36%** of everything you spent."
+- Write amounts using the "currencySymbol" given in the payload.
+- "kind" must be exactly one of: category, merchant, payment, frequency, new.
+- "subject" must appear verbatim in the payload — a category name, merchant name, or payment-method name, lowercased. It becomes a search filter, so it has to match. Use an empty string when "kind" is "frequency".
+- Second person, direct. No emojis, no markdown beyond the bold numbers, no moralising, no praise.
+- Every insight should tell the user something the total alone doesn't. Skip anything they can already see on the card.`;
 
-You MUST respond with a single JSON object — no markdown fences, no prose outside the JSON — matching this shape exactly:
+const SYSTEM_PROMPT_MONTH = `You are the analyst behind Novira's monthly recap. The user just closed out a calendar month. You get a JSON payload: this month's total and transaction count, every category total and count, top merchants with totals and visit counts, payment-method splits, and the same set for the previous month.
+
+Respond with a single JSON object in exactly this shape:
 
 {
-  "headline": "<one short sentence with total spent and direction vs last month, ≤14 words>",
-  "totalSpent": <number, this month's total in base currency>,
-  "previousTotal": <number, prior month's total in base currency>,
-  "changePercent": <number, signed % change vs prior month; 0 if prior was 0>,
-  "transactionCount": <number, this month's transaction count from the input>,
+  "headline": "<one sentence, ≤14 words: what the month looked like and which way it moved>",
   "insights": [
     {
       "label": "<2–3 word title>",
       "kind": "<category|merchant|payment|frequency|new>",
-      "subject": "<lowercase exact value from the data — category name for kind=category|new, merchant name for kind=merchant, payment-method name for kind=payment, empty string for kind=frequency>",
-      "detail": "<one concrete sentence with specific numbers, ≤18 words>"
+      "subject": "<lowercase value from the payload; empty string when kind is frequency>",
+      "detail": "<one sentence, ≤18 words, carrying the specific numbers>"
     }
   ],
-  "takeaway": "<one practical, specific suggestion grounded in the data, ≤24 words>"
+  "takeaway": "<one specific, doable suggestion tied to one of the insights, ≤24 words>"
 }
 
-What to analyze (pick the 3–4 most useful insights — variety beats redundancy):
-1. Biggest category mover up — name it, give absolute amount and % change vs prior month.
-2. Biggest category mover down or that you cut — same format.
-3. A brand-new category that didn't exist last month, if any.
-4. Top merchant or merchant concentration — e.g. "X visits to Y for Z total" or "top 3 merchants account for N% of spend".
-5. Payment-method shift — e.g. "credit card share rose from X% to Y%".
-6. Transaction frequency — e.g. "N transactions vs M last month, average ticket ₹X".
+Pick the 3–4 most useful insights. Variety beats repetition — don't spend two of them on the same category. Candidates:
+1. The category that rose most — name it, the amount, and the % change vs last month.
+2. The category that fell most.
+3. A category that shows up this month and not last month.
+4. Merchant concentration — "N visits to X for Y total", or "the top 3 places were Z% of spend".
+5. A payment-method shift — "card went from X% to Y% of spend".
+6. Frequency and average ticket — "N transactions vs M last month, averaging X each".
 
 Rules:
-- Always 3 to 4 insight objects. Each must use real numbers from the input — no rounding to round numbers, no invented merchants.
-- "kind" must be one of: category, merchant, payment, frequency, new.
-- "subject" must be a real value present in the input (a category name, merchant name, or payment-method name) so it can be used as a search filter. Empty string for frequency-kind insights.
-- In "detail" and "takeaway", wrap every numeric figure (amounts, percentages, counts) in **double asterisks** so the client can render them bold. Example: "Food jumped to **₹13,202** across **31** transactions — **36%** of total spend."
-- Use the currency symbol of baseCurrency (₹ for INR, $ for USD, € for EUR, £ for GBP). Plain numbers in numeric fields.
-- No emojis. No markdown other than the bold-number convention. No moralizing. Direct, second-person.
-- Takeaway must be specific and tied to one of the insights (e.g. "Cap food merchant visits at **20** next month — that alone would save ~**₹2,500**").
-- If the user spent zero this month, return one insight (kind "frequency") noting that and an upbeat takeaway.
-- Output JSON ONLY. No leading/trailing text.`;
+- Exactly 3 or 4 insight objects.
+- The takeaway names a number and an action. Good: "Cap delivery orders at **15** next month — that's about **₹2,500** back." Bad: "Consider watching your food spending."
+- If this month's total is 0, return a single insight with kind "frequency" saying so, plus an encouraging takeaway.
 
-const SYSTEM_PROMPT_YEAR = `You are a sharp personal finance coach embedded in Novira. The user just finished a full calendar year of spending. You'll receive a JSON payload covering the entire year vs the previous year — totals, category breakdowns, top merchants, payment-method splits, plus per-month totals so you can spot peaks and seasonal patterns.
+${SHARED_RULES}`;
 
-You MUST respond with a single JSON object — no markdown fences, no prose outside the JSON — matching this shape exactly:
+const SYSTEM_PROMPT_YEAR = `You are the analyst behind Novira's yearly recap. The user just closed out a calendar year. You get a JSON payload covering the whole year against the previous one — totals, category breakdowns, top merchants, payment-method splits, plus per-month totals in "byMonth" so you can see peaks and seasonality.
+
+Respond with a single JSON object in exactly this shape:
 
 {
-  "headline": "<one short sentence with total spent and direction vs last year, ≤14 words>",
-  "totalSpent": <number, this year's total in base currency>,
-  "previousTotal": <number, prior year's total in base currency>,
-  "changePercent": <number, signed % change vs prior year; 0 if prior was 0>,
-  "transactionCount": <number, this year's transaction count from the input>,
+  "headline": "<one sentence, ≤14 words: what the year looked like and which way it moved>",
   "insights": [
     {
       "label": "<2–3 word title>",
       "kind": "<category|merchant|payment|frequency|new>",
-      "subject": "<lowercase exact value from the data — category name, merchant name, payment-method name, or empty string>",
-      "detail": "<one concrete sentence with specific numbers, ≤20 words>"
+      "subject": "<lowercase value from the payload; empty string when kind is frequency>",
+      "detail": "<one sentence, ≤20 words, carrying the specific numbers>"
     }
   ],
-  "takeaway": "<one practical, specific suggestion grounded in the data, ≤24 words>"
+  "takeaway": "<one specific, doable suggestion tied to one of the insights, ≤24 words>"
 }
 
-What to analyze (pick the 4 most striking insights):
-1. Biggest category by total — share of yearly spend.
-2. Highest-spending month — name the month, the amount, and what drove it.
-3. Notable yearly trend — e.g. category that grew most month-over-month, or one that disappeared.
-4. Top merchant of the year — visits + total.
-5. Payment-method mix shift across the year, if meaningful.
+Pick the 4 most striking insights. Candidates:
+1. The largest category — total and share of the year's spend.
+2. The heaviest month in "byMonth" — name it, the amount, and what drove it.
+3. A trend across the year — a category that climbed month over month, or one that stopped.
+4. The merchant of the year — visits and total.
+5. A payment-method shift across the year, if it's meaningful.
 
-Same formatting rules as the monthly recap: 4 insight objects, real numbers from input, **bold** every figure, currency symbol of baseCurrency, no emojis/markdown/moralizing. JSON only.`;
+Rules:
+- Exactly 4 insight objects.
+- The takeaway names a number and an action, not a platitude.
+- Prefer a month name ("March") over a month key ("2025-03") in "detail".
+
+${SHARED_RULES}`;
 
 const YEAR_RE = /^\d{4}-FY$/;
 export const VALID_PERIOD_RE = /^\d{4}(-\d{2}|-FY)$/;
@@ -251,17 +258,79 @@ export interface RecapAnalyzed {
     comparedToMonth: string;
 }
 
-function isValidRecap(v: unknown): v is RecapShape {
-    if (!v || typeof v !== 'object') return false;
+/** The prose half of the recap — the only part the model is asked to produce. */
+interface RecapNarrative {
+    headline: string;
+    insights: RecapInsight[];
+    takeaway: string;
+}
+
+const VALID_KINDS = new Set(['category', 'merchant', 'payment', 'frequency', 'new']);
+const MAX_INSIGHTS = 4;
+
+/**
+ * Accept the model's prose only if every field the card renders is present and
+ * non-empty, then clamp it to what the card is laid out for. A model that
+ * returns eight insights or a blank detail line would otherwise render as a
+ * wall of half-filled rows.
+ */
+function readNarrative(v: unknown): RecapNarrative | null {
+    if (!v || typeof v !== 'object') return null;
     const o = v as Record<string, unknown>;
-    return typeof o.headline === 'string'
-        && typeof o.takeaway === 'string'
-        && Array.isArray(o.insights)
-        && (o.insights as unknown[]).every(
-            (i) => i && typeof i === 'object'
-                && typeof (i as Record<string, unknown>).label === 'string'
-                && typeof (i as Record<string, unknown>).detail === 'string'
-        );
+    const headline = typeof o.headline === 'string' ? o.headline.trim() : '';
+    const takeaway = typeof o.takeaway === 'string' ? o.takeaway.trim() : '';
+    if (!headline || !takeaway || !Array.isArray(o.insights)) return null;
+
+    const insights: RecapInsight[] = [];
+    for (const raw of o.insights as unknown[]) {
+        if (!raw || typeof raw !== 'object') continue;
+        const i = raw as Record<string, unknown>;
+        const label = typeof i.label === 'string' ? i.label.trim() : '';
+        const detail = typeof i.detail === 'string' ? i.detail.trim() : '';
+        if (!label || !detail) continue;
+        const kind = typeof i.kind === 'string' && VALID_KINDS.has(i.kind) ? i.kind : 'category';
+        insights.push({
+            label,
+            kind,
+            // Drives the search drill-down, so it has to be a clean match.
+            subject: typeof i.subject === 'string' ? i.subject.trim().toLowerCase() : '',
+            detail,
+        });
+        if (insights.length === MAX_INSIGHTS) break;
+    }
+    if (insights.length === 0) return null;
+
+    return { headline, insights, takeaway };
+}
+
+/**
+ * Shown when the model's output is unusable. Built from the aggregates so the
+ * card still says something true and specific instead of surfacing an error.
+ */
+function fallbackNarrative(
+    agg: ReturnType<typeof aggregate>,
+    baseCurrency: string,
+    periodWord: string,
+): RecapNarrative {
+    const top = agg.categories[0];
+    const money = (n: number) => fmtMoney(n, baseCurrency);
+    return {
+        headline: `You spent ${money(agg.total)} over the ${periodWord}.`,
+        insights: top
+            ? [{
+                label: 'Top category',
+                kind: 'category',
+                subject: top.category,
+                detail: `${top.category.charAt(0).toUpperCase()}${top.category.slice(1)} led at **${money(top.total)}** across **${top.count}** transactions.`,
+            }]
+            : [{
+                label: 'Activity',
+                kind: 'frequency',
+                subject: '',
+                detail: `You logged **${agg.count}** transactions this ${periodWord}.`,
+            }],
+        takeaway: 'Open the breakdown below for the full category detail.',
+    };
 }
 
 export async function generateRecap(
@@ -331,7 +400,7 @@ export async function generateRecap(
     if (currentAgg.count === 0) {
         const periodWord = isYear ? 'year' : 'month';
         const recap: RecapShape = {
-            headline: `No spending logged for ${period}.`,
+            headline: `Nothing logged this ${periodWord}.`,
             totalSpent: 0,
             previousTotal: prevAgg.total,
             changePercent: 0,
@@ -369,6 +438,9 @@ export async function generateRecap(
         previousPeriod: prev,
         kind: isYear ? 'year' : 'month',
         baseCurrency,
+        // The prompt used to name symbols for four currencies and let the model
+        // guess the rest. Novira supports 26.
+        currencySymbol: currencySymbol(baseCurrency),
         current: {
             totalSpent: Math.round(currentAgg.total * 100) / 100,
             transactionCount: currentAgg.count,
@@ -417,16 +489,20 @@ export async function generateRecap(
     });
 
     const text = message.content[0].type === 'text' ? message.content[0].text.trim() : '';
-    const parsed = extractJson(text);
+    const narrative = readNarrative(extractJson(text))
+        ?? fallbackNarrative(currentAgg, baseCurrency, isYear ? 'year' : 'month');
 
-    const recap: RecapShape = isValidRecap(parsed) ? parsed : {
-        headline: `You spent ${baseCurrency} ${Math.round(currentAgg.total).toLocaleString()} in ${period}.`,
-        totalSpent: currentAgg.total,
-        previousTotal: prevAgg.total,
-        changePercent: prevAgg.total > 0 ? ((currentAgg.total - prevAgg.total) / prevAgg.total) * 100 : 0,
+    // The headline figures are what the card renders largest, so they come
+    // straight from the aggregates. Asking the model to echo them back only
+    // created a path for the most prominent number on screen to be wrong.
+    const recap: RecapShape = {
+        ...narrative,
+        totalSpent: Math.round(currentAgg.total * 100) / 100,
+        previousTotal: Math.round(prevAgg.total * 100) / 100,
+        changePercent: prevAgg.total > 0
+            ? ((currentAgg.total - prevAgg.total) / prevAgg.total) * 100
+            : 0,
         transactionCount: currentAgg.count,
-        insights: [{ label: 'Summary', kind: 'category', subject: '', detail: 'Recap could not be generated from the model output.' }],
-        takeaway: 'Try regenerating, or check the breakdown below for category-level detail.'
     };
 
     await supabase.from('monthly_recaps').upsert({

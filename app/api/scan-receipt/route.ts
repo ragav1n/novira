@@ -13,6 +13,68 @@ const MAX_IMAGE_BYTES = 5 * 1024 * 1024 // 5MB raw
 
 const RATE_CFG = { max: 30, windowMs: 24 * 60 * 60 * 1000 }
 
+// Static extraction instructions live in the system block; the user turn carries
+// the image and nothing else. (No cache_control — Haiku 4.5 needs a 4096-token
+// prefix before caching engages, and this is well under it.)
+const SYSTEM_PROMPT = `You read a photographed receipt and return its details as JSON. Respond with the JSON object only — no markdown fences, no prose around it.
+
+{
+  "amount": <number, no currency symbol>,
+  "description": <short summary of what was bought, in English, max 40 chars>,
+  "date": <"YYYY-MM-DD", or null if not printed>,
+  "time": <"HH:MM" 24-hour, or null if not printed>,
+  "currency": <ISO 4217 code, or null>,
+  "is_online": <true for an online order, false for an in-person purchase>,
+  "place_name": <store or merchant name — null when is_online is true>,
+  "place_address": <full street address if visible — null when is_online is true>,
+  "category": <exactly one value from the category list below>
+}
+
+Field rules:
+- "amount" is the final sum actually charged — after tax, tip, service charge, and discounts. It is not the subtotal, not the cash tendered, and not the change given. If the receipt shows several payment methods, use the combined total. If the image isn't a receipt, or no total is legible, return null and leave the other fields as your best effort.
+- "description" names the actual items: "Milk, eggs, bread", "Coffee & sandwich". Translate foreign item names to English ("Brot"→"Bread", "Käse"→"Cheese"), but keep brand names, proper nouns, and untranslatable words as they are. With too many items to list, pick the 2–3 most prominent or expensive ("Steak, wine, cheese"). Never write placeholder text like "Groceries x7". If no item line is legible, fall back to the merchant name.
+- "date": when the day/month order is ambiguous ("03/04/2026"), settle it from the merchant's country, address, or language — most of the world prints DD/MM, the US prints MM/DD. A receipt is never dated in the future; if your reading lands there, you misread it.
+- "currency": read the printed symbol together with the address, language, and tax labels. "$" alone is ambiguous across USD, CAD, AUD, SGD, NZD, and MXN — use the country to decide, and return null rather than guessing.
+- "is_online" is true when the receipt shows a website, an order number, or a shipping address and no physical storefront.
+
+Category — pick the single best match. On a mixed basket, go by where most of the money went:
+- food: restaurants, cafes, takeaway, fast food, coffee shops, delivery (Zomato, Swiggy, UberEats)
+- groceries: supermarkets, grocery stores, fresh produce, dairy, household consumables (BigBasket, Blinkit, Whole Foods, Tesco)
+- transport: fuel, petrol, taxi, ride-hail (Uber, Ola), parking, bus/train tickets, tolls
+- fashion: clothing, shoes, accessories, apparel stores (Zara, H&M, Myntra, Nike)
+- beauty: skincare, haircare, cosmetics, salon, spa, pharmacy beauty products (Nykaa, Sephora, MAC)
+- healthcare: doctor, hospital, pharmacy/chemist, medicine, dental, optician, gym/fitness
+- rent: rent payment, lease, property maintenance
+- bills: electricity, water, gas, internet, phone recharge, insurance, utility providers
+- shopping: general retail, electronics, home goods, online marketplaces (Amazon, Flipkart) — use this when no more specific category fits
+- entertainment: movies, concerts, streaming (Netflix, Spotify), games, sports events, amusement
+- education: school fees, tuition, courses, books, stationery, online learning (Udemy, Coursera)
+- others: anything that does not clearly fit the above`
+
+/**
+ * A shape-only regex accepts "2103-05-40" and dates years in the future, which
+ * then land in the expense form as a real transaction date. Check the calendar
+ * and the clock too — a misread year is the most common OCR failure here.
+ */
+function readReceiptDate(value: unknown): string | null {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null
+  const [y, m, d] = value.split('-').map(Number)
+  const parsed = new Date(Date.UTC(y, m - 1, d))
+  // Rejects overflow like month 13 or 31 February, which Date silently rolls over.
+  if (parsed.getUTCFullYear() !== y || parsed.getUTCMonth() !== m - 1 || parsed.getUTCDate() !== d) return null
+  if (y < 2000) return null
+  // One day of slack covers a receipt written across a timezone boundary.
+  const tomorrow = Date.now() + 24 * 60 * 60 * 1000
+  if (parsed.getTime() > tomorrow) return null
+  return value
+}
+
+function readReceiptTime(value: unknown): string | null {
+  if (typeof value !== 'string' || !/^\d{2}:\d{2}$/.test(value)) return null
+  const [h, min] = value.split(':').map(Number)
+  return h <= 23 && min <= 59 ? value : null
+}
+
 export async function POST(req: NextRequest) {
   if (!process.env.ANTHROPIC_API_KEY) {
     return NextResponse.json({ error: 'Receipt scanning is not configured (missing ANTHROPIC_API_KEY).' }, { status: 503 })
@@ -56,6 +118,7 @@ export async function POST(req: NextRequest) {
   const message = await client.messages.create({
     model: 'claude-haiku-4-5-20251001',
     max_tokens: 512,
+    system: SYSTEM_PROMPT,
     messages: [
       {
         role: 'user',
@@ -64,35 +127,7 @@ export async function POST(req: NextRequest) {
             type: 'image',
             source: { type: 'base64', media_type: mediaType, data: imageBase64 },
           },
-          {
-            type: 'text',
-            text: `Extract the following from this receipt and respond with ONLY valid JSON, no markdown:
-{
-  "amount": <total amount as a number, no currency symbol>,
-  "description": <short summary of items purchased IN ENGLISH, max 40 chars (e.g. "Milk, eggs, bread" or "Coffee & sandwich"). Translate foreign-language item names to English (e.g. "Brot"→"Bread", "Käse"→"Cheese"). Keep brand names, proper nouns, and untranslatable foreign words as-is. If there are too many items to list, pick the 2–3 most prominent/expensive ones (e.g. "Steak, wine, cheese"). Never output placeholder text like "Groceries x7" — always describe actual items. Fall back to merchant name if items are not legible>,
-  "date": <date in YYYY-MM-DD format, or null if not found>,
-  "time": <time in HH:MM 24h format, or null if not found>,
-  "currency": <ISO 4217 currency code e.g. EUR, USD, INR, GBP — infer from symbol if needed, or null>,
-  "is_online": <true if this was an online/e-commerce purchase (website URL, order number, "shipped to", no physical store address), false if it was at a physical location>,
-  "place_name": <physical store or merchant name — null if is_online is true>,
-  "place_address": <full physical store address if visible — null if is_online is true>,
-  "category": <pick exactly one from the list below based on what was purchased>
-}
-
-Category definitions — pick the best match:
-- food: restaurants, cafes, takeaway, fast food, coffee shops, delivery (Zomato, Swiggy, UberEats)
-- groceries: supermarkets, grocery stores, fresh produce, dairy, household consumables (BigBasket, Blinkit, Whole Foods, Tesco)
-- transport: fuel, petrol, taxi, ride-hail (Uber, Ola), parking, bus/train tickets, tolls
-- fashion: clothing, shoes, accessories, apparel stores (Zara, H&M, Myntra, Nike)
-- beauty: skincare, haircare, cosmetics, salon, spa, pharmacy beauty products (Nykaa, Sephora, MAC)
-- healthcare: doctor, hospital, pharmacy/chemist, medicine, dental, optician, gym/fitness
-- rent: rent payment, lease, property maintenance
-- bills: electricity, water, gas, internet, phone recharge, insurance, utility providers
-- shopping: general retail, electronics, home goods, online marketplaces (Amazon, Flipkart) — use this when no more specific category fits
-- entertainment: movies, concerts, streaming (Netflix, Spotify), games, sports events, amusement
-- education: school fees, tuition, courses, books, stationery, online learning (Udemy, Coursera)
-- others: anything that does not clearly fit the above categories`,
-          },
+          { type: 'text', text: 'Extract this receipt.' },
         ],
       },
     ],
@@ -125,8 +160,8 @@ Category definitions — pick the best match:
   ])
   const category = typeof r.category === 'string' && VALID_CATEGORIES.has(r.category) ? r.category : 'others'
   const description = typeof r.description === 'string' ? r.description.slice(0, 80) : ''
-  const date = typeof r.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(r.date) ? r.date : null
-  const time = typeof r.time === 'string' && /^\d{2}:\d{2}$/.test(r.time) ? r.time : null
+  const date = readReceiptDate(r.date)
+  const time = readReceiptTime(r.time)
   const currency = typeof r.currency === 'string' && /^[A-Z]{3}$/.test(r.currency) ? r.currency : null
   const is_online = typeof r.is_online === 'boolean' ? r.is_online : false
   const place_name = typeof r.place_name === 'string' ? r.place_name : null

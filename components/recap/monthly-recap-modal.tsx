@@ -3,11 +3,10 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, ChartLine, Sparkles, PencilLine } from 'lucide-react';
-import { format } from 'date-fns';
 import { usePathname, useRouter } from 'next/navigation';
 import { useUserPreferences } from '@/components/providers/user-preferences-provider';
 import { HolographicCard } from '@/components/ui/holographic-card';
-import { RecapBody, RecapSkeleton, type RecapData, type RecapAnalyzed } from '@/components/recap/recap-card';
+import { RecapBody, RecapSkeleton, formatRecapPeriod, type RecapData, type RecapAnalyzed } from '@/components/recap/recap-card';
 
 function RecapEmpty({ monthLabel, onAdd }: { monthLabel: string; onAdd: () => void }) {
     return (
@@ -146,10 +145,7 @@ export function MonthlyRecapModal() {
         };
     }, [userId, currency, pathname]);
 
-    const monthLabel = month ? (() => {
-        const [y, m] = month.split('-').map(Number);
-        return format(new Date(y, m - 1, 1), 'MMMM yyyy');
-    })() : '';
+    const monthLabel = formatRecapPeriod(month);
 
     return (
         <AnimatePresence>
@@ -208,6 +204,7 @@ export function MonthlyRecapModal() {
                                     <RecapBody
                                         recap={recap}
                                         analyzed={analyzed}
+                                        period={month}
                                         formatCurrency={formatCurrency}
                                         onInsightClick={drillTo}
                                     />

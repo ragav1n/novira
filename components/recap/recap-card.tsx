@@ -3,6 +3,7 @@
 import React from 'react';
 import { TrendingUp, TrendingDown, Lightbulb, Tags, Store, Wallet, Repeat, BadgePlus, Database } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { isYearlyPeriod } from '@/lib/recap-period';
 
 export type InsightKind = 'category' | 'merchant' | 'payment' | 'frequency' | 'new';
 
@@ -31,6 +32,8 @@ export interface RecapAnalyzed {
     comparedToMonth: string;
 }
 
+export { formatRecapPeriod, isYearlyPeriod } from '@/lib/recap-period';
+
 const INSIGHT_ICON: Record<InsightKind, React.ComponentType<{ className?: string }>> = {
     category: Tags,
     merchant: Store,
@@ -57,14 +60,21 @@ function RichText({ text, className }: { text: string; className?: string }) {
 export function RecapBody({
     recap,
     analyzed,
+    period,
     formatCurrency,
     onInsightClick,
 }: {
     recap: RecapData;
     analyzed?: RecapAnalyzed | null;
+    /** `YYYY-MM` or `YYYY-FY`. Drives the comparison label. */
+    period?: string | null;
     formatCurrency: (n: number) => string;
     onInsightClick?: (subject: string, kind?: InsightKind) => void;
 }) {
+    const comparisonLabel = isYearlyPeriod(period ?? analyzed?.comparedToMonth)
+        ? 'vs Last Year'
+        : 'vs Last Month';
+
     return (
         <div className="space-y-4" aria-live="polite">
             {/* Headline + change */}
@@ -79,7 +89,7 @@ export function RecapBody({
                     </div>
                     <div className="h-8 w-px bg-border/60" />
                     <div className="flex flex-col">
-                        <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/80">vs Last Month</span>
+                        <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/80">{comparisonLabel}</span>
                         <span className={cn(
                             'text-sm font-bold flex items-center gap-1',
                             recap.changePercent > 0 ? 'text-rose-400' : recap.changePercent < 0 ? 'text-emerald-400' : 'text-foreground/70'
