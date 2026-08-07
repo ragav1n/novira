@@ -1,6 +1,9 @@
 import 'server-only'
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
+// Schema written as JSON Schema rather than zod: the SDK's `zodOutputFormat`
+// converts through zod/v4, and this project is still on zod 3's v3 surface.
+import { jsonSchemaOutputFormat } from '@anthropic-ai/sdk/helpers/json-schema'
 import { createClient } from '@/utils/supabase/server'
 import { checkRateLimit, rateLimitResponse } from '@/lib/server/rate-limit'
 
@@ -13,22 +16,59 @@ const MAX_IMAGE_BYTES = 5 * 1024 * 1024 // 5MB raw
 
 const RATE_CFG = { max: 30, windowMs: 24 * 60 * 60 * 1000 }
 
+const nullableString = (description: string) =>
+  ({ anyOf: [{ type: 'string' }, { type: 'null' }], description }) as const
+
+// The response shape is enforced by the API against this schema, so the system
+// prompt below carries only the reading rules — not the field list or a "reply
+// with JSON only" instruction.
+const RECEIPT_SCHEMA = {
+  type: 'object',
+  properties: {
+    amount: {
+      anyOf: [{ type: 'number' }, { type: 'null' }],
+      description: 'Final sum charged, as a number with no currency symbol. Null when no total is legible.',
+    },
+    description: {
+      type: 'string',
+      description: 'Short summary of what was bought, in English, max 40 characters.',
+    },
+    date: nullableString('Purchase date as YYYY-MM-DD, or null when not printed on the receipt.'),
+    time: nullableString('Purchase time as HH:MM on a 24-hour clock, or null when not printed.'),
+    currency: nullableString('ISO 4217 currency code, or null when it cannot be determined.'),
+    is_online: {
+      type: 'boolean',
+      description: 'True for an online order, false for an in-person purchase.',
+    },
+    place_name: nullableString('Store or merchant name. Null when is_online is true.'),
+    place_address: nullableString('Full street address if visible. Null when is_online is true.'),
+    category: {
+      type: 'string',
+      enum: [
+        'food', 'groceries', 'transport', 'fashion', 'beauty', 'healthcare',
+        'rent', 'bills', 'shopping', 'entertainment', 'education', 'others',
+      ],
+      description: 'The single best-matching category, chosen by the rules in the system prompt.',
+    },
+  },
+  required: [
+    'amount', 'description', 'date', 'time', 'currency',
+    'is_online', 'place_name', 'place_address', 'category',
+  ],
+  additionalProperties: false,
+} as const
+
+// `transform: false` sends the schema above verbatim. The SDK's default
+// transform keeps only an allowlist of keywords and folds the rest into the
+// description — `enum` is not on that list, so the category list would reach
+// the model as a prose hint instead of a constraint the API enforces.
+const RECEIPT_FORMAT = jsonSchemaOutputFormat(RECEIPT_SCHEMA, { transform: false })
+type Receipt = ReturnType<typeof RECEIPT_FORMAT.parse>
+
 // Static extraction instructions live in the system block; the user turn carries
 // the image and nothing else. (No cache_control — Haiku 4.5 needs a 4096-token
 // prefix before caching engages, and this is well under it.)
-const SYSTEM_PROMPT = `You read a photographed receipt and return its details as JSON. Respond with the JSON object only — no markdown fences, no prose around it.
-
-{
-  "amount": <number, no currency symbol>,
-  "description": <short summary of what was bought, in English, max 40 chars>,
-  "date": <"YYYY-MM-DD", or null if not printed>,
-  "time": <"HH:MM" 24-hour, or null if not printed>,
-  "currency": <ISO 4217 code, or null>,
-  "is_online": <true for an online order, false for an in-person purchase>,
-  "place_name": <store or merchant name — null when is_online is true>,
-  "place_address": <full street address if visible — null when is_online is true>,
-  "category": <exactly one value from the category list below>
-}
+const SYSTEM_PROMPT = `You read a photographed receipt and report its details.
 
 Field rules:
 - "amount" is the final sum actually charged — after tax, tip, service charge, and discounts. It is not the subtotal, not the cash tendered, and not the change given. If the receipt shows several payment methods, use the combined total. If the image isn't a receipt, or no total is legible, return null and leave the other fields as your best effort.
@@ -56,8 +96,8 @@ Category — pick the single best match. On a mixed basket, go by where most of 
  * then land in the expense form as a real transaction date. Check the calendar
  * and the clock too — a misread year is the most common OCR failure here.
  */
-function readReceiptDate(value: unknown): string | null {
-  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null
+function readReceiptDate(value: string | null): string | null {
+  if (value === null || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null
   const [y, m, d] = value.split('-').map(Number)
   const parsed = new Date(Date.UTC(y, m - 1, d))
   // Rejects overflow like month 13 or 31 February, which Date silently rolls over.
@@ -69,8 +109,8 @@ function readReceiptDate(value: unknown): string | null {
   return value
 }
 
-function readReceiptTime(value: unknown): string | null {
-  if (typeof value !== 'string' || !/^\d{2}:\d{2}$/.test(value)) return null
+function readReceiptTime(value: string | null): string | null {
+  if (value === null || !/^\d{2}:\d{2}$/.test(value)) return null
   const [h, min] = value.split(':').map(Number)
   return h <= 23 && min <= 59 ? value : null
 }
@@ -115,67 +155,53 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  const message = await client.messages.create({
-    model: 'claude-haiku-4-5-20251001',
-    max_tokens: 512,
-    system: SYSTEM_PROMPT,
-    messages: [
-      {
-        role: 'user',
-        content: [
-          {
-            type: 'image',
-            source: { type: 'base64', media_type: mediaType, data: imageBase64 },
-          },
-          { type: 'text', text: 'Extract this receipt.' },
-        ],
-      },
-    ],
-  })
-
-  const firstBlock = message.content[0]
-  const text = firstBlock?.type === 'text' ? firstBlock.text : ''
-  const cleaned = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim()
-  let parsed: unknown
+  let receipt: Receipt | null
   try {
-    parsed = JSON.parse(cleaned)
+    const message = await client.messages.parse({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 512,
+      system: SYSTEM_PROMPT,
+      output_config: { format: RECEIPT_FORMAT },
+      messages: [
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'image',
+              source: { type: 'base64', media_type: mediaType, data: imageBase64 },
+            },
+            { type: 'text', text: 'Extract this receipt.' },
+          ],
+        },
+      ],
+    })
+    receipt = message.parsed_output
   } catch (err) {
-    console.error('[scan-receipt] JSON parse failed', { err, raw: text })
+    // A schema-shaped response can still fail to parse — a `max_tokens` cutoff
+    // truncates the JSON mid-object. Transport and rate-limit failures are a
+    // different problem and keep their own status.
+    if (err instanceof Anthropic.APIError) throw err
+    console.error('[scan-receipt] structured output parse failed', { err })
     return NextResponse.json({ error: 'Could not parse receipt' }, { status: 422 })
   }
 
-  if (!parsed || typeof parsed !== 'object') {
+  if (!receipt) {
     return NextResponse.json({ error: 'Receipt response missing fields' }, { status: 422 })
   }
 
-  const r = parsed as Record<string, unknown>
-  const amount = typeof r.amount === 'number' && Number.isFinite(r.amount) && r.amount >= 0 ? r.amount : null
-  if (amount === null) {
+  if (receipt.amount === null || receipt.amount < 0) {
     return NextResponse.json({ error: 'Receipt amount could not be read' }, { status: 422 })
   }
 
-  const VALID_CATEGORIES = new Set([
-    'food', 'groceries', 'transport', 'fashion', 'beauty', 'healthcare',
-    'rent', 'bills', 'shopping', 'entertainment', 'education', 'others',
-  ])
-  const category = typeof r.category === 'string' && VALID_CATEGORIES.has(r.category) ? r.category : 'others'
-  const description = typeof r.description === 'string' ? r.description.slice(0, 80) : ''
-  const date = readReceiptDate(r.date)
-  const time = readReceiptTime(r.time)
-  const currency = typeof r.currency === 'string' && /^[A-Z]{3}$/.test(r.currency) ? r.currency : null
-  const is_online = typeof r.is_online === 'boolean' ? r.is_online : false
-  const place_name = typeof r.place_name === 'string' ? r.place_name : null
-  const place_address = typeof r.place_address === 'string' ? r.place_address : null
-
   return NextResponse.json({
-    amount,
-    description,
-    date,
-    time,
-    currency,
-    is_online,
-    place_name,
-    place_address,
-    category,
+    amount: receipt.amount,
+    description: receipt.description.slice(0, 80),
+    date: readReceiptDate(receipt.date),
+    time: readReceiptTime(receipt.time),
+    currency: /^[A-Z]{3}$/.test(receipt.currency ?? '') ? receipt.currency : null,
+    is_online: receipt.is_online,
+    place_name: receipt.place_name,
+    place_address: receipt.place_address,
+    category: receipt.category,
   })
 }
