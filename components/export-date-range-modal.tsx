@@ -154,7 +154,8 @@ export function ExportDateRangeModal({
     const isExportDisabled = loading || (!dateRange && selectedPreset !== 'all_time');
 
     return (
-        <Dialog open={isOpen} onOpenChange={onOpenChange}>
+        // Guarded on `loading` so the modal can't be dismissed mid-export.
+        <Dialog open={isOpen} onOpenChange={(o) => { if (!loading) onOpenChange(o); }}>
             <DialogContent
                 className="sm:max-w-md p-0 gap-0 overflow-hidden rounded-3xl border-white/10 bg-card/95 backdrop-blur-xl"
             >

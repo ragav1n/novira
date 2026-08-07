@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils';
 import { toast } from '@/utils/haptics';
 import type { Group, Friend, Split } from '@/components/providers/groups-provider';
 import { simplifyDebtsForGroup } from '@/utils/simplify-debts';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 import { GroupSettingsDialog } from './group-settings-dialog';
 import { GroupDetailSheet } from './group-detail-sheet';
 
@@ -62,6 +63,7 @@ export function GroupsTabContent({
     groups, friends, currentUserId, pendingSplits, currency, formatCurrency, convertAmount,
     leaveGroup, onStartGroup,
 }: GroupsTabContentProps) {
+    const { confirm, dialog } = useConfirm();
     const [settingsGroupId, setSettingsGroupId] = useState<string | null>(null);
     const [detailGroupId, setDetailGroupId] = useState<string | null>(null);
     const [pastOpen, setPastOpen] = useState(false);
@@ -157,18 +159,18 @@ export function GroupsTabContent({
                         onOpenDetail={() => setDetailGroupId(group.id)}
                         onOpenSettings={() => setSettingsGroupId(group.id)}
                         onLeave={() => {
-                            toast(`Leave ${group.name}?`, {
-                                action: {
-                                    label: 'Leave',
-                                    onClick: async () => {
-                                        try {
-                                            await leaveGroup(group.id);
-                                            toast.success('Left group successfully');
-                                        } catch (error: unknown) {
-                                            const msg = error instanceof Error ? error.message : 'Failed to leave group';
-                                            toast.error(msg);
-                                        }
-                                    },
+                            confirm({
+                                title: `Leave ${group.name}?`,
+                                description: "You'll lose access to this group's expenses and balances. Any unsettled debts stay recorded — rejoining requires a new invite.",
+                                confirmLabel: 'Leave group',
+                                onConfirm: async () => {
+                                    try {
+                                        await leaveGroup(group.id);
+                                        toast.success('Left group successfully');
+                                    } catch (error: unknown) {
+                                        const msg = error instanceof Error ? error.message : 'Failed to leave group';
+                                        toast.error(msg);
+                                    }
                                 },
                             });
                         }}
@@ -218,6 +220,7 @@ export function GroupsTabContent({
                     )}
                 </div>
             )}
+            {dialog}
         </div>
     );
 }
@@ -319,21 +322,24 @@ function GroupCard({
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-0.5 -mr-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                    {/* gap-2 and 44px targets: Settings and Leave Group were ~26px and
+                        2px apart, so a mis-tap left the group. */}
+                    <div className="flex items-center gap-2 -mr-1 shrink-0" onClick={(e) => e.stopPropagation()}>
                         <button
-                            className="p-1.5 rounded-full text-muted-foreground/60 hover:text-foreground hover:bg-secondary/30 transition-colors"
+                            className="min-h-[44px] min-w-[44px] -my-2 inline-flex items-center justify-center rounded-full text-muted-foreground/60 hover:text-foreground hover:bg-secondary/30 transition-colors"
                             title="Group settings"
                             aria-label={`Settings for ${group.name}`}
                             onClick={(e) => { e.stopPropagation(); onOpenSettings(); }}
                         >
-                            <Settings2 className="w-3.5 h-3.5" />
+                            <Settings2 className="w-3.5 h-3.5" aria-hidden="true" />
                         </button>
                         <button
-                            className="p-1.5 rounded-full text-muted-foreground/60 hover:text-rose-400 hover:bg-rose-400/10 transition-colors"
+                            className="min-h-[44px] min-w-[44px] -my-2 inline-flex items-center justify-center rounded-full text-muted-foreground/60 hover:text-rose-400 hover:bg-rose-400/10 transition-colors"
                             title="Leave Group"
+                            aria-label={`Leave ${group.name}`}
                             onClick={(e) => { e.stopPropagation(); onLeave(); }}
                         >
-                            <LogOut className="w-3.5 h-3.5" />
+                            <LogOut className="w-3.5 h-3.5" aria-hidden="true" />
                         </button>
                     </div>
                 </div>

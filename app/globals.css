@@ -604,6 +604,12 @@ body.focus-bucket {
     100% { opacity: 0; transform: translateY(4px) scale(0.95); }
   }
 
+  /* Indeterminate sweep for the route-change progress bar in mobile-layout. */
+  @keyframes nav-progress {
+    0%   { transform: translateX(-100%); }
+    100% { transform: translateX(400%); }
+  }
+
   .m3-content[data-state="open"] { opacity: 1; }
   .m3-content[data-state="closed"] { opacity: 0; transition: opacity 200ms linear; }
 

@@ -221,7 +221,7 @@ export function CategorizationRulesSection({ userId, rules, loading, buckets, se
                         <Button
                             variant="ghost"
                             size="icon"
-                            className="h-8 w-8 text-muted-foreground hover:text-primary"
+                            className="min-h-[44px] min-w-[44px] -my-2 text-muted-foreground hover:text-primary"
                             onClick={() => openEdit(rule)}
                             aria-label="Edit rule"
                         >
@@ -230,7 +230,7 @@ export function CategorizationRulesSection({ userId, rules, loading, buckets, se
                         <Button
                             variant="ghost"
                             size="icon"
-                            className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                            className="min-h-[44px] min-w-[44px] -my-2 text-muted-foreground hover:text-destructive"
                             onClick={() => setConfirmDelete(rule)}
                             aria-label="Delete rule"
                         >
@@ -245,7 +245,8 @@ export function CategorizationRulesSection({ userId, rules, loading, buckets, se
                 Add rule
             </Button>
 
-            <Dialog open={!!editing} onOpenChange={(o) => { if (!o) setEditing(null); }}>
+            {/* Guarded on `saving` so the dialog can't be dismissed mid-write. */}
+            <Dialog open={!!editing} onOpenChange={(o) => { if (!o && !saving) setEditing(null); }}>
                 <DialogContent className="max-w-md p-0 gap-0 overflow-hidden">
                     <DialogHeader className="px-5 py-4 border-b border-white/5">
                         <DialogTitle className="text-base">{editing?.id ? 'Edit rule' : 'New rule'}</DialogTitle>
@@ -497,10 +498,11 @@ function ActionRow({ label, enabled, onToggle, disabledReason, children }: Actio
                 <button
                     type="button"
                     onClick={() => onToggle(false)}
-                    className="shrink-0 p-1 -m-1 text-muted-foreground/50 hover:text-muted-foreground"
+                    className="shrink-0 min-h-[36px] min-w-[36px] -m-1 inline-flex items-center justify-center text-muted-foreground/50 hover:text-muted-foreground"
                     aria-label={`Disable: ${label}`}
                 >
-                    <span className="block w-4 text-center text-base leading-none">×</span>
+                    {/* aria-hidden or the literal glyph is announced after the label. */}
+                    <span aria-hidden="true" className="block w-4 text-center text-base leading-none">×</span>
                 </button>
             )}
         </div>

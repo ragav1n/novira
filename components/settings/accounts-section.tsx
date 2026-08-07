@@ -106,6 +106,7 @@ export function AccountsSection({ defaultCurrency, formatCurrency }: Props) {
     // balances are withheld so they don't flash an opening-only figure before
     // activity is in.
     const [balancesReady, setBalancesReady] = useState(false);
+    const [balancesError, setBalancesError] = useState(false);
     const [reconciling, setReconciling] = useState<Account | null>(null);
     const [bulkAssignOpen, setBulkAssignOpen] = useState(false);
 
@@ -116,9 +117,13 @@ export function AccountsSection({ defaultCurrency, formatCurrency }: Props) {
         if (!userId) return;
         const { data, error } = await supabase.rpc('compute_account_balances', { p_user_id: userId });
         if (error) {
+            // Returning early left `balancesReady` false forever, so credit-card rows
+            // rendered permanently without a balance and without saying why.
             console.error('[AccountsSection] balances failed', error);
+            setBalancesError(true);
             return;
         }
+        setBalancesError(false);
         // SQL returns per-currency activity rows. Keep the native per-currency
         // breakdown (for multi-currency display) AND build a converted total
         // in current base (for single-currency display + utilization math).
@@ -249,7 +254,7 @@ export function AccountsSection({ defaultCurrency, formatCurrency }: Props) {
             setEditing(null);
         } catch (e) {
             console.error('[AccountsSection] save failed', e);
-            toast.error(`Failed to save: ${(e as Error).message}`);
+            toast.error("Couldn't save that account. Check the details and try again.");
         } finally {
             setSaving(false);
         }
@@ -260,7 +265,7 @@ export function AccountsSection({ defaultCurrency, formatCurrency }: Props) {
             await deleteAccount(a.id);
             toast.success('Account deleted');
         } catch (e) {
-            toast.error(`Failed to delete: ${(e as Error).message}`);
+            toast.error("Couldn't delete that account. Try again.");
         }
         setConfirmDelete(null);
     };
@@ -273,9 +278,19 @@ export function AccountsSection({ defaultCurrency, formatCurrency }: Props) {
                 history but disappear from pickers.
             </p>
 
+            {balancesError && !loading && (
+                <p className="text-[11px] text-amber-400/80">
+                    Balances couldn&apos;t be calculated, so they&apos;re hidden below. Your accounts and
+                    transactions are unaffected.
+                </p>
+            )}
+
             <div className="bg-secondary/5 rounded-xl border border-white/5 divide-y divide-white/5 min-h-[48px]">
                 {loading && (
-                    <div className="p-4 text-center text-xs text-muted-foreground/60">Loading…</div>
+                    <div className="p-4 space-y-2" role="status" aria-label="Loading accounts">
+                        <div className="h-9 rounded-lg bg-secondary/15 animate-pulse" />
+                        <div className="h-9 rounded-lg bg-secondary/15 animate-pulse" />
+                    </div>
                 )}
                 {!loading && active.length === 0 && (
                     <div className="p-4 text-center text-xs text-muted-foreground/60">
@@ -400,7 +415,7 @@ export function AccountsSection({ defaultCurrency, formatCurrency }: Props) {
                                     <Button
                                         variant="ghost"
                                         size="icon"
-                                        className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                                        className="min-h-[44px] min-w-[44px] -my-2 text-muted-foreground hover:text-foreground"
                                         aria-label="Account actions"
                                     >
                                         <MoreVertical className="w-4 h-4" />
@@ -464,7 +479,7 @@ export function AccountsSection({ defaultCurrency, formatCurrency }: Props) {
                                     <Button
                                         variant="ghost"
                                         size="icon"
-                                        className="h-8 w-8 text-muted-foreground hover:text-primary"
+                                        className="min-h-[44px] min-w-[44px] -my-2 text-muted-foreground hover:text-primary"
                                         onClick={() => archiveAccount(a.id, false).catch(() => toast.error('Failed to unarchive'))}
                                         aria-label="Unarchive account"
                                     >
@@ -473,7 +488,7 @@ export function AccountsSection({ defaultCurrency, formatCurrency }: Props) {
                                     <Button
                                         variant="ghost"
                                         size="icon"
-                                        className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                        className="min-h-[44px] min-w-[44px] -my-2 text-muted-foreground hover:text-destructive"
                                         onClick={() => setConfirmDelete(a)}
                                         aria-label="Delete account"
                                     >
@@ -509,7 +524,8 @@ export function AccountsSection({ defaultCurrency, formatCurrency }: Props) {
                 onApplied={() => { /* realtime + dispatch refresh the section */ }}
             />
 
-            <Dialog open={!!editing} onOpenChange={(o) => { if (!o) setEditing(null); }}>
+            {/* Guarded on `saving` so the dialog can't be dismissed mid-write. */}
+            <Dialog open={!!editing} onOpenChange={(o) => { if (!o && !saving) setEditing(null); }}>
                 <DialogContent className="max-w-md p-0 gap-0 overflow-hidden">
                     <DialogHeader className="px-5 py-4 border-b border-white/5">
                         <DialogTitle className="text-base">{editing?.id ? 'Edit account' : 'New account'}</DialogTitle>

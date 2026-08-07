@@ -2,6 +2,7 @@
 
 import React, { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import { useSafeBack } from '@/hooks/useSafeBack';
 import { useDropzone } from 'react-dropzone';
 import Papa from 'papaparse';
 import { parse, isValid, format } from 'date-fns';
@@ -66,6 +67,7 @@ interface ParsedTransaction {
 
 export function ImportView() {
     const router = useRouter();
+    const goBack = useSafeBack('/settings');
     const { userId, currency: baseCurrency } = useUserPreferences();
     const { rules: categorizationRules } = useCategorizationRules(userId);
     const [step, setStep] = useState<ImportStep>('upload');
@@ -89,6 +91,9 @@ export function ImportView() {
 
     const [parsedTransactions, setParsedTransactions] = useState<ParsedTransaction[]>([]);
     const [isImporting, setIsImporting] = useState(false);
+    const [parsing, setParsing] = useState(false);
+    /** Rows committed so far, so a large import reports progress instead of hanging. */
+    const [importProgress, setImportProgress] = useState<{ done: number; total: number } | null>(null);
 
     // Categories for mapping/fallback
     const CATEGORIES = SYSTEM_CATEGORIES.map(c => c.label);
@@ -196,15 +201,21 @@ export function ImportView() {
         }
 
         setFile(file);
+        // Nothing at all changed on screen between here and setStep('map'), and the
+        // Excel path first has to download the exceljs chunk and parse the workbook —
+        // seconds of apparent dead air on a large file.
+        setParsing(true);
 
         if (fileExt === 'csv') {
             Papa.parse(file, {
                 header: false,
                 skipEmptyLines: true,
                 complete: (results) => {
+                    setParsing(false);
                     processData(results.data as unknown[][]);
                 },
                 error: (error) => {
+                    setParsing(false);
                     toast.error(`Error parsing CSV: ${error.message}`);
                 }
             });
@@ -229,6 +240,8 @@ export function ImportView() {
                 } catch (error) {
                     const message = error instanceof Error ? error.message : String(error);
                     toast.error(`Error parsing Excel: ${message}`);
+                } finally {
+                    setParsing(false);
                 }
             };
             arrayBuffer();
@@ -419,26 +432,60 @@ export function ImportView() {
                 };
             });
 
-            const { error } = await supabase.from('transactions').insert(records);
+            // Chunked rather than one big insert: a single bad row used to reject the
+            // entire file, and a long import gave no sign of progress. Rows that do
+            // land stay landed, and we report exactly how far we got.
+            const CHUNK = 100;
+            let inserted = 0;
+            setImportProgress({ done: 0, total: records.length });
+            let failure: string | null = null;
 
-            if (error) throw error;
+            for (let i = 0; i < records.length; i += CHUNK) {
+                const slice = records.slice(i, i + CHUNK);
+                const { error } = await supabase.from('transactions').insert(slice);
+                if (error) {
+                    console.error('[import] chunk failed', error);
+                    failure = error.message;
+                    break;
+                }
+                inserted += slice.length;
+                setImportProgress({ done: inserted, total: records.length });
+            }
 
-            toast.success(`Successfully imported ${validTransactions.length} transactions!`);
+            const skipped = parsedTransactions.length - validTransactions.length;
+
+            if (inserted === 0) {
+                toast.error("Import failed — nothing was saved. Check the highlighted rows and try again.");
+                return;
+            }
+
+            if (failure) {
+                toast.warning(`Imported ${inserted} of ${records.length}. The rest failed — re-import just those rows.`);
+            } else {
+                toast.success(
+                    skipped > 0
+                        ? `Imported ${inserted} transactions · skipped ${skipped} invalid row${skipped === 1 ? '' : 's'}`
+                        : `Successfully imported ${inserted} transactions!`,
+                );
+            }
+
             sessionStorage.setItem('novira_expense_added', '1');
             window.dispatchEvent(new Event('novira:expense-added'));
             router.push('/');
         } catch (error) {
             const msg = error instanceof Error ? error.message : 'Unknown error';
-            toast.error(`Import failed: ${msg}`);
+            console.error('[import] failed', error);
+            toast.error('Import failed — nothing was saved. Check your column mapping and try again.');
         } finally {
             setIsImporting(false);
+            setImportProgress(null);
         }
     };
 
     return (
         <div className="p-5 max-w-2xl mx-auto space-y-6">
             <div className="flex items-center gap-4">
-                <Button variant="ghost" size="icon" aria-label="Go back" onClick={() => router.back()}>
+                <Button variant="ghost" size="icon" aria-label="Go back" onClick={goBack}>
                     <ArrowLeft className="w-5 h-5" />
                 </Button>
                 <div>
@@ -459,13 +506,25 @@ export function ImportView() {
             {step === 'upload' && (
                 <Card className="border-dashed border-2 bg-secondary/5">
                     <CardContent className="pt-6">
+                        {parsing ? (
+                            <div className="flex flex-col items-center justify-center p-10" role="status" aria-live="polite">
+                                <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-4">
+                                    <Loader2 className="w-8 h-8 text-primary animate-spin" aria-hidden="true" />
+                                </div>
+                                <h3 className="text-lg font-semibold mb-1">Reading your file…</h3>
+                                <p className="text-sm text-muted-foreground text-center max-w-xs break-all">
+                                    {file?.name}
+                                </p>
+                            </div>
+                        ) : (
                         <div
                             {...getRootProps()}
+                            aria-label="Upload a bank statement"
                             className={`flex flex-col items-center justify-center p-10 cursor-pointer transition-colors rounded-xl ${isDragActive ? 'bg-primary/10' : 'hover:bg-secondary/20'}`}
                         >
-                            <input {...getInputProps()} />
+                            <input {...getInputProps()} aria-label="Bank statement file" />
                             <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-4">
-                                <Upload className="w-8 h-8 text-primary" />
+                                <Upload className="w-8 h-8 text-primary" aria-hidden="true" />
                             </div>
                             <h3 className="text-lg font-semibold mb-1">Upload File</h3>
                             <p className="text-sm text-muted-foreground text-center max-w-xs">
@@ -480,6 +539,7 @@ export function ImportView() {
                                 </Button>
                             </div>
                         </div>
+                        )}
                     </CardContent>
                 </Card>
             )}
@@ -587,8 +647,12 @@ export function ImportView() {
 
                         <div className="space-y-1">
                             <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Category Column (Optional)</p>
-                            <Select value={mapping.category || ''} onValueChange={(val) => setMapping({ ...mapping, category: val })}>
-                                <SelectTrigger className="h-10 text-sm"><SelectValue placeholder="Select column" /></SelectTrigger>
+                            {/* Defaults to "none" rather than '': the empty value showed
+                                the "Select column" placeholder even though the actual
+                                behaviour is auto-categorise, so the real default was
+                                never the displayed state. */}
+                            <Select value={mapping.category || 'none'} onValueChange={(val) => setMapping({ ...mapping, category: val })}>
+                                <SelectTrigger className="h-10 text-sm"><SelectValue /></SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="none">-- Auto Categorize --</SelectItem>
                                     {headers.map(h => <SelectItem key={h} value={h}>{h}</SelectItem>)}
@@ -670,8 +734,16 @@ export function ImportView() {
                         </CardContent>
                     </Card>
 
+                    {importProgress && importProgress.total > 0 && (
+                        <p className="text-xs text-muted-foreground text-right tabular-nums" role="status" aria-live="polite">
+                            Saving {importProgress.done} of {importProgress.total}…
+                        </p>
+                    )}
+
                     <div className="flex justify-end gap-2 pb-10">
-                        <Button variant="outline" onClick={() => setStep('map')}>Back</Button>
+                        {/* Was live during the insert, letting the user jump back to Map
+                            mid-commit. */}
+                        <Button variant="outline" onClick={() => setStep('map')} disabled={isImporting}>Back</Button>
                         <Button
                             onClick={handleImport}
                             disabled={isImporting || parsedTransactions.filter(t => t.isValid).length === 0}

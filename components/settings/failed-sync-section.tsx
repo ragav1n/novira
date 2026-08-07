@@ -1,9 +1,12 @@
 'use client';
 
+import { useState } from 'react';
 import { AlertTriangle, Clock } from 'lucide-react';
 import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 import { retryFailedItem, discardFailedItem } from '@/lib/sync-manager';
+import { toast } from '@/utils/haptics';
 import type { SyncPayload, SyncErrorKind } from '@/lib/offline-sync-queue';
 
 const KIND_BADGE: Record<SyncErrorKind, { label: string; className: string }> = {
@@ -17,7 +20,39 @@ interface Props {
 }
 
 export function FailedSyncSection({ failedItems }: Props) {
+    const { confirm, dialog } = useConfirm();
+    const [retryingId, setRetryingId] = useState<string | null>(null);
+
     if (failedItems.length === 0) return null;
+
+    const handleDiscard = (item: SyncPayload, description: string) => {
+        // discardFailedItem drops the mutation from IndexedDB and deletes its offline
+        // receipt — there is no server copy to recover from, so this is the one place in
+        // the app where a single tap destroys data outright.
+        confirm({
+            title: 'Discard this change?',
+            description: `"${description}" was never saved to your account. Discarding removes it from the queue permanently, along with any receipt attached to it. This can't be undone.`,
+            confirmLabel: 'Discard',
+            onConfirm: async () => {
+                await discardFailedItem(item.id);
+                toast.success('Change discarded');
+            },
+        });
+    };
+
+    const handleRetry = async (item: SyncPayload) => {
+        if (retryingId) return;
+        setRetryingId(item.id);
+        try {
+            await retryFailedItem(item.id);
+            toast.success('Retrying sync…');
+        } catch (error) {
+            console.error('Retry failed:', error);
+            toast.error("Couldn't retry — check your connection");
+        } finally {
+            setRetryingId(null);
+        }
+    };
 
     return (
         <div className="bg-destructive/10 border border-destructive/20 p-4 rounded-3xl space-y-3 animate-in fade-in slide-in-from-bottom-4">
@@ -55,11 +90,11 @@ export function FailedSyncSection({ failedItems }: Props) {
                                 <Button
                                     size="sm"
                                     variant={isExpired || kind === 'permanent' ? undefined : 'ghost'}
-                                    onClick={() => discardFailedItem(item.id)}
+                                    onClick={() => handleDiscard(item, description)}
                                     className={
                                         isExpired || kind === 'permanent'
-                                            ? 'h-8 px-4 text-[11px] font-bold bg-destructive hover:bg-destructive/90 text-white rounded-xl shadow-lg shadow-destructive/20'
-                                            : 'h-8 px-4 text-[11px] font-bold hover:bg-destructive/10 hover:text-destructive text-muted-foreground border border-transparent hover:border-destructive/20 rounded-xl transition-all'
+                                            ? 'min-h-[44px] px-4 text-[11px] font-bold bg-destructive hover:bg-destructive/90 text-white rounded-xl shadow-lg shadow-destructive/20'
+                                            : 'min-h-[44px] px-4 text-[11px] font-bold hover:bg-destructive/10 hover:text-destructive text-muted-foreground border border-transparent hover:border-destructive/20 rounded-xl transition-all'
                                     }
                                 >
                                     Discard
@@ -68,14 +103,16 @@ export function FailedSyncSection({ failedItems }: Props) {
                                     <Button
                                         size="sm"
                                         variant={kind === 'permanent' ? 'ghost' : undefined}
-                                        onClick={() => retryFailedItem(item.id)}
+                                        onClick={() => handleRetry(item)}
+                                        disabled={retryingId === item.id}
+                                        aria-busy={retryingId === item.id}
                                         className={
                                             kind === 'permanent'
-                                                ? 'h-8 px-4 text-[11px] font-bold hover:bg-primary/10 hover:text-primary text-muted-foreground border border-transparent hover:border-primary/20 rounded-xl transition-all'
-                                                : 'h-8 px-4 text-[11px] font-bold bg-primary hover:bg-primary/90 text-white rounded-xl shadow-lg shadow-primary/20'
+                                                ? 'min-h-[44px] px-4 text-[11px] font-bold hover:bg-primary/10 hover:text-primary text-muted-foreground border border-transparent hover:border-primary/20 rounded-xl transition-all'
+                                                : 'min-h-[44px] px-4 text-[11px] font-bold bg-primary hover:bg-primary/90 text-white rounded-xl shadow-lg shadow-primary/20'
                                         }
                                     >
-                                        Retry Sync
+                                        {retryingId === item.id ? 'Retrying…' : 'Retry Sync'}
                                     </Button>
                                 )}
                             </div>
@@ -83,6 +120,7 @@ export function FailedSyncSection({ failedItems }: Props) {
                     );
                 })}
             </div>
+            {dialog}
         </div>
     );
 }

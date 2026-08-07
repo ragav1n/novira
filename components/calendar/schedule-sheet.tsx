@@ -47,7 +47,12 @@ export function ScheduleSheet({ open, onOpenChange, selectedDate, onCreated }: S
     const dateLabel = format(selectedDate, 'EEEE, MMM d');
 
     const handleSave = async () => {
-        if (!userId) return;
+        // Silent `return` with the Save button still enabled — the tap did nothing
+        // and left no trace at all.
+        if (!userId) {
+            toast.error("You're signed out — sign in again to schedule this");
+            return;
+        }
         const trimmed = label.trim();
         if (!trimmed) {
             toast.error('Add a label first');

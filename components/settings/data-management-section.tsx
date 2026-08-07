@@ -6,6 +6,8 @@ import { useRouter } from 'next/navigation';
 
 interface Props {
     loading: boolean;
+    /** Which format is in flight, so only that button reads "Exporting…". */
+    exportType?: 'csv' | 'pdf' | null;
     onImport: () => void;
     onExportCSV: () => void;
     onExportPDF: () => void;
@@ -13,7 +15,7 @@ interface Props {
     icsLoading?: boolean;
 }
 
-export function DataManagementSection({ loading, onImport, onExportCSV, onExportPDF, onExportICS, icsLoading }: Props) {
+export function DataManagementSection({ loading, exportType = null, onImport, onExportCSV, onExportPDF, onExportICS, icsLoading }: Props) {
     const router = useRouter();
     return (
         <div className="space-y-3">
@@ -21,7 +23,6 @@ export function DataManagementSection({ loading, onImport, onExportCSV, onExport
                 <Button
                     variant="outline"
                     onClick={onImport}
-                    disabled={loading}
                     className="h-16 flex flex-col items-center justify-center gap-1 bg-secondary/5 border-primary/20 hover:bg-primary/10 hover:border-primary/50 transition-all group col-span-2"
                 >
                     <FileSpreadsheet className="w-5 h-5 text-primary group-hover:scale-110 transition-transform" />
@@ -31,19 +32,21 @@ export function DataManagementSection({ loading, onImport, onExportCSV, onExport
                     variant="outline"
                     onClick={onExportCSV}
                     disabled={loading}
+                    aria-busy={exportType === 'csv'}
                     className="h-16 flex flex-col items-center justify-center gap-1 bg-secondary/5 border-primary/20 hover:bg-primary/10 hover:border-primary/50 transition-all group"
                 >
                     <Download className="w-5 h-5 text-primary group-hover:scale-110 transition-transform" />
-                    <span className="text-xs font-medium">{loading ? 'Exporting...' : 'Export CSV'}</span>
+                    <span className="text-xs font-medium">{exportType === 'csv' ? 'Exporting…' : 'Export CSV'}</span>
                 </Button>
                 <Button
                     variant="outline"
                     onClick={onExportPDF}
                     disabled={loading}
+                    aria-busy={exportType === 'pdf'}
                     className="h-16 flex flex-col items-center justify-center gap-1 bg-secondary/5 border-primary/20 hover:bg-primary/10 hover:border-primary/50 transition-all group"
                 >
                     <Download className="w-5 h-5 text-primary group-hover:scale-110 transition-transform" />
-                    <span className="text-xs font-medium">{loading ? 'Exporting...' : 'Export PDF'}</span>
+                    <span className="text-xs font-medium">{exportType === 'pdf' ? 'Exporting…' : 'Export PDF'}</span>
                 </Button>
                 <Button
                     variant="outline"

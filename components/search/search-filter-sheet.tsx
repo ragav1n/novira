@@ -50,6 +50,7 @@ interface Props {
     selectedBucketId: string | null;
     setSelectedBucketId: (id: string | null) => void;
     knownTags: string[];
+    tagsError?: boolean;
     selectedTags: string[];
     setSelectedTags: React.Dispatch<React.SetStateAction<string[]>>;
     selectedCategories: string[];
@@ -65,7 +66,7 @@ export function SearchFilterSheet({
     priceRange, setPriceRange, maxPossiblePrice,
     dateRange, setDateRange,
     selectedBucketId, setSelectedBucketId,
-    knownTags, selectedTags, setSelectedTags,
+    knownTags, tagsError = false, selectedTags, setSelectedTags,
     selectedCategories, setSelectedCategories,
     selectedPayments, setSelectedPayments,
     onReset,
@@ -218,6 +219,15 @@ export function SearchFilterSheet({
                                     );
                                 })}
                             </div>
+                        </div>
+                    )}
+
+                    {tagsError && knownTags.length === 0 && (
+                        <div className="space-y-3">
+                            <Label className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground/70">Tags</Label>
+                            <p className="text-[11px] text-muted-foreground/70">
+                                Couldn&apos;t load your tags. Close and reopen this sheet to retry.
+                            </p>
                         </div>
                     )}
 

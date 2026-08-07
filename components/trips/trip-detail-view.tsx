@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { useUserPreferences } from '@/components/providers/user-preferences-provider';
 import { useActiveTrip } from '@/components/providers/active-trip-provider';
 import { TripService } from '@/lib/services/trip-service';
+import { toast } from '@/utils/haptics';
 import { TripForm } from '@/components/trips/trip-form';
 import { supabase } from '@/lib/supabase';
 import { CATEGORIES, CATEGORY_COLORS, getCategoryLabel } from '@/lib/categories';
@@ -35,6 +36,7 @@ export function TripDetailView({ tripId }: { tripId: string }) {
     const [trip, setTrip] = useState<Trip | null>(null);
     const [transactions, setTransactions] = useState<TxRow[]>([]);
     const [loading, setLoading] = useState(true);
+    const [txError, setTxError] = useState(false);
     const [editOpen, setEditOpen] = useState(false);
     const [notFound, setNotFound] = useState(false);
 
@@ -68,9 +70,13 @@ export function TripDetailView({ tripId }: { tripId: string }) {
                 .order('date', { ascending: false })
                 .limit(500);
             if (error) {
+                // An empty list here renders "No transactions tagged with <slug> yet"
+                // and zeroed KPIs — indistinguishable from an untagged trip.
                 console.error('[TripDetailView] tx fetch error', error);
-                setTransactions([]);
+                setTxError(true);
+                toast.error("Couldn't load this trip's transactions");
             } else {
+                setTxError(false);
                 setTransactions((data ?? []) as TxRow[]);
             }
         } finally {
@@ -122,7 +128,7 @@ export function TripDetailView({ tripId }: { tripId: string }) {
 
     if (notFound) {
         return (
-            <div className="flex flex-col min-h-screen p-5 max-w-md mx-auto items-center justify-center text-center gap-3">
+            <div className="flex flex-col min-h-[100dvh] p-5 max-w-md mx-auto items-center justify-center text-center gap-3">
                 <Plane className="w-10 h-10 text-muted-foreground" aria-hidden="true" />
                 <h2 className="text-lg font-bold">Trip not found</h2>
                 <Button variant="ghost" onClick={handleBack}>Back to trips</Button>
@@ -132,7 +138,7 @@ export function TripDetailView({ tripId }: { tripId: string }) {
 
     if (loading || !trip || !summary) {
         return (
-            <div className="flex flex-col min-h-screen p-5 max-w-md mx-auto space-y-4 pb-24">
+            <div className="flex flex-col min-h-[100dvh] p-5 max-w-md mx-auto space-y-4 pb-24">
                 <div className="h-10 w-32 bg-secondary/20 rounded-lg animate-pulse" />
                 <div className="h-32 bg-secondary/10 rounded-3xl animate-pulse" />
                 <div className="h-24 bg-secondary/10 rounded-3xl animate-pulse" />
@@ -144,7 +150,7 @@ export function TripDetailView({ tripId }: { tripId: string }) {
     const end = parseISO(trip.end_date);
 
     return (
-        <div className="flex flex-col min-h-screen p-5 max-w-md mx-auto space-y-5 pb-32">
+        <div className="flex flex-col min-h-[100dvh] p-5 max-w-md mx-auto space-y-5 pb-32">
             <div className="flex items-center justify-between pt-2 gap-3">
                 <Button
                     variant="ghost"
@@ -269,6 +275,18 @@ export function TripDetailView({ tripId }: { tripId: string }) {
                         )}
                     </div>
                 </section>
+            ) : txError ? (
+                <Card className="bg-card/40 border-white/5">
+                    <CardContent className="p-6 text-center text-sm text-muted-foreground space-y-3">
+                        <p>Couldn&apos;t load this trip&apos;s transactions.</p>
+                        <button
+                            onClick={() => load()}
+                            className="min-h-[36px] px-4 rounded-full text-[11px] font-bold uppercase tracking-wider bg-primary/20 hover:bg-primary/30 border border-primary/30 text-primary transition-colors"
+                        >
+                            Try again
+                        </button>
+                    </CardContent>
+                </Card>
             ) : (
                 <Card className="bg-card/40 border-white/5">
                     <CardContent className="p-6 text-center text-sm text-muted-foreground">

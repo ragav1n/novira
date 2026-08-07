@@ -12,6 +12,8 @@ import { cn } from '@/lib/utils';
 import { resolveGoalIcon, resolveGoalColor } from '@/lib/goal-styles';
 import { monthlyVelocity, projectedCompletionDate, requiredMonthlyContribution } from '@/lib/goal-utils';
 import { GoalService } from '@/lib/services/goal-service';
+import { toast } from '@/utils/haptics';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 import type { SavingsGoal, SavingsDeposit } from '@/types/goal';
 
 type Props = {
@@ -26,6 +28,8 @@ type Props = {
 export function GoalHistorySheet({ goal, userId, open, onOpenChange, formatCurrency, onChanged }: Props) {
     const [deposits, setDeposits] = useState<SavingsDeposit[]>([]);
     const [loading, setLoading] = useState(false);
+    const [loadError, setLoadError] = useState(false);
+    const { confirm, dialog } = useConfirm();
     const [removingId, setRemovingId] = useState<string | null>(null);
     const [scenarioRate, setScenarioRate] = useState<number | null>(null);
 
@@ -37,7 +41,12 @@ export function GoalHistorySheet({ goal, userId, open, onOpenChange, formatCurre
         let cancelled = false;
         setLoading(true);
         GoalService.getAllDepositsForGoal(userId, goal.id)
-            .then(d => { if (!cancelled) setDeposits(d); })
+            .then(d => { if (!cancelled) { setDeposits(d); setLoadError(false); } })
+            .catch(() => {
+                if (cancelled) return;
+                setLoadError(true);
+                toast.error("Couldn't load this goal's history");
+            })
             .finally(() => { if (!cancelled) setLoading(false); });
         return () => { cancelled = true; };
     }, [open, goal, userId]);
@@ -100,6 +109,7 @@ export function GoalHistorySheet({ goal, userId, open, onOpenChange, formatCurre
     const hasChartData = monthlyChartData.some(m => m.total > 0);
 
     return (
+        <>
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-md rounded-3xl border-white/10 bg-card/95 backdrop-blur-xl p-5 max-h-[85vh] flex flex-col">
                 <DialogHeader className="gap-1">
@@ -204,6 +214,10 @@ export function GoalHistorySheet({ goal, userId, open, onOpenChange, formatCurre
                             <div className="h-10 rounded-xl bg-secondary/10 animate-pulse" />
                             <div className="h-10 rounded-xl bg-secondary/10 animate-pulse" />
                         </div>
+                    ) : loadError ? (
+                        <div className="text-center py-8 text-xs text-muted-foreground">
+                            Couldn&apos;t load this goal&apos;s deposits. Close and reopen to retry.
+                        </div>
                     ) : deposits.length === 0 ? (
                         <div className="text-center py-8 text-xs text-muted-foreground">
                             No deposits yet — add your first contribution.
@@ -225,12 +239,17 @@ export function GoalHistorySheet({ goal, userId, open, onOpenChange, formatCurre
                                     </div>
                                     <button
                                         type="button"
-                                        onClick={() => handleRemove(dep)}
+                                        onClick={() => confirm({
+                                            title: 'Delete this deposit?',
+                                            description: `${formatCurrency(Number(dep.amount), dep.currency)} will be removed from this goal's balance and history. This can't be undone.`,
+                                            confirmLabel: 'Delete',
+                                            onConfirm: () => handleRemove(dep),
+                                        })}
                                         disabled={removingId === dep.id}
-                                        aria-label="Delete deposit"
-                                        className="shrink-0 w-8 h-8 rounded-full bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 text-rose-300 flex items-center justify-center transition-colors disabled:opacity-50"
+                                        aria-label={`Delete deposit of ${formatCurrency(Number(dep.amount), dep.currency)}`}
+                                        className="shrink-0 min-w-[44px] min-h-[44px] -my-2 rounded-full bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 text-rose-300 flex items-center justify-center transition-colors disabled:opacity-50"
                                     >
-                                        <Trash2 className="w-3.5 h-3.5" />
+                                        <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
                                     </button>
                                 </li>
                             ))}
@@ -239,6 +258,8 @@ export function GoalHistorySheet({ goal, userId, open, onOpenChange, formatCurre
                 </div>
             </DialogContent>
         </Dialog>
+        {dialog}
+        </>
     );
 }
 

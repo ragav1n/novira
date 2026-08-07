@@ -9,6 +9,8 @@ import {
 import { CATEGORY_COLORS, getIconForCategory, getCategoryLabel } from '@/lib/categories';
 import { ReceiptViewerDialog } from '@/components/receipt-viewer-dialog';
 import { useReceiptViewer } from '@/hooks/useReceiptViewer';
+import { useConfirm } from '@/components/ui/confirm-dialog';
+import { useRefreshRequest } from '@/hooks/useRefreshRequest';
 import { useAccounts } from '@/components/providers/accounts-provider';
 import { Transaction } from '@/types/transaction';
 import { enqueueMutation } from '@/lib/sync-manager';
@@ -49,6 +51,7 @@ export function SearchView() {
     const [filteredTransactions, setFilteredTransactions] = useState<Transaction[]>([]);
     const [searchQuery, setSearchQuery] = useState(() => searchParams?.get('q') || '');
     const [loading, setLoading] = useState(true);
+    const [loadError, setLoadError] = useState(false);
     const { formatCurrency, convertAmount, activeWorkspaceId, userId } = useUserPreferences();
     const { buckets } = useBucketsList();
     const { theme: themeConfig } = useWorkspaceTheme();
@@ -66,6 +69,10 @@ export function SearchView() {
         const max = Number(searchParams?.get('max'));
         return [Number.isFinite(min) && min > 0 ? min : 0, Number.isFinite(max) && max > 0 ? max : 1000];
     });
+    // The slider calls setPriceRange on every drag step and priceRange is a direct dep
+    // of fetchAndFilter, so dragging fired a burst of Supabase queries. Only the text
+    // query used to be debounced; filters weren't.
+    const debouncedPriceRange = useDebounce(priceRange, 300);
     const [selectedCategories, setSelectedCategories] = useState<string[]>(() => {
         const c = searchParams?.get('category');
         return c ? c.split(',').filter(Boolean) : [];
@@ -88,6 +95,7 @@ export function SearchView() {
         return t ? t.split(',').filter(Boolean) : [];
     });
     const [knownTags, setKnownTags] = useState<string[]>([]);
+    const [tagsError, setTagsError] = useState(false);
     const [sortBy, setSortBy] = useState<SortOption>(() => {
         const s = searchParams?.get('sort');
         if (s === 'date-asc' || s === 'amount-desc' || s === 'amount-asc' || s === 'date-desc') return s;
@@ -138,6 +146,7 @@ export function SearchView() {
     const clearHistory = useCallback(() => {
         setHistory([]);
         try { localStorage.removeItem(HISTORY_KEY); } catch (err) { console.error(err); }
+        toast.success('Search history cleared');
     }, []);
 
     // Record successful searches (debounced query that actually ran). Skip the
@@ -151,6 +160,8 @@ export function SearchView() {
         }
         if (debouncedSearchQuery) pushHistory(debouncedSearchQuery);
     }, [debouncedSearchQuery, pushHistory]);
+
+    const { confirm, dialog: confirmDialog } = useConfirm();
 
     // Bulk-edit mode state
     const [bulkMode, setBulkMode] = useState(false);
@@ -176,25 +187,35 @@ export function SearchView() {
     const bulkBusyRef = useRef(false);
     const [bulkBusy, setBulkBusy] = useState(false);
 
-    const bulkDelete = useCallback(async () => {
+    const bulkDelete = useCallback(() => {
         if (selectedIds.size === 0) return;
         if (bulkBusyRef.current) return;
-        bulkBusyRef.current = true;
-        setBulkBusy(true);
-        const ids = [...selectedIds];
-        try {
-            await Promise.all(ids.map(id => enqueueMutation('DELETE_TRANSACTION', { id })));
-            toast.success(`Deleted ${ids.length} transaction${ids.length === 1 ? '' : 's'}`);
-            setFilteredTransactions(prev => prev.filter(t => !selectedIds.has(t.id)));
-            exitBulkMode();
-        } catch (error) {
-            console.error('Bulk delete failed:', error);
-            toast.error('Failed to delete some transactions');
-        } finally {
-            bulkBusyRef.current = false;
-            setBulkBusy(false);
-        }
-    }, [selectedIds, exitBulkMode]);
+        const count = selectedIds.size;
+        // Previously this deleted straight off the tap — the most destructive action in
+        // the app with no confirmation of any kind.
+        confirm({
+            title: `Delete ${count} transaction${count === 1 ? '' : 's'}?`,
+            description: `${count === 1 ? 'This transaction' : 'These transactions'} will be removed from your history, along with any attached receipts. This can't be undone.`,
+            confirmLabel: 'Delete',
+            onConfirm: async () => {
+                bulkBusyRef.current = true;
+                setBulkBusy(true);
+                const ids = [...selectedIds];
+                try {
+                    await Promise.all(ids.map(id => enqueueMutation('DELETE_TRANSACTION', { id })));
+                    toast.success(`Deleted ${ids.length} transaction${ids.length === 1 ? '' : 's'}`);
+                    setFilteredTransactions(prev => prev.filter(t => !selectedIds.has(t.id)));
+                    exitBulkMode();
+                } catch (error) {
+                    console.error('Bulk delete failed:', error);
+                    toast.error('Failed to delete some transactions');
+                } finally {
+                    bulkBusyRef.current = false;
+                    setBulkBusy(false);
+                }
+            },
+        });
+    }, [selectedIds, exitBulkMode, confirm]);
 
     const bulkRecategorize = useCallback(async (categoryId: string) => {
         if (selectedIds.size === 0) return;
@@ -270,8 +291,8 @@ export function SearchView() {
             if (selectedPayments.length > 0) query = query.in('payment_method', selectedPayments);
             if (dateRange.from) query = query.gte('date', format(dateRange.from, 'yyyy-MM-dd'));
             if (dateRange.to) query = query.lte('date', format(dateRange.to, 'yyyy-MM-dd'));
-            if (priceRange[0] > 0) query = query.gte('amount', priceRange[0]);
-            if (priceRange[1] < maxPossiblePrice) query = query.lte('amount', priceRange[1]);
+            if (debouncedPriceRange[0] > 0) query = query.gte('amount', debouncedPriceRange[0]);
+            if (debouncedPriceRange[1] < maxPossiblePrice) query = query.lte('amount', debouncedPriceRange[1]);
             if (selectedBucketId) query = query.eq('bucket_id', selectedBucketId);
             // Tag filter — match transactions that contain ALL selected tags.
             if (selectedTags.length > 0) query = query.contains('tags', selectedTags);
@@ -282,9 +303,25 @@ export function SearchView() {
             const sortColumn = sortBy.startsWith('date') ? 'date' : 'amount';
             query = query.order(sortColumn, { ascending });
 
-            const { data } = await query;
+            const { data, error } = await query;
 
             if (fetchGenRef.current !== myGen) return;
+            if (error) {
+                // PostgREST reports failures on `error` rather than throwing, so without
+                // this branch `data` is null, the setter below is skipped, and the previous
+                // result set stays on screen as though it matched the new filters.
+                console.error('Failed to search transactions:', {
+                    message: error.message,
+                    code: error.code,
+                    details: error.details,
+                    hint: error.hint,
+                });
+                setFilteredTransactions([]);
+                setLoadError(true);
+                if (!opts.silent) toast.error("Couldn't search transactions");
+                return;
+            }
+            setLoadError(false);
             if (data) {
                 const formatted = data.map(tx => ({
                     ...tx,
@@ -294,7 +331,7 @@ export function SearchView() {
                 setFilteredTransactions(formatted);
 
                 // Update max price on first load (no filters active)
-                if (!debouncedSearchQuery && selectedCategories.length === 0 && selectedPayments.length === 0 && !dateRange.from && !dateRange.to && !selectedBucketId && priceRange[0] === 0 && priceRange[1] >= maxPossiblePrice) {
+                if (!debouncedSearchQuery && selectedCategories.length === 0 && selectedPayments.length === 0 && !dateRange.from && !dateRange.to && !selectedBucketId && debouncedPriceRange[0] === 0 && debouncedPriceRange[1] >= maxPossiblePrice) {
                     const max = Math.max(...formatted.map(tx => tx.amount), 1000);
                     const rounded = Math.ceil(max / 100) * 100;
                     if (rounded !== maxPossiblePrice) {
@@ -305,10 +342,14 @@ export function SearchView() {
             }
         } catch (error) {
             console.error('Error fetching transactions:', error);
+            if (fetchGenRef.current !== myGen) return;
+            setFilteredTransactions([]);
+            setLoadError(true);
+            if (!opts.silent) toast.error("Couldn't search transactions");
         } finally {
             if (fetchGenRef.current === myGen && !opts.silent) setLoading(false);
         }
-    }, [activeWorkspaceId, activeAccountId, debouncedSearchQuery, selectedCategories, selectedPayments, dateRange, priceRange, selectedBucketId, selectedTags, sortBy, maxPossiblePrice, showRecurringOnly, showExcludedOnly]);
+    }, [activeWorkspaceId, activeAccountId, debouncedSearchQuery, selectedCategories, selectedPayments, dateRange, debouncedPriceRange, selectedBucketId, selectedTags, sortBy, maxPossiblePrice, showRecurringOnly, showExcludedOnly]);
 
     useEffect(() => {
         fetchGenRef.current++;
@@ -321,14 +362,23 @@ export function SearchView() {
         let cancelled = false;
         (async () => {
             try {
-                const { data } = await supabase
+                const { data, error } = await supabase
                     .from('transactions')
                     .select('tags')
                     .eq('user_id', userId)
                     .not('tags', 'is', null)
                     .order('created_at', { ascending: false })
                     .limit(300);
-                if (cancelled || !data) return;
+                if (cancelled) return;
+                if (error) {
+                    // `knownTags` staying empty makes the filter sheet hide its entire
+                    // Tags group, so the feature just vanishes with no explanation.
+                    console.error('Error fetching tag vocabulary:', error);
+                    setTagsError(true);
+                    return;
+                }
+                setTagsError(false);
+                if (!data) return;
                 const counts = new Map<string, number>();
                 for (const row of data as { tags: string[] | null }[]) {
                     for (const t of row.tags || []) {
@@ -339,6 +389,7 @@ export function SearchView() {
                 setKnownTags([...counts.entries()].sort((a, b) => b[1] - a[1]).map(([t]) => t));
             } catch (error) {
                 console.error('Error fetching tag vocabulary:', error);
+                if (!cancelled) setTagsError(true);
             }
         })();
         return () => { cancelled = true; };
@@ -346,15 +397,7 @@ export function SearchView() {
 
     useTransactionInvalidationListener(() => fetchAndFilter({ silent: true }));
 
-    // Pull-to-refresh trigger from mobile-layout — same handler the dashboard uses.
-    useEffect(() => {
-        const onRefresh = (e: WindowEventMap['novira-refresh-requested']) => {
-            const p = fetchAndFilter();
-            if (p) e.detail?.waitUntil?.(p);
-        };
-        window.addEventListener('novira-refresh-requested', onRefresh);
-        return () => window.removeEventListener('novira-refresh-requested', onRefresh);
-    }, [fetchAndFilter]);
+    useRefreshRequest(() => fetchAndFilter());
 
     // Realtime subscription — re-fetch when transactions or splits change
     const fetchRef = useRef(fetchAndFilter);
@@ -494,7 +537,12 @@ export function SearchView() {
     const handleSavePreset = useCallback(() => {
         if (!userId) return;
         const name = presetNameDraft.trim();
-        if (!name) return;
+        // Reachable via the Enter key, which bypasses the button's `disabled`, so an
+        // empty name previously produced a completely silent no-op.
+        if (!name) {
+            toast.error('Give the preset a name');
+            return;
+        }
         const created = savePreset(userId, name, buildSnapshot());
         setPresets(loadPresets(userId));
         setPresetNameDraft('');
@@ -502,11 +550,20 @@ export function SearchView() {
         toast.success(`Saved preset "${created.name}"`);
     }, [userId, presetNameDraft, buildSnapshot]);
 
-    const handleDeletePreset = useCallback((id: string) => {
+    const handleDeletePreset = useCallback((id: string, name: string) => {
         if (!userId) return;
-        deletePreset(userId, id);
-        setPresets(loadPresets(userId));
-    }, [userId]);
+        // Previously the chip just vanished with no confirm and no toast at all.
+        confirm({
+            title: `Delete preset "${name}"?`,
+            description: 'The saved filter combination is removed. Your transactions are unaffected.',
+            confirmLabel: 'Delete',
+            onConfirm: () => {
+                deletePreset(userId, id);
+                setPresets(loadPresets(userId));
+                toast.success('Preset deleted');
+            },
+        });
+    }, [userId, confirm]);
 
     // Toggle a quick date range. Tapping the active chip clears it.
     const toggleQuickRange = useCallback((id: QuickRangeId) => {
@@ -563,7 +620,7 @@ export function SearchView() {
 
     return (
         <div className="relative min-h-[100dvh] w-full h-full bg-[radial-gradient(ellipse_90%_60%_at_50%_-10%,_rgba(138,43,226,0.18),_transparent_60%)]">
-            <div className="p-5 space-y-7 max-w-md lg:max-w-2xl mx-auto relative pb-24 lg:pb-8 h-full flex flex-col z-10">
+            <div className="p-5 space-y-7 max-w-md lg:max-w-2xl mx-auto relative lg:pb-8 h-full flex flex-col z-10">
                 {/* Header */}
                 <div className="relative flex items-center gap-3 shrink-0 min-h-[40px]">
                     <button
@@ -604,6 +661,7 @@ export function SearchView() {
                             selectedBucketId={selectedBucketId}
                             setSelectedBucketId={setSelectedBucketId}
                             knownTags={knownTags}
+                            tagsError={tagsError}
                             selectedTags={selectedTags}
                             setSelectedTags={setSelectedTags}
                             selectedCategories={selectedCategories}
@@ -617,7 +675,9 @@ export function SearchView() {
 
                 {/* Hero — total when filters yielded results, quiet intro only when truly idle */}
                 {filterStats && (activeFilterCount > 0 || debouncedSearchQuery) ? (
-                    <section className="space-y-2 shrink-0 text-center">
+                    // aria-live so the result count is announced when a query or filter
+                    // changes — results updated silently for screen-reader users before.
+                    <section className="space-y-2 shrink-0 text-center" role="status" aria-live="polite">
                         <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground/70">
                             Total matching
                         </p>
@@ -684,9 +744,22 @@ export function SearchView() {
                             themeConfig.ring
                         )}
                     />
-                    {(searchQuery !== debouncedSearchQuery || (loading && !!searchQuery)) && (
+                    {/* The `!!searchQuery` gate meant toggling a filter chip with an
+                        empty query showed no spinner at all — only the results blur. */}
+                    {(searchQuery !== debouncedSearchQuery || loading) ? (
                         <div className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full border-2 border-primary border-t-transparent animate-spin" aria-hidden="true" />
-                    )}
+                    ) : searchQuery ? (
+                        // The other search field in the app (subscription-filters) has a
+                        // clear button; this one reserved pr-10 but never filled it.
+                        <button
+                            type="button"
+                            onClick={() => setSearchQuery('')}
+                            aria-label="Clear search"
+                            className="absolute right-1 top-1/2 -translate-y-1/2 min-h-[40px] min-w-[40px] inline-flex items-center justify-center rounded-full text-muted-foreground/70 hover:text-foreground hover:bg-secondary/40 transition-colors"
+                        >
+                            <X className="w-4 h-4" aria-hidden="true" />
+                        </button>
+                    ) : null}
                     {inputFocused && searchQuery === '' && history.length > 0 && (
                         <div className="absolute top-full left-0 right-0 mt-1.5 z-40 rounded-2xl bg-card/95 backdrop-blur-xl border border-white/[0.06] shadow-2xl overflow-hidden">
                             <div className="px-3 py-2 text-[10px] uppercase tracking-[0.18em] font-medium text-muted-foreground/70 border-b border-white/[0.04]">
@@ -813,9 +886,9 @@ export function SearchView() {
                                 type="button"
                                 onClick={() => setDateRange({ from: undefined, to: undefined })}
                                 aria-label="Clear date filter"
-                                className="hover:opacity-70 transition-opacity"
+                                className="hover:opacity-70 transition-opacity min-h-[36px] min-w-[28px] -my-1.5 inline-flex items-center justify-center"
                             >
-                                <X className="w-3 h-3" />
+                                <X className="w-3 h-3" aria-hidden="true" />
                             </button>
                         </div>
                     )}
@@ -829,9 +902,9 @@ export function SearchView() {
                                 type="button"
                                 onClick={() => setPriceRange([0, maxPossiblePrice])}
                                 aria-label="Clear price filter"
-                                className="hover:opacity-70 transition-opacity"
+                                className="hover:opacity-70 transition-opacity min-h-[36px] min-w-[28px] -my-1.5 inline-flex items-center justify-center"
                             >
-                                <X className="w-3 h-3" />
+                                <X className="w-3 h-3" aria-hidden="true" />
                             </button>
                         </div>
                     )}
@@ -848,9 +921,9 @@ export function SearchView() {
                                 type="button"
                                 onClick={() => setSelectedCategories(prev => prev.filter(c => c !== cat))}
                                 aria-label={`Clear ${cat} filter`}
-                                className="hover:opacity-70 transition-opacity"
+                                className="hover:opacity-70 transition-opacity min-h-[36px] min-w-[28px] -my-1.5 inline-flex items-center justify-center"
                             >
-                                <X className="w-3 h-3" />
+                                <X className="w-3 h-3" aria-hidden="true" />
                             </button>
                         </div>
                     ))}
@@ -867,9 +940,9 @@ export function SearchView() {
                                 type="button"
                                 onClick={() => setSelectedPayments(prev => prev.filter(m => m !== p))}
                                 aria-label={`Clear ${p} filter`}
-                                className="hover:opacity-70 transition-opacity"
+                                className="hover:opacity-70 transition-opacity min-h-[36px] min-w-[28px] -my-1.5 inline-flex items-center justify-center"
                             >
-                                <X className="w-3 h-3" />
+                                <X className="w-3 h-3" aria-hidden="true" />
                             </button>
                         </div>
                     ))}
@@ -883,9 +956,9 @@ export function SearchView() {
                                 type="button"
                                 onClick={() => setSelectedBucketId(null)}
                                 aria-label="Clear bucket filter"
-                                className="hover:opacity-70 transition-opacity"
+                                className="hover:opacity-70 transition-opacity min-h-[36px] min-w-[28px] -my-1.5 inline-flex items-center justify-center"
                             >
-                                <X className="w-3 h-3" />
+                                <X className="w-3 h-3" aria-hidden="true" />
                             </button>
                         </div>
                     )}
@@ -899,9 +972,9 @@ export function SearchView() {
                                 type="button"
                                 onClick={() => setSelectedTags(prev => prev.filter(x => x !== t))}
                                 aria-label={`Clear ${t} tag`}
-                                className="hover:opacity-70 transition-opacity"
+                                className="hover:opacity-70 transition-opacity min-h-[36px] min-w-[28px] -my-1.5 inline-flex items-center justify-center"
                             >
-                                <X className="w-3 h-3" />
+                                <X className="w-3 h-3" aria-hidden="true" />
                             </button>
                         </div>
                     ))}
@@ -911,18 +984,19 @@ export function SearchView() {
                 {(presets.length > 0 || activeFilterCount > 0) && (
                     <div className="flex gap-1.5 items-center overflow-x-auto pb-1 scrollbar-hide shrink-0 -mt-3">
                         {presets.map((p) => (
-                            <div key={p.id} className="shrink-0 inline-flex items-center gap-1 pl-3 pr-1.5 py-1 rounded-full text-[11px] font-semibold bg-secondary/15 border border-white/[0.06] text-foreground/80">
-                                <button type="button" onClick={() => applySnapshot(p.filters)} className="inline-flex items-center gap-1.5">
-                                    <Bookmark className="w-3 h-3" />
+                            <div key={p.id} className="shrink-0 inline-flex items-center gap-1 pl-3 pr-1 rounded-full text-[11px] font-semibold bg-secondary/15 border border-white/[0.06] text-foreground/80">
+                                <button type="button" onClick={() => applySnapshot(p.filters)} className="inline-flex items-center gap-1.5 min-h-[44px]">
+                                    <Bookmark className="w-3 h-3" aria-hidden="true" />
                                     {p.name}
                                 </button>
+                                {/* Was a 16px target 4px from "apply" — a mis-tap deleted the preset. */}
                                 <button
                                     type="button"
-                                    onClick={() => handleDeletePreset(p.id)}
-                                    className="ml-1 p-0.5 rounded-full hover:bg-white/10 text-muted-foreground"
+                                    onClick={() => handleDeletePreset(p.id, p.name)}
+                                    className="ml-0.5 min-h-[44px] min-w-[32px] inline-flex items-center justify-center rounded-full hover:bg-white/10 text-muted-foreground"
                                     aria-label={`Delete preset ${p.name}`}
                                 >
-                                    <X className="w-3 h-3" />
+                                    <X className="w-3 h-3" aria-hidden="true" />
                                 </button>
                             </div>
                         ))}
@@ -957,7 +1031,7 @@ export function SearchView() {
                                         className="p-0.5 rounded-full hover:bg-white/10 text-muted-foreground"
                                         aria-label="Cancel save preset"
                                     >
-                                        <X className="w-3 h-3" />
+                                        <X className="w-3 h-3" aria-hidden="true" />
                                     </button>
                                 </div>
                             ) : (
@@ -978,6 +1052,9 @@ export function SearchView() {
                     <SearchResultsList
                         transactions={filteredTransactions}
                         loading={loading}
+                        error={loadError}
+                        hasActiveFilters={activeFilterCount > 0 || !!debouncedSearchQuery}
+                        onRetry={() => fetchAndFilter()}
                         sortBy={sortBy}
                         bulkMode={bulkMode}
                         selectedIds={selectedIds}
@@ -1004,6 +1081,7 @@ export function SearchView() {
                 onOpenChange={setIsRecategorizeOpen}
                 selectedCount={selectedIds.size}
                 onRecategorize={bulkRecategorize}
+                busy={bulkBusy}
             />
 
             <ReceiptViewerDialog
@@ -1011,6 +1089,8 @@ export function SearchView() {
                 onOpenChange={receiptViewer.setOpen}
                 receiptPath={receiptViewer.path}
             />
+
+            {confirmDialog}
         </div>
     );
 }

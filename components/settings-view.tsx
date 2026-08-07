@@ -27,6 +27,7 @@ import { FailedSyncSection } from '@/components/settings/failed-sync-section';
 import { SettingsHeader } from '@/components/settings/settings-header';
 import { ProfileSection } from '@/components/settings/profile-section';
 import { SettingsAppFooter } from '@/components/settings/settings-app-footer';
+import { toast } from '@/utils/haptics';
 import { ExportDateRangeModal } from '@/components/export-date-range-modal';
 
 export function SettingsView() {
@@ -78,13 +79,20 @@ export function SettingsView() {
     const { failedItems } = useSyncQueueState();
 
     const [showAlert, setShowAlert] = useState(false);
+    const [signingOut, setSigningOut] = useState(false);
 
     // Honor a URL hash like `#notifications` so deep links can open a specific
     // section. Computed once on mount; users can still collapse/expand after.
     const [defaultOpenSections] = useState<string[]>(() => {
         if (typeof window === 'undefined') return [];
         const hash = window.location.hash.replace('#', '').trim();
-        const valid = ['recurring', 'data', 'notifications', 'locale', 'quick-add', 'dashboard-layout', 'general', 'security'];
+        // Must stay in sync with the AccordionItem `value`s rendered below —
+        // `accounts` and `auto-categorization` were missing, so /settings#accounts
+        // silently opened nothing.
+        const valid = [
+            'recurring', 'accounts', 'auto-categorization', 'data', 'notifications',
+            'locale', 'quick-add', 'dashboard-layout', 'general', 'security',
+        ];
         return hash && valid.includes(hash) ? [hash] : [];
     });
 
@@ -93,8 +101,18 @@ export function SettingsView() {
     const hasGoogleIdentity = !!user?.identities?.some((i) => i.provider === 'google');
 
     const handleSignOut = async () => {
-        await supabase.auth.signOut();
-        router.push('/signin');
+        // Offline, signOut() rejects — without the catch the redirect never ran and the
+        // button silently did nothing, with no pending state to stop a second tap.
+        if (signingOut) return;
+        setSigningOut(true);
+        try {
+            await supabase.auth.signOut();
+            router.push('/signin');
+        } catch (error) {
+            console.error('Sign out failed:', error);
+            toast.error("Couldn't sign out. Check your connection and try again.");
+            setSigningOut(false);
+        }
     };
 
     return (
@@ -172,6 +190,7 @@ export function SettingsView() {
                         <AccordionContent>
                             <DataManagementSection
                                 loading={dataExport.loadingExport}
+                                exportType={dataExport.exportType}
                                 onImport={() => router.push('/import')}
                                 onExportCSV={() => dataExport.handleExportClick('csv')}
                                 onExportPDF={() => dataExport.handleExportClick('pdf')}
@@ -310,7 +329,7 @@ export function SettingsView() {
 
                 <FailedSyncSection failedItems={failedItems} />
 
-                <SettingsAppFooter onSignOut={handleSignOut} />
+                <SettingsAppFooter onSignOut={handleSignOut} signingOut={signingOut} />
 
                 <ExportDateRangeModal
                     isOpen={dataExport.exportModalOpen}

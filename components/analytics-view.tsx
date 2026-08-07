@@ -15,6 +15,7 @@ import { useAccounts } from '@/components/providers/accounts-provider';
 import { useWorkspaceTheme } from '@/hooks/useWorkspaceTheme';
 import { resolveWorkspaceHex } from '@/lib/utils/workspace-theme-hex';
 import { useTransactionInvalidationListener } from '@/hooks/useTransactionInvalidationListener';
+import { useRefreshRequest } from '@/hooks/useRefreshRequest';
 import { useAnalyticsData, type DateRange } from '@/hooks/useAnalyticsData';
 import {
     Select,
@@ -236,6 +237,8 @@ export function AnalyticsView() {
     }, [fetchData, userId, currency]);
 
     useTransactionInvalidationListener(() => fetchData({ silent: true }));
+
+    useRefreshRequest(() => fetchData({ silent: true }));
 
     // Real-time subscription for transactions. Silent refetch so the chart
     // doesn't flash a skeleton when a new tx lands in another tab.

@@ -50,6 +50,7 @@ export function BulkActionBar({
     currentBucketId, currentCategory, currentAccountId,
 }: BulkActionBarProps) {
     const [confirmDelete, setConfirmDelete] = useState(false);
+    const [deleting, setDeleting] = useState(false);
     const [categoryPickerOpen, setCategoryPickerOpen] = useState(false);
     const [bucketPickerOpen, setBucketPickerOpen] = useState(false);
     const [accountPickerOpen, setAccountPickerOpen] = useState(false);
@@ -100,22 +101,22 @@ export function BulkActionBar({
                         size="sm"
                         onClick={() => setCategoryPickerOpen(true)}
                         disabled={count === 0}
-                        className="flex-1 h-9 gap-1.5 text-[12px]"
+                        className="flex-1 min-h-[44px] gap-1.5 text-[12px]"
                     >
                         <TagIcon className="w-3.5 h-3.5" />
                         <span className="hidden sm:inline">Recategorize</span>
-                        <span className="sm:hidden">Cat</span>
+                        {/* "Cat"/"Bkt"/"Acct" were unguessable; short but real words instead. */}
+                        <span className="sm:hidden">Category</span>
                     </Button>
                     <Button
                         variant="ghost"
                         size="sm"
                         onClick={() => setBucketPickerOpen(true)}
                         disabled={count === 0}
-                        className="flex-1 h-9 gap-1.5 text-[12px]"
+                        className="flex-1 min-h-[44px] gap-1.5 text-[12px]"
                     >
                         <FolderInput className="w-3.5 h-3.5" />
-                        <span className="hidden sm:inline">Bucket</span>
-                        <span className="sm:hidden">Bkt</span>
+                        <span className="sm:inline">Bucket</span>
                     </Button>
                     {accountActionAvailable && (
                         <Button
@@ -123,11 +124,10 @@ export function BulkActionBar({
                             size="sm"
                             onClick={() => setAccountPickerOpen(true)}
                             disabled={count === 0}
-                            className="flex-1 h-9 gap-1.5 text-[12px]"
+                            className="flex-1 min-h-[44px] gap-1.5 text-[12px]"
                         >
                             <Wallet className="w-3.5 h-3.5" />
-                            <span className="hidden sm:inline">Account</span>
-                            <span className="sm:hidden">Acct</span>
+                            <span className="sm:inline">Account</span>
                         </Button>
                     )}
                     <Button
@@ -135,7 +135,7 @@ export function BulkActionBar({
                         size="sm"
                         onClick={() => setConfirmDelete(true)}
                         disabled={count === 0}
-                        className="flex-1 h-9 gap-1.5 text-[12px] text-rose-300 hover:text-rose-200 hover:bg-rose-500/10"
+                        className="flex-1 min-h-[44px] gap-1.5 text-[12px] text-rose-300 hover:text-rose-200 hover:bg-rose-500/10"
                     >
                         <Trash2 className="w-3.5 h-3.5" />
                         <span>Delete</span>
@@ -145,14 +145,17 @@ export function BulkActionBar({
                         variant="ghost"
                         size="sm"
                         onClick={onCancel}
-                        className="h-9 text-[12px] text-muted-foreground"
+                        className="min-h-[44px] text-[12px] text-muted-foreground"
                     >
                         Cancel
                     </Button>
                 </div>
             </motion.div>
 
-            <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+            <AlertDialog
+                open={confirmDelete}
+                onOpenChange={(o) => { if (!deleting) setConfirmDelete(o); }}
+            >
                 <AlertDialogContent className="z-[130]">
                     <AlertDialogHeader>
                         <AlertDialogTitle>Delete {count} transaction{count === 1 ? '' : 's'}?</AlertDialogTitle>
@@ -161,15 +164,27 @@ export function BulkActionBar({
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
                         <AlertDialogAction
+                            disabled={deleting}
+                            aria-busy={deleting}
                             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                            onClick={async () => {
-                                setConfirmDelete(false);
-                                await onDelete();
+                            onClick={async (e) => {
+                                // Don't let Radix close the dialog on click — the old code
+                                // dismissed it first, leaving the toolbar live with no
+                                // spinner while N rows were deleted.
+                                e.preventDefault();
+                                if (deleting) return;
+                                setDeleting(true);
+                                try {
+                                    await onDelete();
+                                    setConfirmDelete(false);
+                                } finally {
+                                    setDeleting(false);
+                                }
                             }}
                         >
-                            Delete
+                            {deleting ? 'Deleting…' : 'Delete'}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>

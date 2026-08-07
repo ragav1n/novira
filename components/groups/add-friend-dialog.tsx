@@ -156,10 +156,17 @@ export function AddFriendDialog({ userId, open, onOpenChange }: AddFriendDialogP
                             <Button
                                 variant="ghost"
                                 className="h-9 rounded-full gap-1.5 text-[12px] font-medium text-primary hover:bg-primary/10"
-                                onClick={() => {
-                                    if (userId) {
-                                        navigator.clipboard.writeText(userId);
+                                onClick={async () => {
+                                    if (!userId) return;
+                                    // clipboard.writeText rejects when the document isn't
+                                    // focused or permission is denied; the old code claimed
+                                    // success regardless.
+                                    try {
+                                        await navigator.clipboard.writeText(userId);
                                         toast.success('Code copied');
+                                    } catch (error) {
+                                        console.error('Clipboard write failed:', error);
+                                        toast.error("Couldn't copy — long-press the code to copy it manually");
                                     }
                                 }}
                             >

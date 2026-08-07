@@ -77,11 +77,14 @@ export const DashboardTransactionsDrawer = React.memo(function DashboardTransact
                             <DialogTitle className="text-2xl font-black tracking-tight">All Transactions</DialogTitle>
                             <p className="text-xs text-muted-foreground font-medium uppercase tracking-widest mt-0.5">Your complete history</p>
                         </div>
+                        {/* Outside-interaction is prevented on this sheet, so on touch
+                            this is the only way out — it needs a name and a full target. */}
                         <button
                             onClick={() => onOpenChange(false)}
-                            className="w-10 h-10 rounded-full bg-secondary/20 flex items-center justify-center hover:bg-secondary/40 transition-colors"
+                            aria-label="Close transaction history"
+                            className="min-w-[44px] min-h-[44px] rounded-full bg-secondary/20 flex items-center justify-center hover:bg-secondary/40 transition-colors"
                         >
-                            <X className="w-5 h-5" />
+                            <X className="w-5 h-5" aria-hidden="true" />
                         </button>
                     </div>
                 </DialogHeader>

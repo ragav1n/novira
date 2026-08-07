@@ -45,6 +45,9 @@ export function DeleteAccountDialog({ trigger }: DeleteAccountDialogProps) {
         setIsLoading(true);
         try {
             if (isGoogleUser) {
+                // This navigates away to Google, so `isLoading` is intentionally left set
+                // — but say what's happening first, since the redirect isn't instant.
+                toast.info('Redirecting to Google to verify your identity…');
                 const { error } = await supabase.auth.signInWithOAuth({
                     provider: 'google',
                     options: {
@@ -102,11 +105,15 @@ export function DeleteAccountDialog({ trigger }: DeleteAccountDialogProps) {
                     <div className="absolute -inset-[1px] rounded-2xl bg-gradient-to-r from-destructive/10 via-destructive/30 to-destructive/10 opacity-70 blur-sm pointer-events-none" />
 
                     <div className="relative bg-black/80 backdrop-blur-xl rounded-2xl p-6 border border-white/10 shadow-2xl overflow-hidden">
+                        {/* Disabled while deleting — the dialog was previously dismissible
+                            mid-delete, with no way to tell whether it had completed. */}
                         <button
                             onClick={() => setOpen(false)}
-                            className="absolute top-4 right-4 p-1 rounded-full text-muted-foreground hover:text-white hover:bg-white/10 transition-colors"
+                            disabled={isLoading}
+                            aria-label="Close"
+                            className="absolute top-4 right-4 min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-full text-muted-foreground hover:text-white hover:bg-white/10 transition-colors disabled:opacity-40 disabled:pointer-events-none"
                         >
-                            <X className="w-4 h-4" />
+                            <X className="w-4 h-4" aria-hidden="true" />
                         </button>
 
                         <div className="text-center space-y-2 mb-6">
@@ -152,12 +159,14 @@ export function DeleteAccountDialog({ trigger }: DeleteAccountDialogProps) {
                                         <button
                                             type="button"
                                             onClick={() => setShowPassword(!showPassword)}
-                                            className="absolute right-3 cursor-pointer p-1 rounded-md hover:bg-white/5 transition-colors"
+                                            aria-label={showPassword ? 'Hide password' : 'Show password'}
+                                            aria-pressed={showPassword}
+                                            className="absolute right-1 cursor-pointer min-h-[40px] min-w-[40px] inline-flex items-center justify-center rounded-md hover:bg-white/5 transition-colors"
                                         >
                                             {showPassword ? (
-                                                <Eye className="w-4 h-4 text-foreground/40 hover:text-primary transition-colors" />
+                                                <Eye className="w-4 h-4 text-foreground/40 hover:text-primary transition-colors" aria-hidden="true" />
                                             ) : (
-                                                <EyeClosed className="w-4 h-4 text-foreground/40 hover:text-primary transition-colors" />
+                                                <EyeClosed className="w-4 h-4 text-foreground/40 hover:text-primary transition-colors" aria-hidden="true" />
                                             )}
                                         </button>
                                     </div>

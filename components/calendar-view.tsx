@@ -19,6 +19,7 @@ import {
 } from 'date-fns';
 import { ChevronLeft, ChevronRight, Plus, RotateCw, Target, Tag, Bell, TrendingDown, Check, Trash2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { useRefreshRequest } from '@/hooks/useRefreshRequest';
 import { useUserPreferences } from '@/components/providers/user-preferences-provider';
 import { useBucketsList } from '@/components/providers/buckets-provider';
 import { useWorkspaceTheme } from '@/hooks/useWorkspaceTheme';
@@ -26,6 +27,7 @@ import { cn } from '@/lib/utils';
 import { getCategoryLabel, CATEGORY_COLORS } from '@/lib/categories';
 import { ScheduleSheet } from '@/components/calendar/schedule-sheet';
 import { toast } from '@/utils/haptics';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 
 type EventKind = 'recurring' | 'goal' | 'bucket-end' | 'one-off';
 
@@ -120,16 +122,24 @@ export function CalendarView() {
     const [goals, setGoals] = useState<GoalRow[]>([]);
     const [oneOffs, setOneOffs] = useState<OneOffRow[]>([]);
     const [loading, setLoading] = useState(true);
+    const [loadError, setLoadError] = useState(false);
+    const [mutatingId, setMutatingId] = useState<string | null>(null);
+    const { confirm, dialog } = useConfirm();
     const [selectedDate, setSelectedDate] = useState<Date>(() => startOfDay(new Date()));
     const [scheduleOpen, setScheduleOpen] = useState(false);
     // Bumped on each workspace/user change so in-flight fetches from a previous
     // workspace can't land their results on top of the new one.
     const fetchGenRef = useRef(0);
 
-    const load = useCallback(async () => {
-        if (!userId) return;
+    const load = useCallback(async (opts: { silent?: boolean } = {}) => {
+        // Clear `loading` before bailing — otherwise a userId that never resolves leaves
+        // the screen pulsing its skeleton forever with no error and no retry.
+        if (!userId) {
+            setLoading(false);
+            return;
+        }
         const myGen = fetchGenRef.current;
-        setLoading(true);
+        if (!opts.silent) setLoading(true);
         try {
             let recurringQuery = supabase
                 .from('recurring_templates')
@@ -159,7 +169,11 @@ export function CalendarView() {
                 oneOffQuery = oneOffQuery.eq('group_id', activeWorkspaceId);
             }
 
-            const [{ data: recurringData }, { data: goalsData }, { data: oneOffData, error: oneOffError }] = await Promise.all([
+            const [
+                { data: recurringData, error: recurringError },
+                { data: goalsData, error: goalsError },
+                { data: oneOffData, error: oneOffError },
+            ] = await Promise.all([
                 recurringQuery.returns<RecurringRow[]>(),
                 goalsQuery.returns<GoalRow[]>(),
                 oneOffQuery.returns<OneOffRow[]>(),
@@ -172,17 +186,36 @@ export function CalendarView() {
                 console.error('Error loading scheduled_events:', oneOffError);
             }
 
+            // Bills and goals drive the projected total. If either query failed we must not
+            // fall back to [], or the screen confidently reports "$0.00 projected" for a
+            // month that actually has bills due.
+            if (recurringError || goalsError) {
+                console.error('Error loading calendar data:', {
+                    recurring: recurringError,
+                    goals: goalsError,
+                });
+                setLoadError(true);
+                if (!opts.silent) toast.error("Couldn't load your schedule");
+                return;
+            }
+
+            setLoadError(false);
             setRecurring(recurringData || []);
             setGoals(goalsData || []);
             setOneOffs(oneOffData || []);
         } catch (error) {
             console.error('Error loading calendar data:', error);
+            if (fetchGenRef.current !== myGen) return;
+            setLoadError(true);
+            if (!opts.silent) toast.error("Couldn't load your schedule");
         } finally {
             if (fetchGenRef.current === myGen) setLoading(false);
         }
     }, [userId, activeWorkspaceId, viewMonth]);
 
     useEffect(() => { fetchGenRef.current++; load(); }, [load]);
+
+    useRefreshRequest(() => load({ silent: true }));
 
     // Build events for the visible month + a 60-day forward window so day-detail
     // works for buckets / goals whose dates fall within either range.
@@ -355,7 +388,12 @@ export function CalendarView() {
     const selectedKey = format(selectedDate, 'yyyy-MM-dd');
     const selectedEvents = eventsByDay.get(selectedKey) || [];
 
+    // Both handlers guard on `mutatingId`: without it a rapid double-tap fires two
+    // requests, and since each captures its own `prev` snapshot the rollback could
+    // restore a stale list.
     const handleToggleOneOff = useCallback(async (id: string, completed: boolean) => {
+        if (mutatingId) return;
+        setMutatingId(id);
         const prev = oneOffs;
         setOneOffs(prev.map(o => o.id === id ? { ...o, is_completed: completed } : o));
         try {
@@ -364,30 +402,44 @@ export function CalendarView() {
                 .update({ is_completed: completed })
                 .eq('id', id);
             if (error) throw error;
+            toast.success(completed ? 'Marked done' : 'Marked not done');
         } catch (err) {
             console.error('Error toggling one-off:', err);
             setOneOffs(prev);
             toast.error('Could not update');
+        } finally {
+            setMutatingId(null);
         }
-    }, [oneOffs]);
+    }, [oneOffs, mutatingId]);
 
-    const handleDeleteOneOff = useCallback(async (id: string) => {
-        const prev = oneOffs;
-        setOneOffs(prev.filter(o => o.id !== id));
-        try {
-            const { error } = await supabase.from('scheduled_events').delete().eq('id', id);
-            if (error) throw error;
-            toast.success('Removed');
-        } catch (err) {
-            console.error('Error deleting one-off:', err);
-            setOneOffs(prev);
-            toast.error('Could not delete');
-        }
-    }, [oneOffs]);
+    const handleDeleteOneOff = useCallback((id: string, label: string) => {
+        if (mutatingId) return;
+        confirm({
+            title: `Delete "${label}"?`,
+            description: 'This scheduled item is removed from your cash-flow calendar. This can\'t be undone.',
+            confirmLabel: 'Delete',
+            onConfirm: async () => {
+                setMutatingId(id);
+                const prev = oneOffs;
+                setOneOffs(prev.filter(o => o.id !== id));
+                try {
+                    const { error } = await supabase.from('scheduled_events').delete().eq('id', id);
+                    if (error) throw error;
+                    toast.success('Removed');
+                } catch (err) {
+                    console.error('Error deleting one-off:', err);
+                    setOneOffs(prev);
+                    toast.error('Could not delete');
+                } finally {
+                    setMutatingId(null);
+                }
+            },
+        });
+    }, [oneOffs, mutatingId, confirm]);
 
     return (
         <div className="relative min-h-[100dvh] w-full bg-[radial-gradient(ellipse_90%_60%_at_50%_-10%,_rgba(138,43,226,0.18),_transparent_60%)]">
-            <div className="p-5 space-y-7 max-w-md lg:max-w-2xl mx-auto relative pb-24 lg:pb-8 z-10">
+            <div className="p-5 space-y-7 max-w-md lg:max-w-2xl mx-auto relative lg:pb-8 z-10">
                 <div className="relative flex items-center gap-3 min-h-[40px]">
                     <button
                         onClick={() => router.back()}
@@ -415,6 +467,26 @@ export function CalendarView() {
                     <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground/70">
                         {format(viewMonth, 'MMMM yyyy')} · projected
                     </p>
+                    {/* A number here is a claim about the user's month. While loading, or
+                        after a failed fetch, we have no such claim to make — showing
+                        "$0.00 projected" would read as "you have no bills due". */}
+                    {loadError ? (
+                        <div className="flex flex-col items-center gap-2 py-2">
+                            <p className="text-[15px] font-semibold text-muted-foreground/80">
+                                Couldn&apos;t load your schedule
+                            </p>
+                            <button
+                                onClick={() => load()}
+                                className={cn('text-[11px] font-semibold tracking-tight hover:underline transition-colors', themeConfig.text)}
+                            >
+                                Try again
+                            </button>
+                        </div>
+                    ) : loading ? (
+                        <div className="flex justify-center py-2">
+                            <div className="h-10 w-44 rounded-2xl bg-secondary/20 animate-pulse" />
+                        </div>
+                    ) : (
                     <div className="flex items-end justify-center gap-3 flex-wrap">
                         <h3 className={cn(
                             'text-[40px] leading-none font-bold tracking-tight tabular-nums',
@@ -428,6 +500,7 @@ export function CalendarView() {
                             </span>
                         )}
                     </div>
+                    )}
                     {monthCounts.total > 0 && (
                         <div className="flex items-center justify-center gap-2 text-[11px] text-muted-foreground/70 flex-wrap">
                             {monthCounts.recurring > 0 && (
@@ -463,7 +536,7 @@ export function CalendarView() {
                         <button
                             onClick={() => setViewMonth(prev => subMonths(prev, 1))}
                             aria-label="Previous month"
-                            className="p-1.5 rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary/30 transition-colors"
+                            className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary/30 transition-colors"
                         >
                             <ChevronLeft className="w-4 h-4" />
                         </button>
@@ -471,13 +544,22 @@ export function CalendarView() {
                         <button
                             onClick={() => setViewMonth(prev => addMonths(prev, 1))}
                             aria-label="Next month"
-                            className="p-1.5 rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary/30 transition-colors"
+                            className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary/30 transition-colors"
                         >
                             <ChevronRight className="w-4 h-4" />
                         </button>
                     </div>
+                    {/* <abbr> so screen readers say "Sunday" rather than two
+                        indistinguishable "S"es and two "T"s. */}
                     <div className="grid grid-cols-7 gap-1 mt-1 text-center text-[10px] uppercase tracking-[0.18em] text-muted-foreground/60">
-                        {['S','M','T','W','T','F','S'].map((d, i) => <div key={i}>{d}</div>)}
+                        {[
+                            ['S', 'Sunday'], ['M', 'Monday'], ['T', 'Tuesday'], ['W', 'Wednesday'],
+                            ['T', 'Thursday'], ['F', 'Friday'], ['S', 'Saturday'],
+                        ].map(([short, full], i) => (
+                            <div key={i}>
+                                <abbr title={full} className="no-underline">{short}</abbr>
+                            </div>
+                        ))}
                     </div>
                     <div className="grid grid-cols-7 gap-1 mt-1">
                         {days.map(day => {
@@ -502,6 +584,18 @@ export function CalendarView() {
                                     type="button"
                                     onClick={() => setSelectedDate(day)}
                                     style={heatmapStyle}
+                                    // Screen readers previously got just "5" plus a bare
+                                    // currency string, with no way to tell which day was
+                                    // selected or which is today.
+                                    aria-label={
+                                        `${format(day, 'EEEE d MMMM')}`
+                                        + (isToday ? ', today' : '')
+                                        + (dayEvents.length > 0
+                                            ? `, ${dayEvents.length} item${dayEvents.length === 1 ? '' : 's'}`
+                                            : ', nothing scheduled')
+                                    }
+                                    aria-pressed={isSelected}
+                                    aria-current={isToday ? 'date' : undefined}
                                     className={cn(
                                         'aspect-square rounded-xl flex flex-col items-center justify-center text-xs gap-0.5 transition-colors relative p-1 border',
                                         inMonth ? 'text-foreground' : 'text-muted-foreground/40',
@@ -552,9 +646,29 @@ export function CalendarView() {
                             <div className="h-14 rounded-2xl bg-secondary/10 animate-pulse" />
                             <div className="h-14 rounded-2xl bg-secondary/10 animate-pulse" />
                         </div>
-                    ) : selectedEvents.length === 0 ? (
+                    ) : loadError ? (
                         <div className="text-center py-8 border border-dashed border-white/[0.08] rounded-2xl text-muted-foreground/70 text-[11px]">
-                            Nothing scheduled.
+                            Couldn&apos;t load this day.
+                            <button
+                                onClick={() => load()}
+                                className={cn('ml-1.5 font-semibold hover:underline transition-colors', themeConfig.text)}
+                            >
+                                Try again
+                            </button>
+                        </div>
+                    ) : selectedEvents.length === 0 ? (
+                        <div className="flex flex-col items-center gap-3 py-8 border border-dashed border-white/[0.08] rounded-2xl">
+                            <p className="text-muted-foreground/70 text-[11px]">Nothing scheduled.</p>
+                            <button
+                                onClick={() => setScheduleOpen(true)}
+                                className={cn(
+                                    'inline-flex items-center gap-1.5 min-h-[36px] px-3 rounded-full text-[11px] font-semibold tracking-tight transition-colors hover:bg-primary/10',
+                                    themeConfig.text
+                                )}
+                            >
+                                <Plus className="w-3.5 h-3.5" aria-hidden="true" />
+                                Schedule something
+                            </button>
                         </div>
                     ) : (
                         selectedEvents.map(e => {
@@ -592,27 +706,31 @@ export function CalendarView() {
                                         </span>
                                     )}
                                     {isOneOff && (
-                                        <div className="flex items-center gap-1 shrink-0">
+                                        // gap-2 and 44px targets: these were 28px and 4px
+                                        // apart, with delete adjacent to the done-toggle.
+                                        <div className="flex items-center gap-2 shrink-0">
                                             <button
                                                 type="button"
                                                 onClick={() => handleToggleOneOff(e.sourceId, !e.isCompleted)}
-                                                aria-label={e.isCompleted ? 'Mark as not completed' : 'Mark as completed'}
+                                                disabled={mutatingId === e.sourceId}
+                                                aria-label={e.isCompleted ? `Mark "${e.label}" as not completed` : `Mark "${e.label}" as completed`}
                                                 className={cn(
-                                                    'h-7 w-7 inline-flex items-center justify-center rounded-full transition-colors',
+                                                    'min-h-[44px] min-w-[44px] -my-2 inline-flex items-center justify-center rounded-full transition-colors disabled:opacity-50',
                                                     e.isCompleted
                                                         ? 'text-emerald-400 bg-emerald-500/15 hover:bg-emerald-500/25'
                                                         : 'text-muted-foreground hover:text-foreground hover:bg-secondary/30'
                                                 )}
                                             >
-                                                <Check className="w-3.5 h-3.5" />
+                                                <Check className="w-3.5 h-3.5" aria-hidden="true" />
                                             </button>
                                             <button
                                                 type="button"
-                                                onClick={() => handleDeleteOneOff(e.sourceId)}
-                                                aria-label="Delete one-off"
-                                                className="h-7 w-7 inline-flex items-center justify-center rounded-full text-muted-foreground hover:text-rose-400 hover:bg-rose-500/15 transition-colors"
+                                                onClick={() => handleDeleteOneOff(e.sourceId, e.label)}
+                                                disabled={mutatingId === e.sourceId}
+                                                aria-label={`Delete "${e.label}"`}
+                                                className="min-h-[44px] min-w-[44px] -my-2 inline-flex items-center justify-center rounded-full text-muted-foreground hover:text-rose-400 hover:bg-rose-500/15 transition-colors disabled:opacity-50"
                                             >
-                                                <Trash2 className="w-3.5 h-3.5" />
+                                                <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
                                             </button>
                                         </div>
                                     )}
@@ -629,6 +747,7 @@ export function CalendarView() {
                 selectedDate={selectedDate}
                 onCreated={load}
             />
+            {dialog}
         </div>
     );
 }

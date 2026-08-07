@@ -15,6 +15,8 @@ const DISMISS_TTL_MS = 14 * 24 * 60 * 60 * 1000;
 export function PWAInstallPrompt() {
     const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
     const [isVisible, setIsVisible] = useState(false);
+    // iOS has no install API — the banner becomes instructions instead of a button.
+    const [isIOSHint, setIsIOSHint] = useState(false);
 
     useEffect(() => {
         // Don't show if already installed (standalone mode)
@@ -39,6 +41,18 @@ export function PWAInstallPrompt() {
         };
 
         window.addEventListener('beforeinstallprompt', handler);
+
+        // iOS Safari never fires `beforeinstallprompt`, so without this branch iPhone
+        // users — the primary install target — got no install path at all. There's no
+        // programmatic prompt on iOS, so we show Add-to-Home-Screen instructions.
+        const ua = navigator.userAgent;
+        const isIOS = /iPad|iPhone|iPod/.test(ua) && !('MSStream' in window);
+        const isSafari = /Safari/.test(ua) && !/CriOS|FxiOS|EdgiOS/.test(ua);
+        if (isIOS && isSafari) {
+            setIsIOSHint(true);
+            timer = setTimeout(() => setIsVisible(true), 3000);
+        }
+
         return () => {
             window.removeEventListener('beforeinstallprompt', handler);
             if (timer) clearTimeout(timer);
@@ -67,31 +81,43 @@ export function PWAInstallPrompt() {
                     animate={{ y: 0, opacity: 1 }}
                     exit={{ y: 100, opacity: 0 }}
                     transition={{ type: 'spring', damping: 20, stiffness: 300 }}
-                    className="fixed bottom-20 left-4 right-4 z-50 max-w-sm mx-auto"
-                    role="dialog"
+                    // bottom-24 clears the floating nav, which sits at
+                    // bottom-6 + safe-area inset + ~48px tall.
+                    className="fixed bottom-[calc(7rem+env(safe-area-inset-bottom))] left-4 right-4 z-50 max-w-sm mx-auto"
+                    // A non-modal banner: role="status", not "dialog". It has no focus
+                    // trap and no Escape handler, so announcing it as a dialog was a lie.
+                    role="status"
                     aria-label="Install Novira app"
                 >
                     <div className="bg-card/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl p-4 flex items-center gap-4">
                         <div className="w-10 h-10 rounded-xl bg-primary/20 border border-primary/30 flex items-center justify-center shrink-0">
-                            <Download className="w-5 h-5 text-primary" />
+                            <Download className="w-5 h-5 text-primary" aria-hidden="true" />
                         </div>
                         <div className="flex-1 min-w-0">
                             <p className="text-sm font-bold text-white leading-tight">Install Novira</p>
-                            <p className="text-xs text-white/50 mt-0.5">Add to home screen for the best experience</p>
+                            <p className="text-xs text-white/50 mt-0.5">
+                                {isIOSHint
+                                    ? 'Tap Share, then "Add to Home Screen"'
+                                    : 'Add to home screen for the best experience'}
+                            </p>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
-                            <button
-                                onClick={handleInstall}
-                                className="px-3 py-1.5 bg-primary rounded-lg text-xs font-bold text-white hover:bg-primary/90 transition-colors"
-                            >
-                                Install
-                            </button>
+                            {/* iOS offers no programmatic install, so there's nothing to
+                                tap — the instructions above are the whole affordance. */}
+                            {!isIOSHint && (
+                                <button
+                                    onClick={handleInstall}
+                                    className="px-3 min-h-[44px] bg-primary rounded-lg text-xs font-bold text-white hover:bg-primary/90 transition-colors"
+                                >
+                                    Install
+                                </button>
+                            )}
                             <button
                                 onClick={handleDismiss}
-                                className="p-1.5 rounded-full hover:bg-white/10 text-white/40 hover:text-white/70 transition-colors"
+                                className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-full hover:bg-white/10 text-white/40 hover:text-white/70 transition-colors"
                                 aria-label="Dismiss install prompt"
                             >
-                                <X className="w-4 h-4" />
+                                <X className="w-4 h-4" aria-hidden="true" />
                             </button>
                         </div>
                     </div>

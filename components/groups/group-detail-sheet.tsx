@@ -9,6 +9,7 @@ import { format, parseISO } from 'date-fns';
 import { ArrowRight, Plus, Home, Plane, Heart, FileText } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
+import { toast } from '@/utils/haptics';
 import { simplifyDebtsForGroup, type SimplifiedPayment } from '@/utils/simplify-debts';
 import type { Group, Split } from '@/components/providers/groups-provider';
 
@@ -47,6 +48,7 @@ export function GroupDetailSheet({
     const [transactions, setTransactions] = useState<RecentTransaction[]>([]);
     const [totalSpent, setTotalSpent] = useState(0);
     const [loadingTx, setLoadingTx] = useState(false);
+    const [txError, setTxError] = useState(false);
 
     useEffect(() => {
         if (!open) return;
@@ -63,10 +65,15 @@ export function GroupDetailSheet({
 
             if (cancelled) return;
             if (error) {
+                // Bailing to an empty list here rendered "No expenses yet in this group"
+                // plus a confident "$0.00 total" in the header.
                 console.error('[group-detail] fetch failed', error);
+                setTxError(true);
                 setLoadingTx(false);
+                toast.error("Couldn't load this group's expenses");
                 return;
             }
+            setTxError(false);
 
             type Row = {
                 id: string;
@@ -137,7 +144,9 @@ export function GroupDetailSheet({
                         <div className="min-w-0 flex-1">
                             <SheetTitle className="truncate text-[15px] font-semibold tracking-tight">{group.name}</SheetTitle>
                             <SheetDescription className="text-[11px] mt-0.5">
-                                {group.members.length} member{group.members.length !== 1 ? 's' : ''} · {formatCurrency(totalSpent)} total
+                                {group.members.length} member{group.members.length !== 1 ? 's' : ''}
+                                {/* A total of 0 is a claim we can't make when the fetch failed. */}
+                                {loadingTx || txError ? '' : ` · ${formatCurrency(totalSpent)} total`}
                             </SheetDescription>
                         </div>
                     </div>
@@ -199,6 +208,10 @@ export function GroupDetailSheet({
                                 {[0, 1, 2].map(i => (
                                     <div key={i} className="h-11 rounded-xl bg-secondary/15 animate-pulse" />
                                 ))}
+                            </div>
+                        ) : txError ? (
+                            <div className="rounded-xl border border-dashed border-white/[0.08] p-5 text-center">
+                                <p className="text-[12px] text-muted-foreground">Couldn&apos;t load this group&apos;s expenses.</p>
                             </div>
                         ) : transactions.length === 0 ? (
                             <div className="rounded-xl border border-dashed border-white/[0.08] p-5 text-center">

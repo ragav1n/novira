@@ -8,9 +8,10 @@ import { version as APP_VERSION } from '@/package.json';
 
 interface Props {
     onSignOut: () => Promise<void> | void;
+    signingOut?: boolean;
 }
 
-export function SettingsAppFooter({ onSignOut }: Props) {
+export function SettingsAppFooter({ onSignOut, signingOut = false }: Props) {
     const router = useRouter();
 
     return (
@@ -18,10 +19,12 @@ export function SettingsAppFooter({ onSignOut }: Props) {
             <div className="pt-2">
                 <button
                     onClick={onSignOut}
-                    className="w-full flex items-center justify-center gap-2 p-3 rounded-xl bg-secondary/10 hover:bg-secondary/20 text-muted-foreground hover:text-foreground transition-colors duration-200 border border-white/5"
+                    disabled={signingOut}
+                    aria-busy={signingOut}
+                    className="w-full flex items-center justify-center gap-2 p-3 rounded-xl bg-secondary/10 hover:bg-secondary/20 text-muted-foreground hover:text-foreground transition-colors duration-200 border border-white/5 disabled:opacity-60 disabled:pointer-events-none"
                 >
                     <LogOut className="w-4 h-4" />
-                    <span className="font-medium text-sm">Log Out</span>
+                    <span className="font-medium text-sm">{signingOut ? 'Signing out…' : 'Log Out'}</span>
                 </button>
             </div>
 

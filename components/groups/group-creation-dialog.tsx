@@ -38,16 +38,25 @@ export function GroupCreationDialog({ open, onOpenChange }: GroupCreationDialogP
     const [selectedType, setSelectedType] = useState<GroupTypeId | null>(null);
     const [newGroupName, setNewGroupName] = useState('');
     const [dateRange, setDateRange] = useState<DateRange | undefined>();
+    const [creating, setCreating] = useState(false);
 
     const selectedMeta = TYPE_OPTIONS.find(t => t.id === selectedType);
 
     const handleCreateGroup = async () => {
-        if (!newGroupName.trim()) return;
+        if (creating) return;
+        // Was a silent `return` on an empty name, with the Create button neither
+        // disabled nor showing a pending state — so it looked broken, and a valid
+        // name could be submitted repeatedly before the dialog closed.
+        if (!newGroupName.trim()) {
+            toast.error('Give your group a name');
+            return;
+        }
         if (!selectedType) {
             toast.error('Please select a group type');
             return;
         }
 
+        setCreating(true);
         try {
             await createGroup(newGroupName, selectedType, dateRange?.from, dateRange?.to);
             setNewGroupName('');
@@ -58,6 +67,8 @@ export function GroupCreationDialog({ open, onOpenChange }: GroupCreationDialogP
             toast.success('Group created');
         } catch (error) {
             toast.error(getErrorMessage(error, 'Failed to create group'));
+        } finally {
+            setCreating(false);
         }
     };
 
@@ -175,9 +186,11 @@ export function GroupCreationDialog({ open, onOpenChange }: GroupCreationDialogP
                                 </Button>
                                 <Button
                                     onClick={handleCreateGroup}
+                                    disabled={!newGroupName.trim() || creating}
+                                    aria-busy={creating}
                                     className="flex-1 h-11 rounded-xl bg-primary hover:bg-primary/90 text-white font-semibold"
                                 >
-                                    Create {selectedType === 'trip' ? 'trip' : 'group'}
+                                    {creating ? 'Creating…' : `Create ${selectedType === 'trip' ? 'trip' : 'group'}`}
                                 </Button>
                             </div>
                         </div>

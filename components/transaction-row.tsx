@@ -45,6 +45,7 @@ function CategoryIcon({ icon, color }: { icon: React.ReactNode; color: string })
 
 let _swipeHintLock = false;
 const SWIPE_THRESHOLD = 72;  // minimum drag distance to trigger snap
+const SWIPE_VELOCITY = 400;  // px/s — a fast flick opens even below the distance threshold
 const SNAP_DISTANCE = 130;   // full reveal: 2 × w-16 (64px) buttons + gap
 
 // Deterministic hue per tag so the same tag always renders in the same color.
@@ -87,6 +88,8 @@ export const TransactionRow = memo(function TransactionRow({
 }: TransactionRowProps) {
   const hasSplits = tx.splits && tx.splits.length > 0;
   const isSettlement = tx.is_settlement;
+  const isPending = !!tx._pending;
+  const isFailed = !!tx._failed;
   const formatDate = useFormattedDate();
   const router = useRouter();
 
@@ -96,6 +99,14 @@ export const TransactionRow = memo(function TransactionRow({
   const prefersReducedMotion = useReducedMotion();
   const rowRef = useRef<HTMLDivElement>(null);
   const [isNear, setIsNear] = useState(false);
+
+  // Pending/failed rows have a faded card via opacity-70, which lets the swipe
+  // action buttons (sitting absolutely behind the card) bleed through. Disable
+  // swipe + hide those buttons until the row syncs. Also gate by `isNear` so
+  // off-screen rows in long lists don't pay the drag/overlay cost.
+  // The `!isSettlement && !hasSplits` terms mirror the dropdown's Edit/Delete gate —
+  // otherwise swiping such a row reveals a Delete the menu deliberately hides.
+  const swipeEnabled = canEdit && !isSettlement && !hasSplits && !isPending && !isFailed && isNear && !selectable;
 
   useEffect(() => {
     const el = rowRef.current;
@@ -112,10 +123,16 @@ export const TransactionRow = memo(function TransactionRow({
   }, [isNear]);
 
   useEffect(() => {
-    if (prefersReducedMotion) return;
-    if (!canEdit || tx._pending || tx._failed || _swipeHintLock) return;
-    if (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('novira-swipe-hint')) return;
+    // Gate on `swipeEnabled`, not just `canEdit`: a row that hasn't intersected yet
+    // renders no action buttons, so hinting it just slid open onto a blank strip.
+    if (prefersReducedMotion || !swipeEnabled || _swipeHintLock) return;
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('novira-swipe-hint')) return;
     _swipeHintLock = true;
+    // Tracks whether *this* effect instance took the lock. The effect re-runs when
+    // `swipeEnabled` flips (rows scroll into view), and without this a row that
+    // bailed out early would release a lock another row is actively holding —
+    // letting two rows play the hint at once.
+    const heldLock = true;
     let cancelled = false;
     const run = async () => {
       await new Promise<void>(r => setTimeout(r, 900));
@@ -128,13 +145,23 @@ export const TransactionRow = memo(function TransactionRow({
       await animate(x, 0, { type: 'spring', stiffness: 380, damping: 38 });
       if (!cancelled) {
         setShowHint(false);
-        sessionStorage.setItem('novira-swipe-hint', '1');
+        // localStorage, not sessionStorage: the hint is a one-time teaching moment,
+        // and sessionStorage replayed it in every new tab.
+        localStorage.setItem('novira-swipe-hint', '1');
       }
     };
     run();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      // Release the lock only if we took it and never finished (unmounted mid-run in a
+      // virtualised list, route change). Leaving it set meant the hint silently never
+      // appeared again for the rest of the session.
+      if (heldLock && (typeof localStorage === 'undefined' || !localStorage.getItem('novira-swipe-hint'))) {
+        _swipeHintLock = false;
+      }
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canEdit, prefersReducedMotion]);
+  }, [swipeEnabled, prefersReducedMotion]);
 
   const snapTo = (target: number) => animate(x, target, { type: 'spring', stiffness: 320, damping: 34, mass: 0.8 });
 
@@ -147,9 +174,11 @@ export const TransactionRow = memo(function TransactionRow({
 
   const closeSwipe = () => { snapTo(0); setSwiped(false); };
 
-  const handleDragEnd = (_: unknown, info: { offset: { x: number } }) => {
+  const handleDragEnd = (_: unknown, info: { offset: { x: number }; velocity: { x: number } }) => {
     if (!canEdit) return;
-    if (info.offset.x < -SWIPE_THRESHOLD) openSwipe();
+    // Distance OR velocity: a fast short flick is the natural mobile gesture, and
+    // checking offset alone made it snap back as though the swipe were broken.
+    if (info.offset.x < -SWIPE_THRESHOLD || info.velocity.x < -SWIPE_VELOCITY) openSwipe();
     else closeSwipe();
   };
 
@@ -166,13 +195,6 @@ export const TransactionRow = memo(function TransactionRow({
   }, [tx.id, swiped]);
 
   const paidByLabel = tx.user_id === userId ? 'You' : (tx.profile?.full_name?.split(' ')[0] ?? 'Other');
-  const isPending = !!tx._pending;
-  const isFailed = !!tx._failed;
-  // Pending/failed rows have a faded card via opacity-70, which lets the swipe
-  // action buttons (sitting absolutely behind the card) bleed through. Disable
-  // swipe + hide those buttons until the row syncs. Also gate by `isNear` so
-  // off-screen rows in long lists don't pay the drag/overlay cost.
-  const swipeEnabled = canEdit && !isPending && !isFailed && isNear && !selectable;
   const canBulkSelect = selectable && !isPending && !isFailed;
 
   return (
@@ -207,6 +229,9 @@ export const TransactionRow = memo(function TransactionRow({
       {/* Sliding card */}
       <motion.div
         drag={swipeEnabled ? 'x' : false}
+        // Without direction lock, a diagonal thumb-scroll hands its horizontal
+        // component to Framer and rows visibly shear sideways during normal scrolling.
+        dragDirectionLock
         dragConstraints={{ left: -SNAP_DISTANCE, right: 0 }}
         dragElastic={0.07}
         onDragEnd={handleDragEnd}
@@ -219,11 +244,25 @@ export const TransactionRow = memo(function TransactionRow({
           }
           if (swiped) closeSwipe();
         }}
+        // In bulk mode the row is the checkbox. Without these it was mouse/touch-only,
+        // and the selected state was carried purely by a background tint.
+        {...(canBulkSelect && onToggleSelect ? {
+          role: 'checkbox' as const,
+          'aria-checked': selected,
+          'aria-label': `Select ${tx.description}`,
+          tabIndex: 0,
+          onKeyDown: (e: React.KeyboardEvent) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              onToggleSelect();
+            }
+          },
+        } : {})}
         className={cn(
           "relative flex items-center gap-3 px-4 py-3.5 bg-card select-none transition-colors",
           isPending && "opacity-70",
           selectable && !canBulkSelect && "opacity-40",
-          canBulkSelect && "cursor-pointer",
+          canBulkSelect && "cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/60",
           selected && "bg-primary/10"
         )}
       >
@@ -299,8 +338,8 @@ export const TransactionRow = memo(function TransactionRow({
               {/* Location indicator */}
               {tx.place_name && (
                 tx.place_name === 'Online'
-                  ? <Globe className="shrink-0 w-3 h-3 text-blue-400/60 ml-0.5" aria-label="Online purchase" />
-                  : <MapPin className="shrink-0 w-3 h-3 text-emerald-400/50 ml-0.5" aria-label="Has location" />
+                  ? <Globe role="img" className="shrink-0 w-3 h-3 text-blue-400/60 ml-0.5" aria-label="Online purchase" />
+                  : <MapPin role="img" className="shrink-0 w-3 h-3 text-emerald-400/50 ml-0.5" aria-label="Has location" />
               )}
               {/* Receipt indicator — tap to open viewer */}
               {tx.receipt_path && onViewReceipt && (

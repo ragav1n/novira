@@ -9,6 +9,7 @@ import { BucketService } from '@/lib/services/bucket-service';
 import { Bucket } from '@/components/providers/buckets-provider';
 import { useUserPreferences } from '@/components/providers/user-preferences-provider';
 import { Trophy, Flag, MapPin, Layers } from 'lucide-react';
+import { toast } from '@/utils/haptics';
 import { cn } from '@/lib/utils';
 
 type ProfileLite = { full_name: string; avatar_url?: string };
@@ -44,6 +45,7 @@ export function BucketDetailSheet({ bucket, spent, open, onOpenChange }: Props) 
     const [transactions, setTransactions] = useState<DetailTx[]>([]);
     const [truncated, setTruncated] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [loadError, setLoadError] = useState(false);
 
     useEffect(() => {
         if (!open || !bucket) return;
@@ -55,9 +57,15 @@ export function BucketDetailSheet({ bucket, spent, open, onOpenChange }: Props) 
                 if (!cancelled) {
                     setTransactions((data || []) as DetailTx[]);
                     setTruncated(truncated);
+                    setLoadError(false);
                 }
             } catch (error) {
+                // Without this the sheet rendered "No spending yet" on a failed fetch.
                 console.error('Error fetching bucket transactions:', error);
+                if (!cancelled) {
+                    setLoadError(true);
+                    toast.error("Couldn't load this bucket's spending");
+                }
             } finally {
                 if (!cancelled) setLoading(false);
             }
@@ -240,6 +248,16 @@ export function BucketDetailSheet({ bucket, spent, open, onOpenChange }: Props) 
                         <div className="space-y-2">
                             <div className="h-20 rounded-2xl bg-secondary/10 animate-pulse" />
                             <div className="h-20 rounded-2xl bg-secondary/10 animate-pulse" />
+                        </div>
+                    ) : loadError ? (
+                        <div className="text-center py-10 space-y-2">
+                            <div className="w-10 h-10 mx-auto rounded-full bg-secondary/15 flex items-center justify-center">
+                                <Layers className="w-4 h-4 text-muted-foreground/50" aria-hidden="true" />
+                            </div>
+                            <p className="text-[13px] font-semibold">Couldn&apos;t load this bucket</p>
+                            <p className="text-[11px] text-muted-foreground px-6">
+                                Its spending is safe — we just couldn&apos;t reach it. Close and reopen to retry.
+                            </p>
                         </div>
                     ) : !breakdown || breakdown.totalConverted === 0 ? (
                         <div className="text-center py-10 space-y-2">

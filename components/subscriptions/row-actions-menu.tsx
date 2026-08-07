@@ -28,7 +28,7 @@ export function RowActionsMenu({ template, meta, paused, onTogglePin, onSetPause
             <PopoverTrigger asChild>
                 <button
                     type="button"
-                    className="text-muted-foreground hover:text-foreground p-1 transition-colors"
+                    className="text-muted-foreground hover:text-foreground min-h-[44px] min-w-[44px] -my-2 inline-flex items-center justify-center transition-colors"
                     aria-label="Subscription actions"
                 >
                     <MoreVertical className="w-4 h-4" aria-hidden="true" />

@@ -1,11 +1,12 @@
 'use client';
 
 import React from 'react';
+import Link from 'next/link';
 import { format, parseISO } from 'date-fns';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
     CheckSquare, Square, SearchX, Tag, Plane, Home, Gift, Car, Utensils,
-    ShoppingCart, Heart, Gamepad2, School, Laptop, Music,
+    ShoppingCart, Heart, Gamepad2, School, Laptop, Music, WifiOff, Receipt,
 } from 'lucide-react';
 import { TransactionRow } from '@/components/transaction-row';
 import { CATEGORY_COLORS, getIconForCategory } from '@/lib/categories';
@@ -40,6 +41,9 @@ function calculateUserShare(tx: Transaction, currentUserId: string | null): numb
 interface Props {
     transactions: Transaction[];
     loading: boolean;
+    error: boolean;
+    hasActiveFilters: boolean;
+    onRetry: () => void;
     sortBy: SortOption;
     bulkMode: boolean;
     selectedIds: Set<string>;
@@ -50,7 +54,7 @@ interface Props {
 }
 
 export function SearchResultsList({
-    transactions, loading, sortBy, bulkMode, selectedIds, toggleSelection,
+    transactions, loading, error, hasActiveFilters, onRetry, sortBy, bulkMode, selectedIds, toggleSelection,
     debouncedSearchQuery, onViewReceipt, onResetFilters,
 }: Props) {
     const { formatCurrency, convertAmount, currency, userId } = useUserPreferences();
@@ -75,10 +79,33 @@ export function SearchResultsList({
     return (
         <div className={cn(
             "space-y-0 overflow-y-auto pr-1 -mr-1 h-full transition-all duration-300 flex-1",
-            loading ? "opacity-50 blur-[2px] pointer-events-none" : "opacity-100 blur-0"
+            // Don't dim/blur while the skeleton is showing — it was blurring its own
+            // placeholder. The dim is only meaningful over real, stale content.
+            loading ? "pointer-events-none" : "opacity-100 blur-0"
         )}>
             {loading ? (
                 <SearchSkeleton />
+            ) : error ? (
+                <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="flex flex-col items-center justify-center py-16 px-6 text-center"
+                >
+                    <WifiOff className="w-7 h-7 text-muted-foreground/40 mb-4" strokeWidth={1.5} />
+                    <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground/70">Couldn&apos;t search</p>
+                    <p className="text-[13px] text-muted-foreground/60 mt-2 max-w-[260px] leading-snug">
+                        We couldn&apos;t reach your transactions. This isn&apos;t a result — check your connection and try again.
+                    </p>
+                    <button
+                        onClick={onRetry}
+                        className={cn(
+                            'mt-5 text-[11px] font-semibold tracking-tight hover:underline transition-colors',
+                            themeConfig.text
+                        )}
+                    >
+                        Try again
+                    </button>
+                </motion.div>
             ) : (
                 <AnimatePresence mode="popLayout">
                     {transactions.length > 0 ? (
@@ -131,18 +158,33 @@ export function SearchResultsList({
                                     nodes.push(row);
                                 } else {
                                     nodes.push(
+                                        // The whole selection UI was a plain onClick div
+                                        // with a pointer-events-none child, so it was
+                                        // unreachable by keyboard and exposed no state
+                                        // to assistive tech.
                                         <div
                                             key={tx.id}
+                                            role="checkbox"
+                                            aria-checked={isSelected}
+                                            aria-label={`Select ${tx.description}`}
+                                            tabIndex={0}
                                             onClick={() => toggleSelection(tx.id)}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter' || e.key === ' ') {
+                                                    e.preventDefault();
+                                                    toggleSelection(tx.id);
+                                                }
+                                            }}
                                             className={cn(
                                                 "relative flex items-center gap-2 cursor-pointer rounded-xl transition-colors",
+                                                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60",
                                                 isSelected && 'bg-white/[0.04]'
                                             )}
                                         >
                                             <div className="pl-2 shrink-0">
                                                 {isSelected
-                                                    ? <CheckSquare className={cn("w-5 h-5", themeConfig.text)} />
-                                                    : <Square className="w-5 h-5 text-muted-foreground/60" />}
+                                                    ? <CheckSquare className={cn("w-5 h-5", themeConfig.text)} aria-hidden="true" />
+                                                    : <Square className="w-5 h-5 text-muted-foreground/60" aria-hidden="true" />}
                                             </div>
                                             <div className="flex-1 min-w-0 pointer-events-none">
                                                 {row}
@@ -159,20 +201,43 @@ export function SearchResultsList({
                             animate={{ opacity: 1 }}
                             className="flex flex-col items-center justify-center py-16 px-6 text-center"
                         >
-                            <SearchX className="w-7 h-7 text-muted-foreground/40 mb-4" strokeWidth={1.5} />
-                            <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground/70">No matches</p>
-                            <p className="text-[13px] text-muted-foreground/60 mt-2 max-w-[260px] leading-snug">
-                                Try a wider date range or clear some filters.
-                            </p>
-                            <button
-                                onClick={onResetFilters}
-                                className={cn(
-                                    'mt-5 text-[11px] font-semibold tracking-tight hover:underline transition-colors',
-                                    themeConfig.text
-                                )}
-                            >
-                                Reset filters
-                            </button>
+                            {hasActiveFilters ? (
+                                <>
+                                    <SearchX className="w-7 h-7 text-muted-foreground/40 mb-4" strokeWidth={1.5} />
+                                    <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground/70">No matches</p>
+                                    <p className="text-[13px] text-muted-foreground/60 mt-2 max-w-[260px] leading-snug">
+                                        Try a wider date range or clear some filters.
+                                    </p>
+                                    <button
+                                        onClick={onResetFilters}
+                                        className={cn(
+                                            'mt-5 text-[11px] font-semibold tracking-tight hover:underline transition-colors',
+                                            themeConfig.text
+                                        )}
+                                    >
+                                        Reset filters
+                                    </button>
+                                </>
+                            ) : (
+                                // No filters are active, so this isn't a filtered-out result —
+                                // the account genuinely has nothing to search yet.
+                                <>
+                                    <Receipt className="w-7 h-7 text-muted-foreground/40 mb-4" strokeWidth={1.5} />
+                                    <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground/70">Nothing to search yet</p>
+                                    <p className="text-[13px] text-muted-foreground/60 mt-2 max-w-[260px] leading-snug">
+                                        Once you add a few expenses, you can search them by description, amount, category or tag.
+                                    </p>
+                                    <Link
+                                        href="/add"
+                                        className={cn(
+                                            'mt-5 text-[11px] font-semibold tracking-tight hover:underline transition-colors',
+                                            themeConfig.text
+                                        )}
+                                    >
+                                        Add an expense
+                                    </Link>
+                                </>
+                            )}
                         </motion.div>
                     )}
                 </AnimatePresence>

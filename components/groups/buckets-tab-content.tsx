@@ -6,6 +6,7 @@ import { format, differenceInDays } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { type Bucket } from '@/components/providers/buckets-provider';
 import { toast } from '@/utils/haptics';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 import { BucketDialog } from './bucket-dialog';
 import { BucketDetailSheet } from './bucket-detail-sheet';
 
@@ -14,18 +15,55 @@ interface BucketsTabContentProps {
     bucketSpending: Record<string, number>;
     formatCurrency: (amount: number, currencyCode?: string) => string;
     currency: string;
+    /** Without this the tab flashes its "No active buckets" empty state on every visit. */
+    loading?: boolean;
     archiveBucket: (id: string, archive: boolean) => Promise<void>;
     deleteBucket: (id: string) => Promise<void>;
 }
 
 export function BucketsTabContent({
-    buckets, bucketSpending, formatCurrency,
+    buckets, bucketSpending, formatCurrency, loading = false,
     archiveBucket, deleteBucket,
 }: BucketsTabContentProps) {
+    const { confirm, dialog } = useConfirm();
     const [isBucketDialogOpen, setIsBucketDialogOpen] = useState(false);
     const [editingBucket, setEditingBucket] = useState<Bucket | null>(null);
     const [detailBucket, setDetailBucket] = useState<Bucket | null>(null);
     const [archivedOpen, setArchivedOpen] = useState(false);
+
+    // Archive is reversible, so it gets an undo toast rather than a blocking confirm.
+    const handleArchive = async (bucket: Bucket) => {
+        try {
+            await archiveBucket(bucket.id, true);
+            toast.success(`${bucket.name} archived`, {
+                action: {
+                    label: 'Undo',
+                    onClick: () => { archiveBucket(bucket.id, false).catch(console.error); },
+                },
+            });
+        } catch (error) {
+            console.error('Failed to archive bucket:', error);
+            toast.error("Couldn't archive that bucket");
+        }
+    };
+
+    // Delete is not reversible, so it gets a dialog that waits for a real decision.
+    const handleDelete = (bucket: Bucket) => {
+        confirm({
+            title: `Delete ${bucket.name}?`,
+            description: 'Transactions tagged to this bucket stay — only the label is removed. This can\'t be undone.',
+            confirmLabel: 'Delete',
+            onConfirm: async () => {
+                try {
+                    await deleteBucket(bucket.id);
+                    toast.success('Bucket deleted');
+                } catch (error) {
+                    console.error('Failed to delete bucket:', error);
+                    toast.error("Couldn't delete that bucket");
+                }
+            },
+        });
+    };
 
     const activeBuckets = buckets.filter(b => !b.is_archived);
     const archivedBuckets = buckets.filter(b => b.is_archived);
@@ -76,7 +114,12 @@ export function BucketsTabContent({
                     </button>
                 </div>
 
-                {activeBuckets.length > 0 ? (
+                {loading && buckets.length === 0 ? (
+                    <div className="space-y-2" role="status" aria-label="Loading buckets">
+                        <div className="h-24 rounded-2xl bg-secondary/10 animate-pulse" />
+                        <div className="h-24 rounded-2xl bg-secondary/10 animate-pulse" />
+                    </div>
+                ) : activeBuckets.length > 0 ? (
                     <div className="space-y-2">
                         {activeBuckets.map((bucket) => {
                             const spent = bucketSpending[bucket.id] || 0;
@@ -115,34 +158,28 @@ export function BucketsTabContent({
                                                     </p>
                                                 </div>
                                             </div>
-                                            <div className="flex items-center gap-0.5 -mr-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                                            {/* gap-2 (not gap-0.5): Archive and Delete were 2px
+                                                apart at ~26px each, so a mis-tap deleted. */}
+                                            <div className="flex items-center gap-2 -mr-1 shrink-0" onClick={(e) => e.stopPropagation()}>
                                                 <button
                                                     onClick={() => handleEditBucket(bucket)}
-                                                    className="p-1.5 rounded-full text-muted-foreground/60 hover:text-foreground hover:bg-secondary/30 transition-colors"
+                                                    className="min-h-[44px] min-w-[44px] -my-2 inline-flex items-center justify-center rounded-full text-muted-foreground/60 hover:text-foreground hover:bg-secondary/30 transition-colors"
                                                     title="Edit bucket"
                                                     aria-label={`Edit bucket ${bucket.name}`}
                                                 >
                                                     <Settings2 className="w-3.5 h-3.5" aria-hidden="true" />
                                                 </button>
                                                 <button
-                                                    onClick={() => archiveBucket(bucket.id, true)}
-                                                    className="p-1.5 rounded-full text-muted-foreground/60 hover:text-foreground hover:bg-secondary/30 transition-colors"
+                                                    onClick={() => handleArchive(bucket)}
+                                                    className="min-h-[44px] min-w-[44px] -my-2 inline-flex items-center justify-center rounded-full text-muted-foreground/60 hover:text-foreground hover:bg-secondary/30 transition-colors"
                                                     title="Archive bucket"
                                                     aria-label={`Archive bucket ${bucket.name}`}
                                                 >
                                                     <Archive className="w-3.5 h-3.5" aria-hidden="true" />
                                                 </button>
                                                 <button
-                                                    onClick={() => {
-                                                        toast(`Delete ${bucket.name}?`, {
-                                                            description: 'Transactions stay; the label is removed.',
-                                                            action: {
-                                                                label: 'Delete',
-                                                                onClick: () => deleteBucket(bucket.id),
-                                                            },
-                                                        });
-                                                    }}
-                                                    className="p-1.5 rounded-full text-muted-foreground/60 hover:text-rose-400 hover:bg-rose-400/10 transition-colors"
+                                                    onClick={() => handleDelete(bucket)}
+                                                    className="min-h-[44px] min-w-[44px] -my-2 inline-flex items-center justify-center rounded-full text-muted-foreground/60 hover:text-rose-400 hover:bg-rose-400/10 transition-colors"
                                                     title="Delete bucket"
                                                     aria-label={`Delete bucket ${bucket.name}`}
                                                 >
@@ -278,30 +315,22 @@ export function BucketsTabContent({
                                                     </p>
                                                 </div>
                                             </button>
-                                            <div className="flex items-center gap-0.5 shrink-0">
+                                            <div className="flex items-center gap-2 shrink-0">
                                                 <button
                                                     onClick={() => archiveBucket(bucket.id, false)}
-                                                    className="p-1.5 rounded-full text-muted-foreground/60 hover:text-primary hover:bg-primary/10 transition-colors"
+                                                    className="min-h-[44px] min-w-[44px] -my-2 inline-flex items-center justify-center rounded-full text-muted-foreground/60 hover:text-primary hover:bg-primary/10 transition-colors"
                                                     title="Unarchive bucket"
-                                                    aria-label="Unarchive bucket"
+                                                    aria-label={`Unarchive bucket ${bucket.name}`}
                                                 >
-                                                    <RotateCcw className="w-3 h-3" />
+                                                    <RotateCcw className="w-3 h-3" aria-hidden="true" />
                                                 </button>
                                                 <button
-                                                    onClick={() => {
-                                                        toast(`Delete ${bucket.name}?`, {
-                                                            description: 'Transactions stay; the label is removed.',
-                                                            action: {
-                                                                label: 'Delete',
-                                                                onClick: () => deleteBucket(bucket.id),
-                                                            },
-                                                        });
-                                                    }}
-                                                    className="p-1.5 rounded-full text-muted-foreground/60 hover:text-rose-400 hover:bg-rose-400/10 transition-colors"
+                                                    onClick={() => handleDelete(bucket)}
+                                                    className="min-h-[44px] min-w-[44px] -my-2 inline-flex items-center justify-center rounded-full text-muted-foreground/60 hover:text-rose-400 hover:bg-rose-400/10 transition-colors"
                                                     title="Delete bucket"
-                                                    aria-label="Delete bucket"
+                                                    aria-label={`Delete bucket ${bucket.name}`}
                                                 >
-                                                    <Trash2 className="w-3 h-3" />
+                                                    <Trash2 className="w-3 h-3" aria-hidden="true" />
                                                 </button>
                                             </div>
                                         </div>
@@ -312,6 +341,7 @@ export function BucketsTabContent({
                     )}
                 </section>
             )}
+            {dialog}
         </div>
     );
 }

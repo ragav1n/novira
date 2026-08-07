@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from '@/lib/utils';
 import { useGroups } from './providers/groups-provider';
 import { useUserPreferences } from './providers/user-preferences-provider';
+import { useRefreshRequest } from '@/hooks/useRefreshRequest';
 import { useBuckets } from './providers/buckets-provider';
 
 import { AddFriendDialog } from './groups/add-friend-dialog';
@@ -37,11 +38,14 @@ export function GroupsView() {
     const searchParams = useSearchParams();
     const {
         groups, friends, friendRequests, balances, pendingSplits, simplifiedDebts, loading,
-        addMemberToGroup, settleSplit, settleSplitsBatch, acceptFriendRequest, declineFriendRequest, leaveGroup, removeFriend
+        addMemberToGroup, settleSplit, settleSplitsBatch, acceptFriendRequest, declineFriendRequest, leaveGroup, removeFriend,
+        refreshData,
     } = useGroups();
+
+    useRefreshRequest(() => refreshData());
     const { formatCurrency, userId, currency, convertAmount } = useUserPreferences();
 
-    const { buckets, archiveBucket, deleteBucket, bucketSpending } = useBuckets();
+    const { buckets, archiveBucket, deleteBucket, bucketSpending, loading: bucketsLoading } = useBuckets();
 
     const [createGroupOpen, setCreateGroupOpen] = useState(false);
     const [addFriendOpen, setAddFriendOpen] = useState(false);
@@ -58,7 +62,10 @@ export function GroupsView() {
 
     const showGroupHeaderActions = activeTab === 'groups' || activeTab === 'friends';
 
-    const showSkeleton = loading && groups.length === 0 && friends.length === 0;
+    // Gated on `loading` alone. The old form also required groups and friends to both
+    // be empty, so it went false the moment *either* list arrived — letting a slower
+    // splits fetch flash "All settled up" on the Settlements tab.
+    const showSkeleton = loading;
     const isFirstTime = !loading && groups.length === 0 && friends.length === 0 && friendRequests.length === 0;
 
     const net = balances.totalOwedToMe - balances.totalOwed;
@@ -68,20 +75,20 @@ export function GroupsView() {
         : 'All settled';
 
     return (
-        <div className="relative min-h-screen w-full bg-[radial-gradient(ellipse_90%_60%_at_50%_-10%,_rgba(138,43,226,0.18),_transparent_60%)]">
-            <div className="p-5 space-y-7 max-w-md lg:max-w-2xl mx-auto relative pb-24 lg:pb-8">
+        <div className="relative min-h-[100dvh] w-full bg-[radial-gradient(ellipse_90%_60%_at_50%_-10%,_rgba(138,43,226,0.18),_transparent_60%)]">
+            <div className="p-5 space-y-7 max-w-md lg:max-w-2xl mx-auto relative lg:pb-8">
                 {/* Header */}
                 <div className="relative flex items-center gap-3 min-h-[40px]">
                     <button
                         onClick={() => router.back()}
                         aria-label="Go back"
-                        className="p-2 -ml-2 rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary/30 transition-colors shrink-0 z-10"
+                        className="min-h-[44px] min-w-[44px] -ml-2 inline-flex items-center justify-center rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary/30 transition-colors shrink-0 z-10"
                     >
                         <ChevronLeft className="w-5 h-5" aria-hidden="true" />
                     </button>
-                    <h2 className="absolute inset-0 flex items-center justify-center pointer-events-none text-lg font-semibold tracking-tight">
+                    <h1 className="absolute inset-0 flex items-center justify-center pointer-events-none text-lg font-semibold tracking-tight">
                         Groups &amp; friends
-                    </h2>
+                    </h1>
                     <div className="flex items-center gap-1.5 ml-auto z-10">
                         <AddFriendDialog userId={userId} open={addFriendOpen} onOpenChange={setAddFriendOpen} />
                         <GroupCreationDialog open={createGroupOpen} onOpenChange={setCreateGroupOpen} />
@@ -90,16 +97,16 @@ export function GroupsView() {
                                 <button
                                     onClick={() => setAddFriendOpen(true)}
                                     aria-label="Add friend"
-                                    className="h-9 w-9 inline-flex items-center justify-center rounded-full text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+                                    className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-full text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
                                 >
-                                    <UserPlus className="w-[18px] h-[18px]" />
+                                    <UserPlus className="w-[18px] h-[18px]" aria-hidden="true" />
                                 </button>
                                 <button
                                     onClick={() => setCreateGroupOpen(true)}
                                     aria-label="Create group"
-                                    className="h-9 w-9 inline-flex items-center justify-center rounded-full text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+                                    className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-full text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
                                 >
-                                    <Plus className="w-[18px] h-[18px]" />
+                                    <Plus className="w-[18px] h-[18px]" aria-hidden="true" />
                                 </button>
                             </>
                         )}
@@ -198,6 +205,7 @@ export function GroupsView() {
                                     bucketSpending={bucketSpending}
                                     formatCurrency={formatCurrency}
                                     currency={currency}
+                                    loading={bucketsLoading}
                                     archiveBucket={archiveBucket}
                                     deleteBucket={deleteBucket}
                                 />

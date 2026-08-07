@@ -102,6 +102,11 @@ export const GoalService = {
         return (data ?? []) as SavingsDeposit[];
     },
 
+    /**
+     * Throws on failure rather than returning `[]`, so callers can tell "no deposits"
+     * apart from "couldn't reach them" — an empty array rendered "No deposits yet" for
+     * goals that in fact had a full history.
+     */
     async getAllDepositsForGoal(userId: string, goalId: string): Promise<SavingsDeposit[]> {
         const { data, error } = await supabase
             .from('savings_deposits')
@@ -111,7 +116,7 @@ export const GoalService = {
             .order('created_at', { ascending: false });
         if (error) {
             console.error('Error fetching deposits:', error);
-            return [];
+            throw error;
         }
         return (data ?? []) as SavingsDeposit[];
     },

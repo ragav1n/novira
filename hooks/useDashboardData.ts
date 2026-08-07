@@ -641,24 +641,42 @@ export function useDashboardData(
         setServerTransactions(prev => prev.filter(t => !idSet.has(t.id)));
 
         if (typeof navigator !== 'undefined' && !navigator.onLine) {
-            try {
-                await Promise.all(ids.map(id => enqueueMutation('DELETE_TRANSACTION', { id })));
-                toast.success(`Queued ${ids.length} for deletion`);
-                mutatingRef.current = false;
-                return { count: ids.length };
-            } catch (err) {
+            // allSettled, not all: `all` rejects on the first failure while the
+            // remaining enqueues still land, so the old code rolled the UI back and
+            // said "Failed to queue deletes" for deletes that were in fact queued.
+            const results = await Promise.allSettled(
+                ids.map(id => enqueueMutation('DELETE_TRANSACTION', { id })),
+            );
+            const queuedIds = ids.filter((_, i) => results[i].status === 'fulfilled');
+            const firstRejection = results.find(r => r.status === 'rejected') as PromiseRejectedResult | undefined;
+            mutatingRef.current = false;
+
+            if (queuedIds.length === 0) {
                 setServerTransactions(previousServerTransactions);
+                const err = firstRejection?.reason;
                 toast.error(getErrorName(err) === 'QueueFullError' ? getErrorMessage(err) : 'Failed to queue deletes');
-                mutatingRef.current = false;
                 return { count: 0 };
             }
+            if (queuedIds.length < ids.length) {
+                // Restore only the rows that did NOT get queued.
+                const queuedSet = new Set(queuedIds);
+                setServerTransactions(previousServerTransactions.filter(t => !queuedSet.has(t.id)));
+                toast.error(`Queued ${queuedIds.length} of ${ids.length} — the rest failed and are still listed`);
+                return { count: queuedIds.length };
+            }
+            toast.success(`Queued ${ids.length} for deletion`);
+            return { count: ids.length };
         }
 
+        // Track chunks that actually committed, so a mid-run failure doesn't resurrect
+        // rows that are already gone server-side.
+        const deletedIds: string[] = [];
         try {
             for (let i = 0; i < ids.length; i += BULK_CHUNK) {
                 const slice = ids.slice(i, i + BULK_CHUNK);
                 const { error } = await supabase.from('transactions').delete().in('id', slice);
                 if (error) throw error;
+                deletedIds.push(...slice);
             }
             invalidateTransactionCaches();
             // Best-effort receipt cleanup for the deleted rows.
@@ -678,9 +696,24 @@ export function useDashboardData(
             // `transactions`, so they refresh on their own.
             return { count: ids.length };
         } catch (error) {
-            setServerTransactions(previousServerTransactions);
-            toast.error('Bulk delete failed: ' + getErrorMessage(error, 'unknown error'));
-            return { count: 0 };
+            // Put back only what's still on the server. Restoring the whole
+            // pre-delete list made already-deleted rows reappear.
+            const deletedSet = new Set(deletedIds);
+            setServerTransactions(previousServerTransactions.filter(t => !deletedSet.has(t.id)));
+            if (deletedIds.length > 0) {
+                invalidateTransactionCaches();
+                for (const tx of eligible) {
+                    if (deletedSet.has(tx.id) && tx.receipt_path) {
+                        deleteReceipt(tx.receipt_path).catch(err => {
+                            console.error('[useDashboardData] bulk receipt cleanup failed', err);
+                        });
+                    }
+                }
+                toast.error(`Deleted ${deletedIds.length} of ${ids.length} — the rest failed and are still listed`);
+            } else {
+                toast.error('Bulk delete failed: ' + getErrorMessage(error, 'unknown error'));
+            }
+            return { count: deletedIds.length };
         } finally {
             mutatingRef.current = false;
         }

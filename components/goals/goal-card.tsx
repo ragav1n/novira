@@ -88,9 +88,21 @@ export function GoalCard({ goal, deposits, formatCurrency, onAddDeposit, onEdit,
     return (
         <Card
             onClick={() => onOpenHistory(goal)}
+            // Card renders a <div>, so without these the whole card was
+            // mouse-only — the one card in the app missing this treatment.
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    onOpenHistory(goal);
+                }
+            }}
+            aria-label={`Open history for goal ${goal.name}`}
             className={cn(
                 'border-white/5 backdrop-blur-xl relative overflow-hidden group transition-all cursor-pointer',
                 'hover:bg-card/60 hover:border-white/10 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/20',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60',
                 isCompleted ? `${tokens.border} ${tokens.bgLight}` : 'bg-card/40'
             )}
         >
@@ -120,7 +132,7 @@ export function GoalCard({ goal, deposits, formatCurrency, onAddDeposit, onEdit,
                             <Icon className={cn('w-5 h-5', tokens.text)} aria-hidden="true" />
                         </div>
                         <div className="min-w-0 flex-1">
-                            <h3 className="text-lg font-bold truncate">{goal.name}</h3>
+                            <h3 className="text-lg font-bold truncate" title={goal.name}>{goal.name}</h3>
                             <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                                 {goal.deadline && (
                                     <span className="text-[10px] text-muted-foreground flex items-center gap-1">
@@ -162,7 +174,7 @@ export function GoalCard({ goal, deposits, formatCurrency, onAddDeposit, onEdit,
                             onClick={(e) => { e.stopPropagation(); onAddDeposit(goal); }}
                             aria-label={`Add deposit to ${goal.name}`}
                             className={cn(
-                                'shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-colors border',
+                                'shrink-0 min-h-[44px] min-w-[44px] -my-1.5 rounded-full flex items-center justify-center transition-colors border',
                                 tokens.bgLight, tokens.border, tokens.text, 'hover:opacity-80'
                             )}
                         >
@@ -173,7 +185,7 @@ export function GoalCard({ goal, deposits, formatCurrency, onAddDeposit, onEdit,
                                 <button
                                     aria-label="Goal actions"
                                     onClick={stopBubble}
-                                    className="shrink-0 w-8 h-8 rounded-full bg-secondary/30 hover:bg-secondary/50 flex items-center justify-center transition-colors"
+                                    className="shrink-0 min-h-[44px] min-w-[44px] -my-1.5 rounded-full bg-secondary/30 hover:bg-secondary/50 flex items-center justify-center transition-colors"
                                 >
                                     <MoreVertical className="w-4 h-4" />
                                 </button>

@@ -1,8 +1,9 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Check, X, UserMinus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from '@/utils/haptics';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 import type { Friend, Split } from '@/components/providers/groups-provider';
 import { simplifyDebtsForFriend } from '@/utils/simplify-debts';
 
@@ -23,6 +24,10 @@ export function FriendsTabContent({
     friendRequests, friends, currentUserId, pendingSplits, currency, formatCurrency, convertAmount,
     acceptFriendRequest, declineFriendRequest, removeFriend,
 }: FriendsTabContentProps) {
+    const { confirm, dialog } = useConfirm();
+    // Accept and Decline sit 4px apart; without a pending state a double-tap fires twice.
+    const [pendingRequestId, setPendingRequestId] = useState<string | null>(null);
+
     const friendBalances = useMemo(() => {
         if (!currentUserId) return new Map<string, { owe: number; owed: number }>();
         const out = new Map<string, { owe: number; owed: number }>();
@@ -85,38 +90,46 @@ export function FriendsTabContent({
                                     <button
                                         type="button"
                                         aria-label="Decline"
+                                        disabled={pendingRequestId === request.request_id}
+                                        aria-busy={pendingRequestId === request.request_id}
                                         onClick={async () => {
+                                            if (!request.request_id || pendingRequestId) return;
+                                            setPendingRequestId(request.request_id);
                                             try {
-                                                if (request.request_id) {
-                                                    await declineFriendRequest(request.request_id);
-                                                    toast.success('Request declined');
-                                                }
+                                                await declineFriendRequest(request.request_id);
+                                                toast.success('Request declined');
                                             } catch (error) {
                                                 console.error('[friends] decline failed', error);
                                                 toast.error('Failed to decline');
+                                            } finally {
+                                                setPendingRequestId(null);
                                             }
                                         }}
-                                        className="h-8 w-8 inline-flex items-center justify-center rounded-full text-muted-foreground/70 hover:text-rose-400 hover:bg-rose-400/10 transition-colors"
+                                        className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-full text-muted-foreground/70 hover:text-rose-400 hover:bg-rose-400/10 transition-colors disabled:opacity-50 disabled:pointer-events-none"
                                     >
-                                        <X className="w-4 h-4" />
+                                        <X className="w-4 h-4" aria-hidden="true" />
                                     </button>
                                     <button
                                         type="button"
+                                        disabled={pendingRequestId === request.request_id}
+                                        aria-busy={pendingRequestId === request.request_id}
                                         onClick={async () => {
+                                            if (!request.request_id || pendingRequestId) return;
+                                            setPendingRequestId(request.request_id);
                                             try {
-                                                if (request.request_id) {
-                                                    await acceptFriendRequest(request.request_id);
-                                                    toast.success('Friend added');
-                                                }
+                                                await acceptFriendRequest(request.request_id);
+                                                toast.success('Friend added');
                                             } catch (error) {
                                                 toast.error('Failed to accept');
                                                 console.error(error);
+                                            } finally {
+                                                setPendingRequestId(null);
                                             }
                                         }}
-                                        className="inline-flex items-center gap-1 h-8 px-3 rounded-full bg-amber-400 text-amber-950 text-[11px] font-semibold hover:bg-amber-300 transition-colors"
+                                        className="inline-flex items-center gap-1 min-h-[44px] px-3 rounded-full bg-amber-400 text-amber-950 text-[11px] font-semibold hover:bg-amber-300 transition-colors disabled:opacity-50 disabled:pointer-events-none"
                                     >
-                                        <Check className="w-3.5 h-3.5" />
-                                        Accept
+                                        <Check className="w-3.5 h-3.5" aria-hidden="true" />
+                                        {pendingRequestId === request.request_id ? 'Working…' : 'Accept'}
                                     </button>
                                 </div>
                             </li>
@@ -189,27 +202,27 @@ export function FriendsTabContent({
                                             type="button"
                                             aria-label={`Remove ${friend.full_name || 'friend'}`}
                                             onClick={() => {
-                                                toast(`Remove ${friend.full_name || 'friend'}?`, {
-                                                    action: {
-                                                        label: 'Remove',
-                                                        onClick: async () => {
-                                                            try {
-                                                                if (friend.request_id) {
-                                                                    await removeFriend(friend.request_id);
-                                                                    toast.success('Friend removed');
-                                                                }
-                                                            } catch (error) {
-                                                                console.error('[friends] remove failed', error);
-                                                                const message = error instanceof Error ? error.message : 'Failed to remove friend';
-                                                                toast.error(message);
+                                                confirm({
+                                                    title: `Remove ${friend.full_name || 'friend'}?`,
+                                                    description: "You'll no longer be able to split expenses with them. Existing shared expenses and unsettled balances stay recorded.",
+                                                    confirmLabel: 'Remove',
+                                                    onConfirm: async () => {
+                                                        try {
+                                                            if (friend.request_id) {
+                                                                await removeFriend(friend.request_id);
+                                                                toast.success('Friend removed');
                                                             }
-                                                        },
+                                                        } catch (error) {
+                                                            console.error('[friends] remove failed', error);
+                                                            const message = error instanceof Error ? error.message : 'Failed to remove friend';
+                                                            toast.error(message);
+                                                        }
                                                     },
                                                 });
                                             }}
-                                            className="h-7 w-7 inline-flex items-center justify-center rounded-full text-muted-foreground/50 hover:text-rose-400 hover:bg-rose-400/10 transition-colors"
+                                            className="min-h-[44px] min-w-[44px] -m-2 inline-flex items-center justify-center rounded-full text-muted-foreground/50 hover:text-rose-400 hover:bg-rose-400/10 transition-colors"
                                         >
-                                            <UserMinus className="w-3.5 h-3.5" />
+                                            <UserMinus className="w-3.5 h-3.5" aria-hidden="true" />
                                         </button>
                                     </div>
                                 </li>
@@ -232,6 +245,7 @@ export function FriendsTabContent({
                     )
                 )}
             </section>
+            {dialog}
         </div>
     );
 }

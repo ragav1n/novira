@@ -9,6 +9,7 @@ import { DateRange } from 'react-day-picker';
 import { Home, Plane, Heart, FileText, Trash2, UserMinus, UserPlus, Settings2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from '@/utils/haptics';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 import { useGroupsActions, type Group, type GroupType, type Friend, type Split } from '@/components/providers/groups-provider';
 
 interface GroupSettingsDialogProps {
@@ -29,6 +30,7 @@ const TYPE_OPTIONS: { id: GroupType; label: string; icon: React.ElementType; tin
 
 export function GroupSettingsDialog({ group, friends, currentUserId, pendingSplits, open, onOpenChange }: GroupSettingsDialogProps) {
     const { updateGroup, deleteGroup, addMemberToGroup, removeGroupMember } = useGroupsActions();
+    const { confirm, dialog } = useConfirm();
 
     const memberHasOpenSplits = (memberId: string) =>
         pendingSplits.some(s =>
@@ -56,12 +58,22 @@ export function GroupSettingsDialog({ group, friends, currentUserId, pendingSpli
         });
     }, [open, group]);
 
+    // `start_date`/`end_date` are timestamptz, so the stored string ("2026-08-07T00:00:00+00:00")
+    // never equals `Date.toISOString()` ("2026-08-07T00:00:00.000Z") as raw text — the old
+    // string comparison was always unequal and left Save permanently enabled for trips.
+    // Compare the parsed instants instead; the state is seeded from these same values,
+    // so an untouched range compares exactly equal.
+    const sameInstant = (d: Date | undefined, stored: string | null | undefined) => {
+        if (!d && !stored) return true;
+        if (!d || !stored) return false;
+        return d.getTime() === new Date(stored).getTime();
+    };
     const dirty =
         name.trim() !== group.name ||
         type !== (group.type ?? 'other') ||
         (type === 'trip' && (
-            (dateRange?.from?.toISOString() ?? null) !== (group.start_date ?? null) ||
-            (dateRange?.to?.toISOString() ?? null) !== (group.end_date ?? null)
+            !sameInstant(dateRange?.from, group.start_date) ||
+            !sameInstant(dateRange?.to, group.end_date)
         ));
 
     const handleSave = async () => {
@@ -88,20 +100,19 @@ export function GroupSettingsDialog({ group, friends, currentUserId, pendingSpli
     };
 
     const handleDelete = () => {
-        toast(`Delete ${group.name}?`, {
+        confirm({
+            title: `Delete ${group.name}?`,
             description: 'Members are removed and shared expenses become personal. This cannot be undone.',
-            action: {
-                label: 'Delete',
-                onClick: async () => {
-                    try {
-                        await deleteGroup(group.id);
-                        toast.success('Group deleted');
-                        onOpenChange(false);
-                    } catch (error: unknown) {
-                        const msg = error instanceof Error ? error.message : 'Failed to delete group';
-                        toast.error(msg);
-                    }
-                },
+            confirmLabel: 'Delete group',
+            onConfirm: async () => {
+                try {
+                    await deleteGroup(group.id);
+                    toast.success('Group deleted');
+                    onOpenChange(false);
+                } catch (error: unknown) {
+                    const msg = error instanceof Error ? error.message : 'Failed to delete group';
+                    toast.error(msg);
+                }
             },
         });
     };
@@ -110,6 +121,7 @@ export function GroupSettingsDialog({ group, friends, currentUserId, pendingSpli
     const selectedType = TYPE_OPTIONS.find(t => t.id === type) || TYPE_OPTIONS[3];
 
     return (
+        <>
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-[420px] w-[95vw] rounded-[28px] border-white/[0.08] bg-card/95 backdrop-blur-2xl p-0 overflow-hidden shadow-2xl">
                 <div className="p-5 space-y-4">
@@ -217,31 +229,32 @@ export function GroupSettingsDialog({ group, friends, currentUserId, pendingSpli
                                                 {canRemove && (
                                                     <button
                                                         type="button"
-                                                        className="p-1.5 rounded-full text-muted-foreground/60 hover:bg-rose-400/10 hover:text-rose-400 transition-colors"
+                                                        className="p-1.5 -m-1 min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-full text-muted-foreground/60 hover:bg-rose-400/10 hover:text-rose-400 transition-colors"
+                                                        aria-label={`Remove ${m.full_name || 'member'} from group`}
                                                         title="Remove from group"
                                                         onClick={() => {
                                                             const hasOpen = memberHasOpenSplits(m.user_id);
-                                                            const promptMsg = hasOpen
-                                                                ? `${m.full_name || 'Member'} has unsettled splits in this group. Remove anyway?`
-                                                                : `Remove ${m.full_name || 'member'}?`;
-                                                            toast(promptMsg, {
-                                                                description: hasOpen ? 'Unsettled splits stay open and visible in Settlements.' : undefined,
-                                                                action: {
-                                                                    label: 'Remove',
-                                                                    onClick: async () => {
-                                                                        try {
-                                                                            await removeGroupMember(group.id, m.user_id);
-                                                                            toast.success('Member removed');
-                                                                        } catch (error: unknown) {
-                                                                            const msg = error instanceof Error ? error.message : 'Failed to remove member';
-                                                                            toast.error(msg);
-                                                                        }
-                                                                    },
+                                                            confirm({
+                                                                title: hasOpen
+                                                                    ? `${m.full_name || 'Member'} has unsettled splits. Remove anyway?`
+                                                                    : `Remove ${m.full_name || 'member'}?`,
+                                                                description: hasOpen
+                                                                    ? 'Unsettled splits stay open and visible in Settlements. They lose access to this group immediately.'
+                                                                    : 'They lose access to this group immediately. Expenses they already logged stay recorded.',
+                                                                confirmLabel: 'Remove',
+                                                                onConfirm: async () => {
+                                                                    try {
+                                                                        await removeGroupMember(group.id, m.user_id);
+                                                                        toast.success('Member removed');
+                                                                    } catch (error: unknown) {
+                                                                        const msg = error instanceof Error ? error.message : 'Failed to remove member';
+                                                                        toast.error(msg);
+                                                                    }
                                                                 },
                                                             });
                                                         }}
                                                     >
-                                                        <UserMinus className="w-3.5 h-3.5" />
+                                                        <UserMinus className="w-3.5 h-3.5" aria-hidden="true" />
                                                     </button>
                                                 )}
                                             </li>
@@ -324,5 +337,7 @@ export function GroupSettingsDialog({ group, friends, currentUserId, pendingSpli
                 </div>
             </DialogContent>
         </Dialog>
+        {dialog}
+        </>
     );
 }

@@ -9,11 +9,19 @@ interface Props {
     onOpenChange: (open: boolean) => void;
     selectedCount: number;
     onRecategorize: (categoryId: string) => void;
+    /** True while a batch is in flight. Without it, tapping a second category hit the
+     *  caller's busy guard and returned with no toast, no spinner and the sheet open. */
+    busy?: boolean;
 }
 
-export function RecategorizeSheet({ open, onOpenChange, selectedCount, onRecategorize }: Props) {
+export function RecategorizeSheet({ open, onOpenChange, selectedCount, onRecategorize, busy = false }: Props) {
+    const [pendingCategory, setPendingCategory] = React.useState<string | null>(null);
+
+    // Clear the local pending marker whenever the batch finishes.
+    React.useEffect(() => { if (!busy) setPendingCategory(null); }, [busy]);
+
     return (
-        <Sheet open={open} onOpenChange={onOpenChange}>
+        <Sheet open={open} onOpenChange={(o) => { if (!busy) onOpenChange(o); }}>
             <SheetContent side="bottom" className="border-white/[0.06] bg-background rounded-t-2xl">
                 <SheetHeader className="space-y-1">
                     <SheetTitle className="text-[15px] font-semibold tracking-tight">
@@ -26,8 +34,10 @@ export function RecategorizeSheet({ open, onOpenChange, selectedCount, onRecateg
                         <button
                             key={cat.id}
                             type="button"
-                            onClick={() => onRecategorize(cat.id)}
-                            className="flex items-center gap-3 p-3 rounded-xl border bg-secondary/10 border-white/[0.06] hover:border-white/15 transition-colors text-left"
+                            disabled={busy}
+                            aria-busy={busy && pendingCategory === cat.id}
+                            onClick={() => { setPendingCategory(cat.id); onRecategorize(cat.id); }}
+                            className="flex items-center gap-3 p-3 rounded-xl border bg-secondary/10 border-white/[0.06] hover:border-white/15 transition-colors text-left disabled:opacity-50 disabled:pointer-events-none"
                         >
                             <div
                                 className="w-8 h-8 rounded-full flex items-center justify-center border"
@@ -41,6 +51,9 @@ export function RecategorizeSheet({ open, onOpenChange, selectedCount, onRecateg
                                 })}
                             </div>
                             <span className="text-[13px] font-medium">{cat.label}</span>
+                            {busy && pendingCategory === cat.id && (
+                                <span className="ml-auto text-[11px] text-muted-foreground">Applying…</span>
+                            )}
                         </button>
                     ))}
                 </div>

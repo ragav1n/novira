@@ -24,6 +24,9 @@ interface TransactionListProps {
   getBucketChip: (tx: Transaction) => React.ReactNode;
   loadAuditLogs: (tx: Transaction) => void;
   canEditTransaction: (tx: Transaction) => boolean;
+  /** Suppresses the empty state while the list is still being fetched. Without it a
+   *  user with hundreds of transactions is told to "Add your first expense". */
+  loading?: boolean;
   hasMore?: boolean;
   loadingMore?: boolean;
   onLoadMore?: () => void;
@@ -37,7 +40,7 @@ export const TransactionList = React.memo(function TransactionList({
   calculateUserShare, getIconForCategory, formatCurrency,
   convertAmount, setEditingTransaction, setIsEditOpen,
   handleDeleteTransaction, getBucketChip, loadAuditLogs,
-  canEditTransaction, hasMore, loadingMore, onLoadMore, onViewReceipt,
+  canEditTransaction, loading, hasMore, loadingMore, onLoadMore, onViewReceipt,
   onBulkDelete, onBulkUpdate,
 }: TransactionListProps) {
   const router = useRouter();
@@ -130,6 +133,16 @@ export const TransactionList = React.memo(function TransactionList({
     const result = await onBulkUpdate(selectedTxs, { account_id: accountId });
     if (result.count > 0) exitSelect();
   }, [onBulkUpdate, selectedTxs, exitSelect]);
+
+  if (loading && transactions.length === 0) {
+    return (
+      <div className="space-y-2 py-2" role="status" aria-label="Loading transactions">
+        <div className="h-16 rounded-2xl bg-secondary/10 animate-pulse" />
+        <div className="h-16 rounded-2xl bg-secondary/10 animate-pulse" />
+        <div className="h-16 rounded-2xl bg-secondary/10 animate-pulse" />
+      </div>
+    );
+  }
 
   if (transactions.length === 0) {
     return (

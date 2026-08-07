@@ -69,9 +69,9 @@ export function SubscriptionRow({
                 <div className="flex-1 min-w-0">
                     <h4 className="font-bold text-base truncate flex items-center gap-1.5">
                         {meta.pinned && (
-                            <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400 shrink-0" aria-label="Pinned" />
+                            <Star role="img" className="w-3.5 h-3.5 text-amber-400 fill-amber-400 shrink-0" aria-label="Pinned" />
                         )}
-                        <span className="truncate">{template.description}</span>
+                        <span className="truncate" title={template.description}>{template.description}</span>
                     </h4>
                     {lastCharge && (
                         <p className="text-[10px] text-muted-foreground/70 mt-0.5 flex items-center gap-1">
@@ -187,7 +187,7 @@ export function SubscriptionRow({
                             type="button"
                             onClick={(e) => { e.stopPropagation(); onRequestPriceUpdate({ template, change: drift }); }}
                             className={cn(
-                                "inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] font-bold transition-colors",
+                                "inline-flex items-center gap-1 px-2.5 min-h-[36px] rounded-full border text-[10px] font-bold transition-colors",
                                 drift.pctChange > 0
                                     ? "bg-rose-500/15 border-rose-500/30 text-rose-300 hover:bg-rose-500/25"
                                     : "bg-emerald-500/15 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/25"
@@ -203,12 +203,12 @@ export function SubscriptionRow({
                             </span>
                         </button>
                     )}
-                    <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                         <button
                             type="button"
                             onClick={(e) => { e.stopPropagation(); onEdit(template); }}
                             aria-label={`Edit ${template.description}`}
-                            className="text-muted-foreground hover:text-foreground p-1 transition-colors"
+                            className="text-muted-foreground hover:text-foreground min-h-[44px] min-w-[44px] -my-2 inline-flex items-center justify-center transition-colors"
                         >
                             <Pencil className="w-4 h-4" aria-hidden="true" />
                         </button>

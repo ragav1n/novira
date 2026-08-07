@@ -7,9 +7,10 @@ import Link from 'next/link';
 import { useUserPreferences, CURRENCY_SYMBOLS, type Currency } from '@/components/providers/user-preferences-provider';
 import { useWorkspaceTheme } from '@/hooks/useWorkspaceTheme';
 import { supabase } from '@/lib/supabase';
+import { useRefreshRequest } from '@/hooks/useRefreshRequest';
 import {
     Target, Plus, ChevronLeft, Calendar, PiggyBank, Search, X, ArrowUpDown, Check,
-    ChevronDown, BookOpen,
+    ChevronDown, BookOpen, WifiOff,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format, parseISO } from 'date-fns';
@@ -67,6 +68,8 @@ export function GoalsView() {
     const [goals, setGoals] = useState<SavingsGoal[]>([]);
     const [deposits, setDeposits] = useState<SavingsDeposit[]>([]);
     const [loading, setLoading] = useState(true);
+    const [loadError, setLoadError] = useState(false);
+    const [isSavingGoal, setIsSavingGoal] = useState(false);
     // Bumped on each workspace/user change so in-flight fetches from a previous
     // workspace can't land their results on top of the new one.
     const fetchGenRef = useRef(0);
@@ -76,6 +79,12 @@ export function GoalsView() {
     const [sortBy, setSortBy] = useState<SortBy>('deadline');
     const [filterKey, setFilterKey] = useState<FilterKey>('all');
     const [showAchieved, setShowAchieved] = useState(false);
+
+    const clearGoalFilters = useCallback(() => {
+        setSearch('');
+        setFilterKey('all');
+        setShowAchieved(false);
+    }, []);
 
     const [isGoalModalOpen, setIsGoalModalOpen] = useState(false);
     const [goalModalMode, setGoalModalMode] = useState<'add'|'edit'>('add');
@@ -96,7 +105,10 @@ export function GoalsView() {
     const [historyOpen, setHistoryOpen] = useState(false);
 
     const loadGoals = useCallback(async (opts: { silent?: boolean } = {}) => {
-        if (!userId) return;
+        if (!userId) {
+            setLoading(false);
+            return;
+        }
         const myGen = fetchGenRef.current;
         if (!opts.silent) setLoading(true);
         // Goals are author-scoped, then filtered to a workspace if one is active.
@@ -114,7 +126,19 @@ export function GoalsView() {
         const { data, error } = await query;
 
         if (fetchGenRef.current !== myGen) return;
-        if (!error && data) {
+        if (error) {
+            // Without this branch a failed fetch left `goals` empty and rendered the
+            // "No savings goals yet" empty state — indistinguishable from deletion.
+            console.error('Failed to load goals:', {
+                message: error.message,
+                code: error.code,
+                details: error.details,
+                hint: error.hint,
+            });
+            setLoadError(true);
+            if (!opts.silent) toast.error("Couldn't load your goals");
+        } else if (data) {
+            setLoadError(false);
             setGoals(data as SavingsGoal[]);
         }
         if (!opts.silent) setLoading(false);
@@ -124,6 +148,8 @@ export function GoalsView() {
         fetchGenRef.current++;
         loadGoals();
     }, [loadGoals]);
+
+    useRefreshRequest(() => loadGoals());
 
     // Batch-fetch the last 90 days of deposits for all goals once whenever the
     // goal set changes — avoids N+1 per-card queries while still giving each
@@ -249,9 +275,22 @@ export function GoalsView() {
     };
 
     const handleSaveGoal = async () => {
-        if (!goalName || !goalTarget || !userId) return;
-        if (isNaN(parseFloat(goalTarget)) || parseFloat(goalTarget) <= 0) return;
+        if (!userId || isSavingGoal) return;
+        // These used to `return` silently. The submit button only checked for
+        // non-empty strings, so entering "0" and tapping "Create Goal" did nothing
+        // at all — no toast, no inline error.
+        if (!goalName.trim()) {
+            toast.error('Give your goal a name');
+            return;
+        }
+        const target = parseFloat(goalTarget);
+        if (isNaN(target) || target <= 0) {
+            toast.error('Enter a target amount greater than zero');
+            return;
+        }
 
+        setIsSavingGoal(true);
+        try {
         if (goalModalMode === 'add') {
             const { error } = await supabase
                 .from('savings_goals')
@@ -296,6 +335,9 @@ export function GoalsView() {
                 loadGoals();
             }
         }
+        } finally {
+            setIsSavingGoal(false);
+        }
     };
 
     const handleDeleteGoal = async (id: string) => {
@@ -315,10 +357,15 @@ export function GoalsView() {
     };
 
     const handleAddDeposit = async () => {
-        if (!selectedGoalId || !depositAmount || !userId) return;
+        if (!selectedGoalId || !userId) return;
 
+        // Same silent-return problem as handleSaveGoal: "Add Funds" was enabled for any
+        // non-empty string, so "0" or "abc" produced no response whatsoever.
         const amount = parseFloat(depositAmount);
-        if (isNaN(amount) || amount <= 0) return;
+        if (isNaN(amount) || amount <= 0) {
+            toast.error('Enter an amount greater than zero');
+            return;
+        }
         const goal = goals.find(g => g.id === selectedGoalId);
         if (!goal) return;
 
@@ -473,18 +520,18 @@ export function GoalsView() {
 
     return (
         <div className="relative min-h-[100dvh] w-full bg-[radial-gradient(ellipse_90%_60%_at_50%_-10%,_rgba(138,43,226,0.18),_transparent_60%)]">
-            <div className="p-5 space-y-7 max-w-md lg:max-w-2xl mx-auto relative pb-24 lg:pb-8 z-10">
+            <div className="p-5 space-y-7 max-w-md lg:max-w-2xl mx-auto relative lg:pb-8 z-10">
                 <div className="relative flex items-center gap-3 min-h-[40px]">
                     <button
                         onClick={() => router.back()}
                         aria-label="Go back"
-                        className="p-2 -ml-2 rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary/30 transition-colors shrink-0 z-10"
+                        className="min-h-[44px] min-w-[44px] -ml-2 inline-flex items-center justify-center rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary/30 transition-colors shrink-0 z-10"
                     >
                         <ChevronLeft className="w-5 h-5" aria-hidden="true" />
                     </button>
-                    <h2 className="absolute inset-0 flex items-center justify-center pointer-events-none text-lg font-semibold tracking-tight">
+                    <h1 className="absolute inset-0 flex items-center justify-center pointer-events-none text-lg font-semibold tracking-tight">
                         Savings Goals
-                    </h2>
+                    </h1>
                     <div className="ml-auto z-10">
                         <button
                             onClick={openAddModal}
@@ -598,6 +645,22 @@ export function GoalsView() {
                             <div className="h-32 w-full rounded-3xl bg-secondary/10 animate-pulse" />
                             <div className="h-32 w-full rounded-3xl bg-secondary/10 animate-pulse" />
                         </div>
+                    ) : loadError ? (
+                        <div className="text-center py-16 px-4 border border-dashed border-white/10 rounded-3xl bg-card/20 backdrop-blur-sm">
+                            <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 border border-white/10 bg-secondary/20">
+                                <WifiOff className="w-8 h-8 opacity-70 text-muted-foreground" />
+                            </div>
+                            <h3 className="text-lg font-bold mb-2">Couldn&apos;t load your goals</h3>
+                            <p className="text-sm text-muted-foreground mb-6 max-w-[250px] mx-auto">
+                                Your goals are safe — we just couldn&apos;t reach them. Check your connection and try again.
+                            </p>
+                            <Button
+                                onClick={() => loadGoals()}
+                                className={`text-white font-bold rounded-xl transition-all ${themeConfig.bgSolid} ${themeConfig.hoverBtnBg} ${themeConfig.shadowStrong}`}
+                            >
+                                Try again
+                            </Button>
+                        </div>
                     ) : goals.length === 0 ? (
                         <div className="text-center py-16 px-4 border border-dashed border-white/10 rounded-3xl bg-card/20 backdrop-blur-sm">
                             <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 border ${themeConfig.bgLight} ${themeConfig.border}`}>
@@ -625,8 +688,14 @@ export function GoalsView() {
                             </div>
                         </div>
                     ) : activeGoals.length === 0 && achievedGoals.length === 0 ? (
-                        <div className="text-center py-12 text-sm text-muted-foreground">
-                            No goals match the current filters.
+                        <div className="flex flex-col items-center gap-3 py-12">
+                            <p className="text-sm text-muted-foreground">No goals match the current filters.</p>
+                            <button
+                                onClick={clearGoalFilters}
+                                className={cn('min-h-[36px] px-3 rounded-full text-[11px] font-semibold tracking-tight transition-colors hover:bg-primary/10', themeConfig.text)}
+                            >
+                                Clear filters
+                            </button>
                         </div>
                     ) : (
                         <>
@@ -746,6 +815,7 @@ export function GoalsView() {
                                 placeholder="e.g. Dream Vacation"
                                 value={goalName}
                                 onChange={(e) => setGoalName(e.target.value)}
+                                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleSaveGoal(); } }}
                                 className={cn('bg-secondary/20 border-white/10 h-10 text-sm', themeConfig.ring)}
                             />
                         </div>
@@ -823,9 +893,10 @@ export function GoalsView() {
                             className={cn('flex-[1.5] h-10 rounded-xl font-bold text-white transition-all',
                                 themeConfig.bgSolid, themeConfig.hoverBtnBg, themeConfig.shadowStrong)}
                             onClick={handleSaveGoal}
-                            disabled={!goalName || !goalTarget}
+                            disabled={!goalName || !goalTarget || isSavingGoal}
+                            aria-busy={isSavingGoal}
                         >
-                            {goalModalMode === 'add' ? 'Create Goal' : 'Save Changes'}
+                            {isSavingGoal ? 'Saving…' : goalModalMode === 'add' ? 'Create Goal' : 'Save Changes'}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
@@ -890,6 +961,7 @@ export function GoalsView() {
                                                 placeholder="0.00"
                                                 value={depositAmount}
                                                 onChange={(e) => setDepositAmount(e.target.value)}
+                                                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddDeposit(); } }}
                                                 className={cn('bg-secondary/20 border-white/10 h-14 text-2xl font-bold pl-10', themeConfig.ring)}
                                             />
                                             <span className={cn('absolute left-4 top-1/2 -translate-y-1/2 text-xl font-bold', depositTokens.text)}>

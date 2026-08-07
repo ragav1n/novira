@@ -14,6 +14,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { CurrencyDropdown } from '@/components/ui/currency-dropdown';
 import { TripService } from '@/lib/services/trip-service';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 import { useUserPreferences, type Currency } from '@/components/providers/user-preferences-provider';
 import { toast } from '@/utils/haptics';
 import { cn } from '@/lib/utils';
@@ -36,6 +37,7 @@ export function TripForm({ open, onOpenChange, onSaved, editing }: Props) {
     const [baseLocation, setBaseLocation] = useState('');
     const [autoTag, setAutoTag] = useState(true);
     const [saving, setSaving] = useState(false);
+    const { confirm: confirmDelete, dialog: confirmDialog } = useConfirm();
 
     useEffect(() => {
         if (!open) return;
@@ -90,22 +92,31 @@ export function TripForm({ open, onOpenChange, onSaved, editing }: Props) {
         }
     };
 
-    const handleDelete = async () => {
+    const handleDelete = () => {
         if (!editing) return;
-        if (!confirm(`Delete trip "${editing.name}"? Transactions keep their trip tag.`)) return;
-        setSaving(true);
-        try {
-            await TripService.deleteTrip(editing.id);
-            onSaved();
-            onOpenChange(false);
-        } catch {
-            toast.error('Failed to delete trip');
-        } finally {
-            setSaving(false);
-        }
+        // Was `window.confirm`, which renders an OS dialog showing the origin URL in a
+        // standalone PWA and can't be dismissed by tapping outside on iOS.
+        confirmDelete({
+            title: `Delete trip "${editing.name}"?`,
+            description: 'Transactions keep their trip tag, so nothing is lost from your history — only the trip itself is removed.',
+            confirmLabel: 'Delete trip',
+            onConfirm: async () => {
+                setSaving(true);
+                try {
+                    await TripService.deleteTrip(editing.id);
+                    onSaved();
+                    onOpenChange(false);
+                } catch {
+                    toast.error('Failed to delete trip');
+                } finally {
+                    setSaving(false);
+                }
+            },
+        });
     };
 
     return (
+        <>
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-md rounded-3xl border-white/10 bg-card/95 backdrop-blur-xl p-5">
                 <DialogHeader>
@@ -178,6 +189,8 @@ export function TripForm({ open, onOpenChange, onSaved, editing }: Props) {
                 </DialogFooter>
             </DialogContent>
         </Dialog>
+        {confirmDialog}
+        </>
     );
 }
 

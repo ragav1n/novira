@@ -141,8 +141,10 @@ export function useDataExport() {
             const transactions = txRes.data;
 
             if (!transactions || transactions.length === 0) {
-                toast.error('No transactions found for the selected period');
-                setExportModalOpen(false);
+                // An empty range is a result, not an error. Closing the modal here threw
+                // away the user's preset/scope/bucket picks and made them redo all of it
+                // just to widen the date range.
+                toast.warning('No transactions in that range — try a wider period');
                 return;
             }
 

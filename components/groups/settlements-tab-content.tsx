@@ -3,6 +3,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Sparkles, ArrowRight, ArrowUpRight, ArrowDownLeft, Check, ChevronDown, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from '@/utils/haptics';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 import type { Split } from '@/components/providers/groups-provider';
 import type { SimplifiedPayment } from '@/utils/simplify-debts';
 
@@ -41,7 +42,9 @@ export function SettlementsTabContent({
     simplifiedDebts, pendingSplits, userId, currency, formatCurrency, convertAmount,
     settleSplit, settleSplitsBatch,
 }: SettlementsTabContentProps) {
+    const { confirm, dialog } = useConfirm();
     const [settlingPaymentIndex, setSettlingPaymentIndex] = useState<number | null>(null);
+    const [settlingSplitId, setSettlingSplitId] = useState<string | null>(null);
     const [isSettlingAll, setIsSettlingAll] = useState(false);
     const [expandedCounterparties, setExpandedCounterparties] = useState<Set<string>>(new Set());
 
@@ -167,25 +170,35 @@ export function SettlementsTabContent({
                             <button
                                 type="button"
                                 disabled={isSettlingAll}
-                                onClick={async () => {
-                                    setIsSettlingAll(true);
-                                    try {
-                                        const ids = debtorSplits.map(s => s.id);
-                                        const { settled, total } = await settleSplitsBatch(ids);
-                                        if (settled === total) {
-                                            toast.success(`Settled all ${settled} debt${settled !== 1 ? 's' : ''}`);
-                                        } else {
-                                            toast.error(`Settled ${settled} of ${total} — please retry`);
-                                        }
-                                    } catch (error) {
-                                        toast.error(settleErrorMessage(error, 'Failed to settle all'));
-                                    } finally {
-                                        setIsSettlingAll(false);
-                                    }
+                                onClick={() => {
+                                    // Marks every open debt paid at once — a money action
+                                    // that was previously one unguarded tap.
+                                    confirm({
+                                        title: `Settle all ${debtorSplits.length} debts?`,
+                                        description: `This marks every debt you owe as paid. Only do this once you've actually sent the money — undoing it means re-entering each split by hand.`,
+                                        confirmLabel: 'Settle all',
+                                        destructive: false,
+                                        onConfirm: async () => {
+                                            setIsSettlingAll(true);
+                                            try {
+                                                const ids = debtorSplits.map(s => s.id);
+                                                const { settled, total } = await settleSplitsBatch(ids);
+                                                if (settled === total) {
+                                                    toast.success(`Settled all ${settled} debt${settled !== 1 ? 's' : ''}`);
+                                                } else {
+                                                    toast.error(`Settled ${settled} of ${total} — please retry`);
+                                                }
+                                            } catch (error) {
+                                                toast.error(settleErrorMessage(error, 'Failed to settle all'));
+                                            } finally {
+                                                setIsSettlingAll(false);
+                                            }
+                                        },
+                                    });
                                 }}
-                                className="inline-flex items-center gap-1 text-[11px] font-medium text-primary hover:text-primary/80 transition-colors disabled:opacity-60"
+                                className="inline-flex items-center gap-1 min-h-[44px] px-2 text-[11px] font-medium text-primary hover:text-primary/80 transition-colors disabled:opacity-60"
                             >
-                                <Check className="w-3 h-3" />
+                                <Check className="w-3 h-3" aria-hidden="true" />
                                 {isSettlingAll ? 'Settling…' : `Settle ${debtorSplits.length} debts`}
                             </button>
                         )}
@@ -294,17 +307,25 @@ export function SettlementsTabContent({
                                                             {isDebtor && (
                                                                 <button
                                                                     type="button"
+                                                                    disabled={settlingSplitId === split.id}
+                                                                    aria-busy={settlingSplitId === split.id}
                                                                     onClick={async () => {
+                                                                        // No pending state here meant a double-tap
+                                                                        // fired the settle RPC twice.
+                                                                        if (settlingSplitId) return;
+                                                                        setSettlingSplitId(split.id);
                                                                         try {
                                                                             await settleSplit(split.id, split.transaction?.user_id);
                                                                             toast.success('Split settled');
                                                                         } catch (error) {
                                                                             toast.error(settleErrorMessage(error, 'Failed to settle split'));
+                                                                        } finally {
+                                                                            setSettlingSplitId(null);
                                                                         }
                                                                     }}
-                                                                    className="inline-flex items-center h-6 px-2 rounded-full text-[10px] font-semibold text-primary border border-primary/30 hover:bg-primary/10 transition-colors"
+                                                                    className="inline-flex items-center justify-center min-h-[44px] px-3 -my-2 rounded-full text-[10px] font-semibold text-primary border border-primary/30 hover:bg-primary/10 transition-colors disabled:opacity-60 disabled:pointer-events-none"
                                                                 >
-                                                                    Settle
+                                                                    {settlingSplitId === split.id ? 'Settling…' : 'Settle'}
                                                                 </button>
                                                             )}
                                                         </div>
@@ -327,6 +348,7 @@ export function SettlementsTabContent({
                     <p className="text-[11px] text-muted-foreground">No pending payments.</p>
                 </div>
             )}
+            {dialog}
         </div>
     );
 }

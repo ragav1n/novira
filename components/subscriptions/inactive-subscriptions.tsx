@@ -11,9 +11,11 @@ interface Props {
     showAll: boolean;
     onToggleShowAll: () => void;
     onReactivate: (id: string) => void;
+    /** Id currently being toggled, so its button can disable instead of double-firing. */
+    busyId?: string | null;
 }
 
-export function InactiveSubscriptions({ templates, showAll, onToggleShowAll, onReactivate }: Props) {
+export function InactiveSubscriptions({ templates, showAll, onToggleShowAll, onReactivate, busyId = null }: Props) {
     const { formatCurrency } = useUserPreferences();
     const { theme: themeConfig } = useWorkspaceTheme();
 
@@ -46,10 +48,13 @@ export function InactiveSubscriptions({ templates, showAll, onToggleShowAll, onR
                     <div className="flex items-center gap-3">
                         <span className="text-xs font-bold text-muted-foreground">{formatCurrency(template.amount, template.currency)} / {template.frequency}</span>
                         <button
+                            type="button"
                             onClick={() => onReactivate(template.id)}
-                            className={cn("text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-lg bg-secondary/30 hover:bg-secondary/50 transition-colors", themeConfig.text)}
+                            disabled={busyId === template.id}
+                            aria-busy={busyId === template.id}
+                            className={cn("text-[10px] font-bold uppercase tracking-wider px-3 min-h-[44px] rounded-lg bg-secondary/30 hover:bg-secondary/50 transition-colors disabled:opacity-50 disabled:pointer-events-none", themeConfig.text)}
                         >
-                            Re-activate
+                            {busyId === template.id ? 'Working…' : 'Re-activate'}
                         </button>
                     </div>
                 </div>

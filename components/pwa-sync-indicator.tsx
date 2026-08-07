@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { RefreshCcw, AlertCircle, CloudOff, ChevronDown, X, Clock } from 'lucide-react';
 import { usePathname } from 'next/navigation';
+import { cn } from '@/lib/utils';
 import { type SyncErrorKind } from '@/lib/offline-sync-queue';
 import { retryFailedItem, discardFailedItem, attemptSync } from '@/lib/sync-manager';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
@@ -244,7 +245,13 @@ export function SyncIndicator() {
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.8 }}
                         transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
-                        className="fixed top-12 lg:top-[120px] left-1/2 -translate-x-1/2 z-[60] pointer-events-auto px-2"
+                        // Drops below the eviction notice when both are up. They both
+                        // used to sit at top-12 and render exactly on top of each other —
+                        // and both report dropped data, so one was silently hidden.
+                        className={cn(
+                            "fixed left-1/2 -translate-x-1/2 z-[60] pointer-events-auto px-2",
+                            evictionNotice ? "top-[5.5rem] lg:top-[164px]" : "top-12 lg:top-[120px]",
+                        )}
                         style={{ willChange: "transform, opacity" }}
                     >
                         <div className="bg-amber-500/15 backdrop-blur-md border border-amber-500/30 shadow-lg rounded-full pl-3 pr-1 py-1 flex items-center gap-2 max-w-[90vw]">
@@ -275,29 +282,40 @@ export function SyncIndicator() {
                         style={{ willChange: "transform, opacity" }}
                     >
                         <div className="bg-background/95 backdrop-blur-md border border-destructive/30 shadow-lg rounded-2xl overflow-hidden">
-                            <button
-                                onClick={() => setExpanded(v => !v)}
-                                className="w-full px-3 py-1.5 flex items-center gap-2"
-                                aria-expanded={expanded}
-                                aria-label={expanded ? 'Collapse failed sync details' : 'Expand failed sync details'}
-                            >
-                                <AlertCircle className="w-3.5 h-3.5 text-destructive shrink-0" />
-                                <span className="text-xs font-medium text-destructive flex-1 text-left">
-                                    {failedCount} {failedCount === 1 ? 'item' : 'items'} failed to sync
-                                </span>
+                            {/* "Retry all" used to be nested inside the expand button —
+                                invalid HTML — and the outer aria-label overrode its own
+                                text so the failure count was never announced. They're
+                                siblings now, and the count carries aria-live. */}
+                            <div className="w-full px-3 py-1.5 flex items-center gap-2">
+                                <AlertCircle className="w-3.5 h-3.5 text-destructive shrink-0" aria-hidden="true" />
+                                <button
+                                    onClick={() => setExpanded(v => !v)}
+                                    className="text-xs font-medium text-destructive flex-1 text-left min-h-[36px]"
+                                    aria-expanded={expanded}
+                                >
+                                    <span role="status" aria-live="polite">
+                                        {failedCount} {failedCount === 1 ? 'item' : 'items'} failed to sync
+                                    </span>
+                                </button>
                                 {hasRetryableFailures && (
                                     <button
-                                        onClick={(e) => { e.stopPropagation(); retryAll(); }}
-                                        className="text-xs text-destructive/80 hover:text-destructive underline"
+                                        onClick={retryAll}
+                                        className="text-xs text-destructive/80 hover:text-destructive underline min-h-[36px] px-1"
                                     >
                                         Retry all
                                     </button>
                                 )}
-                                <ChevronDown
-                                    className={`w-3.5 h-3.5 text-destructive/70 transition-transform ${expanded ? 'rotate-180' : ''}`}
-                                    aria-hidden="true"
-                                />
-                            </button>
+                                <button
+                                    onClick={() => setExpanded(v => !v)}
+                                    aria-label={expanded ? 'Collapse failed sync details' : 'Expand failed sync details'}
+                                    className="min-h-[36px] min-w-[32px] inline-flex items-center justify-center"
+                                >
+                                    <ChevronDown
+                                        className={`w-3.5 h-3.5 text-destructive/70 transition-transform ${expanded ? 'rotate-180' : ''}`}
+                                        aria-hidden="true"
+                                    />
+                                </button>
+                            </div>
                             <AnimatePresence initial={false}>
                                 {expanded && (
                                     <motion.div

@@ -1,13 +1,13 @@
 'use client';
 
-import React, { useRef } from 'react';
+import React, { useCallback, useRef } from 'react';
 import { Wallet, ChevronRight, Check, Pencil, Clock, ArrowUpRight, ArrowDownLeft, LayoutGrid, MapPin, X } from 'lucide-react';
 import { AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { Transaction } from '@/types/transaction';
 import { TransactionRow } from '@/components/transaction-row';
 import { getIconForCategory, CATEGORY_COLORS } from '@/lib/categories';
-import { toast } from '@/utils/haptics';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 import { Currency } from '@/components/providers/user-preferences-provider';
 import { Bucket } from '@/components/providers/buckets-provider';
 import { DashboardTransactionsDrawer } from '@/components/dashboard-transactions-drawer';
@@ -77,6 +77,19 @@ export function TransactionListSection({
     onBulkUpdate,
 }: TransactionListSectionProps) {
     const drawerScrollRef = useRef<HTMLDivElement>(null);
+    const { confirm, dialog } = useConfirm();
+
+    // Both the inline list and the "View all" drawer swipe onto this, so the same
+    // gesture behaves identically in both. Previously the inline list used a 3s
+    // auto-dismissing action-toast and the drawer deleted with no confirm at all.
+    const confirmDelete = useCallback((tx: Transaction) => {
+        confirm({
+            title: 'Delete this transaction?',
+            description: `"${tx.description}" will be removed from your history, along with any attached receipt. This can't be undone.`,
+            confirmLabel: 'Delete',
+            onConfirm: () => handleDeleteTransaction(tx),
+        });
+    }, [confirm, handleDeleteTransaction]);
     // When filtering by category, also exclude settlements AND bound to the pie's
     // scope so the visible rows reconcile with the pie slice value:
     //   - non-bucket: pie covers the current calendar month, so filter rows to the
@@ -163,11 +176,7 @@ export function TransactionListSection({
                             bucketChip={getBucketChip(tx)}
                             onHistory={() => loadAuditLogs(tx)}
                             onEdit={() => { setEditingTransaction(tx); setIsEditOpen(true); }}
-                            onDelete={() => {
-                                toast('Delete transaction?', {
-                                    action: { label: 'Delete', onClick: () => handleDeleteTransaction(tx) }
-                                });
-                            }}
+                            onDelete={() => confirmDelete(tx)}
                             onViewReceipt={onViewReceipt ? () => onViewReceipt(tx) : undefined}
                         />
                     );
@@ -202,6 +211,10 @@ export function TransactionListSection({
             >
                 <TransactionList
                     transactions={allTransactions ?? displayTransactions}
+                    // The drawer opens before the unfiltered list has loaded. Without this
+                    // an account with hundreds of transactions is briefly told to
+                    // "Add your first expense".
+                    loading={allTransactions === undefined}
                     userId={userId}
                     currency={currency}
                     buckets={buckets}
@@ -214,7 +227,7 @@ export function TransactionListSection({
                     loadAuditLogs={loadAuditLogs}
                     setEditingTransaction={setEditingTransaction}
                     setIsEditOpen={setIsEditOpen}
-                    handleDeleteTransaction={handleDeleteTransaction}
+                    handleDeleteTransaction={confirmDelete}
                     hasMore={hasMore}
                     loadingMore={loadingMore}
                     onLoadMore={onLoadMore}
@@ -223,6 +236,7 @@ export function TransactionListSection({
                     onBulkUpdate={onBulkUpdate}
                 />
             </DashboardTransactionsDrawer>
+            {dialog}
         </div>
     );
 }

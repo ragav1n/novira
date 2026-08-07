@@ -139,7 +139,7 @@ export function BulkAssignByPaymentDialog({ open, onOpenChange, onApplied }: Bul
             onApplied?.();
         } catch (e) {
             console.error('[BulkAssignByPayment] apply failed', e);
-            toast.error(`Failed: ${(e as Error).message}`);
+            toast.error("Couldn't reassign those transactions. Try again.");
         } finally {
             setApplying(false);
         }

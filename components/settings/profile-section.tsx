@@ -24,8 +24,13 @@ export function ProfileSection({ showBudgetAlert, onDismissBudgetAlert }: Props)
     const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
     const [uploadingAvatar, setUploadingAvatar] = useState(false);
     const [saving, setSaving] = useState(false);
+    const [profileError, setProfileError] = useState(false);
     const [localBudget, setLocalBudget] = useState(monthlyBudget.toString());
+    // Snapshot of the last-saved name, so Save can tell "nothing changed" from a real edit.
+    const [savedName, setSavedName] = useState('');
     const userEmail = user?.email ?? '';
+
+    const isDirty = fullName !== savedName || localBudget !== monthlyBudget.toString();
 
     useEffect(() => {
         setLocalBudget(monthlyBudget.toString());
@@ -40,11 +45,17 @@ export function ProfileSection({ showBudgetAlert, onDismissBudgetAlert }: Props)
                 .eq('id', userId)
                 .single();
             if (error && error.code !== 'PGRST116') {
+                // The name field stays empty on failure. Without this flag the user can
+                // type over it and upsert a blank name believing it was never set.
                 console.error('Error fetching profile:', error);
+                setProfileError(true);
+                toast.error("Couldn't load your profile");
                 return;
             }
+            setProfileError(false);
             if (data) {
                 setFullName(data.full_name || '');
+                setSavedName(data.full_name || '');
                 setAvatarUrl(data.avatar_url);
             }
         };
@@ -79,6 +90,7 @@ export function ProfileSection({ showBudgetAlert, onDismissBudgetAlert }: Props)
             const { error } = await supabase.from('profiles').upsert(updates);
             await setMonthlyBudget(updates.monthly_budget);
             if (error) throw error;
+            setSavedName(fullName);
             toast.success('Profile updated successfully');
         } catch (error) {
             const msg = error instanceof Error ? error.message : 'Unknown error';
@@ -160,6 +172,12 @@ export function ProfileSection({ showBudgetAlert, onDismissBudgetAlert }: Props)
                     </div>
 
                     <div className="flex-1 space-y-3">
+                        {profileError && (
+                            <p className="text-[11px] text-amber-400/80">
+                                We couldn&apos;t load your profile, so the fields below may be blank.
+                                Reload before saving, or you may overwrite your existing details.
+                            </p>
+                        )}
                         <div className="space-y-1">
                             <label htmlFor="full-name" className="text-[11px] uppercase font-bold text-muted-foreground tracking-wider">Full Name</label>
                             <Input
@@ -182,17 +200,18 @@ export function ProfileSection({ showBudgetAlert, onDismissBudgetAlert }: Props)
                                 onChange={(e) => setLocalBudget(e.target.value)}
                                 className="bg-secondary/10 border-white/5 h-10 rounded-xl"
                                 placeholder="e.g. 3000"
-                                type="number"
+                                type="text"
                                 inputMode="decimal"
                                 autoComplete="off"
                             />
                         </div>
                         <Button
                             onClick={updateProfile}
-                            disabled={saving}
+                            disabled={saving || !isDirty}
+                            aria-busy={saving}
                             className="w-full h-10 text-xs bg-primary/20 text-primary hover:bg-primary/30 border border-primary/20 rounded-xl font-bold"
                         >
-                            {saving ? 'Saving...' : 'Save Changes'}
+                            {saving ? 'Saving…' : isDirty ? 'Save Changes' : 'Saved'}
                         </Button>
                     </div>
                 </div>

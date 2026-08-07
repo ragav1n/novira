@@ -22,7 +22,12 @@ export function NetworkErrorBanner() {
         const unsubscribe = subscribeNetworkError((detail) => {
             setActive(detail);
             clearTimer();
-            dismissTimer.current = window.setTimeout(() => setActive(null), AUTO_DISMISS_MS);
+            // Only auto-dismiss purely informational errors. When a retry action is
+            // offered the banner is the user's only route to it, so self-destructing
+            // after 8s takes the recovery path away with it.
+            if (!detail.retry) {
+                dismissTimer.current = window.setTimeout(() => setActive(null), AUTO_DISMISS_MS);
+            }
         });
 
         return () => {
@@ -54,19 +59,19 @@ export function NetworkErrorBanner() {
                                     active.retry?.();
                                     setActive(null);
                                 }}
-                                className="text-[11px] font-bold uppercase tracking-wider text-rose-200 hover:text-white transition-colors flex items-center gap-1 shrink-0"
+                                className="text-[11px] font-bold uppercase tracking-wider text-rose-200 hover:text-white transition-colors flex items-center gap-1 shrink-0 min-h-[44px] px-2 -my-2"
                                 aria-label="Retry"
                             >
-                                <RotateCw className="w-3.5 h-3.5" />
+                                <RotateCw className="w-3.5 h-3.5" aria-hidden="true" />
                                 Retry
                             </button>
                         )}
                         <button
                             onClick={() => setActive(null)}
-                            className="text-rose-300 hover:text-white transition-colors shrink-0"
+                            className="text-rose-300 hover:text-white transition-colors shrink-0 min-h-[44px] min-w-[36px] -my-2 inline-flex items-center justify-center"
                             aria-label="Dismiss"
                         >
-                            <X className="w-4 h-4" />
+                            <X className="w-4 h-4" aria-hidden="true" />
                         </button>
                     </div>
                 </motion.div>

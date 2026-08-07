@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useUserPreferences } from '@/components/providers/user-preferences-provider';
 import { useWorkspaceTheme } from '@/hooks/useWorkspaceTheme';
 import { supabase } from '@/lib/supabase';
+import { useRefreshRequest } from '@/hooks/useRefreshRequest';
 import { Calendar, ChevronLeft, BookOpen } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { differenceInCalendarDays, parseISO } from 'date-fns';
@@ -35,6 +36,8 @@ export function SubscriptionsView() {
     const [cancelTarget, setCancelTarget] = useState<string | null>(null);
     const [editTarget, setEditTarget] = useState<Tpl | null>(null);
     const [lastCharges, setLastCharges] = useState<Record<string, LastCharge>>({});
+    const [lastChargesError, setLastChargesError] = useState(false);
+    const [togglingId, setTogglingId] = useState<string | null>(null);
     const [updateTarget, setUpdateTarget] = useState<{ template: Tpl; change: PriceChange } | null>(null);
     // Bumped on each workspace/user change so in-flight fetches from a previous
     // workspace can't land their results on top of the new one.
@@ -57,7 +60,12 @@ export function SubscriptionsView() {
     const effectiveActive = useCallback((t: Tpl) => t.is_active && !isPaused(t), [isPaused]);
 
     const loadTemplates = useCallback(async (opts: { silent?: boolean } = {}) => {
-        if (!userId) return;
+        // Clear `loading` before bailing — otherwise a userId that never resolves leaves
+        // the screen pulsing its skeleton forever with no error and no retry.
+        if (!userId) {
+            setLoading(false);
+            return;
+        }
         const myGen = fetchGenRef.current;
         if (!opts.silent) setLoading(true);
         let query = supabase
@@ -94,6 +102,8 @@ export function SubscriptionsView() {
         loadTemplates();
     }, [loadTemplates]);
 
+    useRefreshRequest(() => loadTemplates());
+
     // Capture the most recent matching transaction per active template. We compute
     // pctChange for every match (drift badge still gates display ≥5%), and the
     // "Last charged" line uses lastDate from the same lookup with no extra queries.
@@ -106,6 +116,9 @@ export function SubscriptionsView() {
         (async () => {
             const active = templates.filter(t => t.is_active);
             const results: Record<string, LastCharge> = {};
+            // Tracks whether any lookup failed, so a missing drift badge can be explained
+            // rather than being read as "no price change detected".
+            let anyFailed = false;
             await Promise.all(active.map(async (t) => {
                 try {
                     const escapedDesc = t.description.replace(/[%_\\]/g, '\\$&');
@@ -120,7 +133,12 @@ export function SubscriptionsView() {
                     if (activeWorkspaceId) {
                         q = q.eq('group_id', activeWorkspaceId);
                     }
-                    const { data } = await q;
+                    const { data, error } = await q;
+                    if (error) {
+                        console.error('Error checking last charge for template', t.id, error);
+                        anyFailed = true;
+                        return;
+                    }
                     if (!data || data.length === 0) return;
                     const last = data[0];
                     const rawLast = Number(last.amount);
@@ -139,9 +157,13 @@ export function SubscriptionsView() {
                     };
                 } catch (error) {
                     console.error('Error checking last charge for template', t.id, error);
+                    anyFailed = true;
                 }
             }));
-            if (!cancelled) setLastCharges(results);
+            if (!cancelled) {
+                setLastCharges(results);
+                setLastChargesError(anyFailed);
+            }
         })();
         return () => { cancelled = true; };
     }, [templates, userId, activeWorkspaceId, convertAmount, currency]);
@@ -262,6 +284,9 @@ export function SubscriptionsView() {
     }, [updateMetadata]);
 
     const handleToggleActive = async (id: string, currentStatus: boolean) => {
+        // Without this guard a double-tap on Cancel/Re-activate fired two updates.
+        if (togglingId) return;
+        setTogglingId(id);
         const newStatus = !currentStatus;
         setTemplates(prev => prev.map(t => t.id === id ? { ...t, is_active: newStatus } : t));
 
@@ -276,6 +301,7 @@ export function SubscriptionsView() {
         } else {
             toast.success(newStatus ? 'Subscription re-activated!' : 'Subscription cancelled');
         }
+        setTogglingId(null);
     };
 
     const totalMonthly = useMemo(() => {
@@ -399,7 +425,7 @@ export function SubscriptionsView() {
     return (
         <>
             <div className="relative min-h-[100dvh] w-full bg-[radial-gradient(ellipse_90%_60%_at_50%_-10%,_rgba(138,43,226,0.18),_transparent_60%)]">
-                <div className="p-5 space-y-7 max-w-md lg:max-w-2xl mx-auto relative pb-24 lg:pb-8 z-10">
+                <div className="p-5 space-y-7 max-w-md lg:max-w-2xl mx-auto relative lg:pb-8 z-10">
                     <div className="relative flex items-center gap-3 min-h-[40px]">
                         <button
                             onClick={() => router.back()}
@@ -413,14 +439,26 @@ export function SubscriptionsView() {
                         </h2>
                     </div>
 
-                    <SubscriptionSummaryCard
-                        totalMonthly={totalMonthly}
-                        totalYearly={totalYearly}
-                        totalActiveCount={totalActiveCount}
-                        pausedCount={pausedCount}
-                        breakdown={breakdown}
-                        nextTrialEnding={nextTrialEnding}
-                    />
+                    {/* While loading, the card would confidently render "$0.00 · 0 active"
+                        and then snap to the real figures. A skeleton makes no claim. */}
+                    {loading ? (
+                        <div className="h-32 w-full rounded-3xl bg-secondary/10 animate-pulse" role="status" aria-label="Loading subscription totals" />
+                    ) : (
+                        <SubscriptionSummaryCard
+                            totalMonthly={totalMonthly}
+                            totalYearly={totalYearly}
+                            totalActiveCount={totalActiveCount}
+                            pausedCount={pausedCount}
+                            breakdown={breakdown}
+                            nextTrialEnding={nextTrialEnding}
+                        />
+                    )}
+
+                    {lastChargesError && !loading && (
+                        <p className="text-[11px] text-amber-400/80 text-center">
+                            Couldn&apos;t check recent charges, so price-change badges may be missing.
+                        </p>
+                    )}
 
                     {totalActiveCount > 0 && (
                         <SubscriptionFilters
@@ -523,6 +561,7 @@ export function SubscriptionsView() {
                         showAll={showAllInactive}
                         onToggleShowAll={() => setShowAllInactive(s => !s)}
                         onReactivate={(id) => handleToggleActive(id, false)}
+                        busyId={togglingId}
                     />
                 </div>
             </div>

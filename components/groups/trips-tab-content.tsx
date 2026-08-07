@@ -29,6 +29,7 @@ export function TripsTabContent() {
     const [formOpen, setFormOpen] = useState(false);
     const [editing, setEditing] = useState<Trip | null>(null);
     const [tripTotals, setTripTotals] = useState<Record<string, number>>({});
+    const [totalsError, setTotalsError] = useState(false);
     const fetchGenRef = useRef(0);
 
     const load = useCallback(async () => {
@@ -60,10 +61,16 @@ export function TripsTabContent() {
                 ? query.eq('group_id', activeWorkspaceId)
                 : query.eq('user_id', userId).is('group_id', null);
             const { data, error } = await q.overlaps('tags', slugs);
-            if (error || !data || fetchGenRef.current !== myGen) {
+            if (fetchGenRef.current !== myGen) return;
+            if (error || !data) {
+                // `tripTotals` stays empty on failure, so every card would render
+                // formatCurrency(0) as though the trip had no spending. Flag it instead
+                // and let the cards show a placeholder.
                 if (error) console.error('[TripsTabContent] tx fetch error', error);
+                setTotalsError(true);
                 return;
             }
+            setTotalsError(false);
 
             const totals: Record<string, number> = {};
             for (const tx of data as Array<{
@@ -130,9 +137,9 @@ export function TripsTabContent() {
                 <EmptyState onCreate={openCreate} />
             ) : (
                 <>
-                    <Section title="Active" trips={grouped.active} totals={tripTotals} formatCurrency={formatCurrency} onEdit={openEdit} />
-                    <Section title="Upcoming" trips={grouped.upcoming} totals={tripTotals} formatCurrency={formatCurrency} onEdit={openEdit} />
-                    <Section title="Past" trips={grouped.past} totals={tripTotals} formatCurrency={formatCurrency} onEdit={openEdit} />
+                    <Section title="Active" trips={grouped.active} totals={totalsError ? null : tripTotals} formatCurrency={formatCurrency} onEdit={openEdit} />
+                    <Section title="Upcoming" trips={grouped.upcoming} totals={totalsError ? null : tripTotals} formatCurrency={formatCurrency} onEdit={openEdit} />
+                    <Section title="Past" trips={grouped.past} totals={totalsError ? null : tripTotals} formatCurrency={formatCurrency} onEdit={openEdit} />
                 </>
             )}
 
@@ -151,7 +158,8 @@ function Section({
 }: {
     title: string;
     trips: Trip[];
-    totals: Record<string, number>;
+    /** `null` when the totals query failed — cards show a placeholder, not zero. */
+    totals: Record<string, number> | null;
     formatCurrency: (amount: number, currencyOverride?: string) => string;
     onEdit: (t: Trip) => void;
 }) {
@@ -166,7 +174,7 @@ function Section({
                     <TripCard
                         key={t.id}
                         trip={t}
-                        total={totals[t.slug] ?? 0}
+                        total={totals ? (totals[t.slug] ?? 0) : null}
                         formatCurrency={formatCurrency}
                         onEdit={onEdit}
                     />
@@ -180,7 +188,7 @@ function TripCard({
     trip, total, formatCurrency, onEdit,
 }: {
     trip: Trip;
-    total: number;
+    total: number | null;
     formatCurrency: (amount: number, currencyOverride?: string) => string;
     onEdit: (t: Trip) => void;
 }) {
@@ -235,7 +243,7 @@ function TripCard({
                                 {status === 'active' ? `Day ${elapsed} of ${totalDays}` : `${totalDays} days`}
                             </span>
                             <span className="font-bold text-sky-300 tabular-nums">
-                                {formatCurrency(total, trip.home_currency ?? undefined)}
+                                {total === null ? '—' : formatCurrency(total, trip.home_currency ?? undefined)}
                             </span>
                         </div>
                         <div className="h-[3px] w-full bg-white/[0.04] rounded-full overflow-hidden">

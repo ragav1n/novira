@@ -41,7 +41,7 @@ export function RecurringExpensesSection({ templates, loading, formatCurrency, o
                                     <div className="h-2 w-24 rounded bg-secondary/20 animate-pulse" />
                                 </div>
                             </div>
-                            <div className="h-8 w-8 rounded-full bg-secondary/20 animate-pulse" />
+                            <div className="min-h-[44px] min-w-[44px] -my-2 rounded-full bg-secondary/20 animate-pulse" />
                         </div>
                         <div className="flex items-center justify-between p-3">
                             <div className="flex items-center gap-3">
@@ -51,7 +51,7 @@ export function RecurringExpensesSection({ templates, loading, formatCurrency, o
                                     <div className="h-2 w-20 rounded bg-secondary/20 animate-pulse" />
                                 </div>
                             </div>
-                            <div className="h-8 w-8 rounded-full bg-secondary/20 animate-pulse" />
+                            <div className="min-h-[44px] min-w-[44px] -my-2 rounded-full bg-secondary/20 animate-pulse" />
                         </div>
                     </>
                 ) : templates.length > 0 ? (
@@ -78,7 +78,7 @@ export function RecurringExpensesSection({ templates, loading, formatCurrency, o
                                 <Button
                                     variant="ghost"
                                     size="icon"
-                                    className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                                    className="min-h-[44px] min-w-[44px] -my-2 text-muted-foreground hover:text-foreground"
                                     onClick={() => setTemplateToEdit(template)}
                                     aria-label={`Edit ${template.description}`}
                                 >
@@ -87,7 +87,7 @@ export function RecurringExpensesSection({ templates, loading, formatCurrency, o
                                 <Button
                                     variant="ghost"
                                     size="icon"
-                                    className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                                    className="min-h-[44px] min-w-[44px] -my-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
                                     onClick={() => setTemplateToDelete(template)}
                                     aria-label={`Stop ${template.description}`}
                                 >

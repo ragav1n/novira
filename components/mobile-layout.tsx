@@ -33,6 +33,10 @@ const DESKTOP_NAV = [
     { title: 'Settings', icon: Settings, route: '/settings' },
 ];
 
+// Routes whose view registers a `novira-refresh-requested` listener. Adding a route
+// here without adding the listener just makes the gesture spin and do nothing.
+const PTR_ROUTES = ['/', '/search', '/goals', '/subscriptions', '/cashflow', '/groups', '/analytics', '/receipts'];
+
 const containerVariants = {
     hidden: { y: -80, opacity: 0 },
     expanded: {
@@ -87,11 +91,9 @@ const NAV_TOGGLE_COOLDOWN_MS = 600;
 function MobileBottomNavScroller({
     children,
     scrollContainerRef,
-    isNative,
 }: {
     children: React.ReactNode;
     scrollContainerRef: React.RefObject<HTMLElement | null>;
-    isNative: boolean;
 }) {
     const [isVisible, setVisible] = useState(true);
     const lastScrollY = useRef(0);
@@ -135,10 +137,11 @@ function MobileBottomNavScroller({
             // higher off the bottom edge) without us having to read it.
             animate={isVisible ? { y: 0, opacity: 1 } : { y: '120%', opacity: 0 }}
             transition={{ type: 'spring', damping: 26, stiffness: 220, mass: 0.85 }}
-            className={cn(
-                "fixed bottom-6 left-0 right-0 z-50 flex justify-center px-4",
-                isNative && "bottom-[calc(1.5rem+env(safe-area-inset-bottom))]"
-            )}
+            // The inset is applied unconditionally, not gated on `isNative`. `env()`
+            // resolves to 0px where there's no inset, and the layout sets
+            // viewportFit: 'cover', so an installed iOS PWA (not a Capacitor shell)
+            // was drawing the nav inside the home-indicator zone.
+            className="fixed left-0 right-0 z-50 flex justify-center px-4 bottom-[calc(1.5rem+env(safe-area-inset-bottom))]"
             style={{ pointerEvents: isVisible ? 'auto' : 'none' }}
             inert={!isVisible}
         >
@@ -407,6 +410,9 @@ export function MobileLayout({ children, defaultIsDesktop = false }: { children:
         const navRoutes = ['/add', '/analytics', '/groups', '/subscriptions', '/cashflow', '/goals', '/search', '/settings'];
         navRoutes.forEach(route => router.prefetch(route));
 
+        // Prewarm the chunks behind the most-tapped nav destinations. `/add` belongs
+        // here more than any of them — it's the centre button.
+        import('@/components/add-expense-view').catch(() => {});
         import('@/components/analytics-view').catch(() => {});
         import('@/components/search-view').catch(() => {});
     }, [isAuthenticated, router]);
@@ -442,9 +448,10 @@ export function MobileLayout({ children, defaultIsDesktop = false }: { children:
 
     const handleTabChange = async (index: number | null) => {
         if (index !== null) {
-            if (isNative) {
-                toast.haptic(ImpactStyle.Light);
-            }
+            // Not gated on isNative: utils/haptics already falls back to the Web
+            // Vibration API, which works in Android Chrome and no-ops elsewhere.
+            // Capacitor isn't shipped, so the old gate disabled haptics for everyone.
+            toast.haptic(ImpactStyle.Light);
             const route = routes[index];
             if (route && route !== pathname) {
                 setIsNavigating(true);
@@ -472,11 +479,13 @@ export function MobileLayout({ children, defaultIsDesktop = false }: { children:
 
     // Pull-to-refresh is mobile-only (touch). Enabled on routes that share the
     // main scroll container and have a `novira-refresh-requested` listener.
-    const ptrEnabled = showNav && !showDesktop && (pathname === '/' || pathname === '/search');
+    // On an installed PWA there's no browser chrome, so this is the only way to
+    // force a refetch — every data route should be in this list.
+    const ptrEnabled = showNav && !showDesktop && PTR_ROUTES.includes(pathname);
     const { pull, refreshing, threshold } = usePullToRefresh(mainRef, {
         enabled: ptrEnabled,
         onRefresh: async () => {
-            if (isNative) toast.haptic(ImpactStyle.Light);
+            toast.haptic(ImpactStyle.Light);
             const pending: Promise<unknown>[] = [];
             window.dispatchEvent(new CustomEvent('novira-refresh-requested', {
                 detail: { waitUntil: (p: Promise<unknown>) => { pending.push(p); } },
@@ -496,7 +505,9 @@ export function MobileLayout({ children, defaultIsDesktop = false }: { children:
             // h-[100dvh] (not min-h) so <main> is the scroll container — required for the
             // desktop nav's useScroll(mainRef) to fire collapse on scroll-down.
             "h-[100dvh] w-full bg-background text-foreground relative overflow-hidden font-sans select-none flex flex-col",
-            isNative && "pt-[env(safe-area-inset-top)]",
+            // Unconditional, like the bottom inset: viewportFit is 'cover', so without
+            // this the header ran under the notch / Dynamic Island on an installed PWA.
+            "pt-[env(safe-area-inset-top)]",
             isCoupleWorkspace && "theme-couple",
             isHomeWorkspace && "theme-home"
         )}>
@@ -548,6 +559,20 @@ export function MobileLayout({ children, defaultIsDesktop = false }: { children:
                 />
             )}
 
+            {/* Route-change progress bar. `isNavigating` was previously set by both
+                nav handlers and reset on pathname change, but never read by anything —
+                so tapping a tab gave no feedback until the next page painted. */}
+            {isNavigating && (
+                <div
+                    className="fixed left-0 right-0 z-[200] h-0.5 overflow-hidden pointer-events-none"
+                    style={{ top: 'env(safe-area-inset-top)' }}
+                    role="status"
+                    aria-label="Loading page"
+                >
+                    <div className="h-full w-1/3 bg-primary/80 rounded-full animate-[nav-progress_1s_ease-in-out_infinite]" />
+                </div>
+            )}
+
             {/* Pull-to-refresh indicator */}
             {ptrEnabled && (pull > 0 || refreshing) && (
                 <div
@@ -577,7 +602,9 @@ export function MobileLayout({ children, defaultIsDesktop = false }: { children:
                 // grain z-2) so the multiply-blended overlay never darkens
                 // page content.
                 "relative z-10 flex-1 w-full overflow-y-auto no-scrollbar flex flex-col",
-                showDesktop ? "pt-20" : (showNav ? "pb-24" : "pb-0"),
+                // pb must carry the same inset term the nav now does, or the nav
+                // (24px + inset + ~48px tall) overlaps the last row of every list.
+                showDesktop ? "pt-20" : (showNav ? "pb-[calc(6rem+env(safe-area-inset-bottom))]" : "pb-0"),
                 ptrEnabled && "overscroll-y-contain"
             )}>
                 <UIBoundary>
@@ -597,7 +624,7 @@ export function MobileLayout({ children, defaultIsDesktop = false }: { children:
             {showNav && !showDesktop && (
                 <>
                     <PWAUpdater />
-                    <MobileBottomNavScroller scrollContainerRef={mainRef} isNative={isNative}>
+                    <MobileBottomNavScroller scrollContainerRef={mainRef}>
                         <ExpandableTabs
                             tabs={tabs}
                             className="bg-background/80 backdrop-blur-xl border-white/10 shadow-2xl shadow-primary/20"
