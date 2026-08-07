@@ -38,7 +38,7 @@ function Inner({ play }: { play: boolean }) {
 
   return (
     <div className="mx-auto max-w-md">
-      <div className="rounded-2xl border border-white/10 bg-zinc-950/60 p-5">
+      <div className="rounded-xl border border-white/10 bg-zinc-950/60 p-5">
         <div className="flex items-center justify-between">
           <div className="text-sm font-semibold text-foreground">Adding an expense</div>
           <AnimatePresence mode="wait" initial={false}>
@@ -49,7 +49,6 @@ function Inner({ play }: { play: boolean }) {
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.85 }}
                 transition={POP}
-                style={{ willChange: 'transform, opacity' }}
                 className="flex items-center gap-1.5 transform-gpu rounded-full border border-amber-400/30 bg-amber-500/10 px-2.5 py-1 text-[11px] text-amber-300"
               >
                 <WifiOff className="h-3 w-3" />
@@ -62,7 +61,6 @@ function Inner({ play }: { play: boolean }) {
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.85 }}
                 transition={POP}
-                style={{ willChange: 'transform, opacity' }}
                 className="flex items-center gap-1.5 transform-gpu rounded-full border border-emerald-400/30 bg-emerald-500/10 px-2.5 py-1 text-[11px] text-emerald-300"
               >
                 <Wifi className="h-3 w-3" />
@@ -82,7 +80,6 @@ function Inner({ play }: { play: boolean }) {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}
               transition={FADE}
-              style={{ willChange: 'transform, opacity' }}
               className="transform-gpu"
             >
               <motion.div

@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useEffect, useRef, useState, useMemo } from 'react';
+import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import { X, MapPin, Navigation } from 'lucide-react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
+import { SHEET } from '@/lib/motion';
 import { parseISO, startOfMonth, subMonths, startOfYear } from 'date-fns';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -94,10 +95,13 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency, 
     const styleTimerRef = useRef<NodeJS.Timeout | null>(null);
     const reduceMotion = useReducedMotion();
     // Map animation durations collapse to 0 when the user prefers reduced motion.
-    const camDuration = (ms: number) => (reduceMotion ? 0 : ms);
-    const springTransition = reduceMotion
-        ? { duration: 0 }
-        : { type: 'spring' as const, damping: 25, stiffness: 300 };
+    const camDuration = useCallback((ms: number) => (reduceMotion ? 0 : ms), [reduceMotion]);
+    // Memoized: this object is handed to two motion.div `transition` props, and a
+    // fresh identity each render defeats Framer's transition-diffing short-circuit.
+    const springTransition = useMemo(
+        () => (reduceMotion ? { duration: 0 } : SHEET),
+        [reduceMotion]
+    );
     const [mapError, setMapError] = useState(false);
     const [retryNonce, setRetryNonce] = useState(0);
     const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set());
@@ -764,7 +768,7 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency, 
                             transition={springTransition}
                             className="absolute bottom-36 left-4 right-4 z-30"
                         >
-                            <div className="rounded-2xl bg-card/95 backdrop-blur-xl border border-white/10 shadow-2xl overflow-hidden">
+                            <div className="rounded-xl bg-card/95 backdrop-blur-xl border border-white/10 shadow-2xl overflow-hidden">
                                 <div className="p-4 flex items-start gap-3">
                                     <div
                                         className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 border"
@@ -840,7 +844,7 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency, 
                             animate={{ y: 0, opacity: 1 }}
                             exit={{ y: 200, opacity: 0 }}
                             transition={springTransition}
-                            className="absolute bottom-4 left-4 right-4 sm:bottom-8 sm:left-auto sm:right-8 sm:w-[350px] z-40 max-h-[60vh] overflow-hidden flex flex-col rounded-2xl bg-card/95 backdrop-blur-xl border border-white/10 shadow-2xl"
+                            className="absolute bottom-4 left-4 right-4 sm:bottom-8 sm:left-auto sm:right-8 sm:w-[350px] z-40 max-h-[60vh] overflow-hidden flex flex-col rounded-xl bg-card/95 backdrop-blur-xl border border-white/10 shadow-2xl"
                         >
                             <div className="p-4 border-b border-white/10 flex items-center justify-between bg-card/80 sticky top-0">
                                 <div className="flex items-center gap-2">
@@ -902,7 +906,7 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency, 
                                 transform: 'translateX(-50%)'
                             }}
                         >
-                            <div className="bg-card/40 backdrop-blur-xl border border-white/20 rounded-2xl p-4 shadow-2xl min-w-[200px]">
+                            <div className="bg-card/40 backdrop-blur-xl border border-white/20 rounded-xl p-4 shadow-2xl min-w-[200px]">
                                 <div className="flex items-center gap-2 mb-3">
                                     <div
                                         className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 border border-white/20"

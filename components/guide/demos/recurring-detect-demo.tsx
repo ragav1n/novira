@@ -48,7 +48,7 @@ function Inner({ play }: { play: boolean }) {
 
   return (
     <div className="mx-auto max-w-md">
-      <div className="rounded-2xl border border-white/10 bg-zinc-950/60 p-5">
+      <div className="rounded-xl border border-white/10 bg-zinc-950/60 p-5">
         <div className="text-[10px] uppercase tracking-widest text-foreground/65">Last 90 days</div>
 
         {/* Fixed height fits the worst case (4 transactions stacked) so the
@@ -63,7 +63,6 @@ function Inner({ play }: { play: boolean }) {
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, scale: 0.85, y: -i * 8, transition: { ...FADE, duration: 0.5 } }}
                   transition={FADE}
-                  style={{ willChange: 'transform, opacity' }}
                   className="mb-2 flex items-center gap-3 transform-gpu rounded-xl border border-white/5 bg-white/[0.02] px-3 py-2"
                 >
                   <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/15 text-emerald-300">
@@ -82,8 +81,7 @@ function Inner({ play }: { play: boolean }) {
                 initial={{ opacity: 0, y: -10, scale: 0.94 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 transition={SOFT}
-                style={{ willChange: 'transform, opacity' }}
-                className="absolute inset-x-0 top-0 transform-gpu rounded-2xl border border-emerald-400/30 bg-gradient-to-br from-emerald-500/[0.08] to-transparent p-4"
+                className="absolute inset-x-0 top-0 transform-gpu rounded-xl border border-emerald-400/30 bg-gradient-to-br from-emerald-500/[0.08] to-transparent p-4"
               >
                 <div className="flex items-center gap-3">
                   <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-300">

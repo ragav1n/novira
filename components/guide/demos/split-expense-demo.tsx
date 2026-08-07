@@ -43,7 +43,7 @@ function Inner({ play }: { play: boolean }) {
 
   return (
     <div className="mx-auto max-w-md">
-      <div className="rounded-2xl border border-white/10 bg-zinc-950/60 p-5">
+      <div className="rounded-xl border border-white/10 bg-zinc-950/60 p-5">
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-500/15 text-orange-300">
             <Pizza className="h-5 w-5" />
@@ -77,7 +77,6 @@ function Inner({ play }: { play: boolean }) {
                   opacity: { duration: 0.55, ease: EASE_GLIDE, delay: isShown ? i * STAGGER_NORMAL : 0 },
                   scale: { duration: 0.95, ease: EASE_GLIDE, delay: isShown ? i * STAGGER_NORMAL : 0 },
                 }}
-                style={{ willChange: 'transform, opacity' }}
                 className="flex w-[76px] flex-col items-center transform-gpu"
               >
                 <div className={`flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br ${p.tone} text-sm font-bold text-white shadow-md`}>
@@ -95,7 +94,6 @@ function Inner({ play }: { play: boolean }) {
                         delay: i * STAGGER_NORMAL,
                       }}
                       className="mt-1.5 rounded-full border border-emerald-400/30 bg-emerald-500/10 px-2 py-0.5 font-mono text-[11px] text-emerald-300 transform-gpu"
-                      style={{ willChange: 'transform, opacity' }}
                     >
                       ₹333.00
                     </motion.div>
@@ -114,7 +112,6 @@ function Inner({ play }: { play: boolean }) {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -6 }}
               transition={{ duration: 0.7, ease: EASE_GLIDE }}
-              style={{ willChange: 'transform, opacity' }}
               className="flex items-center gap-1.5 transform-gpu"
             >
               <Users className="h-3 w-3" />

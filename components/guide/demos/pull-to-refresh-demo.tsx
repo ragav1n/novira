@@ -76,7 +76,6 @@ function Inner({ play }: { play: boolean }) {
         <motion.div
           ref={iconRef}
           initial={{ opacity: 0, scale: 0.6, rotate: 0 }}
-          style={{ willChange: 'transform, opacity' }}
           className="absolute left-1/2 top-3 z-10 -translate-x-1/2 transform-gpu rounded-full border border-white/10 bg-card/80 p-2 shadow-lg backdrop-blur-md"
         >
           <RefreshCcw className="h-4 w-4 text-primary" />
@@ -85,7 +84,6 @@ function Inner({ play }: { play: boolean }) {
         {/* Content stack */}
         <motion.div
           ref={contentRef}
-          style={{ willChange: 'transform' }}
           className="space-y-3 p-4 transform-gpu"
         >
           <div className="flex items-center gap-2.5">
@@ -95,14 +93,14 @@ function Inner({ play }: { play: boolean }) {
               <div className="h-2 w-32 rounded bg-white/10" />
             </div>
           </div>
-          <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
             <div className="text-[10px] uppercase tracking-widest text-foreground/65">Available this month</div>
             <div className="mt-1 text-2xl font-semibold text-foreground">₹42,180</div>
             <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
               <div className="h-full w-[63%] bg-gradient-to-r from-primary to-fuchsia-400" />
             </div>
           </div>
-          <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
             <div className="text-[10px] uppercase tracking-widest text-foreground/65">Recent</div>
             <div className="mt-2 space-y-2">
               {['Zara', 'Uber', 'Blue Tokai'].map((n, i) => (

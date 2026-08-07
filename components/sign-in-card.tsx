@@ -2,7 +2,8 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { motion, AnimatePresence, useMotionValue, useTransform, useSpring } from 'framer-motion';
+import { motion, AnimatePresence, useMotionValue, useTransform, useSpring, useReducedMotion } from 'framer-motion';
+import { ICON_POP } from '@/lib/motion';
 import { Mail, Lock, Eye, EyeClosed, ArrowRight } from 'lucide-react';
 
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -42,6 +43,10 @@ export function Component({ isSignUp = false }: { isSignUp?: boolean }) {
   const [isLoading, setIsLoading] = useState(false);
   type FocusedInput = "name" | "email" | "password" | "confirmPassword" | null;
   const [focusedInput, setFocusedInput] = useState<FocusedInput>(null);
+
+  // Gates the decorative infinite loops. Framer's `reducedMotion="user"` suppresses
+  // transform animations but still schedules them; this skips mounting them at all.
+  const reduceMotion = useReducedMotion();
 
   // For 3D card effect - Optimized with spring for smoothness and reduced main-thread load
   const mouseX = useMotionValue(0);
@@ -225,17 +230,13 @@ export function Component({ isSignUp = false }: { isSignUp?: boolean }) {
           whileHover={{ z: 10 }}
         >
           <div className="relative group">
-            {/* Card glow effect - reduced intensity */}
+            {/* Card glow effect - reduced intensity. The box-shadow is static and the
+                pulse is pure opacity: animating `boxShadow` keyframes forever repainted
+                the card's whole bounding box every frame, and at these values (0.03 ->
+                0.05 alpha) the shadow change was invisible next to the opacity pulse. */}
             <motion.div
-              className="absolute -inset-[1px] rounded-2xl opacity-0 group-hover:opacity-70 transition-opacity duration-700"
-              animate={{
-                boxShadow: [
-                  "0 0 10px 2px rgba(255,255,255,0.03)",
-                  "0 0 15px 5px rgba(255,255,255,0.05)",
-                  "0 0 10px 2px rgba(255,255,255,0.03)"
-                ],
-                opacity: [0.2, 0.4, 0.2]
-              }}
+              className="absolute -inset-[1px] rounded-xl opacity-0 group-hover:opacity-70 transition-opacity duration-700 shadow-[0_0_15px_5px_rgba(255,255,255,0.05)]"
+              animate={{ opacity: [0.2, 0.4, 0.2] }}
               transition={{
                 duration: 4,
                 repeat: Infinity,
@@ -244,19 +245,26 @@ export function Component({ isSignUp = false }: { isSignUp?: boolean }) {
               }}
             />
 
-            {/* Traveling light beam effect - reduced opacity */}
-            <div className="absolute -inset-[1px] rounded-2xl overflow-hidden">
-              {/* Top light beam - enhanced glow */}
+            {/* Traveling light beams.
+                These animate `x`/`y` percentages, never `left`/`top`/`right`/`bottom`.
+                The position properties they used to animate triggered layout on every
+                frame of a `repeat: Infinity` loop — four of them, forever, on the app's
+                entry screen — and neither `MotionConfig reducedMotion="user"` nor the
+                CSS reduced-motion kill-switch could reach an inline-styled Framer loop.
+                Percentages on x/y resolve against the element's own size, so a beam
+                that is 50% of the track reads x:-100% at the same place left:-50% did.
+                The blur is static for the same reason: animated `filter` repaints. */}
+            {!reduceMotion && (
+            <div className="absolute -inset-[1px] rounded-xl overflow-hidden">
+              {/* Top light beam */}
               <motion.div
-                className="absolute top-0 left-0 h-[3px] w-[50%] bg-gradient-to-r from-transparent via-white to-transparent opacity-70"
-                initial={{ filter: "blur(2px)" }}
+                className="absolute top-0 left-0 h-[3px] w-[50%] bg-gradient-to-r from-transparent via-white to-transparent opacity-70 blur-[2px]"
                 animate={{
-                  left: ["-50%", "100%"],
+                  x: ["-100%", "200%"],
                   opacity: [0.3, 0.7, 0.3],
-                  filter: ["blur(1px)", "blur(2.5px)", "blur(1px)"]
                 }}
                 transition={{
-                  left: {
+                  x: {
                     duration: 3,
                     ease: "linear",
                     repeat: Infinity,
@@ -270,17 +278,15 @@ export function Component({ isSignUp = false }: { isSignUp?: boolean }) {
                 }}
               />
 
-              {/* Right light beam - enhanced glow */}
+              {/* Right light beam */}
               <motion.div
-                className="absolute top-0 right-0 h-[50%] w-[3px] bg-gradient-to-b from-transparent via-white to-transparent opacity-70"
-                initial={{ filter: "blur(2px)" }}
+                className="absolute top-0 right-0 h-[50%] w-[3px] bg-gradient-to-b from-transparent via-white to-transparent opacity-70 blur-[2px]"
                 animate={{
-                  top: ["-50%", "100%"],
+                  y: ["-100%", "200%"],
                   opacity: [0.3, 0.7, 0.3],
-                  filter: ["blur(1px)", "blur(2.5px)", "blur(1px)"]
                 }}
                 transition={{
-                  top: {
+                  y: {
                     duration: 3,
                     ease: "linear",
                     repeat: Infinity,
@@ -296,17 +302,15 @@ export function Component({ isSignUp = false }: { isSignUp?: boolean }) {
                 }}
               />
 
-              {/* Bottom light beam - enhanced glow */}
+              {/* Bottom light beam — travels right to left */}
               <motion.div
-                className="absolute bottom-0 right-0 h-[3px] w-[50%] bg-gradient-to-r from-transparent via-white to-transparent opacity-70"
-                initial={{ filter: "blur(2px)" }}
+                className="absolute bottom-0 right-0 h-[3px] w-[50%] bg-gradient-to-r from-transparent via-white to-transparent opacity-70 blur-[2px]"
                 animate={{
-                  right: ["-50%", "100%"],
+                  x: ["100%", "-200%"],
                   opacity: [0.3, 0.7, 0.3],
-                  filter: ["blur(1px)", "blur(2.5px)", "blur(1px)"]
                 }}
                 transition={{
-                  right: {
+                  x: {
                     duration: 2.5,
                     ease: "easeInOut",
                     repeat: Infinity,
@@ -315,12 +319,6 @@ export function Component({ isSignUp = false }: { isSignUp?: boolean }) {
                   },
                   opacity: {
                     duration: 1.2,
-                    repeat: Infinity,
-                    repeatType: "mirror",
-                    delay: 1.2
-                  },
-                  filter: {
-                    duration: 1.5,
                     repeat: Infinity,
                     repeatType: "mirror",
                     delay: 1.2
@@ -328,17 +326,15 @@ export function Component({ isSignUp = false }: { isSignUp?: boolean }) {
                 }}
               />
 
-              {/* Left light beam - enhanced glow */}
+              {/* Left light beam — travels bottom to top */}
               <motion.div
-                className="absolute bottom-0 left-0 h-[50%] w-[3px] bg-gradient-to-b from-transparent via-white to-transparent opacity-70"
-                initial={{ filter: "blur(2px)" }}
+                className="absolute bottom-0 left-0 h-[50%] w-[3px] bg-gradient-to-b from-transparent via-white to-transparent opacity-70 blur-[2px]"
                 animate={{
-                  bottom: ["-50%", "100%"],
+                  y: ["100%", "-200%"],
                   opacity: [0.3, 0.7, 0.3],
-                  filter: ["blur(1px)", "blur(2.5px)", "blur(1px)"]
                 }}
                 transition={{
-                  bottom: {
+                  y: {
                     duration: 2.5,
                     ease: "easeInOut",
                     repeat: Infinity,
@@ -347,12 +343,6 @@ export function Component({ isSignUp = false }: { isSignUp?: boolean }) {
                   },
                   opacity: {
                     duration: 1.2,
-                    repeat: Infinity,
-                    repeatType: "mirror",
-                    delay: 1.8
-                  },
-                  filter: {
-                    duration: 1.5,
                     repeat: Infinity,
                     repeatType: "mirror",
                     delay: 1.8
@@ -409,12 +399,13 @@ export function Component({ isSignUp = false }: { isSignUp?: boolean }) {
                 }}
               />
             </div>
+            )}
 
             {/* Card border glow - cosmic purple */}
-            <div className="absolute -inset-[0.5px] rounded-2xl bg-gradient-to-r from-primary/10 via-primary/20 to-primary/10 opacity-0 group-hover:opacity-70 transition-opacity duration-500" />
+            <div className="absolute -inset-[0.5px] rounded-xl bg-gradient-to-r from-primary/10 via-primary/20 to-primary/10 opacity-0 group-hover:opacity-70 transition-opacity duration-500" />
 
             {/* Glass card background - cosmic theme */}
-            <div className="relative bg-card/60 backdrop-blur-xl rounded-2xl p-6 border border-primary/20 shadow-2xl overflow-hidden">
+            <div className="relative bg-card/60 backdrop-blur-xl rounded-xl p-6 border border-primary/20 shadow-2xl overflow-hidden">
               {/* Subtle card inner patterns */}
               <div className="absolute inset-0 opacity-[0.03] pointer-events-none"
                 style={{
@@ -499,7 +490,7 @@ export function Component({ isSignUp = false }: { isSignUp?: boolean }) {
                       className={`relative ${focusedInput === "name" ? 'z-10' : ''}`}
                       whileFocus={{ scale: 1.02 }}
                       whileHover={{ scale: 1.01 }}
-                      transition={{ type: "spring", stiffness: 400, damping: 25 }}
+                      transition={ICON_POP}
                     >
                       <div className="absolute -inset-[0.5px] bg-gradient-to-r from-primary/20 via-primary/10 to-primary/20 rounded-lg opacity-0 group-hover:opacity-100 transition-all duration-300" />
 
@@ -534,7 +525,7 @@ export function Component({ isSignUp = false }: { isSignUp?: boolean }) {
                     className={`relative ${focusedInput === "email" ? 'z-10' : ''}`}
                     whileFocus={{ scale: 1.02 }}
                     whileHover={{ scale: 1.01 }}
-                    transition={{ type: "spring", stiffness: 400, damping: 25 }}
+                    transition={ICON_POP}
                   >
                     <div className="absolute -inset-[0.5px] bg-gradient-to-r from-white/10 via-white/5 to-white/10 rounded-lg opacity-0 group-hover:opacity-100 transition-all duration-300" />
 
@@ -573,7 +564,7 @@ export function Component({ isSignUp = false }: { isSignUp?: boolean }) {
                     className={`relative ${focusedInput === "password" ? 'z-10' : ''}`}
                     whileFocus={{ scale: 1.02 }}
                     whileHover={{ scale: 1.01 }}
-                    transition={{ type: "spring", stiffness: 400, damping: 25 }}
+                    transition={ICON_POP}
                   >
                     <div className="absolute -inset-[0.5px] bg-gradient-to-r from-primary/20 via-primary/10 to-primary/20 rounded-lg opacity-0 group-hover:opacity-100 transition-all duration-300" />
 
@@ -644,7 +635,7 @@ export function Component({ isSignUp = false }: { isSignUp?: boolean }) {
                       className={`relative ${focusedInput === "confirmPassword" ? 'z-10' : ''}`}
                       whileFocus={{ scale: 1.02 }}
                       whileHover={{ scale: 1.01 }}
-                      transition={{ type: "spring", stiffness: 400, damping: 25 }}
+                      transition={ICON_POP}
                     >
                       <div className="absolute -inset-[0.5px] bg-gradient-to-r from-primary/20 via-primary/10 to-primary/20 rounded-lg opacity-0 group-hover:opacity-100 transition-all duration-300" />
 

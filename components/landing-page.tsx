@@ -1,6 +1,7 @@
 'use client';
 
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, type Variants } from 'framer-motion';
+import { EASE_OUT_SOFT } from '@/lib/motion';
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -53,10 +54,23 @@ const TXNS = [
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-const fadeUp = (delay = 0) => ({
-  hidden: { opacity: 0, y: 32 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.65, delay, ease: [0.22, 1, 0.36, 1] } },
-});
+// Cached by delay so repeat renders hand Framer the *same* variants object.
+// This is called inline in JSX at ~19 sites; as a plain factory every render
+// allocated a fresh object per node, which defeats Framer's variant identity
+// check and makes it re-resolve each one. Only a handful of distinct delays
+// exist (0.1 / 0.2 / 0.3 / 0.4 plus i * 0.04 within one bounded list), so the
+// cache stays tiny.
+const fadeUpCache = new Map<number, Variants>();
+const fadeUp = (delay = 0): Variants => {
+  const cached = fadeUpCache.get(delay);
+  if (cached) return cached;
+  const variants: Variants = {
+    hidden: { opacity: 0, y: 32 },
+    visible: { opacity: 1, y: 0, transition: { duration: 0.65, delay, ease: EASE_OUT_SOFT } },
+  };
+  fadeUpCache.set(delay, variants);
+  return variants;
+};
 
 function Tag({ children }: { children: React.ReactNode }) {
   return (

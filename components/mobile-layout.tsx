@@ -10,7 +10,7 @@ import { cn } from '@/lib/utils';
 import { useUserPreferences } from '@/components/providers/user-preferences-provider';
 import { WaveLoader } from '@/components/ui/wave-loader';
 import { UIBoundary } from '@/components/boundaries/ui-boundary';
-import { AnimatePresence, motion, MotionConfig, useScroll, useMotionValueEvent } from 'framer-motion';
+import { AnimatePresence, motion, useScroll, useMotionValueEvent } from 'framer-motion';
 import { useIsNative } from '@/hooks/use-native';
 import { useGroups } from '@/components/providers/groups-provider';
 import { PWAUpdater } from '@/components/pwa-updater';
@@ -500,7 +500,6 @@ export function MobileLayout({ children, defaultIsDesktop = false }: { children:
     const ptrProgress = Math.min(1, pull / threshold);
 
     return (
-        <MotionConfig reducedMotion="user">
         <div className={cn(
             // h-[100dvh] (not min-h) so <main> is the scroll container — required for the
             // desktop nav's useScroll(mainRef) to fire collapse on scroll-down.
@@ -514,15 +513,33 @@ export function MobileLayout({ children, defaultIsDesktop = false }: { children:
             {/* Global Background Glows. Two soft corner halos tinted by the
                 `--workspace-accent` CSS variable that the dashboard hero card
                 also consumes — workspace switches and bucket-focus changes
-                tint the page background subtly without washing out content. */}
-            <div className="fixed inset-0 pointer-events-none overflow-hidden z-0 gpu">
+                tint the page background subtly without washing out content.
+
+                Painted as radial gradients, not as solid circles under a
+                `blur-3xl` filter. A 64px-blurred solid circle and a radial
+                gradient are visually the same thing, but the blurred version
+                cost two permanently GPU-promoted layers at 65% and 55% of the
+                viewport — each carrying `will-change: filter`, which tells the
+                browser *not* to cache the blur result — plus a third from the
+                wrapper's `.gpu`. That was the steady-state compositing cost on
+                every single screen. Gradients need no filter and no promotion.
+                `--workspace-accent` is @property-typed as <color>, so it still
+                cross-fades on workspace switch: each frame just resolves a new
+                gradient, the same mechanism the hero card uses. */}
+            <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
                 <div
-                    className="absolute top-[15%] -right-[10%] w-[65%] h-[65%] rounded-full opacity-[0.26] blur-3xl gpu glow-optimized"
-                    style={{ backgroundColor: 'var(--workspace-accent)' }}
+                    className="absolute top-[15%] -right-[10%] w-[65%] h-[65%] opacity-[0.26]"
+                    style={{
+                        backgroundImage:
+                            'radial-gradient(closest-side, color-mix(in oklch, var(--workspace-accent) 85%, transparent), transparent)',
+                    }}
                 />
                 <div
-                    className="absolute bottom-[15%] -left-[10%] w-[55%] h-[55%] rounded-full opacity-[0.18] blur-3xl gpu glow-optimized"
-                    style={{ backgroundColor: 'var(--workspace-accent)' }}
+                    className="absolute bottom-[15%] -left-[10%] w-[55%] h-[55%] opacity-[0.18]"
+                    style={{
+                        backgroundImage:
+                            'radial-gradient(closest-side, color-mix(in oklch, var(--workspace-accent) 85%, transparent), transparent)',
+                    }}
                 />
             </div>
 
@@ -657,6 +674,5 @@ export function MobileLayout({ children, defaultIsDesktop = false }: { children:
                 closeButton
             />
         </div>
-        </MotionConfig>
     );
 }

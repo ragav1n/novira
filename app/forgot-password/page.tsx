@@ -3,7 +3,8 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-motion';
+import { motion, AnimatePresence, useMotionValue, useTransform, useSpring } from 'framer-motion';
+import { ICON_POP } from '@/lib/motion';
 import { Mail, ArrowRight, ArrowLeft } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { cn } from "@/lib/utils";
@@ -35,8 +36,14 @@ export default function ForgotPassword() {
     // For 3D card effect
     const mouseX = useMotionValue(0);
     const mouseY = useMotionValue(0);
-    const rotateX = useTransform(mouseY, [-300, 300], [10, -10]);
-    const rotateY = useTransform(mouseX, [-300, 300], [-10, 10]);
+    // Spring-smoothed and +/-8deg, matching sign-in-card. Driving rotate straight off
+    // the raw pointer motion value made this tilt read stiff next to the sign-in card
+    // it is otherwise a copy of.
+    const springConfig = { damping: 20, stiffness: 300 };
+    const smoothX = useSpring(mouseX, springConfig);
+    const smoothY = useSpring(mouseY, springConfig);
+    const rotateX = useTransform(smoothY, [-300, 300], [8, -8]);
+    const rotateY = useTransform(smoothX, [-300, 300], [-8, 8]);
 
     const handleMouseMove = (e: React.MouseEvent) => {
         const rect = e.currentTarget.getBoundingClientRect();
@@ -123,15 +130,11 @@ export default function ForgotPassword() {
                     <div className="relative group">
                         {/* Card glow effect */}
                         <motion.div
-                            className="absolute -inset-[1px] rounded-2xl opacity-0 group-hover:opacity-70 transition-opacity duration-700"
-                            animate={{
-                                boxShadow: [
-                                    "0 0 10px 2px rgba(255,255,255,0.03)",
-                                    "0 0 15px 5px rgba(255,255,255,0.05)",
-                                    "0 0 10px 2px rgba(255,255,255,0.03)"
-                                ],
-                                opacity: [0.2, 0.4, 0.2]
-                            }}
+                            // Static box-shadow, opacity-only pulse — animating boxShadow
+                            // keyframes forever repainted the card bounding box each frame,
+                            // and at 0.03 -> 0.05 alpha the change was invisible anyway.
+                            className="absolute -inset-[1px] rounded-xl opacity-0 group-hover:opacity-70 transition-opacity duration-700 shadow-[0_0_15px_5px_rgba(255,255,255,0.05)]"
+                            animate={{ opacity: [0.2, 0.4, 0.2] }}
                             transition={{
                                 duration: 4,
                                 repeat: Infinity,
@@ -141,10 +144,10 @@ export default function ForgotPassword() {
                         />
 
                         {/* Card border glow */}
-                        <div className="absolute -inset-[0.5px] rounded-2xl bg-gradient-to-r from-primary/10 via-primary/20 to-primary/10 opacity-0 group-hover:opacity-70 transition-opacity duration-500" />
+                        <div className="absolute -inset-[0.5px] rounded-xl bg-gradient-to-r from-primary/10 via-primary/20 to-primary/10 opacity-0 group-hover:opacity-70 transition-opacity duration-500" />
 
                         {/* Glass card background */}
-                        <div className="relative bg-card/60 backdrop-blur-xl rounded-2xl p-6 border border-primary/20 shadow-2xl overflow-hidden">
+                        <div className="relative bg-card/60 backdrop-blur-xl rounded-xl p-6 border border-primary/20 shadow-2xl overflow-hidden">
                             {/* Subtle card inner patterns */}
                             <div className="absolute inset-0 opacity-[0.03] pointer-events-none"
                                 style={{
@@ -215,7 +218,7 @@ export default function ForgotPassword() {
                                     className={`relative ${focusedInput === "email" ? 'z-10' : ''}`}
                                     whileFocus={{ scale: 1.02 }}
                                     whileHover={{ scale: 1.01 }}
-                                    transition={{ type: "spring", stiffness: 400, damping: 25 }}
+                                    transition={ICON_POP}
                                 >
                                     <div className="absolute -inset-[0.5px] bg-gradient-to-r from-primary/20 via-primary/10 to-primary/20 rounded-lg opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none" />
 
@@ -245,8 +248,10 @@ export default function ForgotPassword() {
                                     <div className="relative overflow-hidden bg-primary text-primary-foreground font-medium h-10 rounded-lg transition-all duration-300 flex items-center justify-center">
                                         <motion.div
                                             className="absolute inset-0 bg-gradient-to-r from-primary/0 via-primary/40 to-primary/0 -z-10"
-                                            animate={{ x: ['-100%', '100%'] }}
-                                            transition={{ duration: 1.5, ease: "easeInOut", repeat: Infinity, repeatDelay: 1 }}
+                                            // Only animate while it is actually visible; it used to
+                                            // loop forever behind opacity: 0.
+                                            animate={isLoading ? { x: ['-100%', '100%'] } : { x: '-100%' }}
+                                            transition={{ duration: 1.5, ease: "easeInOut", repeat: isLoading ? Infinity : 0, repeatDelay: 1 }}
                                             style={{ opacity: isLoading ? 1 : 0, transition: 'opacity 0.3s ease' }}
                                         />
                                         <AnimatePresence mode="wait">

@@ -48,7 +48,7 @@ function Inner({ play }: { play: boolean }) {
 
   return (
     <div className="mx-auto max-w-md">
-      <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br from-sky-500/[0.05] to-transparent p-5">
+      <div className="relative overflow-hidden rounded-xl border border-white/10 bg-gradient-to-br from-sky-500/[0.05] to-transparent p-5">
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-500/15 text-sky-300">
             <Plane className="h-5 w-5" />
@@ -74,7 +74,7 @@ function Inner({ play }: { play: boolean }) {
             initial={{ scaleX: 0 }}
             animate={{ scaleX: progress / 100 }}
             transition={{ type: 'spring', damping: 24, stiffness: 130, mass: 0.9 }}
-            style={{ width: '100%', willChange: 'transform' }}
+            style={{ width: '100%' }}
           />
           {[25, 50, 75].map((m) => (
             <div
@@ -99,7 +99,6 @@ function Inner({ play }: { play: boolean }) {
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: -6, scale: 0.95 }}
                 transition={SNAPPY}
-                style={{ willChange: 'transform, opacity' }}
                 className="flex items-center gap-2 transform-gpu rounded-xl border border-sky-400/30 bg-sky-500/[0.08] px-3 py-2.5 text-[12px]"
               >
                 <Sparkle className="h-4 w-4 shrink-0 text-sky-300" />

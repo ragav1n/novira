@@ -88,14 +88,14 @@ export function SearchPlaygroundDemo() {
     <div
       role="region"
       aria-label="Try Novira's search syntax — type a query and watch results filter live"
-      className="mx-auto max-w-2xl rounded-2xl border border-white/10 bg-gradient-to-br from-primary/[0.04] to-transparent p-5"
+      className="mx-auto max-w-2xl rounded-xl border border-white/10 bg-gradient-to-br from-primary/[0.04] to-transparent p-5"
     >
       <div className="mb-3 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-widest text-primary/85">
         <SearchIcon className="h-3 w-3" />
         Try the search syntax — live
       </div>
 
-      <div className="flex items-center gap-2 rounded-2xl border border-white/10 bg-background/60 px-3 py-2.5 focus-within:border-primary/40 focus-within:bg-background/80">
+      <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-background/60 px-3 py-2.5 focus-within:border-primary/40 focus-within:bg-background/80">
         <SearchIcon className="h-4 w-4 shrink-0 text-foreground/75" />
         <input
           aria-label="Search query"
@@ -182,7 +182,6 @@ export function SearchPlaygroundDemo() {
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -8 }}
                 transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1], layout: { duration: 0.32, ease: [0.22, 1, 0.36, 1] } }}
-                style={{ willChange: 'transform, opacity' }}
                 className="grid grid-cols-[1fr_auto] items-center gap-3 px-3 py-2.5 text-[12px] transform-gpu"
               >
                 <div className="min-w-0">

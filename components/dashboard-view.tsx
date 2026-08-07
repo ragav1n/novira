@@ -110,7 +110,7 @@ export function DashboardView() {
         isAddFundsOpen, setIsAddFundsOpen, isHowToUseOpen, setIsHowToUseOpen,
         activeModal, setActiveModal, isFocusMenuOpen, setIsFocusMenuOpen,
         focusSelectorRef, isViewAllOpen, setIsViewAllOpen,
-        isMapOpen, setIsMapOpen, hoveredFocusId, setHoveredFocusId
+        isMapOpen, setIsMapOpen
     } = useDashboardState(userId);
 
     const [isBudgetEditOpen, setIsBudgetEditOpen] = useState(false);
@@ -406,7 +406,7 @@ export function DashboardView() {
 
                 {/* Empty State */}
                 {(!loading && groups.length === 0 && friends.length === 0 && transactions.length === 0) && (
-                    <Card className="bg-card/40 border-primary/20 overflow-hidden relative rounded-2xl shadow-[inset_0_1px_0_rgb(255_255_255_/0.06)]">
+                    <Card className="bg-card/40 border-primary/20 overflow-hidden relative rounded-xl shadow-[inset_0_1px_0_rgb(255_255_255_/0.06)]">
                         <div className="absolute top-0 right-0 p-8 opacity-5">
                             <Users className="w-24 h-24" />
                         </div>
@@ -457,8 +457,6 @@ export function DashboardView() {
                     getBucketIcon={getBucketIcon}
                     setIsBudgetEditOpen={setIsBudgetEditOpen}
                     setTempBudgetInput={setTempBudgetInput}
-                    hoveredFocusId={hoveredFocusId}
-                    setHoveredFocusId={setHoveredFocusId}
                     focusSelectorRef={focusSelectorRef}
                     spendingData={spendingData}
                     showCategoryDonut={dashboardLayout.category_donut}

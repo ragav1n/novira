@@ -31,7 +31,6 @@ export function AutoPlay({
       initial={{ opacity: 0, y: 14 }}
       animate={inView ? { opacity: 1, y: 0 } : { opacity: 0.5, y: 10 }}
       transition={FADE}
-      style={{ willChange: 'transform, opacity' }}
     >
       {children(inView)}
     </motion.div>

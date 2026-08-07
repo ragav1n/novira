@@ -12,7 +12,6 @@ export function useDashboardState(userId: string | null) {
     const [activeModal, setActiveModal] = useState<'welcome' | 'announcement' | null>(null);
     const [isFocusMenuOpen, setIsFocusMenuOpen] = useState(false);
     const focusSelectorRef = useRef<HTMLDivElement>(null);
-    const [hoveredFocusId, setHoveredFocusId] = useState<string | null>(null);
 
     // Modal Interaction State
     const [isViewAllOpen, setIsViewAllOpen] = useState(false);
@@ -70,8 +69,6 @@ export function useDashboardState(userId: string | null) {
         isFocusMenuOpen,
         setIsFocusMenuOpen,
         focusSelectorRef,
-        hoveredFocusId,
-        setHoveredFocusId,
         isViewAllOpen,
         setIsViewAllOpen,
         isMapOpen,

@@ -50,7 +50,7 @@ function Inner({ play }: { play: boolean }) {
 
   return (
     <div className="mx-auto max-w-md">
-      <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-sky-500/[0.05] to-transparent p-5">
+      <div className="rounded-xl border border-white/10 bg-gradient-to-br from-sky-500/[0.05] to-transparent p-5">
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-500/15 text-sky-300">
             <Plane className="h-5 w-5" />
@@ -78,7 +78,7 @@ function Inner({ play }: { play: boolean }) {
             initial={{ scaleX: 0 }}
             animate={{ scaleX: pct / 100 }}
             transition={SOFT}
-            style={{ width: '100%', willChange: 'transform' }}
+            style={{ width: '100%' }}
           />
         </div>
         <div className="mt-1 flex items-center justify-between text-[11px] text-foreground/75">
@@ -97,7 +97,6 @@ function Inner({ play }: { play: boolean }) {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 4 }}
                 transition={FADE}
-                style={{ willChange: 'transform, opacity' }}
                 className="flex items-center justify-between rounded-xl border border-white/5 bg-white/[0.02] px-3 py-2 text-[12px] transform-gpu"
               >
                 <span className="text-foreground">{t.name}</span>

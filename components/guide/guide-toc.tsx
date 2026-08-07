@@ -104,7 +104,7 @@ export function GuideTocMobile() {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center justify-between gap-3 rounded-2xl border border-white/10 bg-background/80 px-4 py-3 text-left backdrop-blur-md transition-colors hover:bg-white/[0.04]"
+        className="flex w-full items-center justify-between gap-3 rounded-xl border border-white/10 bg-background/80 px-4 py-3 text-left backdrop-blur-md transition-colors hover:bg-white/[0.04]"
         aria-expanded={open}
       >
         <div className="flex min-w-0 items-center gap-2.5">
@@ -127,8 +127,8 @@ export function GuideTocMobile() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -8, scale: 0.98 }}
             transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
-            style={{ willChange: 'transform, opacity', transformOrigin: 'top center' }}
-            className="mt-2 max-h-[60vh] origin-top transform-gpu overflow-y-auto rounded-2xl border border-white/10 bg-background/95 p-2 backdrop-blur-md"
+            style={{ transformOrigin: 'top center' }}
+            className="mt-2 max-h-[60vh] origin-top transform-gpu overflow-y-auto rounded-xl border border-white/10 bg-background/95 p-2 backdrop-blur-md"
           >
             {GUIDE_GROUPS.map((group) => (
               <div key={group} className="px-1 py-1">

@@ -57,7 +57,7 @@ function Inner({ play }: { play: boolean }) {
 
   return (
     <div className="mx-auto max-w-md">
-      <div className="rounded-2xl border border-white/10 bg-zinc-950/60 p-5">
+      <div className="rounded-xl border border-white/10 bg-zinc-950/60 p-5">
         <div className="flex items-center justify-between">
           <div>
             <div className="text-[10px] uppercase tracking-widest text-foreground/65">April</div>
@@ -82,7 +82,6 @@ function Inner({ play }: { play: boolean }) {
                 initial={{ opacity: 0, scale: 0.7 }}
                 animate={isShown ? { opacity: 1, scale: 1 } : { opacity: 0, scale: 0.7 }}
                 transition={QUICK_FADE}
-                style={{ willChange: 'transform, opacity' }}
                 className={`relative aspect-square transform-gpu rounded-md ${tone(n)}`}
               >
                 {isTightest && isShown && (
@@ -91,7 +90,6 @@ function Inner({ play }: { play: boolean }) {
                     animate={{ scale: 1, opacity: 1 }}
                     transition={{ ...POP, delay: 0.18 }}
                     className="absolute inset-0 transform-gpu rounded-md ring-2 ring-amber-300"
-                    style={{ willChange: 'transform, opacity' }}
                   />
                 )}
               </motion.div>
@@ -110,7 +108,6 @@ function Inner({ play }: { play: boolean }) {
                 exit={{ opacity: 0 }}
                 transition={FADE}
                 className="flex items-center gap-2 rounded-xl border border-amber-400/20 bg-amber-500/[0.05] px-3 py-2 text-[12px] text-amber-200 transform-gpu"
-                style={{ willChange: 'transform, opacity' }}
               >
                 <TrendingDown className="h-3.5 w-3.5 shrink-0" />
                 <span>

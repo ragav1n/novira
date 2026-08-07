@@ -27,7 +27,7 @@ const BasePieChart = dynamic(
 );
 const CashflowForecast = dynamic(
     () => import('./cashflow-forecast').then(m => m.CashflowForecast),
-    { ssr: false, loading: () => <div className="h-32 w-full rounded-2xl bg-secondary/10 motion-safe:animate-pulse" aria-hidden /> }
+    { ssr: false, loading: () => <div className="h-32 w-full rounded-xl bg-secondary/10 motion-safe:animate-pulse" aria-hidden /> }
 );
 
 type SpendingCategory = {
@@ -78,8 +78,6 @@ interface SpendingOverviewProps {
     getBucketIcon: (iconName?: string) => React.ReactNode;
     setIsBudgetEditOpen: (open: boolean) => void;
     setTempBudgetInput: (val: string) => void;
-    hoveredFocusId: string | null;
-    setHoveredFocusId: (id: string | null) => void;
     focusSelectorRef: React.RefObject<HTMLDivElement | null>;
     spendingData: SpendingCategory[];
     balances: {
@@ -139,8 +137,6 @@ export const SpendingOverview = React.memo(function SpendingOverview({
     getBucketIcon,
     setIsBudgetEditOpen,
     setTempBudgetInput,
-    hoveredFocusId,
-    setHoveredFocusId,
     focusSelectorRef,
     spendingData,
     balances,
@@ -198,12 +194,10 @@ export const SpendingOverview = React.memo(function SpendingOverview({
                             exit={{ opacity: 0, y: -10, height: 0, scale: 0.95 }}
                             className="absolute top-[110%] left-1/2 -translate-x-1/2 w-64 z-[70] overflow-hidden"
                         >
-                            <div className="bg-card/95 backdrop-blur-xl border border-white/10 rounded-2xl p-1.5 shadow-2xl">
+                            <div className="bg-card/95 backdrop-blur-xl border border-white/10 rounded-xl p-1.5 shadow-2xl">
                                 <motion.div variants={containerVariants} initial="hidden" animate="visible" className="space-y-1">
                                     <motion.button 
                                         variants={itemVariants}
-                                        onHoverStart={() => setHoveredFocusId('allowance')}
-                                        onHoverEnd={() => setHoveredFocusId(null)}
                                         onClick={() => {
                                             startTransition(() => {
                                                 setDashboardFocus('allowance');
@@ -212,11 +206,16 @@ export const SpendingOverview = React.memo(function SpendingOverview({
                                             setIsFocusMenuOpen(false);
                                         }}
                                         className={cn(
+                                            // Hover is a CSS background, not a shared-layout
+                                            // projection. Driving it from React state meant every
+                                            // pointer move over a row re-rendered the whole
+                                            // dashboard tree (the state lived in useDashboardState)
+                                            // and re-measured the layoutId across all rows.
                                             "relative flex w-full items-center rounded-xl py-3 px-3 transition-colors duration-200",
-                                            !isBucketFocused ? "text-primary" : "text-muted-foreground hover:text-foreground"
+                                            !isBucketFocused ? "text-primary" : "text-muted-foreground hover:text-foreground hover:bg-white/5"
                                         )}
                                     >
-                                        {(dashboardFocus === 'allowance' || hoveredFocusId === 'allowance') && (
+                                        {dashboardFocus === 'allowance' && (
                                             <motion.div layoutId="focus-highlight" className="absolute inset-0 bg-primary/20 rounded-xl -z-0" />
                                         )}
                                         <div className="relative z-10 flex items-center w-full">
@@ -238,8 +237,6 @@ export const SpendingOverview = React.memo(function SpendingOverview({
                                         <motion.button 
                                             key={bucket.id}
                                             variants={itemVariants}
-                                            onHoverStart={() => setHoveredFocusId(bucket.id)}
-                                            onHoverEnd={() => setHoveredFocusId(null)}
                                             onClick={() => {
                                                 startTransition(() => {
                                                     setDashboardFocus(bucket.id);
@@ -249,10 +246,10 @@ export const SpendingOverview = React.memo(function SpendingOverview({
                                             }}
                                             className={cn(
                                                 "relative flex w-full items-center rounded-xl py-3 px-3 transition-colors duration-200",
-                                                dashboardFocus === bucket.id ? "text-primary" : "text-muted-foreground hover:text-foreground"
+                                                dashboardFocus === bucket.id ? "text-primary" : "text-muted-foreground hover:text-foreground hover:bg-white/5"
                                             )}
                                         >
-                                            {(dashboardFocus === bucket.id || hoveredFocusId === bucket.id) && (
+                                            {dashboardFocus === bucket.id && (
                                                 <motion.div layoutId="focus-highlight" className={cn("absolute inset-0 rounded-xl -z-0", bucket.id === dashboardFocus ? "bg-primary/20" : "bg-white/5")} />
                                             )}
                                             <div className="relative z-10 flex items-center w-full">
@@ -418,11 +415,11 @@ export const SpendingOverview = React.memo(function SpendingOverview({
                 animate={{ opacity: 1, y: 0 }}
                 onClick={() => setIsAddFundsOpen(true)}
                 className={cn(
-                    "w-full flex items-center justify-center gap-2 py-4 rounded-2xl border text-white font-bold transition-all active:scale-95 group shadow-[inset_0_1px_0_rgb(255_255_255_/0.06)]",
+                    "w-full flex items-center justify-center gap-2 py-4 rounded-xl border text-white font-bold transition-all active:scale-95 group shadow-[inset_0_1px_0_rgb(255_255_255_/0.06)]",
                     isCoupleWorkspace
                         ? "bg-rose-500/20 border-rose-500/30 hover:bg-rose-500/30 hover:border-rose-500/50"
                         : isHomeWorkspace
-                            ? "bg-yellow-500/20 border-yellow-500/30 hover:bg-yellow-500/30 hover:border-yellow-500/50"
+                            ? "bg-amber-500/20 border-amber-500/30 hover:bg-amber-500/30 hover:border-amber-500/50"
                             : "bg-primary/20 border-primary/30 hover:bg-primary/30 hover:border-primary/50"
                 )}
             >
@@ -449,21 +446,21 @@ export const SpendingOverview = React.memo(function SpendingOverview({
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     className={cn(
-                        "p-4 rounded-2xl border relative overflow-hidden shadow-[inset_0_1px_0_rgb(255_255_255_/0.06)]",
+                        "p-4 rounded-xl border relative overflow-hidden shadow-[inset_0_1px_0_rgb(255_255_255_/0.06)]",
                         runRateData.isExceeding
-                            ? isCoupleWorkspace ? "bg-rose-500/10 border-rose-500/20" : isHomeWorkspace ? "bg-yellow-500/10 border-yellow-500/20" : "bg-red-500/10 border-red-500/20"
-                            : isCoupleWorkspace ? "bg-rose-500/5 border-rose-500/10" : isHomeWorkspace ? "bg-yellow-500/5 border-yellow-500/10" : "bg-emerald-500/10 border-emerald-500/20"
+                            ? isCoupleWorkspace ? "bg-rose-500/10 border-rose-500/20" : isHomeWorkspace ? "bg-amber-500/10 border-amber-500/20" : "bg-red-500/10 border-red-500/20"
+                            : isCoupleWorkspace ? "bg-rose-500/5 border-rose-500/10" : isHomeWorkspace ? "bg-amber-500/5 border-amber-500/10" : "bg-emerald-500/10 border-emerald-500/20"
                     )}
                 >
                     <div className={cn(
                         "absolute top-0 right-0 w-24 h-24 rounded-full blur-[40px] opacity-20",
-                        isCoupleWorkspace ? "bg-rose-500" : isHomeWorkspace ? "bg-yellow-500" : (runRateData.isExceeding ? "bg-red-500" : "bg-emerald-500")
+                        isCoupleWorkspace ? "bg-rose-500" : isHomeWorkspace ? "bg-amber-500" : (runRateData.isExceeding ? "bg-red-500" : "bg-emerald-500")
                     )} />
                     
                     <div className="relative z-10">
                         <div className="flex justify-between items-start mb-2">
                             <div className="flex items-center gap-2">
-                                <Clock className={cn("w-4 h-4", isCoupleWorkspace ? "text-rose-400" : isHomeWorkspace ? "text-yellow-500" : (runRateData.isExceeding ? "text-red-400" : "text-emerald-400"))} />
+                                <Clock className={cn("w-4 h-4", isCoupleWorkspace ? "text-rose-400" : isHomeWorkspace ? "text-amber-500" : (runRateData.isExceeding ? "text-red-400" : "text-emerald-400"))} />
                                 <h3 className="text-sm font-bold">Month forecast</h3>
                                 <Popover>
                                     <PopoverTrigger asChild>
@@ -516,7 +513,7 @@ export const SpendingOverview = React.memo(function SpendingOverview({
                         {runRateData.isExceeding ? (
                             <div className={cn(
                                 "flex items-center gap-2 text-xs font-bold px-3 py-2 rounded-xl border mt-2",
-                                isCoupleWorkspace ? "text-rose-400 bg-rose-500/10 border-rose-500/20" : isHomeWorkspace ? "text-yellow-500 bg-yellow-500/10 border-yellow-500/20" : "text-red-400 bg-red-500/10 border-red-500/20"
+                                isCoupleWorkspace ? "text-rose-400 bg-rose-500/10 border-rose-500/20" : isHomeWorkspace ? "text-amber-500 bg-amber-500/10 border-amber-500/20" : "text-red-400 bg-red-500/10 border-red-500/20"
                             )}>
                                 <ArrowUpRight className="w-4 h-4" />
                                 Projected to exceed {isCoupleWorkspace || isHomeWorkspace ? 'workspace limit' : 'budget'} by {formatCurrency(Math.abs(displayBudget - runRateData.projectedSpend), bucketCurrency)}
@@ -524,7 +521,7 @@ export const SpendingOverview = React.memo(function SpendingOverview({
                         ) : (
                             <div className={cn(
                                 "flex items-center gap-2 text-xs font-bold px-3 py-2 rounded-xl border mt-2",
-                                isCoupleWorkspace ? "text-rose-400 bg-rose-500/10 border-rose-500/20" : isHomeWorkspace ? "text-yellow-500 bg-yellow-500/10 border-yellow-500/20" : "text-emerald-400 bg-emerald-500/10 border-emerald-500/20"
+                                isCoupleWorkspace ? "text-rose-400 bg-rose-500/10 border-rose-500/20" : isHomeWorkspace ? "text-amber-500 bg-amber-500/10 border-amber-500/20" : "text-emerald-400 bg-emerald-500/10 border-emerald-500/20"
                             )}>
                                 <ArrowDownLeft className="w-4 h-4" />
                                 On track! Projected to save {formatCurrency(displayBudget - runRateData.projectedSpend, bucketCurrency)}
@@ -575,7 +572,7 @@ export const SpendingOverview = React.memo(function SpendingOverview({
             {/* Balance strip — one connected unit, divided by a center rule.
                 Replaces the previous twin-card grid which read as a generic
                 mirrored layout. */}
-            <div className="rounded-2xl bg-card/60 border border-white/5 shadow-[inset_0_1px_0_rgb(255_255_255_/0.06)] grid grid-cols-2 divide-x divide-white/5 overflow-hidden">
+            <div className="rounded-xl bg-card/60 border border-white/5 shadow-[inset_0_1px_0_rgb(255_255_255_/0.06)] grid grid-cols-2 divide-x divide-white/5 overflow-hidden">
                 <div className="p-4 flex items-center gap-3 min-w-0">
                     <div className={cn("w-9 h-9 rounded-xl flex items-center justify-center shrink-0", balances.totalOwedToMe > 0 ? "bg-emerald-500/15" : "bg-white/5")}>
                         <ArrowDownLeft className={cn("w-4 h-4", balances.totalOwedToMe > 0 ? "text-emerald-400" : "text-muted-foreground/60")} />
@@ -637,13 +634,13 @@ export const SpendingOverview = React.memo(function SpendingOverview({
                         })()}
                         <span className={cn(
                             "text-[11px] bg-secondary/50 px-3 py-1 rounded-full border font-bold whitespace-nowrap",
-                            isCoupleWorkspace ? "text-rose-400 border-rose-500/20" : isHomeWorkspace ? "text-yellow-500 border-yellow-500/20" : "text-primary border-primary/20"
+                            isCoupleWorkspace ? "text-rose-400 border-rose-500/20" : isHomeWorkspace ? "text-amber-500 border-amber-500/20" : "text-primary border-primary/20"
                         )}>
                             {isBucketFocused ? (focusedBucket?.name ?? 'Bucket') : format(new Date(), 'MMMM')} overview
                         </span>
                     </div>
                 </div>
-                <Card className="border border-white/5 bg-card/60 shadow-[inset_0_1px_0_rgb(255_255_255_/0.06)] rounded-2xl overflow-hidden">
+                <Card className="border border-white/5 bg-card/60 shadow-[inset_0_1px_0_rgb(255_255_255_/0.06)] rounded-xl overflow-hidden">
                     <CardContent className="p-4 flex flex-col sm:flex-row items-center justify-start gap-4">
                         {spendingData.length > 0 ? (
                             <>

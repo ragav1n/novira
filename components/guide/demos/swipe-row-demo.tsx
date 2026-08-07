@@ -51,7 +51,7 @@ function Inner({ play }: { play: boolean }) {
 
   return (
     <div className="mx-auto max-w-md">
-      <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-zinc-950/60">
+      <div className="relative overflow-hidden rounded-xl border border-white/10 bg-zinc-950/60">
         {/* Action layer (revealed on swipe) */}
         <div className="absolute inset-0 flex items-stretch justify-end">
           <div className="flex w-16 items-center justify-center bg-indigo-500/85 text-white">
@@ -65,7 +65,6 @@ function Inner({ play }: { play: boolean }) {
         {/* Foreground row */}
         <motion.div
           ref={scope}
-          style={{ willChange: 'transform' }}
           className="relative z-10 flex items-center gap-3 bg-zinc-950 px-4 py-3.5 transform-gpu"
         >
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-500/15 text-amber-300">

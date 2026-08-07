@@ -12,6 +12,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import { motion, useMotionValue, animate, useReducedMotion } from 'framer-motion';
+import { ROW, rowVariants } from '@/lib/motion';
 import { getCategoryLabel } from '@/lib/categories';
 
 interface TransactionRowProps {
@@ -33,6 +34,11 @@ interface TransactionRowProps {
   selectable?: boolean;
   selected?: boolean;
   onToggleSelect?: () => void;
+  /** Plays the fade-up entrance on mount. Pass `false` for lists that swap their
+   *  whole contents at once — search returns up to 300 rows per query, and firing
+   *  300 simultaneous entrance tweens on every keystroke is what made results feel
+   *  heavy. Bounded lists (dashboard's 5, the paginated main list) leave it on. */
+  animateEntrance?: boolean;
 }
 
 function CategoryIcon({ icon, color }: { icon: React.ReactNode; color: string }) {
@@ -85,6 +91,7 @@ export const TransactionRow = memo(function TransactionRow({
   selectable = false,
   selected = false,
   onToggleSelect,
+  animateEntrance = true,
 }: TransactionRowProps) {
   const hasSplits = tx.splits && tx.splits.length > 0;
   const isSettlement = tx.is_settlement;
@@ -200,10 +207,11 @@ export const TransactionRow = memo(function TransactionRow({
   return (
     <motion.div
       ref={rowRef}
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, scale: 0.97 }}
-      transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+      variants={rowVariants}
+      initial={animateEntrance ? 'hidden' : false}
+      animate="visible"
+      exit="exit"
+      transition={ROW}
       className="relative overflow-hidden rounded-xl mt-1.5 first:mt-0"
     >
       {/* Swipe action buttons */}

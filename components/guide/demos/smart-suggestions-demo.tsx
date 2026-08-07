@@ -57,7 +57,7 @@ function Inner({ play }: { play: boolean }) {
 
   return (
     <div className="mx-auto max-w-md">
-      <div className="rounded-2xl border border-white/10 bg-zinc-950/60 p-5">
+      <div className="rounded-xl border border-white/10 bg-zinc-950/60 p-5">
         <div className="text-[10px] uppercase tracking-widest text-foreground/65">Description</div>
         <div className="mt-2 flex items-baseline">
           <span className="font-medium text-foreground">{text || <span className="text-foreground/50">Where did you spend?</span>}</span>
@@ -91,7 +91,6 @@ function Inner({ play }: { play: boolean }) {
                       initial={{ opacity: 0, scale: 0.85, y: 4 }}
                       animate={{ opacity: 1, scale: 1, y: 0 }}
                       transition={{ ...POP, delay: i * STAGGER_FAST }}
-                      style={{ willChange: 'transform, opacity' }}
                       className={`inline-flex items-center gap-1.5 transform-gpu rounded-full border px-2.5 py-1 text-[12px] ${tones[s.tone]}`}
                     >
                       <Icon className="h-3 w-3" />

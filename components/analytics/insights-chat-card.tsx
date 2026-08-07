@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
+import { QUICK_FADE, SNAPPY } from '@/lib/motion';
 import { Card, CardContent } from '@/components/ui/card';
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
 import { Sparkles, Send, Loader2 } from 'lucide-react';
@@ -41,8 +42,8 @@ function renderBoldChunks(text: string): ReactNode[] {
 }
 
 /** Smooth Claude-style reveal: paces character emission at a steady cadence
- *  decoupled from network chunk timing. Each newly revealed word fades in with
- *  a subtle blur + opacity ramp, and a blinking caret marks the streaming tip. */
+ *  decoupled from network chunk timing. Each newly revealed word fades and lifts
+ *  in, and a blinking caret marks the streaming tip. */
 function StreamedAssistantMessage({ text, streaming }: { text: string; streaming: boolean }) {
     // If the message is not actively streaming on first render (e.g. drawer reopened
     // for a finished reply), reveal it instantly. Only stream-then-mounted messages
@@ -120,11 +121,15 @@ function StreamedAssistantMessage({ text, streaming }: { text: string; streaming
         <>
             {tokens.map(t => (
                 t.fresh ? (
+                    // Opacity + y only. This fires per streamed token — many times a
+                    // second while a reply comes in — and animating `filter` on each
+                    // one meant a fresh blur pass per token per frame. The blur was
+                    // never legible at 4px over 220ms on inline text anyway.
                     <motion.span
                         key={t.key}
-                        initial={{ opacity: 0, filter: 'blur(4px)', y: 1 }}
-                        animate={{ opacity: 1, filter: 'blur(0px)', y: 0 }}
-                        transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+                        initial={{ opacity: 0, y: 1 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={QUICK_FADE}
                         className={t.bold ? 'font-bold tabular-nums' : undefined}
                     >
                         {t.text}
@@ -265,7 +270,7 @@ export function InsightsChatCard({ dateRange, customStart, customEnd, bucketId, 
         <>
             <Card className="bg-gradient-to-br from-primary/10 via-card/40 to-card/40 border-primary/20 shadow-none backdrop-blur-md">
                 <CardContent className="p-4 flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-2xl bg-primary/15 border border-primary/25 flex items-center justify-center text-primary shrink-0">
+                    <div className="w-10 h-10 rounded-xl bg-primary/15 border border-primary/25 flex items-center justify-center text-primary shrink-0">
                         <Sparkles className="w-5 h-5" />
                     </div>
                     <div className="flex-1 min-w-0">
@@ -326,17 +331,21 @@ export function InsightsChatCard({ dateRange, customStart, customEnd, bucketId, 
 
                         <AnimatePresence initial={false}>
                             {messages.map((m, i) => (
+                                // No `layout`: the message list only ever grows, and
+                                // shared-layout made each new message re-measure and
+                                // re-project every message before it — unbounded for the
+                                // length of a session. The y/scale entrance is the whole
+                                // effect; nothing here reorders or resizes.
                                 <motion.div
                                     key={i}
-                                    layout
                                     initial={{ opacity: 0, y: 8, scale: 0.98 }}
                                     animate={{ opacity: 1, y: 0, scale: 1 }}
-                                    transition={{ type: 'spring', stiffness: 380, damping: 26 }}
+                                    transition={SNAPPY}
                                     className={cn('flex', m.role === 'user' ? 'justify-end' : 'justify-start')}
                                 >
                                     <div
                                         className={cn(
-                                            'max-w-[85%] rounded-2xl px-3.5 py-2.5 text-[13px] leading-relaxed whitespace-pre-wrap shadow-sm',
+                                            'max-w-[85%] rounded-xl px-3.5 py-2.5 text-[13px] leading-relaxed whitespace-pre-wrap shadow-sm',
                                             m.role === 'user'
                                                 ? 'bg-primary text-primary-foreground rounded-tr-md'
                                                 : 'bg-secondary/40 border border-white/10 text-foreground rounded-tl-md backdrop-blur-sm'

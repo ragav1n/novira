@@ -58,7 +58,7 @@ function Inner({ play }: { play: boolean }) {
 
   return (
     <div className="mx-auto max-w-sm">
-      <div className="rounded-2xl border border-white/10 bg-zinc-950/60 p-5">
+      <div className="rounded-xl border border-white/10 bg-zinc-950/60 p-5">
         <div className="text-[10px] uppercase tracking-widest text-foreground/65">Amount</div>
         <div className="mt-2 flex items-baseline gap-2">
           <span className="text-2xl font-medium text-foreground/75">₹</span>
@@ -72,7 +72,6 @@ function Inner({ play }: { play: boolean }) {
                   exit={{ opacity: 0, y: -4 }}
                   transition={FADE}
                   className="block text-emerald-300 transform-gpu"
-                  style={{ willChange: 'transform, opacity' }}
                 >
                   {RESOLVED}
                 </motion.span>
@@ -103,7 +102,6 @@ function Inner({ play }: { play: boolean }) {
                 exit={{ opacity: 0, scale: 0.8 }}
                 transition={POP}
                 className="inline-flex items-center gap-1 transform-gpu rounded-full border border-emerald-400/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-300"
-                style={{ willChange: 'transform, opacity' }}
               >
                 <Calculator className="h-3 w-3" />
                 Press Enter

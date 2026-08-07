@@ -107,7 +107,14 @@ export function SearchResultsList({
                     </button>
                 </motion.div>
             ) : (
-                <AnimatePresence mode="popLayout">
+                // Plain sync mode, not `mode="popLayout"`. popLayout absolutely-positions
+                // every exiting child and measures it to hold its place — fine for a
+                // reorderable list of a dozen, but this list carries up to 300 rows
+                // (search-view limits to 300) and swaps wholesale on each debounced
+                // keystroke. There is no reorder to preserve here: results are replaced,
+                // not moved. What's left is the exit fade for a row removed in place
+                // (bulk delete, recategorise out of the filter), which is worth keeping.
+                <AnimatePresence initial={false}>
                     {transactions.length > 0 ? (
                         (() => {
                             const groupByDate = sortBy.startsWith('date');
@@ -138,6 +145,10 @@ export function SearchResultsList({
                                     <TransactionRow
                                         key={tx.id}
                                         tx={tx}
+                                        // A new query replaces the whole list; 300
+                                        // simultaneous entrance tweens is not motion, it's
+                                        // jank. The skeleton already covers the swap.
+                                        animateEntrance={false}
                                         userId={userId}
                                         myShare={myShare}
                                         formattedAmount={formatCurrency(Math.abs(myShare), tx.currency)}
