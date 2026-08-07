@@ -57,13 +57,14 @@ html, body {
 
 /* Brute-force tween during workspace switches — narrowed to only elements
    whose class name actually references a workspace-affected hue (rose / amber /
-   yellow / emerald). The original universal `*` selector matched hundreds of
-   DOM nodes and was the dominant cost of workspace switches. We also dropped
+   emerald). The original universal `*` selector matched hundreds of DOM nodes
+   and was the dominant cost of workspace switches. We also dropped
    fill/stroke/box-shadow/opacity from the transition list since none of those
-   actually change between workspaces. */
+   actually change between workspaces.
+   `yellow-` was dropped along with the dashboard's yellow-500 accent — it was
+   only ever here to cover for that inconsistency. */
 body.theme-transitioning [class*="rose-"],
 body.theme-transitioning [class*="amber-"],
-body.theme-transitioning [class*="yellow-"],
 body.theme-transitioning [class*="emerald-"] {
   transition:
     background-color 360ms cubic-bezier(0.22, 1, 0.36, 1),
@@ -152,10 +153,14 @@ body.focus-bucket {
 }
 
 .theme-home {
-  --workspace-accent: rgb(234 179 8);
-  --focus-card-from: rgb(234 179 8);   /* yellow-500 */
+  /* amber-500. Was yellow-500 (234 179 8) while hooks/useWorkspaceTheme.ts served
+     amber-500 to search / goals / subscriptions / calendar and the dashboard
+     hard-coded yellow-500 — so one "home" workspace session rendered two
+     different accents depending on which screen you were on. */
+  --workspace-accent: rgb(245 158 11);
+  --focus-card-from: rgb(245 158 11);  /* amber-500 */
   --focus-card-to: rgb(217 119 6);     /* amber-600 */
-  --focus-card-glow: rgb(234 179 8 / 0.25);
+  --focus-card-glow: rgb(245 158 11 / 0.25);
   --background: oklch(0.1 0.05 70);
   --foreground: oklch(0.98 0.01 70);
   --card: oklch(0.18 0.06 70);
@@ -201,10 +206,21 @@ body.focus-bucket {
   --color-input: var(--input);
   --color-ring: var(--ring);
 
+  /* The full radius scale is declared explicitly — every step, not just the four
+     that used to be overridden here. Previously `--radius-xl` was redefined to
+     `--radius + 4px` (16px) while `--radius-2xl` was left at Tailwind's stock
+     1rem, which is *also* 16px. So `rounded-xl` and `rounded-2xl` rendered
+     identically, and any future change to `--radius` would have silently split
+     ~460 elements into two different corner radii. Class usage is now normalized
+     onto `rounded-xl`; `2xl` sits at +8px so the scale is monotonic if anything
+     ever reaches for it again.
+     Effective: 8 / 10 / 12 / 16 / 20 / 24 px at --radius: 0.75rem. */
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
 }
 
 @layer base {
@@ -260,22 +276,6 @@ body.focus-bucket {
     will-change: filter, transform;
     transform: translateZ(0);
     filter: blur(50px);
-  }
-
-  /* Page transition animation (replaces framer-motion in template.tsx) */
-  @keyframes page-in {
-    from {
-      opacity: 0;
-      transform: scale(0.98) translateY(10px);
-    }
-    to {
-      opacity: 1;
-      transform: scale(1) translateY(0);
-    }
-  }
-
-  .animate-page-in {
-    animation: page-in 0.25s cubic-bezier(0.32, 0.72, 0, 1) forwards;
   }
 
   /* Hide scrollbars while keeping scroll functionality */

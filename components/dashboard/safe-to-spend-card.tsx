@@ -30,34 +30,38 @@ export const SafeToSpendCard = React.memo(function SafeToSpendCard({
     const remaining = afterCommitments + committedUpcoming;
     const overspentAlready = remaining < 0;
 
-    const accent = isCoupleWorkspace ? 'rose' : isHomeWorkspace ? 'yellow' : 'primary';
+    const accent = isCoupleWorkspace ? 'rose' : isHomeWorkspace ? 'amber' : 'primary';
     const ringClass = billsExceedBudget
         ? 'bg-rose-500/10 border-rose-500/20'
         : accent === 'rose'
             ? 'bg-rose-500/10 border-rose-500/20'
-            : accent === 'yellow'
-                ? 'bg-yellow-500/10 border-yellow-500/20'
+            : accent === 'amber'
+                ? 'bg-amber-500/10 border-amber-500/20'
                 : 'bg-emerald-500/10 border-emerald-500/20';
     const iconClass = billsExceedBudget
         ? 'text-rose-400'
         : accent === 'rose'
             ? 'text-rose-400'
-            : accent === 'yellow'
-                ? 'text-yellow-500'
+            : accent === 'amber'
+                ? 'text-amber-500'
                 : 'text-emerald-400';
     const glowClass = billsExceedBudget
         ? 'bg-rose-500'
         : accent === 'rose'
             ? 'bg-rose-500'
-            : accent === 'yellow'
-                ? 'bg-yellow-500'
+            : accent === 'amber'
+                ? 'bg-amber-500'
                 : 'bg-emerald-500';
 
     return (
         <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className={cn('p-4 rounded-2xl border relative overflow-hidden shadow-[inset_0_1px_0_rgb(255_255_255_/0.06)]', ringClass)}
+            // Matches its three siblings on this screen (cashflow-forecast,
+            // weekday-spending, upcoming-recurring): rounded-3xl + bg-card/40 +
+            // backdrop-blur-md. It used to be the only card in the column at 16px
+            // with no blur, which read as a different component family.
+            className={cn('p-4 rounded-3xl border bg-card/40 backdrop-blur-md relative overflow-hidden', ringClass)}
         >
             <div className={cn('absolute top-0 right-0 w-24 h-24 rounded-full blur-[40px] opacity-20', glowClass)} />
 

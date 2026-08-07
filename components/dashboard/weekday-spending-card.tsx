@@ -32,26 +32,26 @@ export const WeekdaySpendingCard = React.memo(function WeekdaySpendingCard({
 }: WeekdaySpendingCardProps) {
     const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
 
-    const accent = isCoupleWorkspace ? 'rose' : isHomeWorkspace ? 'yellow' : 'primary';
+    const accent = isCoupleWorkspace ? 'rose' : isHomeWorkspace ? 'amber' : 'primary';
     const ringClass =
         accent === 'rose' ? 'bg-rose-500/10 border-rose-500/20' :
-        accent === 'yellow' ? 'bg-yellow-500/10 border-yellow-500/20' :
+        accent === 'amber' ? 'bg-amber-500/10 border-amber-500/20' :
         'bg-primary/10 border-primary/20';
     const iconClass =
         accent === 'rose' ? 'text-rose-400' :
-        accent === 'yellow' ? 'text-yellow-500' :
+        accent === 'amber' ? 'text-amber-500' :
         'text-primary';
     const baseBarClass =
         accent === 'rose' ? 'bg-rose-500/40' :
-        accent === 'yellow' ? 'bg-yellow-500/40' :
+        accent === 'amber' ? 'bg-amber-500/40' :
         'bg-primary/40';
     const todayBarClass =
         accent === 'rose' ? 'bg-rose-400 ring-2 ring-rose-300/40' :
-        accent === 'yellow' ? 'bg-yellow-400 ring-2 ring-yellow-300/40' :
+        accent === 'amber' ? 'bg-amber-400 ring-2 ring-amber-300/40' :
         'bg-primary ring-2 ring-primary/40';
     const selectedBarClass =
         accent === 'rose' ? 'bg-rose-500 ring-2 ring-rose-300/60' :
-        accent === 'yellow' ? 'bg-yellow-500 ring-2 ring-yellow-300/60' :
+        accent === 'amber' ? 'bg-amber-500 ring-2 ring-amber-300/60' :
         'bg-primary ring-2 ring-primary/60';
 
     const peakIndex = totals.indexOf(maxValue);

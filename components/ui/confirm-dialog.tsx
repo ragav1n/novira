@@ -54,12 +54,13 @@ export function useConfirm() {
             // Not dismissible mid-flight, so the action can't be abandoned halfway.
             onOpenChange={(open) => { if (!open && !busy) setRequest(null); }}
         >
-            {/* The shared AlertDialog primitive sits at z-50 while Dialog is z-[100]
-                (overlay) / z-[110] (content). A confirm opened from inside a Dialog —
-                group settings, trip form, goal history — therefore rendered *underneath*
-                its parent's overlay and was completely unclickable. Same workaround
-                bulk-action-bar already uses for its own confirm. */}
-            <AlertDialogContent className="z-[200]">
+            {/* No local z-index override needed any more: ui/alert-dialog.tsx now sits
+                at z-[190]/z-[200] by default, above Dialog's z-[100]/z-[110]. This used
+                to carry a `z-[200]` patch because the primitive was still at shadcn's
+                stock z-50, which made a confirm opened from inside a Dialog (group
+                settings, trip form, goal history) render underneath its parent's
+                overlay — visible and completely unclickable. */}
+            <AlertDialogContent>
                 <AlertDialogHeader>
                     <AlertDialogTitle>{request?.title}</AlertDialogTitle>
                     <AlertDialogDescription>{request?.description}</AlertDialogDescription>

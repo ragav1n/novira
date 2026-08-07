@@ -121,7 +121,7 @@ export function TransactionListSection({
                                 isCoupleWorkspace
                                     ? "bg-rose-500/10 text-rose-300 border-rose-500/20 hover:bg-rose-500/15"
                                     : isHomeWorkspace
-                                        ? "bg-yellow-500/10 text-yellow-300 border-yellow-500/20 hover:bg-yellow-500/15"
+                                        ? "bg-amber-500/10 text-amber-300 border-amber-500/20 hover:bg-amber-500/15"
                                         : "bg-primary/10 text-primary border-primary/20 hover:bg-primary/15"
                             )}
                         >
@@ -144,7 +144,7 @@ export function TransactionListSection({
                         onClick={() => setIsViewAllOpen(true)}
                         className={cn(
                             "text-[13px] font-semibold transition-colors px-2 py-1",
-                            isCoupleWorkspace ? "text-rose-400 hover:text-rose-300" : isHomeWorkspace ? "text-yellow-500 hover:text-yellow-400" : "text-primary hover:text-primary/80"
+                            isCoupleWorkspace ? "text-rose-400 hover:text-rose-300" : isHomeWorkspace ? "text-amber-500 hover:text-amber-400" : "text-primary hover:text-primary/80"
                         )}
                     >
                         View all

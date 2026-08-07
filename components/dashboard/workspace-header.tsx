@@ -123,11 +123,11 @@ export function WorkspaceHeader({
                     onClick={() => router.push('/add')}
                     className={cn(
                         "w-10 h-10 rounded-full flex items-center justify-center border transition-colors shrink-0",
-                        isCoupleWorkspace ? "bg-rose-500/20 hover:bg-rose-500/30 border-rose-500/20" : isHomeWorkspace ? "bg-yellow-500/20 hover:bg-yellow-500/30 border-yellow-500/20" : "bg-primary/20 hover:bg-primary/30 border-primary/20"
+                        isCoupleWorkspace ? "bg-rose-500/20 hover:bg-rose-500/30 border-rose-500/20" : isHomeWorkspace ? "bg-amber-500/20 hover:bg-amber-500/30 border-amber-500/20" : "bg-primary/20 hover:bg-primary/30 border-primary/20"
                     )}
                     title="Add Expense"
                 >
-                    <Plus className={cn("w-5 h-5", isCoupleWorkspace ? "text-rose-500" : isHomeWorkspace ? "text-yellow-500" : "text-primary")} />
+                    <Plus className={cn("w-5 h-5", isCoupleWorkspace ? "text-rose-500" : isHomeWorkspace ? "text-amber-500" : "text-primary")} />
                 </button>
             </div>
         </div>

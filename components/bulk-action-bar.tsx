@@ -2,6 +2,7 @@
 
 import React, { useRef, useState } from 'react';
 import { motion } from 'framer-motion';
+import { SHEET } from '@/lib/motion';
 import { Trash2, FolderInput, Tag as TagIcon, Check, Wallet, Landmark, PiggyBank, CreditCard as CardIcon, Smartphone, CircleDollarSign, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -87,10 +88,10 @@ export function BulkActionBar({
                 initial={{ y: 80, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 exit={{ y: 80, opacity: 0 }}
-                transition={{ type: 'spring', stiffness: 320, damping: 30, mass: 0.8 }}
+                transition={SHEET}
                 className="fixed bottom-0 left-0 right-0 z-[120] pointer-events-none px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]"
             >
-                <div className="max-w-md lg:max-w-2xl mx-auto pointer-events-auto rounded-2xl bg-card/95 backdrop-blur-xl border border-white/10 shadow-2xl flex items-center gap-1 p-1.5">
+                <div className="max-w-md lg:max-w-2xl mx-auto pointer-events-auto rounded-xl bg-card/95 backdrop-blur-xl border border-white/10 shadow-2xl flex items-center gap-1 p-1.5">
                     <div className="px-2.5 text-[12px] font-semibold tabular-nums">
                         <span className="text-primary">{count}</span>
                         <span className="text-muted-foreground/70"> selected</span>
@@ -156,7 +157,10 @@ export function BulkActionBar({
                 open={confirmDelete}
                 onOpenChange={(o) => { if (!deleting) setConfirmDelete(o); }}
             >
-                <AlertDialogContent className="z-[130]">
+                {/* No z-index override: ui/alert-dialog.tsx defaults to z-[190]/z-[200],
+                    which already clears the action bar (z-[120]) and this file's own
+                    Dialogs (z-[130]). The old local `z-[130]` here would now *lower* it. */}
+                <AlertDialogContent>
                     <AlertDialogHeader>
                         <AlertDialogTitle>Delete {count} transaction{count === 1 ? '' : 's'}?</AlertDialogTitle>
                         <AlertDialogDescription>
