@@ -22,7 +22,7 @@ export function RecategorizeSheet({ open, onOpenChange, selectedCount, onRecateg
 
     return (
         <Sheet open={open} onOpenChange={(o) => { if (!busy) onOpenChange(o); }}>
-            <SheetContent side="bottom" className="border-white/[0.06] bg-background rounded-t-2xl">
+            <SheetContent side="bottom" className="border-white/[0.06] bg-background rounded-t-xl">
                 <SheetHeader className="space-y-1">
                     <SheetTitle className="text-[15px] font-semibold tracking-tight">
                         Recategorize <span className="text-muted-foreground/70 font-medium tabular-nums">{selectedCount}</span>

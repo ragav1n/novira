@@ -61,7 +61,7 @@ export function CurrencyDropdown({ value, onValueChange, className, compact = fa
                 // (whichever is smaller) and scroll, rather than flipping above the field.
                 avoidCollisions={false}
                 className={cn(
-                    "max-h-[min(320px,var(--radix-dropdown-menu-content-available-height))] overflow-y-auto scrollbar-hide rounded-2xl bg-[#0B0B12]/95 border-white/10 p-1",
+                    "max-h-[min(320px,var(--radix-dropdown-menu-content-available-height))] overflow-y-auto scrollbar-hide rounded-xl bg-[#0B0B12]/95 border-white/10 p-1",
                     compact ? "min-w-[200px]" : "min-w-[var(--radix-dropdown-menu-trigger-width)]",
                 )}
             >

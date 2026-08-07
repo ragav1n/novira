@@ -107,7 +107,7 @@ export function SettlementsTabContent({
                             return (
                                 <li
                                     key={`${payment.from}-${payment.to}-${index}`}
-                                    className="relative overflow-hidden rounded-2xl border border-amber-400/25 bg-amber-400/[0.06] shadow-[inset_0_1px_0_rgba(255,255,255,0.06),_0_4px_12px_-6px_rgba(0,0,0,0.5)]"
+                                    className="relative overflow-hidden rounded-xl border border-amber-400/25 bg-amber-400/[0.06] shadow-[inset_0_1px_0_rgba(255,255,255,0.06),_0_4px_12px_-6px_rgba(0,0,0,0.5)]"
                                 >
                                     <span className="absolute left-0 top-3 bottom-3 w-[2px] rounded-r bg-amber-400" aria-hidden="true" />
                                     <div className="p-3 pl-4 flex items-center justify-between gap-3">
@@ -215,7 +215,7 @@ export function SettlementsTabContent({
                             const single = group.splits.length === 1;
 
                             return (
-                                <li key={group.key} className="rounded-2xl border border-white/10 bg-white/[0.035] overflow-hidden shadow-[inset_0_1px_0_rgba(255,255,255,0.05),_0_4px_12px_-6px_rgba(0,0,0,0.45)]">
+                                <li key={group.key} className="rounded-xl border border-white/10 bg-white/[0.035] overflow-hidden shadow-[inset_0_1px_0_rgba(255,255,255,0.05),_0_4px_12px_-6px_rgba(0,0,0,0.45)]">
                                     <button
                                         type="button"
                                         onClick={() => !single && toggleGroup(group.key)}

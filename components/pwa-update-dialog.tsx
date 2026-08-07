@@ -43,7 +43,7 @@ export function PWAUpdateDialog({ open, onUpdate, onLater }: PWAUpdateDialogProp
                         </div>
                     </div>
 
-                    <ul className="space-y-2 rounded-2xl border border-white/5 bg-white/[0.02] p-3">
+                    <ul className="space-y-2 rounded-xl border border-white/5 bg-white/[0.02] p-3">
                         {bullets.map((b) => (
                             <li key={b.title} className="flex items-start gap-2.5 text-[12px] text-white/80 leading-snug">
                                 <span className="mt-1.5 w-1 h-1 rounded-full bg-primary shrink-0" aria-hidden="true" />

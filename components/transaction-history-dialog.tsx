@@ -36,7 +36,7 @@ export const TransactionHistoryDialog = React.memo(function TransactionHistoryDi
             <DialogContent className="max-w-md bg-card/95 backdrop-blur-xl border-white/10 rounded-[32px] overflow-hidden p-0 gap-0 shadow-2xl">
                 <DialogHeader className="p-6 pb-4 border-b border-white/5 bg-secondary/10">
                     <div className="flex items-center gap-3 mb-1">
-                        <div className="w-10 h-10 rounded-2xl bg-primary/20 flex items-center justify-center border border-primary/20">
+                        <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center border border-primary/20">
                             <History className="w-5 h-5 text-primary" />
                         </div>
                         <div>
@@ -90,7 +90,7 @@ export const TransactionHistoryDialog = React.memo(function TransactionHistoryDi
                                                 {log.action === 'UPDATE' && log.new_data && (() => {
                                                     const newData = log.new_data;
                                                     return (
-                                                        <div className="mt-2 p-3 rounded-2xl bg-white/5 border border-white/5 text-[11px] space-y-1.5">
+                                                        <div className="mt-2 p-3 rounded-xl bg-white/5 border border-white/5 text-[11px] space-y-1.5">
                                                             {Object.keys(newData).map(key => {
                                                                 if (key === 'updated_at' || key === 'id' || JSON.stringify(newData[key]) === JSON.stringify(log.old_data?.[key])) return null;
                                                                 return (

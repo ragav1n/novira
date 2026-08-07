@@ -190,7 +190,7 @@ export function GoalCard({ goal, deposits, formatCurrency, onAddDeposit, onEdit,
                                     <MoreVertical className="w-4 h-4" />
                                 </button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-44 rounded-2xl bg-card/95 backdrop-blur-xl border-white/10">
+                            <DropdownMenuContent align="end" className="w-44 rounded-xl bg-card/95 backdrop-blur-xl border-white/10">
                                 <DropdownMenuItem delayDuration={0} onClick={() => onOpenHistory(goal)} className="gap-2 cursor-pointer">
                                     <History className="w-4 h-4" /> View History
                                 </DropdownMenuItem>

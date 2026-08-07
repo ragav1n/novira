@@ -154,7 +154,7 @@ export function WhatsNewSection() {
             <ul className="grid gap-2 sm:grid-cols-2">
               {release.items.map((item) => {
                 const Inner = (
-                  <div className="group h-full rounded-2xl border border-white/8 bg-white/[0.02] p-4 transition-colors hover:border-primary/30 hover:bg-primary/[0.04]">
+                  <div className="group h-full rounded-xl border border-white/8 bg-white/[0.02] p-4 transition-colors hover:border-primary/30 hover:bg-primary/[0.04]">
                     <div className="flex items-start gap-3">
                       <div className="shrink-0 rounded-xl border border-white/10 bg-primary/10 p-2 text-primary transition-transform group-hover:scale-110">
                         <item.icon className="h-4 w-4" />

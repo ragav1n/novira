@@ -140,7 +140,7 @@ export function GoalHistorySheet({ goal, userId, open, onOpenChange, formatCurre
                 </div>
 
                 {hasChartData && (
-                    <div className="mt-3 rounded-2xl bg-secondary/10 border border-white/5 p-3">
+                    <div className="mt-3 rounded-xl bg-secondary/10 border border-white/5 p-3">
                         <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold mb-1">Last 6 months</p>
                         <div className="h-20">
                             <ResponsiveContainer width="100%" height="100%">
@@ -175,7 +175,7 @@ export function GoalHistorySheet({ goal, userId, open, onOpenChange, formatCurre
                 )}
 
                 {scenario && scenario.remaining > 0 && (
-                    <div className="mt-3 rounded-2xl bg-secondary/10 border border-white/5 p-3">
+                    <div className="mt-3 rounded-xl bg-secondary/10 border border-white/5 p-3">
                         <div className="flex items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground font-bold mb-2">
                             <Wand2 className={cn('w-3 h-3', tokens.text)} aria-hidden="true" />
                             <span>What if</span>
@@ -265,7 +265,7 @@ export function GoalHistorySheet({ goal, userId, open, onOpenChange, formatCurre
 
 function StatTile({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
     return (
-        <div className="rounded-2xl bg-secondary/10 border border-white/5 p-2.5">
+        <div className="rounded-xl bg-secondary/10 border border-white/5 p-2.5">
             <div className="flex items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
                 {icon}
                 <span className="truncate">{label}</span>

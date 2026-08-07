@@ -177,7 +177,7 @@ export function ExportDateRangeModal({
                 {/* ── Body ──────────────────────────────────────────────────── */}
                 <div className="px-4 sm:px-5 pb-2 grid gap-3 max-h-[64vh] overflow-y-auto scrollbar-hide">
                     {/* Period card */}
-                    <section className="rounded-2xl border border-white/[0.08] bg-card/40 backdrop-blur-xl p-3 sm:p-3.5">
+                    <section className="rounded-xl border border-white/[0.08] bg-card/40 backdrop-blur-xl p-3 sm:p-3.5">
                         <div className="mb-2 flex items-center gap-1.5 text-[9.5px] font-semibold uppercase tracking-widest text-muted-foreground/80">
                             <Calendar className="h-3 w-3" /> Period
                         </div>
@@ -216,7 +216,7 @@ export function ExportDateRangeModal({
                     </section>
 
                     {/* Scope card */}
-                    <section className="rounded-2xl border border-white/[0.08] bg-card/40 backdrop-blur-xl p-3 sm:p-3.5 space-y-3">
+                    <section className="rounded-xl border border-white/[0.08] bg-card/40 backdrop-blur-xl p-3 sm:p-3.5 space-y-3">
                         <div>
                             <div className="mb-2 flex items-center gap-1.5 text-[9.5px] font-semibold uppercase tracking-widest text-muted-foreground/80">
                                 <Layers className="h-3 w-3" /> Context
@@ -294,7 +294,7 @@ export function ExportDateRangeModal({
                             onClick={handleExportClick}
                             disabled={isExportDisabled}
                             className={cn(
-                                'h-11 w-full rounded-2xl text-xs font-semibold',
+                                'h-11 w-full rounded-xl text-xs font-semibold',
                                 'bg-gradient-to-b from-primary to-primary/85 hover:from-primary hover:to-primary',
                                 'shadow-[0_12px_36px_-14px_rgba(138,43,226,0.75)]',
                             )}

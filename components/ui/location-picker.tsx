@@ -1046,7 +1046,7 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                 <div className="space-y-2">
                     <p className="text-sm font-medium">Location</p>
                     <div className={cn(
-                        "rounded-2xl border overflow-hidden",
+                        "rounded-xl border overflow-hidden",
                         isOnline ? "border-blue-500/20 bg-blue-500/5" : "border-emerald-500/20 bg-emerald-500/5"
                     )}>
                         {!isOnline && placeLat && placeLng && (() => {
@@ -1090,7 +1090,7 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
         }
         return (
             <button type="button" onClick={() => setIsExpanded(true)}
-                className="w-full flex items-center gap-3 p-3.5 rounded-2xl bg-secondary/10 border border-white/5 active:border-primary/30 active:bg-primary/5 transition-all touch-manipulation">
+                className="w-full flex items-center gap-3 p-3.5 rounded-xl bg-secondary/10 border border-white/5 active:border-primary/30 active:bg-primary/5 transition-all touch-manipulation">
                 <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 border border-primary/20">
                     <MapPin className="w-4 h-4 text-primary" />
                 </div>
@@ -1127,7 +1127,7 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                     value={query}
                     onChange={(e) => { setQuery(e.target.value); handleSearch(e.target.value); setActiveIndex(-1); }}
                     onKeyDown={handleKeyDown}
-                    className="h-14 pl-12 pr-4 bg-primary/5 border-primary/20 focus-visible:ring-primary/30 rounded-2xl text-base"
+                    className="h-14 pl-12 pr-4 bg-primary/5 border-primary/20 focus-visible:ring-primary/30 rounded-xl text-base"
                 />
                 <div className="absolute left-4 top-1/2 -translate-y-1/2">
                     {isSearching && query.length > 0
@@ -1140,7 +1140,7 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
             {/* Quick-select buttons */}
             <div className={cn("grid gap-2", mapboxToken ? "grid-cols-3" : "grid-cols-2")}>
                 <button type="button" onClick={handleUseCurrentLocation}
-                    className="h-[72px] flex flex-col items-center justify-center gap-2 px-2 rounded-2xl border border-primary/20 bg-primary/5 active:bg-primary/10 transition-all touch-manipulation">
+                    className="h-[72px] flex flex-col items-center justify-center gap-2 px-2 rounded-xl border border-primary/20 bg-primary/5 active:bg-primary/10 transition-all touch-manipulation">
                     <div className={cn('w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center shrink-0', isLocating && 'animate-pulse')}>
                         <LocateFixed className="w-4 h-4 text-primary" />
                     </div>
@@ -1152,7 +1152,7 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                     onChange({ place_name: 'Online', place_address: null, place_lat: null, place_lng: null });
                     setIsExpanded(false); setQuery(''); setPredictions([]);
                 }}
-                    className="h-[72px] flex flex-col items-center justify-center gap-2 px-2 rounded-2xl border border-blue-500/20 bg-blue-500/5 active:bg-blue-500/10 transition-all touch-manipulation">
+                    className="h-[72px] flex flex-col items-center justify-center gap-2 px-2 rounded-xl border border-blue-500/20 bg-blue-500/5 active:bg-blue-500/10 transition-all touch-manipulation">
                     <div className="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center shrink-0">
                         <Globe className="w-4 h-4 text-blue-400" />
                     </div>
@@ -1162,7 +1162,7 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                     <button type="button"
                         onClick={() => { setDropPinMode(v => !v); setDropPinResult(null); setDropPinCandidates([]); setDropPinSelectedId(null); }}
                         className={cn(
-                            "h-[72px] flex flex-col items-center justify-center gap-2 px-2 rounded-2xl border transition-all touch-manipulation",
+                            "h-[72px] flex flex-col items-center justify-center gap-2 px-2 rounded-xl border transition-all touch-manipulation",
                             dropPinMode
                                 ? "border-rose-500/40 bg-rose-500/10 active:bg-rose-500/15"
                                 : "border-rose-500/20 bg-rose-500/5 active:bg-rose-500/10"
@@ -1184,7 +1184,7 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -6 }}
                     transition={{ duration: 0.2 }}
-                    className="rounded-2xl border border-rose-500/20 overflow-hidden">
+                    className="rounded-xl border border-rose-500/20 overflow-hidden">
                     <div className="relative">
                         {/* Map container — callback ref fires with real node so mapboxgl gets proper dimensions */}
                         <div ref={dropPinMapInit} className="w-full h-[340px]" />
@@ -1297,7 +1297,7 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                 {!dropPinMode && showRecents && (
                     <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
                         id="loc-listbox" role="listbox" aria-label="Recent locations"
-                        className="absolute left-0 right-0 top-full mt-2 z-[100] rounded-2xl border border-white/10 bg-gradient-to-b from-[#0E0E14] to-[#08080B] shadow-[0_24px_60px_-12px_rgba(0,0,0,0.7)] overflow-hidden ring-1 ring-white/[0.04] backdrop-blur-xl">
+                        className="absolute left-0 right-0 top-full mt-2 z-[100] rounded-xl border border-white/10 bg-gradient-to-b from-[#0E0E14] to-[#08080B] shadow-[0_24px_60px_-12px_rgba(0,0,0,0.7)] overflow-hidden ring-1 ring-white/[0.04] backdrop-blur-xl">
                         <div className="flex items-center gap-1.5 px-4 pt-3 pb-1.5">
                             <div className="w-1 h-1 rounded-full bg-primary/60" />
                             <p className="text-[9px] font-bold text-muted-foreground/60 uppercase tracking-[0.15em]">Recent</p>
@@ -1316,7 +1316,7 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                                             'group w-full flex items-center gap-3.5 px-4 py-3 transition-colors border-b border-white/[0.04] last:border-b-0 text-left touch-manipulation min-h-[64px]',
                                             isActive ? 'bg-white/[0.06]' : 'active:bg-white/[0.04]'
                                         )}>
-                                        <div className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 bg-gradient-to-br from-primary/35 via-primary/15 to-primary/5 ring-1 ring-inset ring-primary/30 shadow-inner">
+                                        <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0 bg-gradient-to-br from-primary/35 via-primary/15 to-primary/5 ring-1 ring-inset ring-primary/30 shadow-inner">
                                             <MapPin className="w-[18px] h-[18px] text-primary" strokeWidth={2.5} />
                                         </div>
                                         <div className="min-w-0 flex-1">
@@ -1350,7 +1350,7 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                 {!dropPinMode && predictions.length > 0 && (
                     <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
                         id="loc-listbox" role="listbox" aria-label="Location suggestions"
-                        className="absolute left-0 right-0 top-full mt-2 z-[100] rounded-2xl border border-white/10 bg-gradient-to-b from-[#0E0E14] to-[#08080B] shadow-[0_24px_60px_-12px_rgba(0,0,0,0.7)] overflow-hidden ring-1 ring-white/[0.04] backdrop-blur-xl">
+                        className="absolute left-0 right-0 top-full mt-2 z-[100] rounded-xl border border-white/10 bg-gradient-to-b from-[#0E0E14] to-[#08080B] shadow-[0_24px_60px_-12px_rgba(0,0,0,0.7)] overflow-hidden ring-1 ring-white/[0.04] backdrop-blur-xl">
                         <div className="max-h-[300px] overflow-y-auto no-scrollbar" ref={listRef}>
                             {predictions.map((prediction, i) => {
                                 const emoji = getMakiEmoji(prediction._maki);
@@ -1365,7 +1365,7 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                                         )}>
                                         {/* Category icon — gradient + ring with proximity dot */}
                                         <div className={cn(
-                                            'w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 relative bg-gradient-to-br ring-1 ring-inset shadow-inner',
+                                            'w-11 h-11 rounded-xl flex items-center justify-center shrink-0 relative bg-gradient-to-br ring-1 ring-inset shadow-inner',
                                             prediction._is_nearby
                                                 ? 'from-emerald-500/30 via-emerald-500/15 to-emerald-500/5 ring-emerald-500/35'
                                                 : 'from-primary/35 via-primary/15 to-primary/5 ring-primary/30'
@@ -1418,7 +1418,7 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
             {/* Empty state */}
             {!dropPinMode && query.length >= 2 && !isSearching && predictions.length === 0 && (
                 <div className="flex flex-col items-center justify-center gap-2 py-8 px-4">
-                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-white/[0.04] to-white/[0.01] ring-1 ring-inset ring-white/5 flex items-center justify-center">
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-white/[0.04] to-white/[0.01] ring-1 ring-inset ring-white/5 flex items-center justify-center">
                         <Search className="w-5 h-5 text-muted-foreground/40" strokeWidth={2} />
                     </div>
                     <div className="text-center">

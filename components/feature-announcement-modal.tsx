@@ -139,7 +139,7 @@ export function FeatureAnnouncementModal({ showAnnouncement = false, userId, onC
                                             initial={{ opacity: 0, y: 8 }}
                                             animate={{ opacity: 1, y: 0 }}
                                             transition={{ delay: 0.08 + index * 0.05, duration: 0.3 }}
-                                            className="flex items-start gap-3 p-3.5 rounded-2xl border border-white/8 bg-white/[0.03]"
+                                            className="flex items-start gap-3 p-3.5 rounded-xl border border-white/8 bg-white/[0.03]"
                                         >
                                             <span className="shrink-0 w-9 h-9 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center">
                                                 <Icon className={`w-4 h-4 ${tone}`} aria-hidden="true" />

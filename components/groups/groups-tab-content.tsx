@@ -272,7 +272,7 @@ function GroupCard({
             }}
             style={{ animationDelay: `${animationDelay}s` }}
             className={cn(
-                'relative overflow-hidden rounded-2xl bg-white/[0.035] border border-white/10 ring-1 ring-inset transition-colors cursor-pointer hover:bg-white/[0.055] shadow-[inset_0_1px_0_rgba(255,255,255,0.06),_0_6px_16px_-8px_rgba(0,0,0,0.55)]',
+                'relative overflow-hidden rounded-xl bg-white/[0.035] border border-white/10 ring-1 ring-inset transition-colors cursor-pointer hover:bg-white/[0.055] shadow-[inset_0_1px_0_rgba(255,255,255,0.06),_0_6px_16px_-8px_rgba(0,0,0,0.55)]',
                 tokens.ring,
             )}
         >
@@ -424,7 +424,7 @@ function GroupCard({
 
 function NoActiveGroupsState({ onStartGroup }: { onStartGroup: () => void }) {
     return (
-        <div className="rounded-2xl border border-dashed border-white/[0.14] bg-white/[0.02] p-6 space-y-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+        <div className="rounded-xl border border-dashed border-white/[0.14] bg-white/[0.02] p-6 space-y-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
             <div className="space-y-1.5">
                 <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground/70">
                     No active groups

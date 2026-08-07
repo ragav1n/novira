@@ -70,7 +70,7 @@ export function FailedSyncSection({ failedItems }: Props) {
                     const isExpired = kind === 'expired';
                     const description = item.data?.transaction?.description ?? item.data?.description ?? 'Unknown Item';
                     return (
-                        <div key={item.id} className="bg-background/80 p-3 rounded-2xl flex flex-col gap-2 shadow-sm border border-destructive/20 backdrop-blur-md">
+                        <div key={item.id} className="bg-background/80 p-3 rounded-xl flex flex-col gap-2 shadow-sm border border-destructive/20 backdrop-blur-md">
                             <div className="flex items-start justify-between gap-2">
                                 <div className="min-w-0 flex-1">
                                     <div className="flex items-center gap-1.5 flex-wrap">

@@ -151,7 +151,7 @@ export function ProfileSection({ showBudgetAlert, onDismissBudgetAlert }: Props)
 
                 <div className="flex gap-4">
                     <div className="relative group self-start">
-                        <div className="w-16 h-16 rounded-2xl bg-primary flex items-center justify-center text-xl font-bold shadow-lg shadow-primary/20 text-white uppercase overflow-hidden relative">
+                        <div className="w-16 h-16 rounded-xl bg-primary flex items-center justify-center text-xl font-bold shadow-lg shadow-primary/20 text-white uppercase overflow-hidden relative">
                             {avatarUrl ? (
                                 <img src={avatarUrl} alt="Avatar" width={64} height={64} className="w-full h-full object-cover" />
                             ) : (

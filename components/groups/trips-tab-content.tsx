@@ -130,8 +130,8 @@ export function TripsTabContent() {
 
             {loading ? (
                 <div className="space-y-2">
-                    <div className="h-[88px] rounded-2xl bg-secondary/10 animate-pulse" />
-                    <div className="h-[88px] rounded-2xl bg-secondary/10 animate-pulse" />
+                    <div className="h-[88px] rounded-xl bg-secondary/10 animate-pulse" />
+                    <div className="h-[88px] rounded-xl bg-secondary/10 animate-pulse" />
                 </div>
             ) : trips.length === 0 ? (
                 <EmptyState onCreate={openCreate} />
@@ -201,7 +201,7 @@ function TripCard({
     const status = bucketOf(trip);
 
     return (
-        <article className="relative overflow-hidden rounded-2xl border border-white/10 ring-1 ring-inset ring-sky-400/15 bg-white/[0.035] hover:bg-white/[0.055] transition-colors shadow-[inset_0_1px_0_rgba(255,255,255,0.06),_0_6px_16px_-8px_rgba(0,0,0,0.55)]">
+        <article className="relative overflow-hidden rounded-xl border border-white/10 ring-1 ring-inset ring-sky-400/15 bg-white/[0.035] hover:bg-white/[0.055] transition-colors shadow-[inset_0_1px_0_rgba(255,255,255,0.06),_0_6px_16px_-8px_rgba(0,0,0,0.55)]">
             <span className="absolute left-0 top-3 bottom-3 w-[2px] rounded-r bg-sky-400" aria-hidden="true" />
             <div className="p-4 pl-[18px]">
                 <div className="flex items-start justify-between gap-3">
@@ -266,7 +266,7 @@ function TripCard({
 
 function EmptyState({ onCreate }: { onCreate: () => void }) {
     return (
-        <div className="rounded-2xl border border-dashed border-white/[0.14] bg-white/[0.02] p-6 space-y-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+        <div className="rounded-xl border border-dashed border-white/[0.14] bg-white/[0.02] p-6 space-y-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
             <div className="space-y-1.5">
                 <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground/70">
                     No trips yet

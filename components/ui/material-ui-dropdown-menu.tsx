@@ -17,7 +17,7 @@ function extractBorderRadius(className?: string): string {
   if (className.includes("rounded-md")) return "0.375rem";
   if (className.includes("rounded-lg")) return "0.5rem";
   if (className.includes("rounded-xl")) return "0.75rem";
-  if (className.includes("rounded-2xl")) return "1rem";
+  if (className.includes("rounded-xl")) return "1rem";
   if (className.includes("rounded-3xl")) return "1.5rem";
   if (className.includes("rounded-full")) return "9999px";
   if (className.includes("rounded")) return "0.25rem";

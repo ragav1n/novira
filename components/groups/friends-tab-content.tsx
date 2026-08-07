@@ -66,7 +66,7 @@ export function FriendsTabContent({
                             Needs review · {friendRequests.length}
                         </h3>
                     </div>
-                    <ul className="rounded-2xl overflow-hidden border border-amber-400/25 bg-amber-400/[0.06] divide-y divide-amber-400/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),_0_4px_12px_-6px_rgba(0,0,0,0.45)]">
+                    <ul className="rounded-xl overflow-hidden border border-amber-400/25 bg-amber-400/[0.06] divide-y divide-amber-400/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.05),_0_4px_12px_-6px_rgba(0,0,0,0.45)]">
                         {friendRequests.map((request) => (
                             <li
                                 key={request.id}
@@ -145,7 +145,7 @@ export function FriendsTabContent({
                     </h3>
                 )}
                 {friends.length > 0 ? (
-                    <ul className="rounded-2xl overflow-hidden border border-white/10 divide-y divide-white/[0.05] shadow-[inset_0_1px_0_rgba(255,255,255,0.05),_0_4px_12px_-6px_rgba(0,0,0,0.45)]">
+                    <ul className="rounded-xl overflow-hidden border border-white/10 divide-y divide-white/[0.05] shadow-[inset_0_1px_0_rgba(255,255,255,0.05),_0_4px_12px_-6px_rgba(0,0,0,0.45)]">
                         {friends.map((friend) => {
                             const bal = friendBalances.get(friend.id);
                             const youOwe = bal && bal.owe > 0.01;
@@ -231,7 +231,7 @@ export function FriendsTabContent({
                     </ul>
                 ) : (
                     friendRequests.length === 0 && (
-                        <div className="rounded-2xl border border-dashed border-white/[0.14] bg-white/[0.02] p-6 space-y-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+                        <div className="rounded-xl border border-dashed border-white/[0.14] bg-white/[0.02] p-6 space-y-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
                             <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground/70">
                                 No friends yet
                             </p>

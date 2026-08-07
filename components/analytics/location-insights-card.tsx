@@ -40,7 +40,7 @@ export function LocationInsightsCard({ locationClusters, geoTxCount, formatCurre
                             <button
                                 key={cluster.key}
                                 onClick={() => router.push(`/search?q=${encodeURIComponent(cluster.label)}`)}
-                                className="w-full flex items-center gap-3 p-2.5 rounded-2xl bg-secondary/10 border border-white/5 hover:bg-secondary/20 transition-colors text-left"
+                                className="w-full flex items-center gap-3 p-2.5 rounded-xl bg-secondary/10 border border-white/5 hover:bg-secondary/20 transition-colors text-left"
                             >
                                 <div className={cn(
                                     'w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border',

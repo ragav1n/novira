@@ -102,9 +102,9 @@ export function DeleteAccountDialog({ trigger }: DeleteAccountDialogProps) {
                 </VisuallyHidden.Root>
 
                 <div className="relative group">
-                    <div className="absolute -inset-[1px] rounded-2xl bg-gradient-to-r from-destructive/10 via-destructive/30 to-destructive/10 opacity-70 blur-sm pointer-events-none" />
+                    <div className="absolute -inset-[1px] rounded-xl bg-gradient-to-r from-destructive/10 via-destructive/30 to-destructive/10 opacity-70 blur-sm pointer-events-none" />
 
-                    <div className="relative bg-black/80 backdrop-blur-xl rounded-2xl p-6 border border-white/10 shadow-2xl overflow-hidden">
+                    <div className="relative bg-black/80 backdrop-blur-xl rounded-xl p-6 border border-white/10 shadow-2xl overflow-hidden">
                         {/* Disabled while deleting — the dialog was previously dismissible
                             mid-delete, with no way to tell whether it had completed. */}
                         <button

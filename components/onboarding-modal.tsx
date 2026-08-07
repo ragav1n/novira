@@ -82,7 +82,7 @@ export function OnboardingModal({ open, onComplete }: Props) {
                         </div>
                     </div>
                     <div className="flex flex-col items-center text-center space-y-3 py-2">
-                        <div className="w-14 h-14 rounded-2xl bg-primary/15 border border-primary/30 flex items-center justify-center text-primary">
+                        <div className="w-14 h-14 rounded-xl bg-primary/15 border border-primary/30 flex items-center justify-center text-primary">
                             {current.icon}
                         </div>
                         <DialogTitle className="text-lg font-bold">{current.title}</DialogTitle>

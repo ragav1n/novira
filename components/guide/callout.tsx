@@ -22,7 +22,7 @@ export function Callout({
   const s = STYLES[type];
   const Icon = s.icon;
   return (
-    <div className={cn('not-prose my-5 rounded-2xl border px-4 py-3.5 backdrop-blur-sm', s.ring, s.tint)}>
+    <div className={cn('not-prose my-5 rounded-xl border px-4 py-3.5 backdrop-blur-sm', s.ring, s.tint)}>
       <div className="flex items-start gap-3">
         <div className={cn('mt-0.5 shrink-0 rounded-lg p-1.5 ring-1', s.ring, s.tint)}>
           <Icon className={cn('h-3.5 w-3.5', s.text)} />

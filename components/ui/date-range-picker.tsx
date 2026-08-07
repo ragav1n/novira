@@ -68,7 +68,7 @@ export function DateRangePicker({
                     </Button>
                 </PopoverTrigger>
                 <PopoverContent
-                    className="w-auto p-0 rounded-2xl border-white/10 overflow-hidden shadow-2xl"
+                    className="w-auto p-0 rounded-xl border-white/10 overflow-hidden shadow-2xl"
                     align={isMobile ? 'center' : align}
                     sideOffset={8}
                 >

@@ -87,7 +87,7 @@ export default function SWResetPage() {
         <div className="min-h-[100dvh] flex flex-col items-center justify-center gap-4 bg-background text-foreground p-6">
             {stage === 'confirm' && (
                 <div className="max-w-sm w-full space-y-5 text-center">
-                    <div className="w-12 h-12 mx-auto rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center">
+                    <div className="w-12 h-12 mx-auto rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center">
                         <AlertTriangle className="w-6 h-6 text-amber-500" />
                     </div>
                     <div className="space-y-2">
@@ -123,7 +123,7 @@ export default function SWResetPage() {
 
             {stage === 'done' && (
                 <>
-                    <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center">
+                    <div className="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center">
                         <Wrench className="w-6 h-6 text-emerald-400" />
                     </div>
                     <p className="text-sm text-muted-foreground font-medium">Done — reloading</p>

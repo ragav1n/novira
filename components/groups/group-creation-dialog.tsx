@@ -132,7 +132,7 @@ export function GroupCreationDialog({ open, onOpenChange }: GroupCreationDialogP
                                             setCreationStep('details');
                                         }}
                                         className={cn(
-                                            'group w-full flex items-center gap-3 p-3 rounded-2xl border border-white/10 bg-white/[0.03] hover:bg-white/[0.06] hover:border-white/[0.16] transition-colors text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]',
+                                            'group w-full flex items-center gap-3 p-3 rounded-xl border border-white/10 bg-white/[0.03] hover:bg-white/[0.06] hover:border-white/[0.16] transition-colors text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]',
                                         )}
                                     >
                                         <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center shrink-0', type.bg)}>

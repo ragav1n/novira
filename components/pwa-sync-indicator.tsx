@@ -281,7 +281,7 @@ export function SyncIndicator() {
                         className="fixed top-2 lg:top-[72px] left-1/2 -translate-x-1/2 z-[60] pointer-events-auto px-2 w-full max-w-md"
                         style={{ willChange: "transform, opacity" }}
                     >
-                        <div className="bg-background/95 backdrop-blur-md border border-destructive/30 shadow-lg rounded-2xl overflow-hidden">
+                        <div className="bg-background/95 backdrop-blur-md border border-destructive/30 shadow-lg rounded-xl overflow-hidden">
                             {/* "Retry all" used to be nested inside the expand button —
                                 invalid HTML — and the outer aria-label overrode its own
                                 text so the failure count was never announced. They're

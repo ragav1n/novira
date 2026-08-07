@@ -117,7 +117,7 @@ export function RecapBody({
                         const Icon = INSIGHT_ICON[(ins.kind as InsightKind) || 'category'] || Tags;
                         const drillable = !!onInsightClick && !!ins.subject && ins.kind !== 'frequency';
                         const content = (
-                            <div className="rounded-2xl bg-secondary/30 border border-white/8 backdrop-blur-sm p-3 flex gap-3 w-full text-left">
+                            <div className="rounded-xl bg-secondary/30 border border-white/8 backdrop-blur-sm p-3 flex gap-3 w-full text-left">
                                 <div className="w-8 h-8 rounded-xl bg-primary/15 border border-primary/25 flex items-center justify-center shrink-0">
                                     <Icon className="w-3.5 h-3.5 text-primary" />
                                 </div>
@@ -139,7 +139,7 @@ export function RecapBody({
                                 key={i}
                                 type="button"
                                 onClick={() => onInsightClick!(ins.subject!, ins.kind)}
-                                className="block w-full hover:bg-primary/5 rounded-2xl transition-colors active:scale-[0.99]"
+                                className="block w-full hover:bg-primary/5 rounded-xl transition-colors active:scale-[0.99]"
                             >
                                 {content}
                             </button>
@@ -151,7 +151,7 @@ export function RecapBody({
             )}
 
             {/* Takeaway */}
-            <div className="rounded-2xl bg-gradient-to-br from-amber-400/15 to-amber-400/5 border border-amber-400/25 p-3 flex gap-2.5">
+            <div className="rounded-xl bg-gradient-to-br from-amber-400/15 to-amber-400/5 border border-amber-400/25 p-3 flex gap-2.5">
                 <Lightbulb className="w-4 h-4 text-amber-300 shrink-0 mt-0.5" />
                 <div>
                     <p className="text-[10px] font-bold uppercase tracking-widest text-amber-300/90 mb-1">Takeaway</p>
@@ -190,7 +190,7 @@ export function RecapSkeleton() {
                 </div>
             </div>
             {[0, 1, 2].map((i) => (
-                <div key={i} className="rounded-2xl bg-secondary/20 border border-white/5 p-3 flex gap-3">
+                <div key={i} className="rounded-xl bg-secondary/20 border border-white/5 p-3 flex gap-3">
                     <div className="w-8 h-8 rounded-xl bg-primary/10 shrink-0" />
                     <div className="min-w-0 flex-1 space-y-1.5">
                         <div className="h-2 w-20 bg-secondary/30 rounded" />
@@ -199,7 +199,7 @@ export function RecapSkeleton() {
                     </div>
                 </div>
             ))}
-            <div className="rounded-2xl bg-amber-400/10 border border-amber-400/20 p-3 space-y-1.5">
+            <div className="rounded-xl bg-amber-400/10 border border-amber-400/20 p-3 space-y-1.5">
                 <div className="h-2 w-16 bg-amber-300/30 rounded" />
                 <div className="h-3 w-full bg-amber-300/15 rounded" />
             </div>

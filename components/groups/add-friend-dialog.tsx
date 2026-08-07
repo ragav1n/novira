@@ -117,7 +117,7 @@ export function AddFriendDialog({ userId, open, onOpenChange }: AddFriendDialogP
                         </TabsContent>
 
                         <TabsContent value="scan" className="pt-4 space-y-2 focus-visible:outline-none">
-                            <div className="aspect-square w-full bg-black rounded-2xl overflow-hidden relative border border-white/[0.08]">
+                            <div className="aspect-square w-full bg-black rounded-xl overflow-hidden relative border border-white/[0.08]">
                                 <QrScanner
                                     onScan={async (scannedId) => {
                                         if (isProcessing) return;

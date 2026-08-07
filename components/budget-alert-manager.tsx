@@ -64,7 +64,7 @@ export function BudgetAlertManager({ totalSpent, currency }: BudgetAlertManagerP
                     className="fixed bottom-24 left-4 right-4 z-[9999] md:left-1/2 md:-translate-x-1/2 md:max-w-md"
                 >
                     <div className={cn(
-                        "relative overflow-hidden rounded-2xl border p-4 shadow-2xl backdrop-blur-xl",
+                        "relative overflow-hidden rounded-xl border p-4 shadow-2xl backdrop-blur-xl",
                         isOverBudget
                             ? "bg-gradient-to-br from-red-950/95 to-rose-950/90 border-red-500/40 shadow-red-500/25"
                             : "bg-gradient-to-br from-amber-950/95 to-orange-950/90 border-amber-500/40 shadow-amber-500/25"
@@ -74,7 +74,7 @@ export function BudgetAlertManager({ totalSpent, currency }: BudgetAlertManagerP
                             animate={{ opacity: [0.4, 0.8, 0.4] }}
                             transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut' }}
                             className={cn(
-                                "absolute inset-0 rounded-2xl pointer-events-none",
+                                "absolute inset-0 rounded-xl pointer-events-none",
                                 isOverBudget
                                     ? "shadow-[inset_0_0_30px_rgba(239,68,68,0.12)]"
                                     : "shadow-[inset_0_0_30px_rgba(245,158,11,0.12)]"

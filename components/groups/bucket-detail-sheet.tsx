@@ -188,7 +188,7 @@ export function BucketDetailSheet({ bucket, spent, open, onOpenChange }: Props) 
                     {/* Progress / Completion summary */}
                     <div
                         className={cn(
-                            'rounded-2xl border p-4 space-y-3',
+                            'rounded-xl border p-4 space-y-3',
                             isCompleted
                                 ? 'bg-emerald-400/[0.05] border-emerald-400/20'
                                 : 'bg-white/[0.035] border-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]',
@@ -246,8 +246,8 @@ export function BucketDetailSheet({ bucket, spent, open, onOpenChange }: Props) 
 
                     {loading ? (
                         <div className="space-y-2">
-                            <div className="h-20 rounded-2xl bg-secondary/10 animate-pulse" />
-                            <div className="h-20 rounded-2xl bg-secondary/10 animate-pulse" />
+                            <div className="h-20 rounded-xl bg-secondary/10 animate-pulse" />
+                            <div className="h-20 rounded-xl bg-secondary/10 animate-pulse" />
                         </div>
                     ) : loadError ? (
                         <div className="text-center py-10 space-y-2">
@@ -316,7 +316,7 @@ export function BucketDetailSheet({ bucket, spent, open, onOpenChange }: Props) 
                                     <h4 className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground/60 pl-1">
                                         By currency
                                     </h4>
-                                    <div className="rounded-2xl border border-white/[0.06] divide-y divide-white/[0.04] overflow-hidden">
+                                    <div className="rounded-xl border border-white/[0.06] divide-y divide-white/[0.04] overflow-hidden">
                                         {breakdown.currencies.map(([curr, totals]) => (
                                             <div key={curr} className="flex items-center justify-between px-3 py-2 bg-white/[0.025]">
                                                 <div className="flex items-center gap-2">
@@ -373,7 +373,7 @@ export function BucketDetailSheet({ bucket, spent, open, onOpenChange }: Props) 
                                 <h4 className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground/60 pl-1">
                                     {transactions.length} transaction{transactions.length === 1 ? '' : 's'}
                                 </h4>
-                                <ul className="rounded-2xl border border-white/[0.06] overflow-hidden divide-y divide-white/[0.04]">
+                                <ul className="rounded-xl border border-white/[0.06] overflow-hidden divide-y divide-white/[0.04]">
                                     {transactions.slice(0, 50).map((tx) => {
                                         const color = CATEGORY_COLORS[(tx.category || '').toLowerCase()] || CATEGORY_COLORS.others;
                                         return (

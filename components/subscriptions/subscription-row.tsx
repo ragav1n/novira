@@ -58,7 +58,7 @@ export function SubscriptionRow({
             )}
         >
             <CardContent className="p-4 flex items-center gap-4">
-                <div className={cn("w-12 h-12 rounded-2xl flex flex-col items-center justify-center shrink-0 border", themeConfig.bg, themeConfig.border)}>
+                <div className={cn("w-12 h-12 rounded-xl flex flex-col items-center justify-center shrink-0 border", themeConfig.bg, themeConfig.border)}>
                     <span className={cn("text-[10px] font-bold uppercase leading-tight w-full text-center py-0.5 rounded-t-lg", themeConfig.text, themeConfig.headerBg)}>
                         {format(parseISO(template.next_occurrence), 'MMM')}
                     </span>

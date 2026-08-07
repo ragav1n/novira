@@ -116,8 +116,8 @@ export function BucketsTabContent({
 
                 {loading && buckets.length === 0 ? (
                     <div className="space-y-2" role="status" aria-label="Loading buckets">
-                        <div className="h-24 rounded-2xl bg-secondary/10 animate-pulse" />
-                        <div className="h-24 rounded-2xl bg-secondary/10 animate-pulse" />
+                        <div className="h-24 rounded-xl bg-secondary/10 animate-pulse" />
+                        <div className="h-24 rounded-xl bg-secondary/10 animate-pulse" />
                     </div>
                 ) : activeBuckets.length > 0 ? (
                     <div className="space-y-2">
@@ -140,7 +140,7 @@ export function BucketsTabContent({
                                         }
                                     }}
                                     aria-label={`Open details for bucket ${bucket.name}`}
-                                    className="relative overflow-hidden rounded-2xl border border-white/10 ring-1 ring-inset ring-cyan-400/15 bg-white/[0.035] hover:bg-white/[0.055] transition-colors cursor-pointer shadow-[inset_0_1px_0_rgba(255,255,255,0.06),_0_6px_16px_-8px_rgba(0,0,0,0.55)]"
+                                    className="relative overflow-hidden rounded-xl border border-white/10 ring-1 ring-inset ring-cyan-400/15 bg-white/[0.035] hover:bg-white/[0.055] transition-colors cursor-pointer shadow-[inset_0_1px_0_rgba(255,255,255,0.06),_0_6px_16px_-8px_rgba(0,0,0,0.55)]"
                                 >
                                     <span className="absolute left-0 top-3 bottom-3 w-[2px] rounded-r bg-cyan-400" aria-hidden="true" />
                                     <div className="p-4 pl-[18px] space-y-3">
@@ -226,7 +226,7 @@ export function BucketsTabContent({
                         })}
                     </div>
                 ) : archivedBuckets.length === 0 ? (
-                    <div className="rounded-2xl border border-dashed border-white/[0.14] bg-white/[0.02] p-6 space-y-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+                    <div className="rounded-xl border border-dashed border-white/[0.14] bg-white/[0.02] p-6 space-y-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
                         <div className="space-y-1.5">
                             <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground/70">
                                 No active buckets

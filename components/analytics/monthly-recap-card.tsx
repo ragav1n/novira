@@ -124,7 +124,7 @@ export function MonthlyRecapCard({ currency, formatCurrency }: Props) {
             <div className="p-5 space-y-4">
                 <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-2.5 min-w-0">
-                        <div className="w-9 h-9 rounded-2xl bg-primary/25 border border-primary/40 flex items-center justify-center shadow-[0_0_18px_-4px_rgba(168,85,247,0.55)] shrink-0">
+                        <div className="w-9 h-9 rounded-xl bg-primary/25 border border-primary/40 flex items-center justify-center shadow-[0_0_18px_-4px_rgba(168,85,247,0.55)] shrink-0">
                             <ChartLine className="w-[18px] h-[18px] text-primary-foreground" />
                         </div>
                         <div className="min-w-0">

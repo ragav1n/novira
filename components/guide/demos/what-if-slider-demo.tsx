@@ -21,7 +21,7 @@ export function WhatIfSliderDemo() {
     <div
       role="region"
       aria-label="Interactive what-if simulator: drag to see what cutting Dining by a percentage would save"
-      className="mx-auto max-w-lg rounded-2xl border border-white/10 bg-gradient-to-br from-fuchsia-500/[0.05] via-primary/[0.05] to-transparent p-5"
+      className="mx-auto max-w-lg rounded-xl border border-white/10 bg-gradient-to-br from-fuchsia-500/[0.05] via-primary/[0.05] to-transparent p-5"
     >
       <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-widest text-fuchsia-300">
         <Sparkles className="h-3 w-3" />

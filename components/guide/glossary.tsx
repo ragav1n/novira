@@ -88,7 +88,7 @@ export function Glossary() {
                   <a
                     key={t.word}
                     href={t.href ? `#${t.href}` : undefined}
-                    className="group block rounded-2xl border border-white/8 bg-white/[0.02] p-3.5 transition-colors hover:border-primary/30 hover:bg-primary/[0.04]"
+                    className="group block rounded-xl border border-white/8 bg-white/[0.02] p-3.5 transition-colors hover:border-primary/30 hover:bg-primary/[0.04]"
                   >
                     {inner}
                     {t.href && (

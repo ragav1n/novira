@@ -64,7 +64,7 @@ function PaymentBreakdownCardInner({ paymentBreakdown, categorizedPayment, forma
 
                     <div className="grid grid-cols-2 gap-3 flex-1 w-full">
                         {categorizedPayment.map((pay) => (
-                            <div key={pay.name} className="flex flex-col p-3 rounded-2xl bg-secondary/10 border border-white/5">
+                            <div key={pay.name} className="flex flex-col p-3 rounded-xl bg-secondary/10 border border-white/5">
                                 <span className="flex items-center gap-1.5 text-[10px] text-muted-foreground/80 uppercase tracking-widest font-bold">
                                     <div className="w-1 h-1 rounded-full shadow-glow" style={{ backgroundColor: pay.fill }} />
                                     {pay.name}

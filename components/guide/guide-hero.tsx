@@ -145,7 +145,7 @@ function SectionsPreviewCard() {
   return (
     <div className="relative">
       {/* Outer card */}
-      <div className="relative rounded-2xl border border-white/10 bg-gradient-to-br from-zinc-900/80 to-zinc-950/90 p-5 shadow-[0_30px_60px_-30px_rgba(138,43,226,0.45),0_0_0_1px_rgba(255,255,255,0.04)_inset]">
+      <div className="relative rounded-xl border border-white/10 bg-gradient-to-br from-zinc-900/80 to-zinc-950/90 p-5 shadow-[0_30px_60px_-30px_rgba(138,43,226,0.45),0_0_0_1px_rgba(255,255,255,0.04)_inset]">
         {/* Header strip */}
         <div className="mb-4 flex items-center justify-between border-b border-white/5 pb-3">
           <div className="flex items-center gap-2">
@@ -199,7 +199,7 @@ function SectionsPreviewCard() {
       </div>
 
       {/* Soft accent ring */}
-      <div className="pointer-events-none absolute -inset-px -z-10 rounded-2xl bg-gradient-to-br from-primary/30 via-transparent to-fuchsia-500/20 blur-md" aria-hidden />
+      <div className="pointer-events-none absolute -inset-px -z-10 rounded-xl bg-gradient-to-br from-primary/30 via-transparent to-fuchsia-500/20 blur-md" aria-hidden />
     </div>
   );
 }

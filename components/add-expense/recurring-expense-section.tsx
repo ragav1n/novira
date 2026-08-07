@@ -24,7 +24,7 @@ export function RecurringExpenseSection({
     setIsIncome,
 }: RecurringExpenseSectionProps) {
     return (
-        <div className="space-y-4 p-4 rounded-2xl bg-secondary/10 border border-white/5">
+        <div className="space-y-4 p-4 rounded-xl bg-secondary/10 border border-white/5">
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                     <RefreshCcw className="w-5 h-5 text-primary" />

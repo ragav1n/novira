@@ -31,7 +31,7 @@ export function GuideSection({
       className={cn('scroll-mt-24 border-b border-white/5 pb-16 pt-12 first:pt-6 last:border-b-0', className)}
     >
       <header className="mb-8 flex items-start gap-4">
-        <div className="mt-1 hidden shrink-0 rounded-2xl border border-white/10 bg-gradient-to-br from-primary/15 to-fuchsia-500/10 p-2.5 text-primary shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] sm:block">
+        <div className="mt-1 hidden shrink-0 rounded-xl border border-white/10 bg-gradient-to-br from-primary/15 to-fuchsia-500/10 p-2.5 text-primary shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] sm:block">
           <Icon className="h-5 w-5" />
         </div>
         <div className="min-w-0 flex-1">
@@ -103,7 +103,7 @@ export function FactRow({ label, children }: { label: React.ReactNode; children:
 
 export function FactGrid({ children }: { children: React.ReactNode }) {
   return (
-    <div className="not-prose my-4 rounded-2xl border border-white/8 bg-white/[0.015] px-4 py-1">
+    <div className="not-prose my-4 rounded-xl border border-white/8 bg-white/[0.015] px-4 py-1">
       {children}
     </div>
   );

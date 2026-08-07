@@ -155,7 +155,7 @@ export function WelcomeModal({ isOpen, onClose, onOpenFullTour }: WelcomeModalPr
                                             className="space-y-5 pt-3"
                                         >
                                             <div className="flex flex-col items-center text-center gap-3">
-                                                <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-white/5 border border-white/10">
+                                                <div className="inline-flex items-center justify-center w-16 h-16 rounded-xl bg-white/5 border border-white/10">
                                                     <Compass className="w-7 h-7 text-primary drop-shadow-[0_0_10px_rgba(138,43,226,0.6)]" />
                                                 </div>
                                                 <div className="space-y-1.5">
@@ -167,7 +167,7 @@ export function WelcomeModal({ isOpen, onClose, onOpenFullTour }: WelcomeModalPr
                                                     </p>
                                                 </div>
                                             </div>
-                                            <div className="rounded-2xl border border-white/8 bg-white/[0.025] divide-y divide-white/5">
+                                            <div className="rounded-xl border border-white/8 bg-white/[0.025] divide-y divide-white/5">
                                                 {[
                                                     { k: 'Log a spend', v: 'In a tap or a snap of a receipt' },
                                                     { k: 'Plan ahead', v: 'Buckets, allowances, run-rate forecast' },
@@ -206,7 +206,7 @@ export function WelcomeModal({ isOpen, onClose, onOpenFullTour }: WelcomeModalPr
                                                         initial={{ opacity: 0, y: 8 }}
                                                         animate={{ opacity: 1, y: 0 }}
                                                         transition={{ delay: 0.05 + i * 0.05, duration: 0.3 }}
-                                                        className="rounded-2xl border border-white/8 bg-white/[0.03] p-3 space-y-1.5"
+                                                        className="rounded-xl border border-white/8 bg-white/[0.03] p-3 space-y-1.5"
                                                     >
                                                         <f.Icon className={cn('w-4 h-4', f.tone)} aria-hidden="true" />
                                                         <div className="text-[12px] font-bold text-white leading-tight">
@@ -257,7 +257,7 @@ export function WelcomeModal({ isOpen, onClose, onOpenFullTour }: WelcomeModalPr
                                                         key={label}
                                                         type="button"
                                                         onClick={() => goTo(path)}
-                                                        className="group w-full flex items-center gap-3 rounded-2xl border border-white/8 bg-white/[0.03] hover:bg-white/[0.06] hover:border-white/15 px-3 py-3 text-left transition-colors"
+                                                        className="group w-full flex items-center gap-3 rounded-xl border border-white/8 bg-white/[0.03] hover:bg-white/[0.06] hover:border-white/15 px-3 py-3 text-left transition-colors"
                                                     >
                                                         <span className="shrink-0 w-9 h-9 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center group-hover:border-primary/40 group-hover:bg-primary/10 transition-colors">
                                                             <Icon className="w-4 h-4 text-primary" aria-hidden="true" />

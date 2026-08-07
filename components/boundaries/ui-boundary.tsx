@@ -76,7 +76,7 @@ function ErrorFallback({ error: unknownError, resetErrorBoundary }: FallbackProp
       <Button 
         onClick={handleAction}
         variant="outline"
-        className="h-12 px-8 rounded-2xl border-primary/20 hover:bg-primary/10 text-primary font-bold transition-all hover:scale-105 active:scale-95 shadow-lg shadow-primary/5"
+        className="h-12 px-8 rounded-xl border-primary/20 hover:bg-primary/10 text-primary font-bold transition-all hover:scale-105 active:scale-95 shadow-lg shadow-primary/5"
       >
         <RefreshCcw className="w-4 h-4 mr-2" />
         {isChunkError ? 'Reload Application' : 'Try Again'}
