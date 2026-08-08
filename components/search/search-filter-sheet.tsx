@@ -92,7 +92,7 @@ export function SearchFilterSheet({
                     {activeFilterCount > 0 && (
                         <span className={cn(
                             'absolute -top-0.5 -right-0.5 min-w-4 h-4 px-1 rounded-full flex items-center justify-center font-bold text-caption tabular-nums',
-                            themeConfig.bgSolid, themeConfig.textWhite
+                            themeConfig.bgSolid, themeConfig.onSolid
                         )}>
                             {activeFilterCount}
                         </span>
@@ -305,7 +305,7 @@ export function SearchFilterSheet({
                                     className={cn(
                                         'px-3 py-1 cursor-pointer transition-colors border-white/[0.06] text-meta',
                                         selectedPayments.includes(method)
-                                            ? `${themeConfig.bgSolid} ${themeConfig.borderSolid} text-white`
+                                            ? `${themeConfig.bgSolid} ${themeConfig.borderSolid} ${themeConfig.onSolid}`
                                             : 'bg-secondary/10 hover:bg-secondary/20'
                                     )}
                                     onClick={() => {
@@ -328,7 +328,11 @@ export function SearchFilterSheet({
                         Reset all
                     </Button>
                     <SheetClose asChild>
-                        <Button className={cn('h-10 rounded-xl text-body font-semibold', themeConfig.bgSolid, themeConfig.textWhite, themeConfig.hoverBg)}>
+                        {/* hoverBtnBg, not hoverBg: the latter is the translucent
+                            `/30` tint meant for ghost surfaces, and on a solid button it
+                            drops the fill to 30% over a near-black page — which with the
+                            dark `onSolid` ink would leave the label unreadable on hover. */}
+                        <Button className={cn('h-10 rounded-xl text-body font-semibold', themeConfig.bgSolid, themeConfig.onSolid, themeConfig.hoverBtnBg)}>
                             Apply
                         </Button>
                     </SheetClose>

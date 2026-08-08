@@ -871,7 +871,7 @@ export function GoalsView() {
                     <DialogFooter className="px-5 py-4 border-t border-white/5 flex gap-2 sm:gap-2">
                         <Button variant="ghost" className="flex-1" onClick={() => setIsGoalModalOpen(false)}>Cancel</Button>
                         <Button
-                            className={cn('flex-[1.5] h-10 rounded-xl font-bold text-white transition-all',
+                            className={cn('flex-[1.5] h-10 rounded-xl font-bold transition-all', themeConfig.onSolid,
                                 themeConfig.bgSolid, themeConfig.hoverBtnBg, themeConfig.shadowStrong)}
                             onClick={handleSaveGoal}
                             disabled={!goalName || !goalTarget || isSavingGoal}
@@ -974,7 +974,7 @@ export function GoalsView() {
                                 <DialogFooter className="px-5 py-4 border-t border-white/5 flex gap-2 sm:gap-2">
                                     <Button variant="ghost" className="flex-1" onClick={() => { setIsAddDepositOpen(false); setDepositAmount(''); }}>Cancel</Button>
                                     <Button
-                                        className={cn('flex-[1.5] h-10 rounded-xl font-bold text-white transition-all',
+                                        className={cn('flex-[1.5] h-10 rounded-xl font-bold transition-all', themeConfig.onSolid,
                                             themeConfig.bgSolid, themeConfig.hoverBtnBg, themeConfig.shadowStrong)}
                                         onClick={handleAddDeposit}
                                         disabled={!depositAmount}

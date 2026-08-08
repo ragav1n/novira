@@ -41,7 +41,7 @@ export function PriceChangeDialog({ target, onClose, onApply }: PriceChangeDialo
                 <AlertDialogFooter>
                     <AlertDialogCancel onClick={onClose}>Keep current</AlertDialogCancel>
                     <AlertDialogAction
-                        className={cn("border", themeConfig.bgSolid, themeConfig.borderSolid, themeConfig.textWhite, themeConfig.hoverBg)}
+                        className={cn("border", themeConfig.bgSolid, themeConfig.borderSolid, themeConfig.onSolid, themeConfig.hoverBtnBg)}
                         onClick={onApply}
                     >
                         Update price

@@ -38,7 +38,7 @@ export function accentFromTheme(theme: WorkspaceTheme): EmptyAccent {
   return {
     solid: theme.bgSolid,
     solidHover: theme.hoverBtnBg,
-    on: theme.textWhite,
+    on: theme.onSolid,
     text: theme.text,
     tile: theme.bgLight,
   }

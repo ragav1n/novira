@@ -6,7 +6,16 @@ export type WorkspaceTheme = {
     text: string;
     textLight: string;
     textOpacity: string;
-    textWhite: string;
+    /**
+     * Ink for text sitting ON `bgSolid`. Was `textWhite: 'text-white'` for every
+     * theme, which failed WCAG AA on all four literal accents — measured against
+     * white: amber-500 2.15:1, cyan-500 2.43:1, emerald-500 2.54:1, rose-500
+     * 3.67:1, where normal text needs 4.5:1. Three of them now take their own
+     * -950 ink instead of white; rose is one step darker so white still works.
+     * `bg-primary` was already fine (5.08–5.39:1 across the three hues) and is
+     * unchanged. Renamed from `textWhite` because for most themes it no longer is.
+     */
+    onSolid: string;
     bg: string;
     bgLight: string;
     bgMedium: string;
@@ -31,11 +40,11 @@ const COUPLE_THEME: WorkspaceTheme = {
     text: 'text-rose-500',
     textLight: 'text-rose-400',
     textOpacity: 'text-rose-500/60',
-    textWhite: 'text-white',
+    onSolid: 'text-white',
     bg: 'bg-rose-500/20',
     bgLight: 'bg-rose-500/10',
     bgMedium: 'bg-rose-500/20',
-    bgSolid: 'bg-rose-500',
+    bgSolid: 'bg-rose-600',
     border: 'border-rose-500/20',
     borderLight: 'border-rose-500/10',
     borderMedium: 'border-rose-500/20',
@@ -43,7 +52,7 @@ const COUPLE_THEME: WorkspaceTheme = {
     borderGlow: 'border-rose-500/30',
     ring: 'focus-visible:ring-rose-500/50',
     hoverBg: 'hover:bg-rose-500/30',
-    hoverBtnBg: 'hover:bg-rose-600',
+    hoverBtnBg: 'hover:bg-rose-700',
     shadowGlow: 'shadow-rose-500/20',
     shadowStrong: 'shadow-[0_0_15px_rgba(244,63,94,0.3)]',
     gradient: 'from-rose-500/20 to-pink-600/20',
@@ -56,7 +65,7 @@ const HOME_THEME: WorkspaceTheme = {
     text: 'text-amber-500',
     textLight: 'text-amber-400',
     textOpacity: 'text-amber-500/60',
-    textWhite: 'text-white',
+    onSolid: 'text-amber-950',
     bg: 'bg-amber-500/20',
     bgLight: 'bg-amber-500/10',
     bgMedium: 'bg-amber-500/20',
@@ -68,7 +77,7 @@ const HOME_THEME: WorkspaceTheme = {
     borderGlow: 'border-amber-500/30',
     ring: 'focus-visible:ring-amber-500/50',
     hoverBg: 'hover:bg-amber-500/30',
-    hoverBtnBg: 'hover:bg-amber-600',
+    hoverBtnBg: 'hover:bg-amber-400',
     shadowGlow: 'shadow-amber-500/20',
     shadowStrong: 'shadow-[0_0_15px_rgba(245,158,11,0.3)]',
     gradient: 'from-amber-500/20 to-yellow-600/20',
@@ -82,7 +91,7 @@ const DEFAULT_THEMES: Record<'primary' | 'cyan' | 'emerald', WorkspaceTheme> = {
         text: 'text-primary',
         textLight: 'text-primary/80',
         textOpacity: 'text-primary/60',
-        textWhite: 'text-white',
+        onSolid: 'text-white',
         bg: 'bg-primary/20',
         bgLight: 'bg-primary/10',
         bgMedium: 'bg-primary/20',
@@ -106,7 +115,7 @@ const DEFAULT_THEMES: Record<'primary' | 'cyan' | 'emerald', WorkspaceTheme> = {
         text: 'text-cyan-500',
         textLight: 'text-cyan-400',
         textOpacity: 'text-cyan-500/60',
-        textWhite: 'text-white',
+        onSolid: 'text-cyan-950',
         bg: 'bg-cyan-500/20',
         bgLight: 'bg-cyan-500/10',
         bgMedium: 'bg-cyan-500/20',
@@ -118,7 +127,7 @@ const DEFAULT_THEMES: Record<'primary' | 'cyan' | 'emerald', WorkspaceTheme> = {
         borderGlow: 'border-cyan-500/30',
         ring: 'focus-visible:ring-cyan-500/50',
         hoverBg: 'hover:bg-cyan-500/30',
-        hoverBtnBg: 'hover:bg-cyan-600',
+        hoverBtnBg: 'hover:bg-cyan-400',
         shadowGlow: 'shadow-[0_0_20px_rgba(6,182,212,0.05)]',
         shadowStrong: 'shadow-[0_0_15px_rgba(6,182,212,0.3)]',
         gradient: 'from-cyan-500/20 to-teal-600/20',
@@ -130,7 +139,7 @@ const DEFAULT_THEMES: Record<'primary' | 'cyan' | 'emerald', WorkspaceTheme> = {
         text: 'text-emerald-500',
         textLight: 'text-emerald-400',
         textOpacity: 'text-emerald-100/80',
-        textWhite: 'text-white',
+        onSolid: 'text-emerald-950',
         bg: 'bg-emerald-500/20',
         bgLight: 'bg-emerald-500/10',
         bgMedium: 'bg-emerald-500/20',
@@ -142,7 +151,7 @@ const DEFAULT_THEMES: Record<'primary' | 'cyan' | 'emerald', WorkspaceTheme> = {
         borderGlow: 'border-emerald-500/30',
         ring: 'focus-visible:ring-emerald-500/50',
         hoverBg: 'hover:bg-emerald-500/30',
-        hoverBtnBg: 'hover:bg-emerald-600',
+        hoverBtnBg: 'hover:bg-emerald-400',
         shadowGlow: 'shadow-emerald-500/20',
         shadowStrong: 'shadow-[0_0_15px_rgba(16,185,129,0.3)]',
         gradient: 'from-emerald-600/20 to-teal-800/20',
