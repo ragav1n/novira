@@ -46,14 +46,32 @@ function DialogOverlay({
   )
 }
 
+/** Centred modal card — the default. */
+const DIALOG_CENTERED =
+  'fixed top-[50%] left-[50%] grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border p-6 shadow-lg sm:max-w-lg'
+
+/**
+ * Edge-to-edge, for a dialog that stands in for a whole route.
+ *
+ * Exists because `dashboard-transactions-drawer.tsx` was fighting six separate
+ * centred-variant styles at once with one very long className
+ * (`fixed inset-0 … max-w-none … rounded-none p-0 … translate-x-0 translate-y-0
+ * shadow-none`). Anything that wants a fullscreen dialog should ask for it, not
+ * re-derive the un-styling.
+ */
+const DIALOG_FULLSCREEN =
+  'fixed inset-0 flex h-full w-full max-w-none flex-col overflow-hidden rounded-none border-none p-0 shadow-none sm:max-w-none'
+
 function DialogContent({
   className,
   children,
   showCloseButton = true,
+  variant = 'centered',
   'aria-describedby': ariaDescribedBy = undefined,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean
+  variant?: 'centered' | 'fullscreen'
 }) {
   return (
     <DialogPortal data-slot="dialog-portal">
@@ -62,9 +80,16 @@ function DialogContent({
         data-slot="dialog-content"
         aria-describedby={ariaDescribedBy}
         className={cn(
-          'bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-[110] grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border p-6 shadow-lg duration-200 sm:max-w-lg',
+          'bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 z-[110] duration-200',
+          variant === 'fullscreen' ? DIALOG_FULLSCREEN : DIALOG_CENTERED,
           className,
         )}
+        // Sheet, Drawer and AlertDialog all carry this triple; Dialog alone did
+        // not, so a press starting inside a Dialog could reach a parent's
+        // press handler (a swipeable row, a card onClick) underneath it.
+        onPointerDown={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
+        onTouchStart={(e) => e.stopPropagation()}
         {...props}
       >
         {children}

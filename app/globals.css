@@ -215,12 +215,98 @@ body.focus-bucket {
      onto `rounded-xl`; `2xl` sits at +8px so the scale is monotonic if anything
      ever reaches for it again.
      Effective: 8 / 10 / 12 / 16 / 20 / 24 px at --radius: 0.75rem. */
+  /* ── Overlay stacking order ────────────────────────────────────────────────
+     Not tokens — Tailwind v4 has no `--z-*` theme namespace, so these stay
+     literal `z-[N]` classes. Written down here because the ordering is load
+     bearing and was already violated once.
+
+       100 / 110   Dialog, Sheet overlay / content. Also the three ordinary
+                   full-screen modals (welcome, how-to-use, feature-announcement)
+                   after they moved off createPortal onto Radix.
+       120 / 130   voice-review-modal (raw Radix primitives, sits over add-expense)
+       150         next/dynamic chunk-loading spinners
+       180         monthly-recap-modal
+       190 / 200   AlertDialog — MUST stay above Dialog/Sheet. A confirm is almost
+                   always opened from inside a Dialog, and at Radix's stock z-50 it
+                   rendered *underneath* its parent's overlay: visible, correctly
+                   titled, and completely inert.
+      1000 / 1100  app-reset-modal only. Deliberately above everything: it is
+                   non-dismissible and terminal (ends in window.location.replace),
+                   so nothing may paint over it. It opens no confirms, so it does
+                   not re-create the AlertDialog trap.
+
+     The other three modals used to sit at 1000/1100 too, which put them above
+     AlertDialog — so any confirm opened from them would have been inert. They are
+     ordinary modals, so they now sit on the ordinary Dialog layer. */
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
   --radius-2xl: calc(var(--radius) + 8px);
   --radius-3xl: calc(var(--radius) + 12px);
+}
+
+/* ── Typography scale ────────────────────────────────────────────────────────
+   Tailwind's stock ladder skips 9/10/11/13/15px, which is the entire reason ~950
+   arbitrary `text-[Npx]` values accumulated here — they outnumbered the named
+   scale. These five steps close the gap.
+
+   Declared with NO companion tokens on purpose. Tailwind emits a companion-less
+   `--text-*` as `font-size` and nothing else — byte-for-byte the same single
+   declaration the arbitrary value produced — which is what makes the migration
+   provably zero-diff: an element inside a `text-sm` ancestor keeps inheriting the
+   same line-height it did before. Add a `--line-height` here and several hundred
+   elements silently change line box.
+
+   Note 12px is deliberately absent: that's `--text-xs`, Tailwind stock. It is NOT
+   interchangeable with the old `text-[12px]` — `text-xs` carries
+   `line-height: calc(1/0.75)` (16px) while `text-[12px]` inherited 1.5 (18px). The
+   sweep onto `text-xs` is a separate, deliberately visible change.
+
+   Plain `@theme`, not `@theme inline`, so the variables reach `:root` and Recharts
+   tick sizes / inline styles can reference them. */
+@theme {
+  --text-micro: 9px;
+  --text-caption: 10px;
+  --text-meta: 11px;
+  --text-body: 13px;
+  --text-lead: 15px;
+}
+
+/* ── Typography roles ────────────────────────────────────────────────────────
+   Unlike the size steps above, these carry treatment as well — one utility for
+   size + tracking + weight. Safe to do because Tailwind emits companions as
+   `var(--tw-tracking, …)` / `var(--tw-font-weight, …)`, so a per-site
+   `font-bold` or `tracking-wider` still wins regardless of stylesheet order.
+   They are defaults, not locks.
+
+   `uppercase` and `tabular-nums` stay explicit: neither is a `--text-*`
+   companion, and baking them in would be wrong anyway — only about a third of
+   10px text in this app is uppercase. Don't reach for `@utility` to bundle them
+   either; a static utility emits a bare `font-weight: 700` with no `--tw-*`
+   indirection and would start winning override fights by source order. */
+@theme {
+  /* Collapses 53 distinct uppercase micro-label signatures. The two dominant
+     dialects were `font-bold` + `tracking-wider` (0.05em) in dashboard/analytics
+     and `font-medium` + `tracking-[0.18em]` in groups/settings/search — a
+     200-unit weight gap and a 3.6x tracking gap for the same role. The quieter
+     groups/search spec wins: it is the one the newest code converged on
+     independently, and at 10px the tighter 0.05em reads as a smudge. */
+  --text-eyebrow: 10px;
+  --text-eyebrow--letter-spacing: 0.18em;
+  --text-eyebrow--font-weight: 500;
+
+  /* The hero amount on goals / cashflow / groups / search / subscriptions. All
+     five were already byte-identical
+     (`text-[40px] leading-none font-bold tracking-tight tabular-nums`), so this
+     collapses them with zero visual change; `tabular-nums` stays alongside.
+     Deliberately NOT applied to the dashboard hero (`text-6xl`) or the analytics
+     hero (`text-3xl sm:text-4xl`) — those are a size hierarchy and the app's only
+     responsive hero, not drift. */
+  --text-hero: 40px;
+  --text-hero--line-height: 1;
+  --text-hero--letter-spacing: -0.025em;
+  --text-hero--font-weight: 700;
 }
 
 @layer base {
