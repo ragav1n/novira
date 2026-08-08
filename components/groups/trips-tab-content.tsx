@@ -122,7 +122,7 @@ export function TripsTabContent() {
                     onClick={openCreate}
                     disabled={loading}
                     aria-label="New trip"
-                    className="inline-flex items-center gap-1 h-7 px-3 rounded-full text-meta font-semibold text-sky-300 hover:text-sky-200 hover:bg-sky-400/10 disabled:opacity-50 transition-colors"
+                    className="relative tap-target inline-flex items-center gap-1 h-7 px-3 rounded-full text-meta font-semibold text-sky-300 hover:text-sky-200 hover:bg-sky-400/10 disabled:opacity-50 transition-colors"
                 >
                     <Plus className="w-3.5 h-3.5" />
                     New trip
@@ -237,7 +237,7 @@ function TripCard({
                     <button
                         onClick={(e) => { e.preventDefault(); e.stopPropagation(); onEdit(trip); }}
                         aria-label={`Edit ${trip.name}`}
-                        className="shrink-0 h-8 w-8 inline-flex items-center justify-center rounded-full text-muted-foreground/60 hover:text-foreground hover:bg-secondary/30 transition-colors"
+                        className="relative tap-target shrink-0 h-8 w-8 inline-flex items-center justify-center rounded-full text-muted-foreground/60 hover:text-foreground hover:bg-secondary/30 transition-colors"
                     >
                         <Edit2 className="w-3.5 h-3.5" />
                     </button>

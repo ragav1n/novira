@@ -63,7 +63,7 @@ export function SubscriptionFilters({
                         <button
                             type="button"
                             className={cn(
-                                "h-9 px-3 rounded-full bg-secondary/20 border border-white/5 inline-flex items-center gap-1.5 text-xs font-bold shrink-0",
+                                "relative tap-target h-9 px-3 rounded-full bg-secondary/20 border border-white/5 inline-flex items-center gap-1.5 text-xs font-bold shrink-0",
                                 themeConfig.text
                             )}
                             aria-label="Sort subscriptions"

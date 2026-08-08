@@ -860,7 +860,7 @@ export function GoalsView() {
                                         type="button"
                                         onClick={() => setGoalDeadline(undefined)}
                                         aria-label="Clear target date"
-                                        className="h-10 w-10 rounded-xl bg-secondary/20 border border-white/10 hover:bg-secondary/30 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors shrink-0"
+                                        className="relative tap-target h-10 w-10 rounded-xl bg-secondary/20 border border-white/10 hover:bg-secondary/30 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors shrink-0"
                                     >
                                         <X className="w-4 h-4" />
                                     </button>

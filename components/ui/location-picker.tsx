@@ -1194,7 +1194,7 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                             <button
                                 type="button"
                                 onClick={handleDropPinRecenter}
-                                className="absolute top-2 right-2 z-10 w-9 h-9 rounded-full bg-black/60 backdrop-blur-sm border border-white/15 flex items-center justify-center active:bg-white/10 transition-colors touch-manipulation shadow-lg"
+                                className="absolute top-2 right-2 z-10 size-11 rounded-full bg-black/60 backdrop-blur-sm border border-white/15 flex items-center justify-center active:bg-white/10 transition-colors touch-manipulation shadow-lg"
                                 title="Go to my location">
                                 <LocateFixed className="w-4 h-4 text-violet-300" />
                             </button>

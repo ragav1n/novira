@@ -289,7 +289,7 @@ export function GroupSettingsDialog({ group, friends, currentUserId, pendingSpli
                                                             toast.error(msg);
                                                         }
                                                     }}
-                                                    className="inline-flex items-center gap-1 h-7 px-2.5 rounded-full text-meta font-medium text-primary hover:bg-primary/10 transition-colors"
+                                                    className="relative tap-target inline-flex items-center gap-1 h-7 px-2.5 rounded-full text-meta font-medium text-primary hover:bg-primary/10 transition-colors"
                                                 >
                                                     <UserPlus className="w-3 h-3" />
                                                     Add
@@ -306,7 +306,7 @@ export function GroupSettingsDialog({ group, friends, currentUserId, pendingSpli
                                     <button
                                         type="button"
                                         onClick={handleDelete}
-                                        className="w-full inline-flex items-center justify-center gap-1.5 h-10 rounded-xl bg-rose-400/[0.06] text-rose-300 hover:bg-rose-400/10 border border-rose-400/15 text-xs font-semibold transition-colors"
+                                        className="relative tap-target w-full inline-flex items-center justify-center gap-1.5 h-10 rounded-xl bg-rose-400/[0.06] text-rose-300 hover:bg-rose-400/10 border border-rose-400/15 text-xs font-semibold transition-colors"
                                     >
                                         <Trash2 className="w-3.5 h-3.5" />
                                         Delete group

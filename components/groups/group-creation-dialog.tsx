@@ -89,7 +89,7 @@ export function GroupCreationDialog({ open, onOpenChange }: GroupCreationDialogP
         >
             {!isControlled && (
                 <DialogTrigger asChild>
-                    <button className="h-9 w-9 inline-flex items-center justify-center rounded-full text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors">
+                    <button className="relative tap-target h-9 w-9 inline-flex items-center justify-center rounded-full text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors">
                         <Plus className="w-[18px] h-[18px]" />
                     </button>
                 </DialogTrigger>

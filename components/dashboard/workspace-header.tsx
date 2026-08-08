@@ -94,10 +94,13 @@ export function WorkspaceHeader({
                 <button
                     onClick={() => router.push('/settings')}
                     aria-label="Open settings"
-                    className="w-10 h-10 rounded-full bg-secondary/20 border border-white/5 overflow-hidden flex items-center justify-center text-xs font-bold text-muted-foreground uppercase shrink-0 cursor-pointer hover:border-primary/50 transition-colors"
+                    // Grown to 44px rather than given `tap-target`: `overflow-hidden` is
+                    // load-bearing here (it rounds the avatar image) and would clip the
+                    // pseudo-element hit area straight back to the visual box.
+                    className="size-11 rounded-full bg-secondary/20 border border-white/5 overflow-hidden flex items-center justify-center text-xs font-bold text-muted-foreground uppercase shrink-0 cursor-pointer hover:border-primary/50 transition-colors"
                 >
                     {avatarUrl ? (
-                        <Image src={avatarUrl} alt="Avatar" width={40} height={40} className="w-full h-full object-cover" />
+                        <Image src={avatarUrl} alt="Avatar" width={44} height={44} className="w-full h-full object-cover" />
                     ) : (
                         userName.substring(0, 2)
                     )}
@@ -106,7 +109,7 @@ export function WorkspaceHeader({
                     <button
                         onClick={togglePrivacyHidden}
                         aria-label={isPrivacyHidden ? 'Reveal amounts' : 'Hide amounts'}
-                        className="w-10 h-10 rounded-full bg-secondary/20 hover:bg-secondary/40 flex items-center justify-center border border-white/5 transition-colors shrink-0"
+                        className="relative tap-target w-10 h-10 rounded-full bg-secondary/20 hover:bg-secondary/40 flex items-center justify-center border border-white/5 transition-colors shrink-0"
                         title={isPrivacyHidden ? 'Reveal amounts' : 'Hide amounts'}
                     >
                         {isPrivacyHidden ? <Eye className="w-5 h-5 text-white/70" /> : <EyeOff className="w-5 h-5 text-white/70" />}
@@ -114,7 +117,7 @@ export function WorkspaceHeader({
                 )}
                 <button
                     onClick={() => setIsHowToUseOpen(true)}
-                    className="w-10 h-10 rounded-full bg-secondary/20 hover:bg-secondary/40 flex items-center justify-center border border-white/5 transition-colors shrink-0"
+                    className="relative tap-target w-10 h-10 rounded-full bg-secondary/20 hover:bg-secondary/40 flex items-center justify-center border border-white/5 transition-colors shrink-0"
                     title="How to use Novira"
                 >
                     <HelpCircle className="w-5 h-5 text-white/70" />
@@ -122,7 +125,7 @@ export function WorkspaceHeader({
                 <button
                     onClick={() => router.push('/add')}
                     className={cn(
-                        "w-10 h-10 rounded-full flex items-center justify-center border transition-colors shrink-0",
+                        "relative tap-target w-10 h-10 rounded-full flex items-center justify-center border transition-colors shrink-0",
                         isCoupleWorkspace ? "bg-rose-500/20 hover:bg-rose-500/30 border-rose-500/20" : isHomeWorkspace ? "bg-amber-500/20 hover:bg-amber-500/30 border-amber-500/20" : "bg-primary/20 hover:bg-primary/30 border-primary/20"
                     )}
                     title="Add Expense"

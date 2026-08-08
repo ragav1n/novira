@@ -916,7 +916,7 @@ export function AddExpenseView() {
                                         aria-label={`Use previous: ${s.description}`}
                                     >
                                         <div
-                                            className="w-5 h-5 rounded-full flex items-center justify-center shrink-0"
+                                            className="relative tap-target w-5 h-5 rounded-full flex items-center justify-center shrink-0"
                                             style={{ backgroundColor: `${color}25`, color }}
                                         >
                                             {getIconForCategory(s.category, 'w-3 h-3')}

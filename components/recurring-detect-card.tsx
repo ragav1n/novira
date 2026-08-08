@@ -186,7 +186,7 @@ export function RecurringDetectCard({
                             <button
                                 type="button"
                                 onClick={() => handleDismiss(c.normalizedKey)}
-                                className="w-7 h-7 rounded-full hover:bg-secondary/30 flex items-center justify-center text-muted-foreground hover:text-foreground"
+                                className="relative tap-target w-7 h-7 rounded-full hover:bg-secondary/30 flex items-center justify-center text-muted-foreground hover:text-foreground"
                                 aria-label={`Dismiss ${c.description}`}
                             >
                                 <X className="w-3.5 h-3.5" aria-hidden="true" />

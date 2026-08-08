@@ -107,7 +107,7 @@ export function BucketsTabContent({
                     <button
                         type="button"
                         onClick={handleAddBucket}
-                        className="inline-flex items-center gap-1 h-7 px-3 rounded-full text-meta font-semibold text-cyan-300 hover:text-cyan-200 hover:bg-cyan-400/10 transition-colors"
+                        className="relative tap-target inline-flex items-center gap-1 h-7 px-3 rounded-full text-meta font-semibold text-cyan-300 hover:text-cyan-200 hover:bg-cyan-400/10 transition-colors"
                     >
                         <Plus className="w-3.5 h-3.5" />
                         New bucket

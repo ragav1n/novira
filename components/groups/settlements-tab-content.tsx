@@ -147,7 +147,7 @@ export function SettlementsTabContent({
                                                         setSettlingPaymentIndex(null);
                                                     }
                                                 }}
-                                                className="inline-flex items-center gap-1 h-7 px-2.5 rounded-full bg-amber-400 text-amber-950 text-meta font-semibold hover:bg-amber-300 transition-colors disabled:opacity-60"
+                                                className="relative tap-target inline-flex items-center gap-1 h-7 px-2.5 rounded-full bg-amber-400 text-amber-950 text-meta font-semibold hover:bg-amber-300 transition-colors disabled:opacity-60"
                                             >
                                                 {isSettling ? 'Settling…' : isMyPayment ? 'Settle' : 'Mark received'}
                                             </button>

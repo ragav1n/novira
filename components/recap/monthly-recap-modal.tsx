@@ -185,7 +185,7 @@ export function MonthlyRecapModal() {
                                     <button
                                         onClick={dismiss}
                                         aria-label="Dismiss recap"
-                                        className="w-8 h-8 rounded-full bg-secondary/40 hover:bg-secondary/60 border border-white/10 flex items-center justify-center text-foreground/70 hover:text-foreground transition-colors"
+                                        className="relative tap-target w-8 h-8 rounded-full bg-secondary/40 hover:bg-secondary/60 border border-white/10 flex items-center justify-center text-foreground/70 hover:text-foreground transition-colors"
                                     >
                                         <X className="w-4 h-4" />
                                     </button>

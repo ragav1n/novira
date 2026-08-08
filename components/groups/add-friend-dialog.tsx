@@ -59,7 +59,7 @@ export function AddFriendDialog({ userId, open, onOpenChange }: AddFriendDialogP
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
             {!isControlled && (
                 <DialogTrigger asChild>
-                    <button className="h-9 w-9 inline-flex items-center justify-center rounded-full text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors">
+                    <button className="relative tap-target h-9 w-9 inline-flex items-center justify-center rounded-full text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors">
                         <UserPlus className="w-[18px] h-[18px]" />
                     </button>
                 </DialogTrigger>

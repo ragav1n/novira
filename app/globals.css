@@ -273,6 +273,35 @@ body.focus-bucket {
   --text-lead: 15px;
 }
 
+/**
+ * Guarantees a 44px pointer target without changing an element's visual size.
+ *
+ * Twenty-two controls sat below 44px — icon buttons down to 20px, and inline
+ * pill chips at 28px (`h-7 px-3`). Growing those chips to 44px would have
+ * rewritten every dense row they live in, so instead an invisible centred
+ * pseudo-element carries the target while the box keeps its designed size.
+ *
+ * The element must establish a containing block; every site that needs it gets
+ * `relative` alongside, except the one that was already `absolute`.
+ *
+ * Note the target can overlap a neighbour's when two small controls sit close
+ * together — the later sibling in DOM order takes the overlap. A couple of px
+ * of ambiguity between two adjacent buttons beats a 28px target on both.
+ */
+@utility tap-target {
+  &::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    translate: -50% -50%;
+    width: 100%;
+    height: 100%;
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+
 /* ── Typography roles ────────────────────────────────────────────────────────
    Unlike the size steps above, these carry treatment as well — one utility for
    size + tracking + weight. Safe to do because Tailwind emits companions as

@@ -469,7 +469,7 @@ export function AnalyticsView() {
                                         setCustomEnd(p.to());
                                         toast.haptic(ImpactStyle.Light);
                                     }}
-                                    className="h-7 px-3 rounded-full text-eyebrow uppercase bg-secondary/30 hover:bg-secondary/50 border border-white/5 transition-colors"
+                                    className="relative tap-target h-7 px-3 rounded-full text-eyebrow uppercase bg-secondary/30 hover:bg-secondary/50 border border-white/5 transition-colors"
                                 >
                                     {p.label}
                                 </button>
