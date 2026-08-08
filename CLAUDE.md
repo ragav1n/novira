@@ -88,7 +88,9 @@ Supabase backend (PostgreSQL + Auth + Realtime). Deployed on Vercel at novira-on
 ### Round 4 — PWA & Functionality Improvements
 - **`public/robots.txt`** — `Disallow: /` prevents all search engine indexing
 - **HSTS header** — `Strict-Transport-Security: max-age=63072000; includeSubDomains; preload` added to `proxy.ts`
-- **Transaction pagination** — `useDashboardData` now loads 100 at a time; `hasMore`/`loadMore`/`loadingMore` exposed; "Load more" button in `VirtualizedTransactionList`; pagination resets on workspace change
+- **Transaction pagination** — `useDashboardData` now loads 100 at a time; `hasMore`/`loadMore`/`loadingMore` exposed; "Load more" button in `components/transaction-list.tsx`; pagination resets on workspace change
+  (note: there has never been a `VirtualizedTransactionList` — no list virtualization is
+  installed anywhere, and the list grows unbounded via "Load more" rather than windowing)
 - **Web Background Sync** — service worker `sync` event notifies clients to run `attemptSync()`; `lib/sync-manager.ts` registers `novira-sync-queue` tag when items are enqueued or device comes online
 - **PWA Install Prompt** — `components/pwa-install-prompt.tsx` listens for `beforeinstallprompt`, shows banner after 3s, dismisses via `sessionStorage`; added to `app/layout.tsx`
 - **Swipe to delete/edit** — `components/transaction-row.tsx` now wraps each row in a container that reveals Edit/Delete buttons on swipe-left (Framer Motion drag with 72px threshold); only enabled when `canEdit`
