@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Button } from '@/components/ui/button';
 import { useRouter } from 'next/navigation';
 import { ChartLine, Sparkles, Repeat, Tags, Store, Wallet, Lightbulb } from 'lucide-react';
 import { format } from 'date-fns';
@@ -220,10 +221,10 @@ export function MonthlyRecapCard({ currency, formatCurrency }: Props) {
                     </div>
                 )}
 
-                <button
+                <Button
                     onClick={() => generateRecap(recap ? recapMonth || priorMonthKey : priorMonthKey, !!recap)}
                     disabled={recapLoading}
-                    className="w-full h-11 text-body font-bold rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 active:scale-[0.99] shadow-[0_6px_22px_-6px_rgba(168,85,247,0.7)] ring-1 ring-inset ring-white/15 transition-all disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    className="w-full text-body font-bold active:scale-[0.99] shadow-[0_6px_22px_-6px_rgba(168,85,247,0.7)] ring-1 ring-inset ring-white/15 disabled:opacity-60"
                 >
                     {recapLoading ? (
                         <>
@@ -241,7 +242,7 @@ export function MonthlyRecapCard({ currency, formatCurrency }: Props) {
                             Generate Recap
                         </>
                     )}
-                </button>
+                </Button>
             </div>
         </HolographicCard>
     );

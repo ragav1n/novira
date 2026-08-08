@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
+import { Button } from '@/components/ui/button';
 import { X, MapPin, Navigation } from 'lucide-react';
 import { Spinner } from '@/components/ui/spinner';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
@@ -664,12 +665,12 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency, 
                                 <p className="text-sm text-muted-foreground mt-2 max-w-xs">
                                     The map tiles didn&apos;t load. Check your connection and try again.
                                 </p>
-                                <button
+                                <Button
                                     onClick={() => { setMapError(false); setRetryNonce(n => n + 1); }}
-                                    className="mt-4 px-4 py-2.5 rounded-full bg-primary text-primary-foreground text-sm font-bold min-h-[44px] transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                                    className="mt-4 rounded-full text-sm font-bold"
                                 >
                                     Try again
-                                </button>
+                                </Button>
                             </div>
                         )}
                         <div ref={mapContainerRef} className="w-full h-full" />

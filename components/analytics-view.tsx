@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Button } from '@/components/ui/button';
 import dynamic from 'next/dynamic';
 import { ChartLine, Plus } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -506,12 +507,12 @@ export function AnalyticsView() {
                         <CardContent className="p-5 space-y-3 text-center">
                             <p className="text-sm font-bold text-destructive">Couldn&apos;t load analytics</p>
                             <p className="text-xs text-muted-foreground">{error}</p>
-                            <button
+                            <Button
                                 onClick={() => fetchData()}
-                                className="h-9 px-4 text-xs font-bold rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-all"
+                                size="sm" className="px-4 text-xs font-bold"
                             >
                                 Retry
-                            </button>
+                            </Button>
                         </CardContent>
                     </Card>
                 ) : (

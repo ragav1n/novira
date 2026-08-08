@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { Button } from '@/components/ui/button';
 import { AnimatePresence, motion } from 'framer-motion';
 import { QUICK_FADE, SNAPPY } from '@/lib/motion';
 import { Card, CardContent } from '@/components/ui/card';
@@ -278,12 +279,12 @@ export function InsightsChatCard({ dateRange, customStart, customEnd, bucketId, 
                         <p className="text-body font-bold">Ask about your spending</p>
                         <p className="text-meta text-muted-foreground/80">Get a quick answer grounded in this view&apos;s data.</p>
                     </div>
-                    <button
+                    <Button
                         onClick={() => setOpen(true)}
-                        className="h-9 px-4 text-xs font-bold rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-all shrink-0"
+                        size="sm" className="px-4 text-xs font-bold shrink-0"
                     >
                         Ask
-                    </button>
+                    </Button>
                 </CardContent>
             </Card>
 

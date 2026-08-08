@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { Button } from '@/components/ui/button';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SHEET } from '@/lib/motion';
 import { X, Download } from 'lucide-react';
@@ -106,12 +107,12 @@ export function PWAInstallPrompt() {
                             {/* iOS offers no programmatic install, so there's nothing to
                                 tap — the instructions above are the whole affordance. */}
                             {!isIOSHint && (
-                                <button
+                                <Button
                                     onClick={handleInstall}
-                                    className="px-3 min-h-[44px] bg-primary rounded-lg text-xs font-bold text-white hover:bg-primary/90 transition-colors"
+                                    className="px-3 text-xs font-bold"
                                 >
                                     Install
-                                </button>
+                                </Button>
                             )}
                             <button
                                 onClick={handleDismiss}

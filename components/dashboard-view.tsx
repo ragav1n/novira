@@ -1,6 +1,7 @@
 'use client';
 
 import { useUserPreferences, type Currency } from '@/components/providers/user-preferences-provider';
+import { Button } from '@/components/ui/button';
 import { BudgetAlertManager } from '@/components/budget-alert-manager';
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
@@ -414,20 +415,21 @@ export function DashboardView() {
                             <h3 className="font-bold text-lg mb-1">Get set up</h3>
                             <p className="text-xs text-muted-foreground mb-4">Create a group or add a friend to start splitting expenses.</p>
                             <div className="flex gap-3">
-                                <button
+                                <Button
                                     onClick={() => router.push('/groups')}
-                                    className="flex-1 bg-primary text-white text-xs font-bold py-2.5 px-4 rounded-xl hover:bg-primary/90 transition-colors flex items-center justify-center gap-2"
+                                    className="flex-1 text-xs font-bold"
                                 >
                                     <Plus className="w-4 h-4" />
                                     Create group
-                                </button>
-                                <button
+                                </Button>
+                                <Button
+                                    variant="ghost"
                                     onClick={() => setIsAddFriendOpen(true)}
-                                    className="flex-1 bg-transparent text-primary text-xs font-bold py-2.5 px-4 rounded-xl hover:bg-primary/10 transition-colors flex items-center justify-center gap-2 border border-primary/30"
+                                    className="flex-1 text-primary text-xs font-bold hover:bg-primary/10 border border-primary/30"
                                 >
                                     <Users className="w-4 h-4" />
                                     Add friend
-                                </button>
+                                </Button>
                             </div>
                         </CardContent>
                     </Card>

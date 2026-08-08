@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useCallback } from 'react';
+import { Button } from '@/components/ui/button';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MODAL } from '@/lib/motion';
 import { X, ChartLine, Sparkles, PencilLine } from 'lucide-react';
@@ -16,13 +17,13 @@ function RecapEmpty({ monthLabel, onAdd }: { monthLabel: string; onAdd: () => vo
                 <p className="text-body font-semibold text-foreground">Nothing to recap for {monthLabel}.</p>
                 <p className="text-meta text-muted-foreground">Log a few expenses and we'll have a real story for you next time.</p>
             </div>
-            <button
+            <Button
                 onClick={onAdd}
-                className="w-full h-11 text-body font-bold rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 active:scale-[0.99] shadow-[0_6px_22px_-6px_rgba(168,85,247,0.7)] ring-1 ring-inset ring-white/15 transition-all flex items-center justify-center gap-2"
+                className="w-full text-body font-bold active:scale-[0.99] shadow-[0_6px_22px_-6px_rgba(168,85,247,0.7)] ring-1 ring-inset ring-white/15"
             >
-                <PencilLine className="w-3.5 h-3.5" />
+                <PencilLine className="size-3.5" />
                 Add a transaction
-            </button>
+            </Button>
         </div>
     );
 }
@@ -212,13 +213,13 @@ export function MonthlyRecapModal() {
                                 ) : null}
 
                                 {!(recap && recap.transactionCount === 0) && (
-                                    <button
+                                    <Button
                                         onClick={dismiss}
-                                        className="w-full h-11 text-body font-bold rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 active:scale-[0.99] shadow-[0_6px_22px_-6px_rgba(168,85,247,0.7)] ring-1 ring-inset ring-white/15 transition-all flex items-center justify-center gap-2"
+                                        className="w-full text-body font-bold active:scale-[0.99] shadow-[0_6px_22px_-6px_rgba(168,85,247,0.7)] ring-1 ring-inset ring-white/15"
                                     >
-                                        <ChartLine className="w-3.5 h-3.5" />
+                                        <ChartLine className="size-3.5" />
                                         Got it
-                                    </button>
+                                    </Button>
                                 )}
                                 <p className="text-caption text-muted-foreground/70 text-center">
                                     You can revisit any month's recap anytime from Analytics.
