@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { createPortal } from 'react-dom';
+import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     X, Zap, Tag, PieChart, Users, QrCode, Upload, Bell, Globe, FileDown,
@@ -61,11 +61,6 @@ const DEFAULT_ICON = { Icon: Zap, tone: 'text-primary' };
 
 export function FeatureAnnouncementModal({ showAnnouncement = false, userId, onClose }: FeatureAnnouncementModalProps) {
     const [isOpen, setIsOpen] = useState(false);
-    const [mounted, setMounted] = useState(false);
-
-    useEffect(() => {
-        setMounted(true);
-    }, []);
 
     // Track the prop both ways — latching open-only would keep this modal
     // alive underneath whichever surface suppressed it (e.g. the first-run
@@ -84,26 +79,49 @@ export function FeatureAnnouncementModal({ showAnnouncement = false, userId, onC
         if (onClose) onClose();
     };
 
-    if (!mounted) return null;
+    return (
+        <DialogPrimitive.Root open={isOpen} onOpenChange={(open) => { if (!open) handleClose(); }}>
+            <AnimatePresence>
+                {isOpen && (
+                    <DialogPrimitive.Portal forceMount>
+                        <DialogPrimitive.Overlay asChild forceMount>
+                            <motion.div
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                className="fixed inset-0 z-[100] bg-black/85 backdrop-blur-md"
+                            />
+                        </DialogPrimitive.Overlay>
 
-    return createPortal(
-        <AnimatePresence>
-            {isOpen && (
-                <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 sm:p-6">
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="fixed inset-0 bg-black/85 backdrop-blur-md"
-                        onClick={handleClose}
-                    />
+                        {/* The Content is the full-screen centring box, so it must not
+                            swallow backdrop clicks — a click outside the panel has to reach
+                            the Overlay, which is what Radix checks before dismissing.
+                            Focus trapping is by DOM subtree, so it is unaffected.
 
+                            This has to be an inline `style`, not `pointer-events-none`:
+                            Radix writes `style="pointer-events: auto"` onto Content itself,
+                            and an inline style beats any class. Its Slot merges the child's
+                            style over its own, so setting it here is what actually wins.
+                            Verified in-browser — with the class, `elementFromPoint` at the
+                            backdrop returned this div and outside-click silently stopped
+                            closing the modal. */}
+                        <DialogPrimitive.Content
+                            asChild
+                            forceMount
+                            // Suppresses Radix's missing-description warning without a
+                            // VisuallyHidden node — same convention as ui/dialog.tsx.
+                            aria-describedby={undefined}
+                        >
+                            <div
+                                className="fixed inset-0 z-[110] flex items-center justify-center p-4 sm:p-6"
+                                style={{ pointerEvents: 'none' }}
+                            >
                     <motion.div
                         initial={{ opacity: 0, scale: 0.95, y: 20 }}
                         animate={{ opacity: 1, scale: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.95, y: 20 }}
                         transition={{ type: 'spring', duration: 0.6, bounce: 0.3 }}
-                        className="relative w-full max-w-md bg-[#0A0A0B]/98 backdrop-blur-xl border border-white/10 rounded-[2.5rem] shadow-[0_0_50px_-12px_rgba(138,43,226,0.3)] overflow-hidden z-[1100]"
+                        className="pointer-events-auto relative w-full max-w-md bg-[#0A0A0B]/98 backdrop-blur-xl border border-white/10 rounded-[2.5rem] shadow-[0_0_50px_-12px_rgba(138,43,226,0.3)] overflow-hidden"
                     >
                         <div className="pointer-events-none absolute -top-32 -left-32 w-72 h-72 bg-primary/20 rounded-full blur-[100px] opacity-50" />
                         <div className="pointer-events-none absolute -bottom-32 -right-32 w-72 h-72 bg-purple-600/20 rounded-full blur-[100px] opacity-50" />
@@ -119,13 +137,17 @@ export function FeatureAnnouncementModal({ showAnnouncement = false, userId, onC
 
                         <div className="relative flex flex-col">
                             <div className="px-6 pt-5 pb-3">
-                                <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary mb-1.5">
+                                <div className="text-eyebrow uppercase text-primary mb-1.5">
                                     Updated · v{version}
                                 </div>
-                                <h2 className="text-xl font-extrabold text-white tracking-tight leading-tight">
-                                    {LATEST_FEATURE_ANNOUNCEMENT.title}
-                                </h2>
-                                <p className="text-[12px] text-white/55 leading-relaxed mt-1">
+                                {/* asChild so Radix uses this as the dialog's accessible
+                                    name without adding a wrapper element. */}
+                                <DialogPrimitive.Title asChild>
+                                    <h2 className="text-xl font-extrabold text-white tracking-tight leading-tight">
+                                        {LATEST_FEATURE_ANNOUNCEMENT.title}
+                                    </h2>
+                                </DialogPrimitive.Title>
+                                <p className="text-xs text-white/55 leading-relaxed mt-1">
                                     A few things changed since you last opened Novira.
                                 </p>
                             </div>
@@ -145,10 +167,10 @@ export function FeatureAnnouncementModal({ showAnnouncement = false, userId, onC
                                                 <Icon className={`w-4 h-4 ${tone}`} aria-hidden="true" />
                                             </span>
                                             <div className="min-w-0 flex-1">
-                                                <h3 className="text-[13px] font-bold text-white leading-tight">
+                                                <h3 className="text-body font-bold text-white leading-tight">
                                                     {feature.title}
                                                 </h3>
-                                                <p className="text-[11.5px] text-white/60 leading-snug mt-1">
+                                                <p className="text-meta text-white/60 leading-snug mt-1">
                                                     {feature.description}
                                                 </p>
                                             </div>
@@ -160,16 +182,18 @@ export function FeatureAnnouncementModal({ showAnnouncement = false, userId, onC
                             <div className="px-6 py-4 border-t border-white/5 bg-black/40 backdrop-blur-xl">
                                 <Button
                                     onClick={handleClose}
-                                    className="w-full h-11 rounded-xl bg-white text-black hover:bg-white/90 font-bold text-[12.5px]"
+                                    className="w-full h-11 rounded-xl bg-white text-black hover:bg-white/90 font-bold text-body"
                                 >
                                     {LATEST_FEATURE_ANNOUNCEMENT.buttonText}
                                 </Button>
                             </div>
                         </div>
                     </motion.div>
-                </div>
-            )}
-        </AnimatePresence>,
-        document.body
+                            </div>
+                        </DialogPrimitive.Content>
+                    </DialogPrimitive.Portal>
+                )}
+            </AnimatePresence>
+        </DialogPrimitive.Root>
     );
 }

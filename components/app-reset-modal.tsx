@@ -1,21 +1,20 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { createPortal } from 'react-dom';
+import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MODAL } from '@/lib/motion';
-import { Wrench, ShieldCheck, LogIn, Settings as SettingsIcon, Loader2 } from 'lucide-react';
+import { Wrench, ShieldCheck, LogIn, Settings as SettingsIcon } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import { Button } from '@/components/ui/button';
 
 const STORAGE_KEY = 'app-reset-v2-completed';
 
 export function AppResetModal() {
     const [isOpen, setIsOpen] = useState(false);
-    const [mounted, setMounted] = useState(false);
     const [resetting, setResetting] = useState(false);
 
     useEffect(() => {
-        setMounted(true);
         if (typeof window === 'undefined') return;
         if (localStorage.getItem(STORAGE_KEY)) return;
         // Migration prompt only makes sense on the deployed origins — on
@@ -103,27 +102,46 @@ export function AppResetModal() {
         window.location.replace('/');
     };
 
-    if (!mounted) return null;
-
-    return createPortal(
+    return (
+        // Deliberately non-dismissible: the only way out is the reset button,
+        // which ends in a full page replace. `onOpenChange` is a no-op and both
+        // Radix dismiss paths are cancelled below.
+        <DialogPrimitive.Root open={isOpen} onOpenChange={() => { /* non-dismissible */ }}>
         <AnimatePresence>
             {isOpen && (
-                <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 sm:p-0">
-                    {/* Backdrop — no onClick, cannot dismiss */}
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="fixed inset-0 bg-black/80 backdrop-blur-md"
-                    />
+                <DialogPrimitive.Portal forceMount>
+                    {/* Backdrop — cannot dismiss */}
+                    <DialogPrimitive.Overlay asChild forceMount>
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="fixed inset-0 z-[1000] bg-black/80 backdrop-blur-md"
+                        />
+                    </DialogPrimitive.Overlay>
 
+                    {/* The Content is the full-screen centring box. The inline
+                        `style` (not `pointer-events-none`) is required: Radix writes
+                        `style="pointer-events: auto"` onto Content itself, and its Slot
+                        merges the child's style over its own, so setting it here wins. */}
+                    <DialogPrimitive.Content
+                        asChild
+                        forceMount
+                        aria-describedby={undefined}
+                        onInteractOutside={(e) => e.preventDefault()}
+                        onEscapeKeyDown={(e) => e.preventDefault()}
+                    >
+                        <div
+                            className="fixed inset-0 z-[1100] flex items-center justify-center p-4 sm:p-0"
+                            style={{ pointerEvents: 'none' }}
+                        >
                     {/* Modal */}
                     <motion.div
                         initial={{ opacity: 0, scale: 0.9, y: 30 }}
                         animate={{ opacity: 1, scale: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.9, y: 30 }}
                         transition={MODAL}
-                        className="relative w-full max-w-sm bg-[#0D0D0F]/98 backdrop-blur-xl border border-white/10 rounded-[2.5rem] shadow-[0_0_80px_-15px_rgba(138,43,226,0.4)] overflow-hidden z-[1100] mx-4 flex flex-col max-h-[90dvh]"
+                        className="pointer-events-auto relative w-full max-w-sm bg-[#0D0D0F]/98 backdrop-blur-xl border border-white/10 rounded-[2.5rem] shadow-[0_0_80px_-15px_rgba(138,43,226,0.4)] overflow-hidden mx-4 flex flex-col max-h-[90dvh]"
                     >
                         {/* Glows */}
                         <div className="absolute -top-24 -left-24 w-56 h-56 bg-primary/30 rounded-full blur-[70px] opacity-40 animate-pulse" />
@@ -142,14 +160,18 @@ export function AppResetModal() {
                             </motion.div>
 
                             <div className="space-y-2">
-                                <motion.h1
-                                    initial={{ y: 10, opacity: 0 }}
-                                    animate={{ y: 0, opacity: 1 }}
-                                    transition={{ delay: 0.2 }}
-                                    className="text-2xl font-black text-white tracking-tight leading-tight"
-                                >
-                                    We&apos;ve moved to a new home
-                                </motion.h1>
+                                {/* asChild so Radix uses this as the dialog's accessible
+                                    name without adding a wrapper element. */}
+                                <DialogPrimitive.Title asChild>
+                                    <motion.h1
+                                        initial={{ y: 10, opacity: 0 }}
+                                        animate={{ y: 0, opacity: 1 }}
+                                        transition={{ delay: 0.2 }}
+                                        className="text-2xl font-black text-white tracking-tight leading-tight"
+                                    >
+                                        We&apos;ve moved to a new home
+                                    </motion.h1>
+                                </DialogPrimitive.Title>
                                 <motion.p
                                     initial={{ y: 10, opacity: 0 }}
                                     animate={{ y: 0, opacity: 1 }}
@@ -200,7 +222,10 @@ export function AppResetModal() {
                                 >
                                     {resetting ? (
                                         <span className="flex items-center gap-2">
-                                            <Loader2 className="w-4 h-4 animate-spin" />
+                                            {/* label={null}: the button's own text already
+                                                announces the busy state, so a nested
+                                                role="status" would be read out twice. */}
+                                            <Spinner label={null} />
                                             Resetting...
                                         </span>
                                     ) : (
@@ -214,9 +239,11 @@ export function AppResetModal() {
                         <div className="absolute top-0 left-0 w-full h-[1px] bg-white/20" />
                         <div className="absolute top-0 left-1/4 w-1/2 h-[2px] bg-gradient-to-r from-transparent via-white/40 to-transparent" />
                     </motion.div>
-                </div>
+                        </div>
+                    </DialogPrimitive.Content>
+                </DialogPrimitive.Portal>
             )}
-        </AnimatePresence>,
-        document.body
+        </AnimatePresence>
+        </DialogPrimitive.Root>
     );
 }

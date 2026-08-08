@@ -65,11 +65,11 @@ export const DashboardTransactionsDrawer = React.memo(function DashboardTransact
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
             <DialogContent
+                variant="fullscreen"
                 showCloseButton={false}
                 aria-describedby={undefined}
                 onInteractOutside={e => e.preventDefault()}
                 onPointerDownOutside={e => e.preventDefault()}
-                className="fixed inset-0 top-0 left-0 right-0 bottom-0 max-w-none sm:max-w-none w-full h-full bg-background border-none rounded-none p-0 overflow-hidden flex flex-col z-[110] translate-x-0 translate-y-0 shadow-none elevation-0"
             >
                 <DialogHeader className="p-6 pt-12 pb-4 border-b border-white/5 shrink-0">
                     <div className="flex items-center justify-between">
@@ -129,7 +129,7 @@ export const DashboardTransactionsDrawer = React.memo(function DashboardTransact
                                                 transition={{ duration: 1.4, repeat: Infinity, ease: 'easeInOut' }}
                                                 className="flex flex-col items-center gap-0.5"
                                             >
-                                                <span className="text-[10px] font-bold uppercase tracking-widest text-white/60">Scroll for more</span>
+                                                <span className="text-eyebrow uppercase text-white/60">Scroll for more</span>
                                                 <ChevronDown className="w-4 h-4 text-white/50" />
                                             </motion.div>
                                         </motion.div>

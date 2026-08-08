@@ -4,8 +4,9 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { AnimatePresence, motion } from 'framer-motion';
 import { QUICK_FADE, SNAPPY } from '@/lib/motion';
 import { Card, CardContent } from '@/components/ui/card';
-import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
-import { Sparkles, Send, Loader2 } from 'lucide-react';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Sparkles, Send } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils';
 import type { DateRange } from '@/hooks/useAnalyticsData';
 
@@ -274,33 +275,44 @@ export function InsightsChatCard({ dateRange, customStart, customEnd, bucketId, 
                         <Sparkles className="w-5 h-5" />
                     </div>
                     <div className="flex-1 min-w-0">
-                        <p className="text-[13px] font-bold">Ask about your spending</p>
-                        <p className="text-[11px] text-muted-foreground/80">Get a quick answer grounded in this view&apos;s data.</p>
+                        <p className="text-body font-bold">Ask about your spending</p>
+                        <p className="text-meta text-muted-foreground/80">Get a quick answer grounded in this view&apos;s data.</p>
                     </div>
                     <button
                         onClick={() => setOpen(true)}
-                        className="h-9 px-4 text-[12px] font-bold rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-all shrink-0"
+                        className="h-9 px-4 text-xs font-bold rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-all shrink-0"
                     >
                         Ask
                     </button>
                 </CardContent>
             </Card>
 
-            <Drawer open={open} onOpenChange={(v) => { setOpen(v); if (!v) abortRef.current?.abort(); }}>
-                <DrawerContent className="max-h-[85vh]">
-                    <DrawerHeader className="text-left border-b border-white/5">
+            <Sheet open={open} onOpenChange={(v) => { setOpen(v); if (!v) abortRef.current?.abort(); }}>
+                {/* Was a vaul Drawer — the only consumer of that dependency in the whole
+                    app, and it used none of vaul's features (no snap points, no
+                    direction, no dismissible/handleOnly). A bottom Sheet is the same
+                    surface on the Radix dialog this app already uses everywhere else.
+
+                    The X is deliberately kept: drag-to-dismiss goes away with vaul, so
+                    without it the only ways out would be the backdrop and Escape. The
+                    grab handle is deliberately NOT carried over — a handle that can't
+                    be dragged advertises a gesture that no longer exists. (Drag was a
+                    liability here anyway: this sheet holds a focused textarea, and vaul
+                    needs repositionInputs/handleOnly tuning for that, which it never had.) */}
+                <SheetContent side="bottom" className="max-h-[85vh] rounded-t-lg">
+                    <SheetHeader className="text-left border-b border-white/5">
                         <div className="flex items-center justify-between gap-2">
-                            <DrawerTitle className="flex items-center gap-2 text-base">
+                            <SheetTitle className="flex items-center gap-2 text-base">
                                 <Sparkles className="w-4 h-4 text-primary" />
                                 Insights
-                            </DrawerTitle>
+                            </SheetTitle>
                             {remaining !== null && (
-                                <span className="text-[10px] font-bold tabular-nums px-2 py-0.5 rounded-md bg-secondary/30 text-foreground/70">
+                                <span className="text-caption font-bold tabular-nums px-2 py-0.5 rounded-md bg-secondary/30 text-foreground/70">
                                     {remaining} / 3 today
                                 </span>
                             )}
                         </div>
-                    </DrawerHeader>
+                    </SheetHeader>
 
                     <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-3 min-h-[300px]">
                         {messages.length === 0 && (
@@ -310,7 +322,7 @@ export function InsightsChatCard({ dateRange, customStart, customEnd, bucketId, 
                                 transition={{ duration: 0.25 }}
                                 className="space-y-2"
                             >
-                                <p className="text-[11px] font-bold uppercase tracking-wider text-foreground/60">Try asking</p>
+                                <p className="text-meta font-bold uppercase tracking-wider text-foreground/60">Try asking</p>
                                 <div className="flex flex-wrap gap-1.5">
                                     {SUGGESTIONS.map((s, i) => (
                                         <motion.button
@@ -319,13 +331,13 @@ export function InsightsChatCard({ dateRange, customStart, customEnd, bucketId, 
                                             animate={{ opacity: 1, y: 0 }}
                                             transition={{ delay: 0.05 * i, duration: 0.2 }}
                                             onClick={() => send(s)}
-                                            className="text-[11px] px-3 py-1.5 rounded-full bg-secondary/30 border border-white/5 hover:bg-secondary/50 hover:border-primary/30 transition-colors text-foreground/90"
+                                            className="text-meta px-3 py-1.5 rounded-full bg-secondary/30 border border-white/5 hover:bg-secondary/50 hover:border-primary/30 transition-colors text-foreground/90"
                                         >
                                             {s}
                                         </motion.button>
                                     ))}
                                 </div>
-                                <p className="text-[10px] text-foreground/50 pt-2">Limited to 3 questions per day to keep this feature free.</p>
+                                <p className="text-caption text-foreground/50 pt-2">Limited to 3 questions per day to keep this feature free.</p>
                             </motion.div>
                         )}
 
@@ -345,7 +357,7 @@ export function InsightsChatCard({ dateRange, customStart, customEnd, bucketId, 
                                 >
                                     <div
                                         className={cn(
-                                            'max-w-[85%] rounded-xl px-3.5 py-2.5 text-[13px] leading-relaxed whitespace-pre-wrap shadow-sm',
+                                            'max-w-[85%] rounded-xl px-3.5 py-2.5 text-body leading-relaxed whitespace-pre-wrap shadow-sm',
                                             m.role === 'user'
                                                 ? 'bg-primary text-primary-foreground rounded-tr-md'
                                                 : 'bg-secondary/40 border border-white/10 text-foreground rounded-tl-md backdrop-blur-sm'
@@ -368,7 +380,7 @@ export function InsightsChatCard({ dateRange, customStart, customEnd, bucketId, 
                             <motion.div
                                 initial={{ opacity: 0, y: 6 }}
                                 animate={{ opacity: 1, y: 0 }}
-                                className="text-[11px] text-destructive border border-destructive/30 bg-destructive/10 rounded-xl px-3 py-2"
+                                className="text-meta text-destructive border border-destructive/30 bg-destructive/10 rounded-xl px-3 py-2"
                             >
                                 {error}
                             </motion.div>
@@ -384,7 +396,7 @@ export function InsightsChatCard({ dateRange, customStart, customEnd, bucketId, 
                             onChange={(e) => setInput(e.target.value)}
                             placeholder="Ask anything…"
                             disabled={streaming}
-                            className="flex-1 h-10 px-4 rounded-full bg-secondary/20 border border-white/5 text-[13px] focus:outline-none focus:ring-1 focus:ring-primary/50 focus:border-primary/30 disabled:opacity-50 transition-all"
+                            className="flex-1 h-10 px-4 rounded-full bg-secondary/20 border border-white/5 text-body focus:outline-none focus:ring-1 focus:ring-primary/50 focus:border-primary/30 disabled:opacity-50 transition-all"
                             aria-label="Ask about your spending"
                         />
                         <motion.button
@@ -395,11 +407,11 @@ export function InsightsChatCard({ dateRange, customStart, customEnd, bucketId, 
                             className="h-10 w-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center disabled:opacity-40 hover:bg-primary/90 transition-colors shadow-md shadow-primary/20"
                             aria-label="Send"
                         >
-                            {streaming ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                            {streaming ? <Spinner className="w-4 h-4" label={null} /> : <Send className="w-4 h-4" />}
                         </motion.button>
                     </form>
-                </DrawerContent>
-            </Drawer>
+                </SheetContent>
+            </Sheet>
         </>
     );
 }

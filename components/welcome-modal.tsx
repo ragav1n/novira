@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { createPortal } from 'react-dom';
+import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import {
@@ -58,13 +58,8 @@ const HERO_FEATURES = [
 ];
 
 export function WelcomeModal({ isOpen, onClose, onOpenFullTour }: WelcomeModalProps) {
-    const [mounted, setMounted] = useState(false);
     const [screen, setScreen] = useState<ScreenKey>('welcome');
     const router = useRouter();
-
-    useEffect(() => {
-        setMounted(true);
-    }, []);
 
     useEffect(() => {
         if (isOpen) setScreen('welcome');
@@ -99,26 +94,46 @@ export function WelcomeModal({ isOpen, onClose, onOpenFullTour }: WelcomeModalPr
         }
     };
 
-    if (!mounted) return null;
-
-    return createPortal(
+    return (
+        <DialogPrimitive.Root open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
         <AnimatePresence>
             {isOpen && (
-                <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 sm:p-6">
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="fixed inset-0 bg-black/85 backdrop-blur-md"
-                        onClick={onClose}
-                    />
+                <DialogPrimitive.Portal forceMount>
+                    <DialogPrimitive.Overlay asChild forceMount>
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="fixed inset-0 z-[100] bg-black/85 backdrop-blur-md"
+                        />
+                    </DialogPrimitive.Overlay>
 
+                    {/* The Content is the full-screen centring box, so it must not
+                        swallow backdrop clicks — a click outside the panel has to reach
+                        the Overlay, which is what Radix checks before dismissing.
+                        Focus trapping is by DOM subtree, so it is unaffected.
+
+                        This has to be an inline `style`, not `pointer-events-none`:
+                        Radix writes `style="pointer-events: auto"` onto Content itself,
+                        and an inline style beats any class. Its Slot merges the child's
+                        style over its own, so setting it here is what actually wins. */}
+                    <DialogPrimitive.Content
+                        asChild
+                        forceMount
+                        // Suppresses Radix's missing-description warning without a
+                        // VisuallyHidden node — same convention as ui/dialog.tsx.
+                        aria-describedby={undefined}
+                    >
+                        <div
+                            className="fixed inset-0 z-[110] flex items-center justify-center p-4 sm:p-6"
+                            style={{ pointerEvents: 'none' }}
+                        >
                     <motion.div
                         initial={{ opacity: 0, scale: 0.95, y: 20 }}
                         animate={{ opacity: 1, scale: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.95, y: 20 }}
                         transition={{ type: 'spring', duration: 0.6, bounce: 0.3 }}
-                        className="relative w-full max-w-md bg-[#0A0A0B]/98 backdrop-blur-xl border border-white/10 rounded-[2.5rem] shadow-[0_0_50px_-12px_rgba(138,43,226,0.3)] overflow-hidden z-[1100]"
+                        className="pointer-events-auto relative w-full max-w-md bg-[#0A0A0B]/98 backdrop-blur-xl border border-white/10 rounded-[2.5rem] shadow-[0_0_50px_-12px_rgba(138,43,226,0.3)] overflow-hidden"
                     >
                         <div className="pointer-events-none absolute -top-32 -left-32 w-72 h-72 bg-primary/20 rounded-full blur-[100px] opacity-50" />
                         <div className="pointer-events-none absolute -bottom-32 -right-32 w-72 h-72 bg-purple-600/20 rounded-full blur-[100px] opacity-50" />
@@ -126,7 +141,7 @@ export function WelcomeModal({ isOpen, onClose, onOpenFullTour }: WelcomeModalPr
 
                         <div className="relative flex flex-col">
                             <div className="px-6 pt-5 pb-3 flex items-center justify-between">
-                                <div className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.18em] font-bold text-primary">
+                                <div className="inline-flex items-center gap-1.5 text-eyebrow uppercase text-primary">
                                     <Sparkles className="w-3 h-3" aria-hidden="true" />
                                     Welcome
                                 </div>
@@ -159,10 +174,14 @@ export function WelcomeModal({ isOpen, onClose, onOpenFullTour }: WelcomeModalPr
                                                     <Compass className="w-7 h-7 text-primary drop-shadow-[0_0_10px_rgba(138,43,226,0.6)]" />
                                                 </div>
                                                 <div className="space-y-1.5">
-                                                    <h1 className="text-2xl font-extrabold text-white tracking-tight leading-tight">
-                                                        Welcome to Novira
-                                                    </h1>
-                                                    <p className="text-[13px] text-white/65 leading-relaxed max-w-[300px] mx-auto">
+                                                    {/* Each screen names the dialog. `mode="wait"` keeps exactly
+                                                        one mounted, so the title id is never duplicated. */}
+                                                    <DialogPrimitive.Title asChild>
+                                                        <h1 className="text-2xl font-extrabold text-white tracking-tight leading-tight">
+                                                            Welcome to Novira
+                                                        </h1>
+                                                    </DialogPrimitive.Title>
+                                                    <p className="text-body text-white/65 leading-relaxed max-w-[300px] mx-auto">
                                                         Track, split, and plan money across currencies.
                                                     </p>
                                                 </div>
@@ -174,8 +193,8 @@ export function WelcomeModal({ isOpen, onClose, onOpenFullTour }: WelcomeModalPr
                                                     { k: 'Share fairly', v: 'Splits with friends, settled in fewer transfers' },
                                                 ].map(({ k, v }) => (
                                                     <div key={k} className="flex items-center justify-between gap-3 px-4 py-2.5">
-                                                        <span className="text-[12px] font-bold text-white">{k}</span>
-                                                        <span className="text-[11px] text-white/55 text-right">{v}</span>
+                                                        <span className="text-xs font-bold text-white">{k}</span>
+                                                        <span className="text-meta text-white/55 text-right">{v}</span>
                                                     </div>
                                                 ))}
                                             </div>
@@ -192,10 +211,12 @@ export function WelcomeModal({ isOpen, onClose, onOpenFullTour }: WelcomeModalPr
                                             className="space-y-4 pt-2"
                                         >
                                             <div className="space-y-1">
-                                                <h2 className="text-lg font-extrabold text-white tracking-tight leading-tight">
-                                                    What you can do
-                                                </h2>
-                                                <p className="text-[12px] text-white/55 leading-relaxed">
+                                                <DialogPrimitive.Title asChild>
+                                                    <h2 className="text-lg font-extrabold text-white tracking-tight leading-tight">
+                                                        What you can do
+                                                    </h2>
+                                                </DialogPrimitive.Title>
+                                                <p className="text-xs text-white/55 leading-relaxed">
                                                     Four things Novira does well. There's more inside.
                                                 </p>
                                             </div>
@@ -209,10 +230,10 @@ export function WelcomeModal({ isOpen, onClose, onOpenFullTour }: WelcomeModalPr
                                                         className="rounded-xl border border-white/8 bg-white/[0.03] p-3 space-y-1.5"
                                                     >
                                                         <f.Icon className={cn('w-4 h-4', f.tone)} aria-hidden="true" />
-                                                        <div className="text-[12px] font-bold text-white leading-tight">
+                                                        <div className="text-xs font-bold text-white leading-tight">
                                                             {f.title}
                                                         </div>
-                                                        <p className="text-[10.5px] text-white/55 leading-snug">
+                                                        <p className="text-caption text-white/55 leading-snug">
                                                             {f.body}
                                                         </p>
                                                     </motion.div>
@@ -221,7 +242,7 @@ export function WelcomeModal({ isOpen, onClose, onOpenFullTour }: WelcomeModalPr
                                             <button
                                                 type="button"
                                                 onClick={openFullTour}
-                                                className="w-full inline-flex items-center justify-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.02] px-3 py-2.5 text-[11.5px] font-semibold text-white/75 hover:text-white hover:bg-white/[0.06] transition-colors"
+                                                className="w-full inline-flex items-center justify-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.02] px-3 py-2.5 text-meta font-semibold text-white/75 hover:text-white hover:bg-white/[0.06] transition-colors"
                                             >
                                                 <BookOpen className="w-3.5 h-3.5" aria-hidden="true" />
                                                 See the full tour
@@ -240,10 +261,12 @@ export function WelcomeModal({ isOpen, onClose, onOpenFullTour }: WelcomeModalPr
                                             className="space-y-4 pt-2"
                                         >
                                             <div className="space-y-1">
-                                                <h2 className="text-lg font-extrabold text-white tracking-tight leading-tight">
-                                                    Start with one thing
-                                                </h2>
-                                                <p className="text-[12px] text-white/55 leading-relaxed">
+                                                <DialogPrimitive.Title asChild>
+                                                    <h2 className="text-lg font-extrabold text-white tracking-tight leading-tight">
+                                                        Start with one thing
+                                                    </h2>
+                                                </DialogPrimitive.Title>
+                                                <p className="text-xs text-white/55 leading-relaxed">
                                                     Pick where to begin. You can do the rest later.
                                                 </p>
                                             </div>
@@ -263,8 +286,8 @@ export function WelcomeModal({ isOpen, onClose, onOpenFullTour }: WelcomeModalPr
                                                             <Icon className="w-4 h-4 text-primary" aria-hidden="true" />
                                                         </span>
                                                         <span className="min-w-0 flex-1">
-                                                            <span className="block text-[13px] font-semibold text-white leading-tight">{label}</span>
-                                                            <span className="block text-[11px] text-white/45 leading-tight mt-0.5">{sub}</span>
+                                                            <span className="block text-body font-semibold text-white leading-tight">{label}</span>
+                                                            <span className="block text-meta text-white/45 leading-tight mt-0.5">{sub}</span>
                                                         </span>
                                                         <ArrowRight className="w-4 h-4 text-white/30 group-hover:text-white/70 transition-colors" aria-hidden="true" />
                                                     </button>
@@ -280,7 +303,7 @@ export function WelcomeModal({ isOpen, onClose, onOpenFullTour }: WelcomeModalPr
                                     <Button
                                         variant="ghost"
                                         onClick={goBack}
-                                        className="h-11 px-4 rounded-xl text-[12px] font-semibold text-white/65 hover:text-white hover:bg-white/5"
+                                        className="h-11 px-4 rounded-xl text-xs font-semibold text-white/65 hover:text-white hover:bg-white/5"
                                     >
                                         Back
                                     </Button>
@@ -288,14 +311,14 @@ export function WelcomeModal({ isOpen, onClose, onOpenFullTour }: WelcomeModalPr
                                     <Button
                                         variant="ghost"
                                         onClick={onClose}
-                                        className="h-11 px-4 rounded-xl text-[12px] font-semibold text-white/65 hover:text-white hover:bg-white/5"
+                                        className="h-11 px-4 rounded-xl text-xs font-semibold text-white/65 hover:text-white hover:bg-white/5"
                                     >
                                         Skip
                                     </Button>
                                 )}
                                 <Button
                                     onClick={goNext}
-                                    className="flex-1 h-11 rounded-xl bg-white text-black hover:bg-white/90 font-bold text-[12.5px] inline-flex items-center justify-center gap-1.5"
+                                    className="flex-1 h-11 rounded-xl bg-white text-black hover:bg-white/90 font-bold text-body inline-flex items-center justify-center gap-1.5"
                                 >
                                     {screen === 'setup' ? 'Get started' : 'Next'}
                                     {screen !== 'setup' && <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />}
@@ -303,9 +326,11 @@ export function WelcomeModal({ isOpen, onClose, onOpenFullTour }: WelcomeModalPr
                             </div>
                         </div>
                     </motion.div>
-                </div>
+                        </div>
+                    </DialogPrimitive.Content>
+                </DialogPrimitive.Portal>
             )}
-        </AnimatePresence>,
-        document.body
+        </AnimatePresence>
+        </DialogPrimitive.Root>
     );
 }

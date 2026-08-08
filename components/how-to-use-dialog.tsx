@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { createPortal } from 'react-dom';
+import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { motion, AnimatePresence } from 'framer-motion';
 import { QUICK_FADE } from '@/lib/motion';
 import Link from 'next/link';
@@ -205,12 +205,7 @@ const STEPS: Step[] = [
 ];
 
 export function HowToUseDialog({ isOpen, onClose }: HowToUseDialogProps) {
-    const [mounted, setMounted] = useState(false);
     const [openGroups, setOpenGroups] = useState<Set<StepGroup>>(new Set(['Capture']));
-
-    useEffect(() => {
-        setMounted(true);
-    }, []);
 
     useEffect(() => {
         if (isOpen) setOpenGroups(new Set(['Capture']));
@@ -232,26 +227,46 @@ export function HowToUseDialog({ isOpen, onClose }: HowToUseDialogProps) {
         });
     };
 
-    if (!mounted) return null;
-
-    return createPortal(
+    return (
+        <DialogPrimitive.Root open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
         <AnimatePresence>
             {isOpen && (
-                <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 sm:p-6">
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="fixed inset-0 bg-black/85 backdrop-blur-md"
-                        onClick={onClose}
-                    />
+                <DialogPrimitive.Portal forceMount>
+                    <DialogPrimitive.Overlay asChild forceMount>
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="fixed inset-0 z-[100] bg-black/85 backdrop-blur-md"
+                        />
+                    </DialogPrimitive.Overlay>
 
+                    {/* The Content is the full-screen centring box, so it must not
+                        swallow backdrop clicks — a click outside the panel has to reach
+                        the Overlay, which is what Radix checks before dismissing.
+                        Focus trapping is by DOM subtree, so it is unaffected.
+
+                        This has to be an inline `style`, not `pointer-events-none`:
+                        Radix writes `style="pointer-events: auto"` onto Content itself,
+                        and an inline style beats any class. Its Slot merges the child's
+                        style over its own, so setting it here is what actually wins. */}
+                    <DialogPrimitive.Content
+                        asChild
+                        forceMount
+                        // Suppresses Radix's missing-description warning without a
+                        // VisuallyHidden node — same convention as ui/dialog.tsx.
+                        aria-describedby={undefined}
+                    >
+                        <div
+                            className="fixed inset-0 z-[110] flex items-center justify-center p-4 sm:p-6"
+                            style={{ pointerEvents: 'none' }}
+                        >
                     <motion.div
                         initial={{ opacity: 0, scale: 0.95, y: 20 }}
                         animate={{ opacity: 1, scale: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.95, y: 20 }}
                         transition={{ type: 'spring', duration: 0.6, bounce: 0.3 }}
-                        className="relative w-full max-w-2xl bg-[#0A0A0B]/98 backdrop-blur-xl border border-white/10 rounded-[2.5rem] shadow-[0_0_50px_-12px_rgba(138,43,226,0.3)] overflow-hidden z-[1100]"
+                        className="pointer-events-auto relative w-full max-w-2xl bg-[#0A0A0B]/98 backdrop-blur-xl border border-white/10 rounded-[2.5rem] shadow-[0_0_50px_-12px_rgba(138,43,226,0.3)] overflow-hidden"
                     >
                         <div className="pointer-events-none absolute -top-32 -left-32 w-80 h-80 bg-primary/20 rounded-full blur-[100px] opacity-40" />
                         <div className="pointer-events-none absolute -bottom-32 -right-32 w-80 h-80 bg-purple-600/20 rounded-full blur-[100px] opacity-40" />
@@ -263,13 +278,17 @@ export function HowToUseDialog({ isOpen, onClose }: HowToUseDialogProps) {
                                     <Compass className="w-5 h-5 text-primary drop-shadow-[0_0_8px_rgba(138,43,226,0.6)]" aria-hidden="true" />
                                 </div>
                                 <div className="min-w-0 flex-1">
-                                    <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary mb-0.5">
+                                    <div className="text-eyebrow uppercase text-primary mb-0.5">
                                         Help
                                     </div>
-                                    <h1 className="text-base sm:text-lg font-extrabold text-white tracking-tight leading-tight">
-                                        How Novira works
-                                    </h1>
-                                    <p className="text-[11.5px] text-white/55 leading-snug mt-0.5">
+                                    {/* asChild so Radix uses this as the dialog's accessible
+                                        name without adding a wrapper element. */}
+                                    <DialogPrimitive.Title asChild>
+                                        <h1 className="text-base sm:text-lg font-extrabold text-white tracking-tight leading-tight">
+                                            How Novira works
+                                        </h1>
+                                    </DialogPrimitive.Title>
+                                    <p className="text-meta text-white/55 leading-snug mt-0.5">
                                         Five sections. Tap one to expand.
                                     </p>
                                 </div>
@@ -300,14 +319,14 @@ export function HowToUseDialog({ isOpen, onClose }: HowToUseDialogProps) {
                                                 >
                                                     <div className="min-w-0 flex-1">
                                                         <div className="flex items-baseline gap-2">
-                                                            <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary">
+                                                            <span className="text-eyebrow uppercase text-primary">
                                                                 {group}
                                                             </span>
-                                                            <span className="text-[10px] font-mono text-white/35">
+                                                            <span className="text-caption font-mono text-white/35">
                                                                 {groupSteps.length}
                                                             </span>
                                                         </div>
-                                                        <p className="text-[12px] text-white/65 leading-snug mt-0.5">
+                                                        <p className="text-xs text-white/65 leading-snug mt-0.5">
                                                             {GROUP_BLURB[group]}
                                                         </p>
                                                     </div>
@@ -343,17 +362,17 @@ export function HowToUseDialog({ isOpen, onClose }: HowToUseDialogProps) {
                                                                                 {step.icon}
                                                                             </div>
                                                                             <div className="space-y-2.5 flex-1 min-w-0">
-                                                                                <h3 className="text-[14px] sm:text-[15px] font-bold text-white tracking-tight">
+                                                                                <h3 className="text-sm sm:text-lead font-bold text-white tracking-tight">
                                                                                     {step.title}
                                                                                 </h3>
-                                                                                <p className="text-[12px] sm:text-[12.5px] text-white/70 leading-relaxed">
+                                                                                <p className="text-xs sm:text-body text-white/70 leading-relaxed">
                                                                                     {step.desc}
                                                                                 </p>
                                                                                 <div className="pt-1 grid grid-cols-1 gap-1.5">
                                                                                     {step.subPoints.map((point) => (
                                                                                         <div
                                                                                             key={point}
-                                                                                            className="flex items-start gap-2 text-[11.5px] text-white/65"
+                                                                                            className="flex items-start gap-2 text-meta text-white/65"
                                                                                         >
                                                                                             <CheckCircle2 className="w-3.5 h-3.5 text-primary mt-0.5 shrink-0" aria-hidden="true" />
                                                                                             <span className="leading-snug">{point}</span>
@@ -384,7 +403,7 @@ export function HowToUseDialog({ isOpen, onClose }: HowToUseDialogProps) {
                                 <Link
                                     href="/guide"
                                     onClick={onClose}
-                                    className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.02] px-4 py-2.5 text-[12px] font-medium text-white/75 hover:bg-white/[0.06] hover:text-white transition-colors"
+                                    className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.02] px-4 py-2.5 text-xs font-medium text-white/75 hover:bg-white/[0.06] hover:text-white transition-colors"
                                 >
                                     <BookOpen className="w-3.5 h-3.5" aria-hidden="true" />
                                     Full guide
@@ -409,9 +428,11 @@ export function HowToUseDialog({ isOpen, onClose }: HowToUseDialogProps) {
                             }
                         `}</style>
                     </motion.div>
-                </div>
+                        </div>
+                    </DialogPrimitive.Content>
+                </DialogPrimitive.Portal>
             )}
-        </AnimatePresence>,
-        document.body
+        </AnimatePresence>
+        </DialogPrimitive.Root>
     );
 }
