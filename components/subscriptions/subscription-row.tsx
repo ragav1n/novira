@@ -59,7 +59,7 @@ export function SubscriptionRow({
         >
             <CardContent className="p-4 flex items-center gap-4">
                 <div className={cn("w-12 h-12 rounded-xl flex flex-col items-center justify-center shrink-0 border", themeConfig.bg, themeConfig.border)}>
-                    <span className={cn("text-[10px] font-bold uppercase leading-tight w-full text-center py-0.5 rounded-t-lg", themeConfig.text, themeConfig.headerBg)}>
+                    <span className={cn("text-eyebrow uppercase leading-tight w-full text-center py-0.5 rounded-t-lg", themeConfig.text, themeConfig.headerBg)}>
                         {format(parseISO(template.next_occurrence), 'MMM')}
                     </span>
                     <span className="text-lg font-bold text-foreground">
@@ -74,13 +74,13 @@ export function SubscriptionRow({
                         <span className="truncate" title={template.description}>{template.description}</span>
                     </h4>
                     {lastCharge && (
-                        <p className="text-[10px] text-muted-foreground/70 mt-0.5 flex items-center gap-1">
+                        <p className="text-caption text-muted-foreground/70 mt-0.5 flex items-center gap-1">
                             <Clock className="w-2.5 h-2.5" aria-hidden="true" />
                             Last charged {formatDistanceToNowStrict(parseISO(lastCharge.lastDate), { addSuffix: true })}
                         </p>
                     )}
                     <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1 flex-wrap">
-                        <span className="capitalize bg-secondary/50 px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wider">{template.frequency}</span>
+                        <span className="capitalize bg-secondary/50 px-2 py-0.5 rounded-md text-caption font-bold tracking-wider">{template.frequency}</span>
                         <div className="flex items-center gap-1 opacity-70">
                             <div className="w-3.5 h-3.5 flex items-center justify-center">
                                 {getIconForCategory(template.category, "w-full h-full", { style: { color: CATEGORY_COLORS[template.category] || CATEGORY_COLORS.others } })}
@@ -93,7 +93,7 @@ export function SubscriptionRow({
                                     type="button"
                                     onClick={(e) => e.stopPropagation()}
                                     className={cn(
-                                        "inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold border transition-colors",
+                                        "inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-caption font-bold border transition-colors",
                                         linkedBucket
                                             ? "bg-cyan-500/10 border-cyan-500/25 text-cyan-300 hover:bg-cyan-500/15"
                                             : "bg-secondary/30 border-white/5 text-muted-foreground/70 hover:text-foreground"
@@ -148,7 +148,7 @@ export function SubscriptionRow({
                             </PopoverContent>
                         </Popover>
                         {paused && meta.pause_until && (
-                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold border bg-amber-500/10 border-amber-500/25 text-amber-300">
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-caption font-bold border bg-amber-500/10 border-amber-500/25 text-amber-300">
                                 <Pause className="w-2.5 h-2.5" aria-hidden="true" />
                                 Paused until {format(parseISO(meta.pause_until), 'MMM d')}
                             </span>
@@ -156,7 +156,7 @@ export function SubscriptionRow({
                         {trialActive && trialEnds && (
                             <span
                                 className={cn(
-                                    "inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold border",
+                                    "inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-caption font-bold border",
                                     trialEndingSoon
                                         ? "bg-amber-500/15 border-amber-500/35 text-amber-300"
                                         : "bg-secondary/30 border-white/10 text-muted-foreground"
@@ -167,7 +167,7 @@ export function SubscriptionRow({
                             </span>
                         )}
                         {trialEnded && (
-                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold border bg-secondary/30 border-white/5 text-muted-foreground/70">
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-caption font-bold border bg-secondary/30 border-white/5 text-muted-foreground/70">
                                 Trial ended
                             </span>
                         )}
@@ -177,7 +177,7 @@ export function SubscriptionRow({
                     <div className="flex flex-col items-end">
                         <span className="font-bold text-base">{formatCurrency(template.amount, template.currency)}</span>
                         {showConvertedHint && (
-                            <span className="text-[10px] text-muted-foreground/70">
+                            <span className="text-caption text-muted-foreground/70">
                                 ≈ {formatCurrency(convertAmount(Number(template.amount), template.currency, currency))}
                             </span>
                         )}
@@ -187,7 +187,7 @@ export function SubscriptionRow({
                             type="button"
                             onClick={(e) => { e.stopPropagation(); onRequestPriceUpdate({ template, change: drift }); }}
                             className={cn(
-                                "inline-flex items-center gap-1 px-2.5 min-h-[36px] rounded-full border text-[10px] font-bold transition-colors",
+                                "inline-flex items-center gap-1 px-2.5 min-h-[36px] rounded-full border text-caption font-bold transition-colors",
                                 drift.pctChange > 0
                                     ? "bg-rose-500/15 border-rose-500/30 text-rose-300 hover:bg-rose-500/25"
                                     : "bg-emerald-500/15 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/25"

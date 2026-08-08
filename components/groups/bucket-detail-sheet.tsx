@@ -160,22 +160,22 @@ export function BucketDetailSheet({ bucket, spent, open, onOpenChange }: Props) 
     return (
         <Sheet open={open} onOpenChange={onOpenChange}>
             <SheetContent side="right" className="w-full sm:max-w-md p-0 border-white/[0.06] bg-background overflow-y-auto">
-                <SheetHeader className="px-5 pt-5 pb-3 sticky top-0 bg-background/95 backdrop-blur-2xl border-b border-white/[0.05] z-10 text-left">
+                <SheetHeader className="px-5 pt-5 pb-3 sticky top-0 bg-background/95 backdrop-blur-2xl border-b border-white/5 z-10 text-left">
                     <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-cyan-400/[0.08] text-cyan-400 p-2 shrink-0">
                             {getBucketIcon(bucket.icon)}
                         </div>
                         <div className="min-w-0 flex-1">
-                            <SheetTitle className="truncate flex items-center gap-2 text-[15px] font-semibold tracking-tight">
+                            <SheetTitle className="truncate flex items-center gap-2 text-lead font-semibold tracking-tight">
                                 {bucket.name}
                                 {isCompleted && (
-                                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-medium uppercase tracking-[0.14em] bg-emerald-400/15 text-emerald-300 border border-emerald-400/20">
+                                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-micro font-medium uppercase tracking-[0.14em] bg-emerald-400/15 text-emerald-300 border border-emerald-400/20">
                                         <Trophy className="w-2.5 h-2.5" aria-hidden="true" />
                                         Complete
                                     </span>
                                 )}
                             </SheetTitle>
-                            <SheetDescription className="text-[11px] mt-0.5">
+                            <SheetDescription className="text-meta mt-0.5">
                                 {bucket.start_date && bucket.end_date
                                     ? `${format(parseISO(bucket.start_date.slice(0, 10)), 'MMM d')} – ${format(parseISO(bucket.end_date.slice(0, 10)), 'MMM d, yyyy')}`
                                     : 'Active bucket'}
@@ -198,19 +198,19 @@ export function BucketDetailSheet({ bucket, spent, open, onOpenChange }: Props) 
                             <>
                                 <div className="flex items-center gap-2">
                                     <Flag className="w-4 h-4 text-emerald-400" aria-hidden="true" />
-                                    <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-emerald-300">Final summary</p>
+                                    <p className="text-eyebrow uppercase text-emerald-300">Final summary</p>
                                 </div>
                                 <div className="grid grid-cols-2 gap-3">
                                     <div>
-                                        <p className="text-[10px] text-muted-foreground/70 uppercase tracking-[0.14em]">Total spent</p>
+                                        <p className="text-eyebrow text-muted-foreground/70 uppercase">Total spent</p>
                                         <p className="text-base font-bold tabular-nums mt-0.5">{formatCurrency(spent, bucketCurrency)}</p>
                                     </div>
                                     <div>
-                                        <p className="text-[10px] text-muted-foreground/70 uppercase tracking-[0.14em]">Budget</p>
+                                        <p className="text-eyebrow text-muted-foreground/70 uppercase">Budget</p>
                                         <p className="text-base font-bold tabular-nums mt-0.5">{formatCurrency(budget, bucketCurrency)}</p>
                                     </div>
                                 </div>
-                                <p className={cn('text-[12px] font-semibold', overBudget ? 'text-rose-300' : 'text-emerald-300')}>
+                                <p className={cn('text-xs font-semibold', overBudget ? 'text-rose-300' : 'text-emerald-300')}>
                                     {budget === 0
                                         ? `${transactions.length} transactions logged`
                                         : overBudget
@@ -222,10 +222,10 @@ export function BucketDetailSheet({ bucket, spent, open, onOpenChange }: Props) 
                             <>
                                 <div className="flex items-end justify-between gap-3">
                                     <div>
-                                        <p className="text-[10px] text-muted-foreground/70 uppercase tracking-[0.14em] font-medium">Spent</p>
+                                        <p className="text-eyebrow text-muted-foreground/70 uppercase">Spent</p>
                                         <p className="text-2xl font-bold tabular-nums mt-1 tracking-tight">{formatCurrency(spent, bucketCurrency)}</p>
                                     </div>
-                                    <p className="text-[11px] text-muted-foreground tabular-nums mb-1">
+                                    <p className="text-meta text-muted-foreground tabular-nums mb-1">
                                         of {formatCurrency(budget, bucketCurrency)}
                                     </p>
                                 </div>
@@ -254,8 +254,8 @@ export function BucketDetailSheet({ bucket, spent, open, onOpenChange }: Props) 
                             <div className="w-10 h-10 mx-auto rounded-full bg-secondary/15 flex items-center justify-center">
                                 <Layers className="w-4 h-4 text-muted-foreground/50" aria-hidden="true" />
                             </div>
-                            <p className="text-[13px] font-semibold">Couldn&apos;t load this bucket</p>
-                            <p className="text-[11px] text-muted-foreground px-6">
+                            <p className="text-body font-semibold">Couldn&apos;t load this bucket</p>
+                            <p className="text-meta text-muted-foreground px-6">
                                 Its spending is safe — we just couldn&apos;t reach it. Close and reopen to retry.
                             </p>
                         </div>
@@ -264,22 +264,22 @@ export function BucketDetailSheet({ bucket, spent, open, onOpenChange }: Props) 
                             <div className="w-10 h-10 mx-auto rounded-full bg-secondary/15 flex items-center justify-center">
                                 <Layers className="w-4 h-4 text-muted-foreground/50" aria-hidden="true" />
                             </div>
-                            <p className="text-[13px] font-semibold">No spending yet</p>
-                            <p className="text-[11px] text-muted-foreground px-6">
+                            <p className="text-body font-semibold">No spending yet</p>
+                            <p className="text-meta text-muted-foreground px-6">
                                 Tag transactions to this bucket to see them here.
                             </p>
                         </div>
                     ) : (
                         <>
                             {truncated && (
-                                <p className="text-[11px] text-amber-300/80 bg-amber-400/[0.06] border border-amber-400/15 rounded-lg px-3 py-2">
+                                <p className="text-meta text-amber-300/80 bg-amber-400/[0.06] border border-amber-400/15 rounded-lg px-3 py-2">
                                     Showing the 500 most recent transactions. The breakdown below reflects this subset.
                                 </p>
                             )}
 
                             {/* Category breakdown */}
                             <section className="space-y-2.5">
-                                <h4 className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground/60 pl-1">
+                                <h4 className="text-eyebrow uppercase text-muted-foreground/60 pl-1">
                                     Top categories
                                 </h4>
                                 <div className="space-y-2">
@@ -298,8 +298,8 @@ export function BucketDetailSheet({ bucket, spent, open, onOpenChange }: Props) 
                                                 </div>
                                                 <div className="flex-1 min-w-0">
                                                     <div className="flex items-baseline justify-between gap-2">
-                                                        <p className="text-[12px] font-semibold capitalize truncate">{getCategoryLabel(cat)}</p>
-                                                        <p className="text-[12px] font-bold tabular-nums">{formatCurrency(amt, bucketCurrency)}</p>
+                                                        <p className="text-xs font-semibold capitalize truncate">{getCategoryLabel(cat)}</p>
+                                                        <p className="text-xs font-bold tabular-nums">{formatCurrency(amt, bucketCurrency)}</p>
                                                     </div>
                                                     <div className="h-[3px] w-full bg-white/[0.04] rounded-full overflow-hidden mt-1">
                                                         <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: color }} />
@@ -313,18 +313,18 @@ export function BucketDetailSheet({ bucket, spent, open, onOpenChange }: Props) 
 
                             {breakdown.currencies.length > 1 && (
                                 <section className="space-y-2.5">
-                                    <h4 className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground/60 pl-1">
+                                    <h4 className="text-eyebrow uppercase text-muted-foreground/60 pl-1">
                                         By currency
                                     </h4>
                                     <div className="rounded-xl border border-white/[0.06] divide-y divide-white/[0.04] overflow-hidden">
                                         {breakdown.currencies.map(([curr, totals]) => (
                                             <div key={curr} className="flex items-center justify-between px-3 py-2 bg-white/[0.025]">
                                                 <div className="flex items-center gap-2">
-                                                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-secondary/30 tabular-nums">{curr}</span>
-                                                    <span className="text-[13px] font-semibold tabular-nums">{formatCurrency(totals.native, curr)}</span>
+                                                    <span className="text-caption font-bold px-1.5 py-0.5 rounded bg-secondary/30 tabular-nums">{curr}</span>
+                                                    <span className="text-body font-semibold tabular-nums">{formatCurrency(totals.native, curr)}</span>
                                                 </div>
                                                 {curr !== bucketCurrency && (
-                                                    <span className="text-[11px] text-muted-foreground tabular-nums">
+                                                    <span className="text-meta text-muted-foreground tabular-nums">
                                                         ≈ {formatCurrency(totals.converted, bucketCurrency)}
                                                     </span>
                                                 )}
@@ -336,7 +336,7 @@ export function BucketDetailSheet({ bucket, spent, open, onOpenChange }: Props) 
 
                             {isGroupBucket && breakdown.members.length > 1 && (
                                 <section className="space-y-2.5">
-                                    <h4 className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground/60 pl-1">
+                                    <h4 className="text-eyebrow uppercase text-muted-foreground/60 pl-1">
                                         By member
                                     </h4>
                                     <div className="space-y-2">
@@ -344,7 +344,7 @@ export function BucketDetailSheet({ bucket, spent, open, onOpenChange }: Props) 
                                             const pct = breakdown.totalConverted > 0 ? (m.total / breakdown.totalConverted) * 100 : 0;
                                             return (
                                                 <div key={uid} className="flex items-center gap-3">
-                                                    <div className="w-7 h-7 rounded-full bg-primary/15 border border-primary/20 flex items-center justify-center text-[10px] font-bold text-primary shrink-0 overflow-hidden">
+                                                    <div className="w-7 h-7 rounded-full bg-primary/15 border border-primary/20 flex items-center justify-center text-caption font-bold text-primary shrink-0 overflow-hidden">
                                                         {m.avatar ? (
                                                             // eslint-disable-next-line @next/next/no-img-element
                                                             <img src={m.avatar} alt="" width={28} height={28} className="w-full h-full object-cover" />
@@ -354,8 +354,8 @@ export function BucketDetailSheet({ bucket, spent, open, onOpenChange }: Props) 
                                                     </div>
                                                     <div className="flex-1 min-w-0">
                                                         <div className="flex items-baseline justify-between gap-2">
-                                                            <p className="text-[12px] font-semibold truncate">{m.name}</p>
-                                                            <p className="text-[12px] font-bold tabular-nums">{formatCurrency(m.total, bucketCurrency)}</p>
+                                                            <p className="text-xs font-semibold truncate">{m.name}</p>
+                                                            <p className="text-xs font-bold tabular-nums">{formatCurrency(m.total, bucketCurrency)}</p>
                                                         </div>
                                                         <div className="h-[3px] w-full bg-white/[0.04] rounded-full overflow-hidden mt-1">
                                                             <div className="h-full rounded-full bg-primary/70" style={{ width: `${pct}%` }} />
@@ -370,7 +370,7 @@ export function BucketDetailSheet({ bucket, spent, open, onOpenChange }: Props) 
 
                             {/* Transaction list */}
                             <section className="space-y-2.5">
-                                <h4 className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground/60 pl-1">
+                                <h4 className="text-eyebrow uppercase text-muted-foreground/60 pl-1">
                                     {transactions.length} transaction{transactions.length === 1 ? '' : 's'}
                                 </h4>
                                 <ul className="rounded-xl border border-white/[0.06] overflow-hidden divide-y divide-white/[0.04]">
@@ -387,8 +387,8 @@ export function BucketDetailSheet({ bucket, spent, open, onOpenChange }: Props) 
                                                     })}
                                                 </div>
                                                 <div className="flex-1 min-w-0">
-                                                    <p className="text-[13px] font-semibold truncate">{tx.description}</p>
-                                                    <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+                                                    <p className="text-body font-semibold truncate">{tx.description}</p>
+                                                    <p className="text-caption text-muted-foreground flex items-center gap-1">
                                                         {format(parseISO(tx.date.slice(0, 10)), 'MMM d')}
                                                         {tx.place_name && (
                                                             <>
@@ -399,14 +399,14 @@ export function BucketDetailSheet({ bucket, spent, open, onOpenChange }: Props) 
                                                         )}
                                                     </p>
                                                 </div>
-                                                <p className="text-[12px] font-bold tabular-nums shrink-0">
+                                                <p className="text-xs font-bold tabular-nums shrink-0">
                                                     {formatCurrency(Number(tx.amount), tx.currency || bucketCurrency)}
                                                 </p>
                                             </li>
                                         );
                                     })}
                                     {transactions.length > 50 && (
-                                        <li className="px-3 py-2 text-center text-[11px] text-muted-foreground bg-white/[0.025]">
+                                        <li className="px-3 py-2 text-center text-meta text-muted-foreground bg-white/[0.025]">
                                             Showing 50 of {transactions.length}
                                         </li>
                                     )}

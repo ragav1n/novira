@@ -23,10 +23,10 @@ function WeekdayChartCardInner({ weekdayTotals, totalSpentInRange, formatCurrenc
     return (
         <div className="space-y-2">
             <div className="flex items-center justify-between px-1">
-                <span className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground/80">
+                <span className="text-meta font-bold uppercase tracking-widest text-muted-foreground/80">
                     By Weekday
                 </span>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
+                <span className="text-eyebrow uppercase text-muted-foreground/70">
                     Peak · {peak.label}
                 </span>
             </div>
@@ -38,7 +38,7 @@ function WeekdayChartCardInner({ weekdayTotals, totalSpentInRange, formatCurrenc
                             const isPeak = w.total === peak.total && peak.total > 0;
                             return (
                                 <div key={w.label} className="flex flex-col items-center gap-1.5 h-full justify-end">
-                                    <span className="text-[10px] font-bold tabular-nums text-muted-foreground/60">
+                                    <span className="text-caption font-bold tabular-nums text-muted-foreground/60">
                                         {w.total > 0 ? formatCurrency(Math.round(w.total)) : ''}
                                     </span>
                                     <motion.div
@@ -56,7 +56,7 @@ function WeekdayChartCardInner({ weekdayTotals, totalSpentInRange, formatCurrenc
                                         className="w-full rounded-md min-h-[6px] h-[60px]"
                                     />
                                     <span className={cn(
-                                        'text-[10px] font-bold uppercase tracking-wider',
+                                        'text-eyebrow uppercase',
                                         isPeak ? 'text-foreground' : 'text-muted-foreground/60'
                                     )}>
                                         {w.label}

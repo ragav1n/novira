@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
 import { toast } from '@/utils/haptics';
 import { simplifyDebtsForGroup, type SimplifiedPayment } from '@/utils/simplify-debts';
+import { EmptyState } from '@/components/ui/empty-state';
 import type { Group, Split } from '@/components/providers/groups-provider';
 
 interface GroupDetailSheetProps {
@@ -134,7 +135,7 @@ export function GroupDetailSheet({
         <Sheet open={open} onOpenChange={onOpenChange}>
             <SheetContent
                 side="bottom"
-                className="rounded-t-[28px] border-t border-white/[0.08] bg-card/95 backdrop-blur-2xl max-h-[88vh] overflow-y-auto p-0"
+                className="rounded-t-[28px] border-t border-white/8 bg-card/95 backdrop-blur-2xl max-h-[88vh] overflow-y-auto p-0"
             >
                 <SheetHeader className="px-5 pt-5 pb-3 text-left">
                     <div className="flex items-center gap-3">
@@ -142,8 +143,8 @@ export function GroupDetailSheet({
                             <Icon className={cn('w-[18px] h-[18px]', tokens.text)} />
                         </div>
                         <div className="min-w-0 flex-1">
-                            <SheetTitle className="truncate text-[15px] font-semibold tracking-tight">{group.name}</SheetTitle>
-                            <SheetDescription className="text-[11px] mt-0.5">
+                            <SheetTitle className="truncate text-lead font-semibold tracking-tight">{group.name}</SheetTitle>
+                            <SheetDescription className="text-meta mt-0.5">
                                 {group.members.length} member{group.members.length !== 1 ? 's' : ''}
                                 {/* A total of 0 is a claim we can't make when the fetch failed. */}
                                 {loadingTx || txError ? '' : ` · ${formatCurrency(totalSpent)} total`}
@@ -155,12 +156,12 @@ export function GroupDetailSheet({
                 <div className="px-5 py-3 space-y-5">
                     {/* Per-member balance block */}
                     <section className="space-y-2">
-                        <h3 className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground/60 px-1">
+                        <h3 className="text-eyebrow uppercase text-muted-foreground/60 px-1">
                             Who owes who
                         </h3>
                         {groupDebts.length === 0 ? (
                             <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4 text-center">
-                                <p className="text-[12px] text-muted-foreground">All settled in this group.</p>
+                                <p className="text-xs text-muted-foreground">All settled in this group.</p>
                             </div>
                         ) : (
                             <ul className="space-y-1">
@@ -179,14 +180,14 @@ export function GroupDetailSheet({
 
                     {/* Members */}
                     <section className="space-y-2">
-                        <h3 className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground/60 px-1">
+                        <h3 className="text-eyebrow uppercase text-muted-foreground/60 px-1">
                             Members
                         </h3>
                         <div className="flex flex-wrap gap-1.5">
                             {group.members.map((m) => (
                                 <span
                                     key={m.user_id}
-                                    className="inline-flex items-center gap-1.5 pl-1 pr-2.5 py-0.5 rounded-full bg-secondary/15 border border-white/[0.06] text-[11px]"
+                                    className="inline-flex items-center gap-1.5 pl-1 pr-2.5 py-0.5 rounded-full bg-secondary/15 border border-white/[0.06] text-meta"
                                 >
                                     <Avatar className="w-4 h-4">
                                         <AvatarImage src={m.avatar_url || ''} />
@@ -200,7 +201,7 @@ export function GroupDetailSheet({
 
                     {/* Recent activity */}
                     <section className="space-y-2">
-                        <h3 className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground/60 px-1">
+                        <h3 className="text-eyebrow uppercase text-muted-foreground/60 px-1">
                             Recent activity
                         </h3>
                         {loadingTx ? (
@@ -210,13 +211,9 @@ export function GroupDetailSheet({
                                 ))}
                             </div>
                         ) : txError ? (
-                            <div className="rounded-xl border border-dashed border-white/[0.08] p-5 text-center">
-                                <p className="text-[12px] text-muted-foreground">Couldn&apos;t load this group&apos;s expenses.</p>
-                            </div>
+                            <EmptyState variant="error" title="Couldn't load this group's expenses." />
                         ) : transactions.length === 0 ? (
-                            <div className="rounded-xl border border-dashed border-white/[0.08] p-5 text-center">
-                                <p className="text-[12px] text-muted-foreground">No expenses yet in this group.</p>
-                            </div>
+                            <EmptyState title="No expenses yet in this group." />
                         ) : (
                             <ul className="rounded-xl border border-white/[0.06] overflow-hidden divide-y divide-white/[0.04]">
                                 {transactions.map((tx) => (
@@ -225,12 +222,12 @@ export function GroupDetailSheet({
                                         className="flex items-center justify-between gap-3 px-3 py-2 bg-white/[0.025]"
                                     >
                                         <div className="min-w-0">
-                                            <p className="text-[12px] font-semibold truncate">{tx.description || 'Expense'}</p>
-                                            <p className="text-[10px] text-muted-foreground">
+                                            <p className="text-xs font-semibold truncate">{tx.description || 'Expense'}</p>
+                                            <p className="text-caption text-muted-foreground">
                                                 {tx.payer_name} · {format(parseISO(tx.date.slice(0, 10)), 'MMM d')}
                                             </p>
                                         </div>
-                                        <span className="text-[12px] font-bold tabular-nums whitespace-nowrap">
+                                        <span className="text-xs font-bold tabular-nums whitespace-nowrap">
                                             {formatCurrency(tx.amount, tx.currency)}
                                         </span>
                                     </li>
@@ -267,14 +264,14 @@ function DebtRow({ from, to, amount, tone }: { from: string; to: string; amount:
                 tone === 'neutral' && 'bg-white/[0.025] border-white/[0.06]',
             )}
         >
-            <p className="text-[12px] flex items-center gap-1.5 min-w-0">
+            <p className="text-xs flex items-center gap-1.5 min-w-0">
                 <span className={cn('font-semibold truncate', tone === 'neutral' && 'text-muted-foreground')}>{from}</span>
                 <ArrowRight className="w-3 h-3 text-muted-foreground/60 shrink-0" />
                 <span className={cn('font-semibold truncate', tone === 'neutral' && 'text-muted-foreground')}>{to}</span>
             </p>
             <span
                 className={cn(
-                    'text-[13px] font-bold tabular-nums shrink-0',
+                    'text-body font-bold tabular-nums shrink-0',
                     tone === 'negative' && 'text-rose-300',
                     tone === 'positive' && 'text-emerald-300',
                     tone === 'neutral' && 'text-muted-foreground',

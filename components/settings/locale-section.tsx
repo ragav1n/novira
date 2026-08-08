@@ -29,7 +29,7 @@ export function LocaleSection({
                     <Banknote className="w-4 h-4 text-muted-foreground" />
                     <div>
                         <p className="text-sm font-medium">Currency</p>
-                        <p className="text-[11px] text-muted-foreground">Select your preferred currency</p>
+                        <p className="text-meta text-muted-foreground">Select your preferred currency</p>
                     </div>
                 </div>
                 <div className="mt-1">
@@ -42,7 +42,7 @@ export function LocaleSection({
                     <CalendarRange className="w-4 h-4 text-muted-foreground shrink-0" />
                     <div className="min-w-0">
                         <p className="text-sm font-medium">First Day of Week</p>
-                        <p className="text-[11px] text-muted-foreground">
+                        <p className="text-meta text-muted-foreground">
                             Affects analytics weekly grouping
                         </p>
                     </div>
@@ -66,7 +66,7 @@ export function LocaleSection({
                     <CalendarDays className="w-4 h-4 text-muted-foreground shrink-0" />
                     <div className="min-w-0">
                         <p className="text-sm font-medium">Date Format</p>
-                        <p className="text-[11px] text-muted-foreground">
+                        <p className="text-meta text-muted-foreground">
                             How dates are shown across the app
                         </p>
                     </div>

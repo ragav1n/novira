@@ -118,7 +118,7 @@ export function GroupsView() {
                     <>
                         {/* Net-position hero */}
                         <section className="space-y-3">
-                            <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground/70">
+                            <p className="text-eyebrow uppercase text-muted-foreground/70">
                                 {netLabel}
                             </p>
                             {netSign === 'flat' ? (
@@ -130,13 +130,13 @@ export function GroupsView() {
                                     <div className="flex items-end gap-3">
                                         <h3
                                             className={cn(
-                                                'text-[40px] leading-none font-bold tracking-tight tabular-nums',
+                                                'text-hero tabular-nums',
                                                 netSign === 'positive' ? 'text-emerald-400' : 'text-rose-400',
                                             )}
                                         >
                                             {formatCurrency(Math.abs(net))}
                                         </h3>
-                                        <span className="text-[11px] text-muted-foreground/70 mb-1.5">
+                                        <span className="text-meta text-muted-foreground/70 mb-1.5">
                                             across {pendingSplits.length} split{pendingSplits.length !== 1 ? 's' : ''}
                                         </span>
                                     </div>
@@ -173,7 +173,7 @@ export function GroupsView() {
                                             key={tab}
                                             value={tab}
                                             className={cn(
-                                                'relative h-11 rounded-none bg-transparent text-[12px] sm:text-[13px] font-medium tracking-tight transition-colors data-[state=active]:bg-transparent data-[state=active]:shadow-none',
+                                                'relative h-11 rounded-none bg-transparent text-xs sm:text-body font-medium tracking-tight transition-colors data-[state=active]:bg-transparent data-[state=active]:shadow-none',
                                                 active ? meta.accent : 'text-muted-foreground/60 hover:text-foreground/80',
                                             )}
                                         >
@@ -275,7 +275,7 @@ function StatsStrip({
     ];
     if (items.length === 0) return null;
     return (
-        <p className="flex flex-wrap items-center gap-x-2 gap-y-1 pt-3 text-[11px] text-muted-foreground">
+        <p className="flex flex-wrap items-center gap-x-2 gap-y-1 pt-3 text-meta text-muted-foreground">
             {items.map((item, i) => (
                 <React.Fragment key={item.label}>
                     {i > 0 && <span className="text-muted-foreground/30" aria-hidden="true">·</span>}
@@ -314,10 +314,10 @@ function BalanceChip({
                 )}
                 aria-hidden="true"
             />
-            <span className="text-[11px] text-muted-foreground">{label}</span>
+            <span className="text-meta text-muted-foreground">{label}</span>
             <span
                 className={cn(
-                    'text-[12px] font-bold tabular-nums',
+                    'text-xs font-bold tabular-nums',
                     tone === 'positive' ? 'text-emerald-300' : 'text-rose-300',
                 )}
             >
@@ -336,13 +336,13 @@ function FirstTimeBlock({
     return (
         <section className="pt-8 space-y-6">
             <div className="space-y-2 max-w-xs">
-                <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground/70">
+                <p className="text-eyebrow uppercase text-muted-foreground/70">
                     Start here
                 </p>
                 <h3 className="text-2xl font-bold tracking-tight">
                     Split anything with anyone.
                 </h3>
-                <p className="text-[13px] text-muted-foreground leading-relaxed">
+                <p className="text-body text-muted-foreground leading-relaxed">
                     Add a friend or spin up a group — home, trip, couple — and Novira tracks
                     who owes who from there.
                 </p>
@@ -354,16 +354,16 @@ function FirstTimeBlock({
                     className="group flex flex-col gap-2 p-4 rounded-xl bg-white/[0.035] border border-white/10 hover:border-primary/30 hover:bg-primary/[0.06] transition-colors text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]"
                 >
                     <UserPlus className="w-4 h-4 text-primary" aria-hidden="true" />
-                    <span className="text-[13px] font-semibold">Add a friend</span>
-                    <span className="text-[11px] text-muted-foreground">By email, ID, or QR</span>
+                    <span className="text-body font-semibold">Add a friend</span>
+                    <span className="text-meta text-muted-foreground">By email, ID, or QR</span>
                 </button>
                 <button
                     onClick={onCreateGroup}
                     className="group flex flex-col gap-2 p-4 rounded-xl bg-white/[0.035] border border-white/10 hover:border-primary/30 hover:bg-primary/[0.06] transition-colors text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]"
                 >
                     <Plus className="w-4 h-4 text-primary" aria-hidden="true" />
-                    <span className="text-[13px] font-semibold">Create a group</span>
-                    <span className="text-[11px] text-muted-foreground">Home, trip, couple, custom</span>
+                    <span className="text-body font-semibold">Create a group</span>
+                    <span className="text-meta text-muted-foreground">Home, trip, couple, custom</span>
                 </button>
             </div>
         </section>

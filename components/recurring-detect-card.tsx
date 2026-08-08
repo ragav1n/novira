@@ -145,11 +145,11 @@ export function RecurringDetectCard({
                     <h3 className="text-sm font-semibold">
                         Possible subscriptions detected
                     </h3>
-                    <span className="text-[10px] text-muted-foreground ml-auto">
+                    <span className="text-caption text-muted-foreground ml-auto">
                         Last 90 days
                     </span>
                 </div>
-                <p className="text-[11px] text-muted-foreground -mt-1">
+                <p className="text-meta text-muted-foreground -mt-1">
                     These look like recurring charges. Track them so they show up in your subscriptions.
                 </p>
                 <div className="space-y-2">
@@ -167,7 +167,7 @@ export function RecurringDetectCard({
                         >
                             <div className="flex-1 min-w-0">
                                 <p className="text-sm font-semibold truncate capitalize">{c.description}</p>
-                                <p className="text-[11px] text-muted-foreground">
+                                <p className="text-meta text-muted-foreground">
                                     {formatCurrency(c.meanAmount, c.currency)} · {FREQ_LABEL[c.frequency]}
                                     <span className="opacity-60"> · {getCategoryLabel(c.category)}</span>
                                     <span className="opacity-60"> · {c.occurrences}× </span>
@@ -178,7 +178,7 @@ export function RecurringDetectCard({
                                 size="sm"
                                 disabled={creatingKey === c.normalizedKey}
                                 onClick={() => handleCreate(c)}
-                                className="h-8 px-2.5 text-[11px] gap-1 border-amber-500/30 text-amber-300 hover:bg-amber-500/10"
+                                className="h-8 px-2.5 text-meta gap-1 border-amber-500/30 text-amber-300 hover:bg-amber-500/10"
                             >
                                 <Plus className="w-3.5 h-3.5" aria-hidden="true" />
                                 {creatingKey === c.normalizedKey ? '...' : 'Track'}

@@ -30,7 +30,7 @@ export function RecurringExpenseSection({
                     <RefreshCcw className="w-5 h-5 text-primary" />
                     <div>
                         <p className="text-sm font-medium">Recurring</p>
-                        <p className="text-[11px] text-muted-foreground">Automatically post this on a schedule</p>
+                        <p className="text-meta text-muted-foreground">Automatically post this on a schedule</p>
                     </div>
                 </div>
                 <Switch
@@ -47,7 +47,7 @@ export function RecurringExpenseSection({
                                 type="button"
                                 onClick={() => setIsIncome(false)}
                                 className={cn(
-                                    "flex items-center justify-center gap-1.5 py-2 text-[11px] font-bold uppercase tracking-wider rounded-xl border transition-all",
+                                    "flex items-center justify-center gap-1.5 py-2 text-meta font-bold uppercase tracking-wider rounded-xl border transition-all",
                                     !isIncome
                                         ? "bg-rose-500/15 text-rose-300 border-rose-500/30"
                                         : "bg-background/20 border-white/5 text-muted-foreground hover:border-white/10"
@@ -61,7 +61,7 @@ export function RecurringExpenseSection({
                                 type="button"
                                 onClick={() => setIsIncome(true)}
                                 className={cn(
-                                    "flex items-center justify-center gap-1.5 py-2 text-[11px] font-bold uppercase tracking-wider rounded-xl border transition-all",
+                                    "flex items-center justify-center gap-1.5 py-2 text-meta font-bold uppercase tracking-wider rounded-xl border transition-all",
                                     isIncome
                                         ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30"
                                         : "bg-background/20 border-white/5 text-muted-foreground hover:border-white/10"
@@ -79,7 +79,7 @@ export function RecurringExpenseSection({
                                 key={freq}
                                 onClick={() => setFrequency(freq)}
                                 className={cn(
-                                    "py-2 text-[11px] font-bold uppercase tracking-wider rounded-xl border transition-all",
+                                    "py-2 text-meta font-bold uppercase tracking-wider rounded-xl border transition-all",
                                     frequency === freq
                                         ? "bg-primary text-white border-primary shadow-lg shadow-primary/20"
                                         : "bg-background/20 border-white/5 text-muted-foreground hover:border-white/10"
@@ -89,7 +89,7 @@ export function RecurringExpenseSection({
                             </button>
                         ))}
                     </div>
-                    <p className="text-[11px] text-center text-muted-foreground italic">
+                    <p className="text-meta text-center text-muted-foreground italic">
                         {isIncome ? 'Next deposit' : 'Next bill'}: {(() => {
                             const next = new Date(date || new Date());
                             if (frequency === 'daily') next.setDate(next.getDate() + 1);

@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { motion, AnimatePresence, useMotionValue, useTransform, useSpring } from 'framer-motion';
 import { ICON_POP } from '@/lib/motion';
 import { Mail, ArrowRight, ArrowLeft } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import { supabase } from '@/lib/supabase';
 import { cn } from "@/lib/utils";
 import { authRateLimiter } from '@/utils/auth-rate-limiter';
@@ -262,7 +263,7 @@ export default function ForgotPassword() {
                                                     animate={{ opacity: 1 }}
                                                     exit={{ opacity: 0 }}
                                                 >
-                                                    <div className="w-4 h-4 border-2 border-black/70 border-t-transparent rounded-full animate-spin" />
+                                                    <Spinner className="text-black/70" label={null} />
                                                 </motion.div>
                                             ) : (
                                                 <motion.span
@@ -290,12 +291,12 @@ export default function ForgotPassword() {
 
                             {/* Footer */}
                             <div className="mt-8 text-center space-y-3">
-                                <div className="flex justify-center items-center gap-3 text-[11px] text-muted-foreground font-medium">
+                                <div className="flex justify-center items-center gap-3 text-meta text-muted-foreground font-medium">
                                     <Link href="/privacy" className="hover:text-primary transition-colors">Privacy Policy</Link>
                                     <span className="w-1 h-1 rounded-full bg-white/10" />
                                     <Link href="/terms" className="hover:text-primary transition-colors">Terms of Service</Link>
                                 </div>
-                                <p className="text-[10px] text-muted-foreground/50 font-medium tracking-wider">
+                                <p className="text-caption text-muted-foreground/50 font-medium tracking-wider">
                                     © 2026 NOVIRA. ALL RIGHTS RESERVED.
                                 </p>
                             </div>

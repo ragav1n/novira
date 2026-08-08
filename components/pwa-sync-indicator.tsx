@@ -333,7 +333,7 @@ export function SyncIndicator() {
                                                         <div className="flex-1 min-w-0">
                                                             <div className="text-xs font-medium text-foreground/90 flex items-center gap-1.5">
                                                                 <span>{FRIENDLY_TYPE[item.type] ?? item.type}</span>
-                                                                <span className={`text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full ${
+                                                                <span className={`text-micro uppercase tracking-wider px-1.5 py-0.5 rounded-full ${
                                                                     item.errorKind === 'expired'
                                                                         ? 'bg-muted text-muted-foreground'
                                                                         : item.errorKind === 'transient'
@@ -343,7 +343,7 @@ export function SyncIndicator() {
                                                                     {meta.badge}
                                                                 </span>
                                                             </div>
-                                                            <div className="text-[11px] text-muted-foreground mt-0.5 break-words">
+                                                            <div className="text-meta text-muted-foreground mt-0.5 break-words">
                                                                 {meta.summary}
                                                             </div>
                                                         </div>
@@ -353,8 +353,8 @@ export function SyncIndicator() {
                                                                     onClick={() => retryFailedItem(item.id)}
                                                                     className={
                                                                         meta.primary === 'retry'
-                                                                            ? 'text-[11px] text-primary hover:underline px-1.5 py-0.5 font-medium'
-                                                                            : 'text-[11px] text-muted-foreground hover:text-primary px-1.5 py-0.5'
+                                                                            ? 'text-meta text-primary hover:underline px-1.5 py-0.5 font-medium'
+                                                                            : 'text-meta text-muted-foreground hover:text-primary px-1.5 py-0.5'
                                                                     }
                                                                 >
                                                                     Retry
@@ -364,8 +364,8 @@ export function SyncIndicator() {
                                                                 onClick={() => discardFailedItem(item.id)}
                                                                 className={
                                                                     meta.primary === 'discard'
-                                                                        ? 'text-[11px] text-destructive hover:underline px-1.5 py-0.5 font-medium'
-                                                                        : 'text-[11px] text-muted-foreground hover:text-destructive p-0.5'
+                                                                        ? 'text-meta text-destructive hover:underline px-1.5 py-0.5 font-medium'
+                                                                        : 'text-meta text-muted-foreground hover:text-destructive p-0.5'
                                                                 }
                                                                 aria-label="Discard this failed item"
                                                             >

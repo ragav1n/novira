@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import Link from 'next/link';
 import { Plus, Archive, Settings2, Trash2, RotateCcw, ChevronDown, ChevronRight } from 'lucide-react';
 import { getBucketIcon } from '@/utils/icon-utils';
 import { format, differenceInDays } from 'date-fns';
@@ -9,6 +8,7 @@ import { toast } from '@/utils/haptics';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { BucketDialog } from './bucket-dialog';
 import { BucketDetailSheet } from './bucket-detail-sheet';
+import { EmptyState, EMPTY_ACCENTS } from '@/components/ui/empty-state';
 
 interface BucketsTabContentProps {
     buckets: Bucket[];
@@ -101,13 +101,13 @@ export function BucketsTabContent({
 
             <section>
                 <div className="flex items-baseline justify-between mb-2 px-1">
-                    <h3 className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground/60">
+                    <h3 className="text-eyebrow uppercase text-muted-foreground/60">
                         Active buckets{activeBuckets.length > 0 ? ` · ${activeBuckets.length}` : ''}
                     </h3>
                     <button
                         type="button"
                         onClick={handleAddBucket}
-                        className="inline-flex items-center gap-1 h-7 px-3 rounded-full text-[11px] font-semibold text-cyan-300 hover:text-cyan-200 hover:bg-cyan-400/10 transition-colors"
+                        className="inline-flex items-center gap-1 h-7 px-3 rounded-full text-meta font-semibold text-cyan-300 hover:text-cyan-200 hover:bg-cyan-400/10 transition-colors"
                     >
                         <Plus className="w-3.5 h-3.5" />
                         New bucket
@@ -150,8 +150,8 @@ export function BucketsTabContent({
                                                     {getBucketIcon(bucket.icon)}
                                                 </div>
                                                 <div className="min-w-0">
-                                                    <h4 className="text-[15px] font-semibold tracking-tight truncate">{bucket.name}</h4>
-                                                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                                                    <h4 className="text-lead font-semibold tracking-tight truncate">{bucket.name}</h4>
+                                                    <p className="text-meta text-muted-foreground mt-0.5">
                                                         {bucket.start_date && bucket.end_date
                                                             ? `${format(new Date(bucket.start_date), 'MMM d')} – ${format(new Date(bucket.end_date), 'MMM d, yy')}`
                                                             : 'Active'}
@@ -190,7 +190,7 @@ export function BucketsTabContent({
 
                                         {budget > 0 && (
                                             <div className="space-y-1.5">
-                                                <div className="flex items-baseline justify-between text-[11px]">
+                                                <div className="flex items-baseline justify-between text-meta">
                                                     <span className="text-muted-foreground tabular-nums">
                                                         {formatCurrency(spent, bucket.currency)}
                                                         <span className="text-muted-foreground/50"> / {formatCurrency(budget, bucket.currency)}</span>
@@ -214,7 +214,7 @@ export function BucketsTabContent({
                                                     />
                                                 </div>
                                                 {bucket.start_date && bucket.end_date && (
-                                                    <p className="text-[10px] text-muted-foreground/60 italic">
+                                                    <p className="text-caption text-muted-foreground/60 italic">
                                                         ≈ {formatCurrency(budget / Math.max(1, differenceInDays(new Date(bucket.end_date), new Date(bucket.start_date)) / 30), bucket.currency)} per month
                                                     </p>
                                                 )}
@@ -226,35 +226,14 @@ export function BucketsTabContent({
                         })}
                     </div>
                 ) : archivedBuckets.length === 0 ? (
-                    <div className="rounded-xl border border-dashed border-white/[0.14] bg-white/[0.02] p-6 space-y-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-                        <div className="space-y-1.5">
-                            <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground/70">
-                                No active buckets
-                            </p>
-                            <h3 className="text-base font-semibold tracking-tight">
-                                Track a private goal.
-                            </h3>
-                            <p className="text-[12px] text-muted-foreground leading-relaxed max-w-xs">
-                                Group spending under a label — Trip to Lisbon, New iPhone, Wedding gift —
-                                with a budget and date range.
-                            </p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <button
-                                onClick={handleAddBucket}
-                                className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-full bg-cyan-400 text-cyan-950 text-[12px] font-semibold hover:bg-cyan-300 transition-colors"
-                            >
-                                <Plus className="w-3.5 h-3.5" />
-                                Create first bucket
-                            </button>
-                            <Link
-                                href="/guide#buckets"
-                                className="text-[11px] text-muted-foreground hover:text-foreground transition-colors px-1"
-                            >
-                                How buckets work →
-                            </Link>
-                        </div>
-                    </div>
+                    <EmptyState
+                        eyebrow="No active buckets"
+                        title="Track a private goal."
+                        description="Group spending under a label — Trip to Lisbon, New iPhone, Wedding gift — with a budget and date range."
+                        accent={EMPTY_ACCENTS.cyan}
+                        action={{ label: 'Create first bucket', icon: Plus, onClick: handleAddBucket }}
+                        secondaryAction={{ label: 'How buckets work →', href: '/guide#buckets' }}
+                    />
                 ) : null}
             </section>
 
@@ -267,7 +246,7 @@ export function BucketsTabContent({
                         aria-expanded={archivedOpen}
                     >
                         <Archive className="w-3 h-3 text-muted-foreground/50" />
-                        <span className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground/60 group-hover:text-foreground/70 transition-colors">
+                        <span className="text-eyebrow uppercase text-muted-foreground/60 group-hover:text-foreground/70 transition-colors">
                             {archivedLabel} · {archivedBuckets.length}
                         </span>
                         <span className="h-px flex-1 bg-white/[0.05]" />
@@ -303,12 +282,12 @@ export function BucketsTabContent({
                                                 </div>
                                                 <div className="min-w-0">
                                                     <p className={cn(
-                                                        'text-[13px] font-medium truncate',
+                                                        'text-body font-medium truncate',
                                                         isCompleted ? 'text-emerald-200' : 'text-muted-foreground',
                                                     )}>
                                                         {bucket.name}
                                                     </p>
-                                                    <p className="text-[10px] text-muted-foreground/60">
+                                                    <p className="text-caption text-muted-foreground/60">
                                                         {isCompleted
                                                             ? `Completed ${format(new Date(bucket.completed_at!), 'MMM d, yy')}`
                                                             : 'Archived'}

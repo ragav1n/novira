@@ -55,7 +55,7 @@ function Inner({ play }: { play: boolean }) {
           </div>
           <div className="min-w-0 flex-1">
             <div className="text-sm font-semibold text-foreground">Iceland trip</div>
-            <div className="text-[11px] text-foreground/75">Goal · ₹{(progress * 1500).toLocaleString('en-IN')} of ₹1,50,000</div>
+            <div className="text-meta text-foreground/75">Goal · ₹{(progress * 1500).toLocaleString('en-IN')} of ₹1,50,000</div>
           </div>
           <motion.div
             key={progress}
@@ -85,7 +85,7 @@ function Inner({ play }: { play: boolean }) {
             />
           ))}
         </div>
-        <div className="mt-1 flex justify-between text-[10px] text-foreground/65">
+        <div className="mt-1 flex justify-between text-caption text-foreground/65">
           <span>0%</span><span>25%</span><span>50%</span><span>75%</span><span>100%</span>
         </div>
 
@@ -99,7 +99,7 @@ function Inner({ play }: { play: boolean }) {
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: -6, scale: 0.95 }}
                 transition={SNAPPY}
-                className="flex items-center gap-2 transform-gpu rounded-xl border border-sky-400/30 bg-sky-500/[0.08] px-3 py-2.5 text-[12px]"
+                className="flex items-center gap-2 transform-gpu rounded-xl border border-sky-400/30 bg-sky-500/[0.08] px-3 py-2.5 text-xs"
               >
                 <Sparkle className="h-4 w-4 shrink-0 text-sky-300" />
                 <span className="text-foreground/90">

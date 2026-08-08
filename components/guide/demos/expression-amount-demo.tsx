@@ -59,7 +59,7 @@ function Inner({ play }: { play: boolean }) {
   return (
     <div className="mx-auto max-w-sm">
       <div className="rounded-xl border border-white/10 bg-zinc-950/60 p-5">
-        <div className="text-[10px] uppercase tracking-widest text-foreground/65">Amount</div>
+        <div className="text-eyebrow uppercase text-foreground/65">Amount</div>
         <div className="mt-2 flex items-baseline gap-2">
           <span className="text-2xl font-medium text-foreground/75">₹</span>
           <div className="relative flex-1 font-mono text-3xl font-semibold tracking-tight text-foreground">
@@ -101,7 +101,7 @@ function Inner({ play }: { play: boolean }) {
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.8 }}
                 transition={POP}
-                className="inline-flex items-center gap-1 transform-gpu rounded-full border border-emerald-400/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-300"
+                className="inline-flex items-center gap-1 transform-gpu rounded-full border border-emerald-400/30 bg-emerald-500/10 px-2 py-0.5 text-caption font-medium text-emerald-300"
               >
                 <Calculator className="h-3 w-3" />
                 Press Enter
@@ -109,11 +109,11 @@ function Inner({ play }: { play: boolean }) {
             )}
           </AnimatePresence>
         </div>
-        <div className="mt-4 text-[12px] leading-relaxed text-foreground/75">
-          Type a math expression with <code className="rounded bg-white/5 px-1 text-[11px]">+</code>{' '}
-          <code className="rounded bg-white/5 px-1 text-[11px]">-</code>{' '}
-          <code className="rounded bg-white/5 px-1 text-[11px]">×</code>{' '}
-          <code className="rounded bg-white/5 px-1 text-[11px]">÷</code> — Novira shows the result and applies it when you tap away or press Enter.
+        <div className="mt-4 text-xs leading-relaxed text-foreground/75">
+          Type a math expression with <code className="rounded bg-white/5 px-1 text-meta">+</code>{' '}
+          <code className="rounded bg-white/5 px-1 text-meta">-</code>{' '}
+          <code className="rounded bg-white/5 px-1 text-meta">×</code>{' '}
+          <code className="rounded bg-white/5 px-1 text-meta">÷</code> — Novira shows the result and applies it when you tap away or press Enter.
         </div>
       </div>
     </div>

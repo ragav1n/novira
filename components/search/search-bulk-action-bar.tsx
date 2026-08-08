@@ -7,8 +7,9 @@
 
 import { motion, AnimatePresence } from 'framer-motion';
 import { SHEET } from '@/lib/motion';
-import { CheckSquare, Tag, Trash2, Loader2 } from 'lucide-react';
+import { CheckSquare, Tag, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Spinner } from '@/components/ui/spinner';
 
 interface Props {
     visible: boolean;
@@ -40,13 +41,13 @@ export function SearchBulkActionBar({
                     transition={SHEET}
                     className="fixed bottom-20 lg:bottom-6 left-1/2 -translate-x-1/2 z-[80] flex items-center gap-2 px-3 py-2 rounded-full bg-card/90 backdrop-blur-xl border border-white/[0.06] shadow-2xl max-w-[calc(100vw-1rem)] flex-wrap justify-center"
                 >
-                    <span className="text-[11px] font-semibold uppercase tracking-[0.14em] px-2 text-muted-foreground/80 tabular-nums">{selectedCount} selected</span>
+                    <span className="text-meta font-semibold uppercase tracking-[0.14em] px-2 text-muted-foreground/80 tabular-nums">{selectedCount} selected</span>
                     <Button
                         size="sm"
                         variant="outline"
                         onClick={onToggleSelectAll}
                         disabled={totalCount === 0}
-                        className="h-8 rounded-full bg-secondary/15 border-white/[0.06] text-[11px] font-semibold"
+                        className="h-8 rounded-full bg-secondary/15 border-white/[0.06] text-meta font-semibold"
                     >
                         <CheckSquare className="w-3.5 h-3.5 mr-1.5" />
                         {selectedCount === totalCount && totalCount > 0 ? 'Clear' : 'Select all'}
@@ -56,7 +57,7 @@ export function SearchBulkActionBar({
                         variant="outline"
                         onClick={onOpenRecategorize}
                         disabled={selectedCount === 0 || busy}
-                        className="h-8 rounded-full bg-secondary/15 border-white/[0.06] text-[11px] font-semibold"
+                        className="h-8 rounded-full bg-secondary/15 border-white/[0.06] text-meta font-semibold"
                     >
                         <Tag className="w-3.5 h-3.5 mr-1.5" /> Recategorize
                     </Button>
@@ -65,9 +66,9 @@ export function SearchBulkActionBar({
                         onClick={onBulkDelete}
                         disabled={selectedCount === 0 || busy}
                         aria-busy={busy}
-                        className="h-8 rounded-full bg-rose-500/15 border border-rose-500/30 text-rose-300 hover:bg-rose-500/25 text-[11px] font-semibold disabled:opacity-50"
+                        className="h-8 rounded-full bg-rose-500/15 border border-rose-500/30 text-rose-300 hover:bg-rose-500/25 text-meta font-semibold disabled:opacity-50"
                     >
-                        {busy ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5 mr-1.5" />}
+                        {busy ? <Spinner className="size-3.5 mr-1.5" label={null} /> : <Trash2 className="w-3.5 h-3.5 mr-1.5" />}
                         {busy ? 'Working…' : 'Delete'}
                     </Button>
                 </motion.div>

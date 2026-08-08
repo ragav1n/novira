@@ -16,6 +16,7 @@ import { CATEGORIES, CATEGORY_COLORS, getCategoryLabel } from '@/lib/categories'
 import type { Trip } from '@/types/trip';
 import { cn } from '@/lib/utils';
 import { ViewHeader } from '@/components/ui/view-header';
+import { EmptyState } from '@/components/ui/empty-state';
 
 type TxRow = {
     id: string;
@@ -165,7 +166,7 @@ export function TripDetailView({ tripId }: { tripId: string }) {
 
             <Card className="bg-card/40 border-white/5 backdrop-blur-xl">
                 <CardContent className="p-5 space-y-3">
-                    <div className="flex flex-wrap gap-2 text-[11px] text-muted-foreground">
+                    <div className="flex flex-wrap gap-2 text-meta text-muted-foreground">
                         <span className="inline-flex items-center gap-1">
                             <CalendarIcon className="w-3 h-3" aria-hidden="true" />
                             {format(start, 'MMM d')} – {format(end, 'MMM d, yyyy')}
@@ -210,7 +211,7 @@ export function TripDetailView({ tripId }: { tripId: string }) {
 
             {categoryBreakdown.length > 0 && (
                 <section className="space-y-2">
-                    <h2 className="text-[11px] uppercase tracking-wider text-muted-foreground font-bold px-1">
+                    <h2 className="text-meta uppercase tracking-wider text-muted-foreground font-bold px-1">
                         By category
                     </h2>
                     <Card className="bg-card/40 border-white/5 backdrop-blur-xl">
@@ -240,7 +241,7 @@ export function TripDetailView({ tripId }: { tripId: string }) {
 
             {transactions.length > 0 ? (
                 <section className="space-y-2">
-                    <h2 className="text-[11px] uppercase tracking-wider text-muted-foreground font-bold px-1">
+                    <h2 className="text-meta uppercase tracking-wider text-muted-foreground font-bold px-1">
                         Transactions
                     </h2>
                     <div className="space-y-1.5">
@@ -249,14 +250,14 @@ export function TripDetailView({ tripId }: { tripId: string }) {
                                 <CardContent className="p-3 flex items-center justify-between gap-2">
                                     <div className="min-w-0 flex-1">
                                         <p className="text-sm font-medium truncate">{tx.description}</p>
-                                        <p className="text-[11px] text-muted-foreground">
+                                        <p className="text-meta text-muted-foreground">
                                             {format(parseISO(tx.date.slice(0, 10)), 'MMM d')} · {getCategoryLabel(tx.category)}
                                         </p>
                                     </div>
                                     <div className="text-right shrink-0">
                                         <p className="text-sm font-bold tabular-nums">{formatCurrency(toDisplay(tx), tripCurrency)}</p>
                                         {(tx.currency || 'USD').toUpperCase() !== tripCurrency && (
-                                            <p className="text-[10px] text-muted-foreground">
+                                            <p className="text-caption text-muted-foreground">
                                                 {formatCurrency(Number(tx.amount), tx.currency)}
                                             </p>
                                         )}
@@ -265,30 +266,23 @@ export function TripDetailView({ tripId }: { tripId: string }) {
                             </Card>
                         ))}
                         {transactions.length > 50 && (
-                            <p className="text-[11px] text-muted-foreground text-center pt-2">
+                            <p className="text-meta text-muted-foreground text-center pt-2">
                                 Showing first 50 of {transactions.length}.
                             </p>
                         )}
                     </div>
                 </section>
             ) : txError ? (
-                <Card className="bg-card/40 border-white/5">
-                    <CardContent className="p-6 text-center text-sm text-muted-foreground space-y-3">
-                        <p>Couldn&apos;t load this trip&apos;s transactions.</p>
-                        <button
-                            onClick={() => load()}
-                            className="min-h-[36px] px-4 rounded-full text-[11px] font-bold uppercase tracking-wider bg-primary/20 hover:bg-primary/30 border border-primary/30 text-primary transition-colors"
-                        >
-                            Try again
-                        </button>
-                    </CardContent>
-                </Card>
+                <EmptyState
+                    variant="error"
+                    title="Couldn't load this trip's transactions."
+                    action={{ label: 'Try again', onClick: () => load() }}
+                />
             ) : (
-                <Card className="bg-card/40 border-white/5">
-                    <CardContent className="p-6 text-center text-sm text-muted-foreground">
-                        No transactions tagged with <code className="text-foreground">{trip.slug}</code> yet.
-                    </CardContent>
-                </Card>
+                <EmptyState
+                    eyebrow="No tagged expenses"
+                    description={<>No transactions tagged with <code className="text-foreground">{trip.slug}</code> yet.</>}
+                />
             )}
 
             <TripForm
@@ -304,7 +298,7 @@ export function TripDetailView({ tripId }: { tripId: string }) {
 function Kpi({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
     return (
         <div className="rounded-xl bg-secondary/10 border border-white/5 p-2.5">
-            <div className="flex items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
+            <div className="flex items-center gap-1 text-eyebrow uppercase text-muted-foreground">
                 {icon}
                 <span className="truncate">{label}</span>
             </div>

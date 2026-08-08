@@ -68,7 +68,7 @@ export function RecurringExpensesSection({ templates, loading, formatCurrency, o
                                 </div>
                                 <div className="min-w-0">
                                     <p className="text-sm font-medium truncate max-w-[150px]">{template.description}</p>
-                                    <p className="text-[11px] text-muted-foreground">
+                                    <p className="text-meta text-muted-foreground">
                                         {formatCurrency(template.amount, template.currency)} • {template.frequency}
                                         {template.created_at && ` • Started ${format(new Date(template.created_at), 'MMM d, yyyy')}`}
                                     </p>
@@ -102,7 +102,7 @@ export function RecurringExpensesSection({ templates, loading, formatCurrency, o
                     </div>
                 )}
             </div>
-            <p className="text-[11px] text-muted-foreground">Manage your automated recurring transactions.</p>
+            <p className="text-meta text-muted-foreground">Manage your automated recurring transactions.</p>
 
             <EditSubscriptionDialog
                 template={templateToEdit}

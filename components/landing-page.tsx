@@ -964,7 +964,7 @@ export function LandingPage() {
                   </AdvancedButton>
                   <Link
                     href="/guide"
-                    className="group inline-flex items-center gap-1.5 px-4 py-3 text-[14px] font-medium transition-colors"
+                    className="group inline-flex items-center gap-1.5 px-4 py-3 text-sm font-medium transition-colors"
                     style={{ color: 'rgba(255,255,255,0.78)' }}
                   >
                     Read the guide

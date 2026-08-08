@@ -139,7 +139,7 @@ export function WhatIfCard({
                 </button>
 
                 {!open && (
-                    <p className="text-[11px] text-muted-foreground">
+                    <p className="text-meta text-muted-foreground">
                         Simulate the impact of trimming a category on your savings and goals.
                     </p>
                 )}
@@ -147,7 +147,7 @@ export function WhatIfCard({
                 {open && (
                     <div className="space-y-4 pt-1">
                         <div className="space-y-2">
-                            <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                            <label className="text-meta font-bold uppercase tracking-wider text-muted-foreground">
                                 Category
                             </label>
                             <Select
@@ -180,7 +180,7 @@ export function WhatIfCard({
 
                         <div className="space-y-2">
                             <div className="flex items-center justify-between">
-                                <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                                <label className="text-meta font-bold uppercase tracking-wider text-muted-foreground">
                                     Reduce by
                                 </label>
                                 <span className="text-sm font-bold text-violet-300">{cutPct}%</span>
@@ -196,7 +196,7 @@ export function WhatIfCard({
 
                         <div className="grid grid-cols-3 gap-2 pt-1">
                             <div className="rounded-xl bg-card/40 border border-white/5 p-3 text-center">
-                                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
+                                <p className="text-eyebrow uppercase text-muted-foreground">
                                     Per month
                                 </p>
                                 <p className="text-sm font-bold text-violet-300 mt-1">
@@ -204,7 +204,7 @@ export function WhatIfCard({
                                 </p>
                             </div>
                             <div className="rounded-xl bg-card/40 border border-white/5 p-3 text-center">
-                                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
+                                <p className="text-eyebrow uppercase text-muted-foreground">
                                     6 months
                                 </p>
                                 <p className="text-sm font-bold text-violet-300 mt-1">
@@ -212,7 +212,7 @@ export function WhatIfCard({
                                 </p>
                             </div>
                             <div className="rounded-xl bg-card/40 border border-white/5 p-3 text-center">
-                                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
+                                <p className="text-eyebrow uppercase text-muted-foreground">
                                     Per year
                                 </p>
                                 <p className="text-sm font-bold text-violet-300 mt-1">
@@ -223,7 +223,7 @@ export function WhatIfCard({
 
                         {monthlySavings > 0 && goalImpact && goalImpact.length > 0 && (
                             <div className="space-y-2 pt-1">
-                                <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-bold">
+                                <p className="text-meta uppercase tracking-wider text-muted-foreground font-bold">
                                     Goal impact
                                 </p>
                                 {goalImpact.map(({ goal, months }) => (
@@ -233,7 +233,7 @@ export function WhatIfCard({
                                     >
                                         <div className="flex-1 min-w-0">
                                             <p className="text-sm font-semibold truncate">{goal.name}</p>
-                                            <p className="text-[11px] text-muted-foreground">
+                                            <p className="text-meta text-muted-foreground">
                                                 Reach in {months < 1 ? '<1' : Math.ceil(months)} {months < 1 || Math.ceil(months) === 1 ? 'month' : 'months'} at this rate
                                             </p>
                                         </div>
@@ -243,7 +243,7 @@ export function WhatIfCard({
                         )}
 
                         {monthlySavings <= 0 && (
-                            <p className="text-[11px] text-muted-foreground text-center">
+                            <p className="text-meta text-muted-foreground text-center">
                                 Pick a category with spending and slide the cut to see the impact.
                             </p>
                         )}

@@ -17,7 +17,7 @@ export function PasswordRequirements({ password = '', showIfEmpty = false }: Pas
     const strength = validatePassword(password);
 
     const RequirementItem = ({ met, label }: { met: boolean; label: string }) => (
-        <div className={cn("flex items-center gap-2.5 text-[11px] font-medium transition-all duration-300", met ? "text-emerald-400" : "text-muted-foreground/40")}>
+        <div className={cn("flex items-center gap-2.5 text-meta font-medium transition-all duration-300", met ? "text-emerald-400" : "text-muted-foreground/40")}>
             <div className={cn("w-4.5 h-4.5 rounded-full flex items-center justify-center border transition-all duration-500",
                 met ? "bg-emerald-500/20 border-emerald-500/50 scale-110 shadow-[0_0_10px_rgba(16,185,129,0.2)]" : "bg-white/5 border-white/5"
             )}>
@@ -40,7 +40,7 @@ export function PasswordRequirements({ password = '', showIfEmpty = false }: Pas
                     <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-primary/50 to-transparent" />
                     
                     <div className="flex items-center justify-between mb-1">
-                        <p className="text-[11px] font-black uppercase tracking-widest text-muted-foreground/70">Security Protocol</p>
+                        <p className="text-meta font-black uppercase tracking-widest text-muted-foreground/70">Security Protocol</p>
                         <div className="flex gap-1">
                             {[1, 2, 3, 4, 5].map((i) => (
                                 <div 

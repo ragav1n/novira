@@ -30,7 +30,7 @@ function CategoryBreakdownCardInner({ title, categoryBreakdown, categorizedBreak
     return (
         <div className="space-y-2">
             <div className="flex items-center justify-between px-1">
-                <span className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground/80">
+                <span className="text-meta font-bold uppercase tracking-widest text-muted-foreground/80">
                     {title}
                 </span>
             </div>
@@ -47,7 +47,7 @@ function CategoryBreakdownCardInner({ title, categoryBreakdown, categorizedBreak
                                 valueFormatter={(v) => `${Math.round(v)}%`}
                             />
                         ) : (
-                            <div className="flex items-center justify-center h-full text-muted-foreground text-[10px] font-bold uppercase">
+                            <div className="flex items-center justify-center h-full text-muted-foreground text-eyebrow uppercase">
                                 No Data
                             </div>
                         )}
@@ -70,7 +70,7 @@ function CategoryBreakdownCardInner({ title, categoryBreakdown, categorizedBreak
                                     }}
                                     className="w-full text-left space-y-1.5 rounded-lg -mx-1 px-1 py-1 hover:bg-white/5 transition-colors"
                                 >
-                                    <div className="flex justify-between text-[11px] font-bold">
+                                    <div className="flex justify-between text-meta font-bold">
                                         <span className="flex items-center gap-2 text-muted-foreground/80">
                                             <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: cat.fill }} />
                                             {cat.name}
@@ -78,7 +78,7 @@ function CategoryBreakdownCardInner({ title, categoryBreakdown, categorizedBreak
                                         <span className="flex items-center gap-1.5 text-foreground">
                                             {anomaly && (
                                                 <span
-                                                    className="text-[9px] font-bold tabular-nums px-1.5 py-0.5 rounded-md bg-rose-500/15 border border-rose-500/30 text-rose-300"
+                                                    className="text-micro font-bold tabular-nums px-1.5 py-0.5 rounded-md bg-rose-500/15 border border-rose-500/30 text-rose-300"
                                                     title={`Up ~${anomaly.pct.toFixed(0)}% vs. prior period's monthly rate`}
                                                 >
                                                     ▲ {anomaly.pct.toFixed(0)}%

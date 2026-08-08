@@ -2,7 +2,8 @@
 
 import React, { useEffect, useState } from 'react';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
-import { FileWarning, Loader2 } from 'lucide-react';
+import { FileWarning } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import { getReceiptSignedUrl } from '@/lib/receipt-storage';
 import { ZoomableImage } from '@/components/ui/zoomable-image';
 
@@ -51,7 +52,7 @@ export function ReceiptViewerDialog({ open, onOpenChange, receiptPath }: Receipt
                     <DialogTitle className="text-sm font-semibold">Receipt</DialogTitle>
                 </div>
                 <div className="relative bg-black/40 min-h-[420px] flex items-center justify-center">
-                    {loading && <Loader2 className="w-8 h-8 animate-spin text-primary/60" />}
+                    {loading && <Spinner className="size-8 text-primary/60" />}
                     {error && !loading && (
                         <div className="flex flex-col items-center gap-2 text-center px-6 text-white/70">
                             <FileWarning className="w-8 h-8 text-amber-400/70" />
@@ -75,7 +76,7 @@ export function ReceiptViewerDialog({ open, onOpenChange, receiptPath }: Receipt
                         )
                     )}
                     {url && !loading && !error && !isPdf && (
-                        <span className="pointer-events-none absolute bottom-3 right-3 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-black/70 backdrop-blur-sm text-white text-[10px] font-semibold opacity-80">
+                        <span className="pointer-events-none absolute bottom-3 right-3 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-black/70 backdrop-blur-sm text-white text-caption font-semibold opacity-80">
                             Pinch · double-tap · scroll to zoom
                         </span>
                     )}

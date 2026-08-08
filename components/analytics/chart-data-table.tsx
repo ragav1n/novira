@@ -30,7 +30,7 @@ export function ChartDataTable({ caption, columns, rows, formatValue, className 
     if (rows.length === 0) return null;
 
     return (
-        <div className={cn('text-[11px]', className)}>
+        <div className={cn('text-meta', className)}>
             <button
                 type="button"
                 onClick={() => setOpen(o => !o)}

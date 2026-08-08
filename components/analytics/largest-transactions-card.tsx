@@ -25,7 +25,7 @@ function LargestTransactionsCardInner({ top3Largest, formatCurrency }: Props) {
     return (
         <div className="space-y-2">
             <div className="flex items-center justify-between px-1">
-                <span className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground/80">
+                <span className="text-meta font-bold uppercase tracking-widest text-muted-foreground/80">
                     Largest Transactions
                 </span>
             </div>
@@ -40,13 +40,13 @@ function LargestTransactionsCardInner({ top3Largest, formatCurrency }: Props) {
                                     style={{ backgroundColor: dotColor }}
                                 />
                                 <div className="flex-1 min-w-0">
-                                    <p className="text-[12px] font-bold truncate">{tx.description}</p>
-                                    <p className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground/60 truncate">
+                                    <p className="text-xs font-bold truncate">{tx.description}</p>
+                                    <p className="text-eyebrow uppercase text-muted-foreground/60 truncate">
                                         {format(parseISO(tx.date.slice(0, 10)), 'd MMM')}
                                         {tx.place_name ? ` · ${tx.place_name}` : ''}
                                     </p>
                                 </div>
-                                <span className="text-[12px] font-bold tabular-nums">{formatCurrency(tx.amount)}</span>
+                                <span className="text-xs font-bold tabular-nums">{formatCurrency(tx.amount)}</span>
                             </div>
                         );
                     })}

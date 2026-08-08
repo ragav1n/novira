@@ -40,7 +40,7 @@ export function TagsSection({ tags, setTags, knownTags }: TagsSectionProps) {
 
     return (
         <div className="space-y-2">
-            <label htmlFor="expense-tags" className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest flex items-center gap-1.5">
+            <label htmlFor="expense-tags" className="text-eyebrow text-muted-foreground/60 uppercase flex items-center gap-1.5">
                 <Hash className="w-3 h-3" aria-hidden="true" />
                 Tags <span className="font-bold text-muted-foreground/40">(Optional)</span>
             </label>
@@ -52,7 +52,7 @@ export function TagsSection({ tags, setTags, knownTags }: TagsSectionProps) {
                 {tags.map(t => (
                     <span
                         key={t}
-                        className="inline-flex items-center gap-1 pl-2.5 pr-1 py-1 rounded-full bg-primary/15 border border-primary/25 text-primary text-[11px] font-semibold"
+                        className="inline-flex items-center gap-1 pl-2.5 pr-1 py-1 rounded-full bg-primary/15 border border-primary/25 text-primary text-meta font-semibold"
                     >
                         <span>#{t}</span>
                         <button
@@ -100,7 +100,7 @@ export function TagsSection({ tags, setTags, knownTags }: TagsSectionProps) {
                             type="button"
                             key={t}
                             onMouseDown={(e) => { e.preventDefault(); addTag(t); }}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-secondary/30 hover:bg-primary/15 border border-white/5 text-[11px] font-semibold text-muted-foreground hover:text-primary transition-colors"
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-secondary/30 hover:bg-primary/15 border border-white/5 text-meta font-semibold text-muted-foreground hover:text-primary transition-colors"
                         >
                             <Plus className="w-3 h-3" aria-hidden="true" />
                             <span>#{t}</span>

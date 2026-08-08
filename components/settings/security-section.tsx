@@ -20,10 +20,10 @@ export function SecuritySection({ userEmail, hasPassword, hasGoogleIdentity, onP
                         <Lock className="w-4 h-4 text-muted-foreground" />
                         <div>
                             <p className="text-sm font-medium">Account Email</p>
-                            <p className="text-[11px] text-muted-foreground">{userEmail}</p>
+                            <p className="text-meta text-muted-foreground">{userEmail}</p>
                         </div>
                     </div>
-                    <div className="px-2 py-0.5 rounded text-[11px] font-bold uppercase bg-white/5 text-muted-foreground border border-white/10">
+                    <div className="px-2 py-0.5 rounded text-meta font-bold uppercase bg-white/5 text-muted-foreground border border-white/10">
                         Primary
                     </div>
                 </div>
@@ -73,7 +73,7 @@ export function SecuritySection({ userEmail, hasPassword, hasGoogleIdentity, onP
                             </span>
                         </div>
                         {hasPassword && (
-                            <div className="px-2 py-0.5 rounded text-[11px] font-bold uppercase bg-primary/10 text-primary border border-primary/20">
+                            <div className="px-2 py-0.5 rounded text-meta font-bold uppercase bg-primary/10 text-primary border border-primary/20">
                                 Linked
                             </div>
                         )}

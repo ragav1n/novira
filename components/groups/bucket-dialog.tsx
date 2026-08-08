@@ -171,17 +171,17 @@ export function BucketDialog({ isOpen, onClose, editingBucket }: BucketDialogPro
 
     return (
         <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-            <DialogContent className="max-w-[420px] w-[95vw] rounded-[28px] border-white/[0.08] bg-card/95 backdrop-blur-2xl p-0 overflow-hidden shadow-2xl">
+            <DialogContent className="max-w-[420px] w-[95vw] rounded-[28px] border-white/8 bg-card/95 backdrop-blur-2xl p-0 overflow-hidden shadow-2xl">
                 <div className="p-5 space-y-4 max-h-[88vh] overflow-y-auto">
                     <DialogHeader className="text-left flex-row items-start gap-3 space-y-0">
                         <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 bg-cyan-400/[0.08] text-cyan-400">
                             <ActiveIcon className="w-[18px] h-[18px]" />
                         </div>
                         <div className="min-w-0">
-                            <DialogTitle className="text-[15px] font-semibold tracking-tight">
+                            <DialogTitle className="text-lead font-semibold tracking-tight">
                                 {editingBucket ? 'Edit bucket' : 'New bucket'}
                             </DialogTitle>
-                            <DialogDescription className="text-[12px] mt-0.5">
+                            <DialogDescription className="text-xs mt-0.5">
                                 {editingBucket ? 'Update name, budget, or category filter.' : 'Group spending under a private label.'}
                             </DialogDescription>
                         </div>
@@ -190,7 +190,7 @@ export function BucketDialog({ isOpen, onClose, editingBucket }: BucketDialogPro
                     <div className="space-y-4">
                         {/* Icon picker */}
                         <div className="space-y-1.5">
-                            <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground/70 pl-1">Icon</p>
+                            <p className="text-eyebrow uppercase text-muted-foreground/70 pl-1">Icon</p>
                             <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
                                 {ICONS.map(item => {
                                     const active = newBucketIcon === item.name;
@@ -208,7 +208,7 @@ export function BucketDialog({ isOpen, onClose, editingBucket }: BucketDialogPro
                                                 'h-10 w-10 shrink-0 rounded-xl border flex items-center justify-center transition-colors',
                                                 active
                                                     ? 'bg-cyan-400/15 border-cyan-400/40 text-cyan-300'
-                                                    : 'bg-secondary/10 border-white/[0.05] text-muted-foreground hover:border-white/[0.1]',
+                                                    : 'bg-secondary/10 border-white/5 text-muted-foreground hover:border-white/10',
                                             )}
                                         >
                                             <item.icon className="w-4 h-4 pointer-events-none" />
@@ -220,7 +220,7 @@ export function BucketDialog({ isOpen, onClose, editingBucket }: BucketDialogPro
 
                         {/* Name */}
                         <div className="space-y-1.5">
-                            <label htmlFor="bucket-name" className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground/70 pl-1">
+                            <label htmlFor="bucket-name" className="text-eyebrow uppercase text-muted-foreground/70 pl-1">
                                 Name
                             </label>
                             <Input
@@ -237,20 +237,20 @@ export function BucketDialog({ isOpen, onClose, editingBucket }: BucketDialogPro
                         {/* Currency + Budget */}
                         <div className="grid grid-cols-2 gap-3">
                             <div className="space-y-1.5">
-                                <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground/70 pl-1">Currency</p>
+                                <p className="text-eyebrow uppercase text-muted-foreground/70 pl-1">Currency</p>
                                 <Select value={newBucketCurrency} onValueChange={setNewBucketCurrency}>
                                     <SelectTrigger className="bg-secondary/20 border-white/[0.06] h-11 rounded-xl">
                                         <div className="flex items-center gap-2">
                                             <span className="text-cyan-300 font-bold w-5 text-left">{CURRENCY_DETAILS[newBucketCurrency as keyof typeof CURRENCY_DETAILS]?.symbol}</span>
-                                            <span className="text-[13px] font-semibold">{newBucketCurrency}</span>
+                                            <span className="text-body font-semibold">{newBucketCurrency}</span>
                                         </div>
                                     </SelectTrigger>
-                                    <SelectContent position="popper" className="bg-card border-white/[0.08] rounded-xl overflow-y-auto max-h-[200px]">
+                                    <SelectContent position="popper" className="bg-card border-white/8 rounded-xl overflow-y-auto max-h-[200px]">
                                         {Object.entries(CURRENCY_DETAILS).map(([code, detail]) => (
                                             <SelectItem key={code} value={code} className="py-2 px-3 focus:bg-cyan-400/10 rounded-lg">
                                                 <div className="flex items-center gap-2">
                                                     <span className="text-cyan-300 font-bold w-5 text-left">{detail.symbol}</span>
-                                                    <span className="text-[13px] font-semibold">{code}</span>
+                                                    <span className="text-body font-semibold">{code}</span>
                                                 </div>
                                             </SelectItem>
                                         ))}
@@ -259,7 +259,7 @@ export function BucketDialog({ isOpen, onClose, editingBucket }: BucketDialogPro
                             </div>
 
                             <div className="space-y-1.5">
-                                <label htmlFor="bucket-budget" className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground/70 pl-1">
+                                <label htmlFor="bucket-budget" className="text-eyebrow uppercase text-muted-foreground/70 pl-1">
                                     Budget
                                 </label>
                                 <div className="relative">
@@ -273,7 +273,7 @@ export function BucketDialog({ isOpen, onClose, editingBucket }: BucketDialogPro
                                         onChange={(e) => setNewBucketTarget(e.target.value)}
                                         className="bg-secondary/20 border-white/[0.06] h-11 rounded-xl pl-7 focus-visible:ring-cyan-400/40 tabular-nums"
                                     />
-                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-[13px] font-bold">
+                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-body font-bold">
                                         {CURRENCY_DETAILS[newBucketCurrency as keyof typeof CURRENCY_DETAILS]?.symbol || '$'}
                                     </span>
                                 </div>
@@ -282,7 +282,7 @@ export function BucketDialog({ isOpen, onClose, editingBucket }: BucketDialogPro
 
                         {budgetSuggestions && (
                             <div className="flex flex-wrap items-center gap-1.5 -mt-1">
-                                <span className="text-[10px] uppercase tracking-[0.14em] font-medium text-muted-foreground/60 inline-flex items-center gap-1">
+                                <span className="text-eyebrow uppercase text-muted-foreground/60 inline-flex items-center gap-1">
                                     <Sparkles className="w-3 h-3" aria-hidden="true" />
                                     Try
                                 </span>
@@ -290,7 +290,7 @@ export function BucketDialog({ isOpen, onClose, editingBucket }: BucketDialogPro
                                     <button
                                         type="button"
                                         onClick={() => setNewBucketTarget(Math.round(budgetSuggestions.avg3mo).toString())}
-                                        className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-cyan-400/10 border border-cyan-400/25 text-cyan-300 hover:bg-cyan-400/15 transition-colors tabular-nums"
+                                        className="text-meta font-semibold px-2 py-0.5 rounded-full bg-cyan-400/10 border border-cyan-400/25 text-cyan-300 hover:bg-cyan-400/15 transition-colors tabular-nums"
                                     >
                                         Avg 3mo · {formatCurrency(budgetSuggestions.avg3mo)}
                                     </button>
@@ -299,7 +299,7 @@ export function BucketDialog({ isOpen, onClose, editingBucket }: BucketDialogPro
                                     <button
                                         type="button"
                                         onClick={() => setNewBucketTarget(Math.round(budgetSuggestions.sameMonthLastYear).toString())}
-                                        className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-cyan-400/10 border border-cyan-400/25 text-cyan-300 hover:bg-cyan-400/15 transition-colors tabular-nums"
+                                        className="text-meta font-semibold px-2 py-0.5 rounded-full bg-cyan-400/10 border border-cyan-400/25 text-cyan-300 hover:bg-cyan-400/15 transition-colors tabular-nums"
                                     >
                                         Last year · {formatCurrency(budgetSuggestions.sameMonthLastYear)}
                                     </button>
@@ -309,7 +309,7 @@ export function BucketDialog({ isOpen, onClose, editingBucket }: BucketDialogPro
 
                         {/* Dates */}
                         <div className="space-y-1.5">
-                            <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground/70 pl-1">Dates</p>
+                            <p className="text-eyebrow uppercase text-muted-foreground/70 pl-1">Dates</p>
                             <DateRangePicker
                                 date={bucketDateRange}
                                 setDate={setBucketDateRange}
@@ -322,7 +322,7 @@ export function BucketDialog({ isOpen, onClose, editingBucket }: BucketDialogPro
                         {/* Category filter */}
                         <div className="space-y-1.5">
                             <div className="flex items-center justify-between pl-1">
-                                <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground/70 inline-flex items-center gap-1.5">
+                                <p className="text-eyebrow uppercase text-muted-foreground/70 inline-flex items-center gap-1.5">
                                     <Filter className="w-3 h-3" aria-hidden="true" />
                                     Limit to categories
                                 </p>
@@ -330,13 +330,13 @@ export function BucketDialog({ isOpen, onClose, editingBucket }: BucketDialogPro
                                     <button
                                         type="button"
                                         onClick={() => setAllowedCategories([])}
-                                        className="text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+                                        className="text-caption text-muted-foreground hover:text-foreground transition-colors"
                                     >
                                         Clear
                                     </button>
                                 )}
                             </div>
-                            <p className="text-[10px] text-muted-foreground/70 pl-1">
+                            <p className="text-caption text-muted-foreground/70 pl-1">
                                 {allowedCategories.length === 0
                                     ? 'All categories count toward this bucket.'
                                     : `${allowedCategories.length} ${allowedCategories.length === 1 ? 'category counts' : 'categories count'} toward this bucket.`}
@@ -353,10 +353,10 @@ export function BucketDialog({ isOpen, onClose, editingBucket }: BucketDialogPro
                                                 active ? prev.filter(c => c !== cat.id) : [...prev, cat.id],
                                             )}
                                             className={cn(
-                                                'inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium border transition-colors capitalize',
+                                                'inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-meta font-medium border transition-colors capitalize',
                                                 active
                                                     ? 'border-transparent'
-                                                    : 'bg-secondary/10 border-white/[0.05] text-muted-foreground hover:border-white/[0.1]',
+                                                    : 'bg-secondary/10 border-white/5 text-muted-foreground hover:border-white/10',
                                             )}
                                             style={active ? { backgroundColor: `${color}1F`, borderColor: `${color}50`, color } : undefined}
                                         >

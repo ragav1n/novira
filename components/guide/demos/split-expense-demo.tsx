@@ -50,10 +50,10 @@ function Inner({ play }: { play: boolean }) {
           </div>
           <div className="min-w-0 flex-1">
             <div className="text-sm font-semibold text-foreground">Pizza Friday</div>
-            <div className="text-[11px] text-foreground/75">Food · Tonight</div>
+            <div className="text-meta text-foreground/75">Food · Tonight</div>
           </div>
           <div className="text-right">
-            <div className="text-[11px] uppercase tracking-widest text-foreground/65">Total</div>
+            <div className="text-meta uppercase tracking-widest text-foreground/65">Total</div>
             <div className="font-mono text-sm font-semibold text-foreground">₹999.00</div>
           </div>
         </div>
@@ -93,7 +93,7 @@ function Inner({ play }: { play: boolean }) {
                         ease: EASE_GLIDE,
                         delay: i * STAGGER_NORMAL,
                       }}
-                      className="mt-1.5 rounded-full border border-emerald-400/30 bg-emerald-500/10 px-2 py-0.5 font-mono text-[11px] text-emerald-300 transform-gpu"
+                      className="mt-1.5 rounded-full border border-emerald-400/30 bg-emerald-500/10 px-2 py-0.5 font-mono text-meta text-emerald-300 transform-gpu"
                     >
                       ₹333.00
                     </motion.div>
@@ -104,7 +104,7 @@ function Inner({ play }: { play: boolean }) {
           })}
         </div>
 
-        <div className="mt-5 flex h-4 items-center justify-center text-[11px] text-foreground/75">
+        <div className="mt-5 flex h-4 items-center justify-center text-meta text-foreground/75">
           <AnimatePresence mode="wait" initial={false}>
             <motion.div
               key={phase}

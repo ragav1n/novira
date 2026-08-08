@@ -1,6 +1,7 @@
 import dynamic from 'next/dynamic';
 import { cn } from '@/lib/utils';
-import { Loader2, CameraOff } from 'lucide-react';
+import { CameraOff } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import { setZXingModuleOverrides } from 'barcode-detector';
 import { useState } from 'react';
 
@@ -20,7 +21,7 @@ const Scanner = dynamic(() => import('@yudiel/react-qr-scanner').then(mod => mod
     ssr: false,
     loading: () => (
         <div className="w-full h-full flex items-center justify-center bg-black/50">
-            <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            <Spinner className="size-8 text-primary" />
         </div>
     )
 });

@@ -71,14 +71,14 @@ export const TransactionHistoryDialog = React.memo(function TransactionHistoryDi
                                             <div className="space-y-1.5">
                                                 <div className="flex items-center justify-between">
                                                     <span className={cn(
-                                                        "text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md",
+                                                        "text-eyebrow font-black uppercase px-2 py-0.5 rounded-md",
                                                         log.action === 'INSERT' ? "bg-emerald-500/10 text-emerald-500" :
                                                         log.action === 'UPDATE' ? "bg-amber-500/10 text-amber-500" :
                                                         "bg-rose-500/10 text-rose-500"
                                                     )}>
                                                         {log.action === 'INSERT' ? 'Created' : log.action === 'UPDATE' ? 'Updated' : 'Deleted'}
                                                     </span>
-                                                    <span className="text-[10px] text-muted-foreground font-mono">
+                                                    <span className="text-caption text-muted-foreground font-mono">
                                                         {format(new Date(log.created_at), 'MMM d, h:mm a')}
                                                     </span>
                                                 </div>
@@ -90,12 +90,12 @@ export const TransactionHistoryDialog = React.memo(function TransactionHistoryDi
                                                 {log.action === 'UPDATE' && log.new_data && (() => {
                                                     const newData = log.new_data;
                                                     return (
-                                                        <div className="mt-2 p-3 rounded-xl bg-white/5 border border-white/5 text-[11px] space-y-1.5">
+                                                        <div className="mt-2 p-3 rounded-xl bg-white/5 border border-white/5 text-meta space-y-1.5">
                                                             {Object.keys(newData).map(key => {
                                                                 if (key === 'updated_at' || key === 'id' || JSON.stringify(newData[key]) === JSON.stringify(log.old_data?.[key])) return null;
                                                                 return (
                                                                     <div key={key} className="flex flex-col">
-                                                                        <span className="text-muted-foreground capitalize font-bold text-[9px] uppercase tracking-wider">{key}</span>
+                                                                        <span className="text-muted-foreground capitalize font-bold text-micro uppercase tracking-wider">{key}</span>
                                                                         <div className="flex items-center gap-2 flex-wrap">
                                                                             <span className="text-rose-400/70 line-through decoration-rose-400/30 truncate max-w-[100px]">{String(log.old_data?.[key] || 'None')}</span>
                                                                             <span className="text-white/40">→</span>
@@ -117,7 +117,7 @@ export const TransactionHistoryDialog = React.memo(function TransactionHistoryDi
                     {!isLoading && auditLogs.length > 0 && (() => {
                         const oldest = auditLogs.reduce((a, b) => (a.created_at < b.created_at ? a : b));
                         return (
-                            <div className="px-6 py-3 border-t border-white/5 bg-secondary/5 text-[10px] text-muted-foreground/70 font-medium uppercase tracking-widest flex items-center justify-between">
+                            <div className="px-6 py-3 border-t border-white/5 bg-secondary/5 text-eyebrow text-muted-foreground/70 uppercase flex items-center justify-between">
                                 <span>{auditLogs.length} entr{auditLogs.length === 1 ? 'y' : 'ies'} · retained indefinitely</span>
                                 <span className="tabular-nums normal-case tracking-normal">Oldest: {format(new Date(oldest.created_at), 'd MMM yyyy')}</span>
                             </div>

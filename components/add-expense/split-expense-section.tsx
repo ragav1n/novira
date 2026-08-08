@@ -77,7 +77,7 @@ function SplitFriendRow({ friend, value, onChange, currency, CURRENCY_SYMBOLS }:
                 </div>
             </div>
             {preview !== null && (
-                <p className="text-[10px] text-muted-foreground font-medium pl-[112px]">
+                <p className="text-caption text-muted-foreground font-medium pl-[112px]">
                     = <span className="font-bold text-primary">{CURRENCY_SYMBOLS[currency] || '$'}{preview.toFixed(2)}</span>
                     <span className="text-muted-foreground/60"> · tap away or press Enter to apply</span>
                 </p>
@@ -128,7 +128,7 @@ export function SplitExpenseSection({
                     <Users className="w-5 h-5 text-primary" />
                     <div>
                         <p className="text-sm font-medium">Split this expense</p>
-                        <p className="text-[11px] text-muted-foreground">Divide cost with others</p>
+                        <p className="text-meta text-muted-foreground">Divide cost with others</p>
                     </div>
                 </div>
                 <Switch
@@ -166,7 +166,7 @@ export function SplitExpenseSection({
                     </div>
 
                     <div className="space-y-2">
-                        <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Split with Group</p>
+                        <p className="text-meta font-semibold text-muted-foreground uppercase tracking-wider">Split with Group</p>
                         <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1 scrollbar-hide">
                             {groups.map((group) => (
                                 <div
@@ -194,14 +194,14 @@ export function SplitExpenseSection({
                                             </div>
                                         )}
                                     </div>
-                                    <span className="text-[11px] font-medium truncate w-16 text-center">{group.name}</span>
+                                    <span className="text-meta font-medium truncate w-16 text-center">{group.name}</span>
                                 </div>
                             ))}
                         </div>
                     </div>
 
                     <div className="space-y-2">
-                        <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Or Split with Friends</p>
+                        <p className="text-meta font-semibold text-muted-foreground uppercase tracking-wider">Or Split with Friends</p>
                         <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1 scrollbar-hide">
                             {friends.map((friend) => (
                                 <div
@@ -242,7 +242,7 @@ export function SplitExpenseSection({
                                             </div>
                                         )}
                                     </div>
-                                    <span className="text-[11px] font-medium truncate w-16 text-center">{friend.full_name.split(' ')[0]}</span>
+                                    <span className="text-meta font-medium truncate w-16 text-center">{friend.full_name.split(' ')[0]}</span>
                                 </div>
                             ))}
                         </div>
@@ -251,10 +251,10 @@ export function SplitExpenseSection({
                     {/* Custom Amount Inputs */}
                     {splitMode === 'custom' && (selectedFriendIds.length > 0 || selectedGroupId) && (
                         <div className="space-y-3 pt-2 border-t border-white/5 animate-in fade-in slide-in-from-top-2 duration-300">
-                            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Enter amounts each person owes you</p>
+                            <p className="text-meta font-semibold text-muted-foreground uppercase tracking-wider">Enter amounts each person owes you</p>
                             {selectedGroupId ? (
                                 // For groups, we show group members (fetched dynamically)
-                                <p className="text-[11px] text-muted-foreground italic">Custom amounts for group members will be applied after saving</p>
+                                <p className="text-meta text-muted-foreground italic">Custom amounts for group members will be applied after saving</p>
                             ) : (
                                 selectedFriendIds.map((friendId) => {
                                     const friend = friends.find(f => f.id === friendId);
@@ -285,20 +285,20 @@ export function SplitExpenseSection({
                                 const yourShare = expenseAmount - totalAllocated;
                                 return (
                                     <div className="space-y-1.5 pt-2 border-t border-white/5">
-                                        <div className="flex justify-between text-[11px]">
+                                        <div className="flex justify-between text-meta">
                                             <span className="text-muted-foreground">Others owe:</span>
                                             <span className="font-medium text-emerald-500">
                                                 {CURRENCY_SYMBOLS[currency] || '$'}{totalAllocated.toFixed(2)}
                                             </span>
                                         </div>
-                                        <div className="flex justify-between text-[11px]">
+                                        <div className="flex justify-between text-meta">
                                             <span className="text-muted-foreground">Your share:</span>
                                             <span className={cn("font-medium", yourShare < 0 ? "text-red-400" : "text-white")}>
                                                 {CURRENCY_SYMBOLS[currency] || '$'}{yourShare.toFixed(2)}
                                             </span>
                                         </div>
                                         {yourShare < 0 && (
-                                            <p className="text-[11px] text-red-400">⚠ Split amounts exceed the total expense</p>
+                                            <p className="text-meta text-red-400">⚠ Split amounts exceed the total expense</p>
                                         )}
                                     </div>
                                 );
@@ -309,7 +309,7 @@ export function SplitExpenseSection({
                     {/* Even split preview */}
                     {splitMode === 'even' && (selectedFriendIds.length > 0 || selectedGroupId) && amount && (
                         <div className="pt-2 border-t border-white/5">
-                            <p className="text-[11px] text-muted-foreground text-center">
+                            <p className="text-meta text-muted-foreground text-center">
                                 {selectedGroupId ? (
                                     <>Split <span className="font-medium text-primary">equally</span> among all group members</>
                                 ) : (

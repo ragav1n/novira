@@ -49,7 +49,7 @@ function Inner({ play }: { play: boolean }) {
   return (
     <div className="mx-auto max-w-md">
       <div className="rounded-xl border border-white/10 bg-zinc-950/60 p-5">
-        <div className="text-[10px] uppercase tracking-widest text-foreground/65">Last 90 days</div>
+        <div className="text-eyebrow uppercase text-foreground/65">Last 90 days</div>
 
         {/* Fixed height fits the worst case (4 transactions stacked) so the
             section content below never shifts while the demo cycles. */}
@@ -68,9 +68,9 @@ function Inner({ play }: { play: boolean }) {
                   <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/15 text-emerald-300">
                     <Music className="h-3.5 w-3.5" />
                   </div>
-                  <div className="min-w-0 flex-1 text-[13px] text-foreground/90">Spotify Premium</div>
-                  <div className="text-[11px] text-foreground/75">{t.date}</div>
-                  <div className="font-mono text-[12px] text-foreground">−₹{t.amount}</div>
+                  <div className="min-w-0 flex-1 text-body text-foreground/90">Spotify Premium</div>
+                  <div className="text-meta text-foreground/75">{t.date}</div>
+                  <div className="font-mono text-xs text-foreground">−₹{t.amount}</div>
                 </motion.div>
               ))}
           </AnimatePresence>
@@ -89,13 +89,13 @@ function Inner({ play }: { play: boolean }) {
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="text-sm font-semibold text-foreground">Spotify Premium</div>
-                    <div className="text-[11px] text-emerald-300">Monthly · ₹199 · Detected</div>
+                    <div className="text-meta text-emerald-300">Monthly · ₹199 · Detected</div>
                   </div>
-                  <button className="rounded-full border border-emerald-400/30 bg-emerald-500/10 px-3 py-1 text-[11px] font-medium text-emerald-300">
+                  <button className="rounded-full border border-emerald-400/30 bg-emerald-500/10 px-3 py-1 text-meta font-medium text-emerald-300">
                     Track
                   </button>
                 </div>
-                <p className="mt-3 text-[11px] leading-relaxed text-foreground/75">
+                <p className="mt-3 text-meta leading-relaxed text-foreground/75">
                   Spotted 4 similar charges on a steady monthly rhythm. Tap Track to start tracking it as recurring.
                 </p>
               </motion.div>

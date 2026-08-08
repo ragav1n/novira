@@ -2,6 +2,7 @@
 
 import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import { X, MapPin, Navigation } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { SHEET } from '@/lib/motion';
 import { parseISO, startOfMonth, subMonths, startOfYear } from 'date-fns';
@@ -627,10 +628,10 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency, 
                         {/* Loading / truncation notice */}
                         {(isLoading || truncated) && geoTransactions.length > 0 && (
                             <div className="absolute top-[5.5rem] sm:top-[4.75rem] left-1/2 -translate-x-1/2 z-30 pointer-events-none">
-                                <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-card/80 backdrop-blur-md border border-white/10 shadow-lg text-[11px] font-medium text-muted-foreground">
+                                <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-card/80 backdrop-blur-md border border-white/10 shadow-lg text-meta font-medium text-muted-foreground">
                                     {isLoading ? (
                                         <>
-                                            <span className="w-3 h-3 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+                                            <Spinner className="size-3 text-primary" label={null} />
                                             Loading all locations…
                                         </>
                                     ) : (
@@ -697,7 +698,7 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency, 
                                     key={key}
                                     onClick={() => setTimeRange(key)}
                                     className={cn(
-                                        "px-3.5 min-h-[40px] rounded-full text-[12px] font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
+                                        "px-3.5 min-h-[40px] rounded-full text-xs font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
                                         timeRange === key ? "bg-primary text-primary-foreground shadow-inner" : "text-muted-foreground hover:bg-white/5"
                                     )}
                                     aria-pressed={timeRange === key}
@@ -724,7 +725,7 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency, 
                                         )}
                                     >
                                         <div className="w-2.5 h-2.5 rounded-full" style={{ background: color }} />
-                                        <span className="text-[12px] font-bold capitalize">{getCategoryLabel(cat)}</span>
+                                        <span className="text-xs font-bold capitalize">{getCategoryLabel(cat)}</span>
                                     </button>
                                 );
                             })}
@@ -732,7 +733,7 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency, 
                         {/* Heatmap intensity legend */}
                         {viewMode === 'heatmap' && (
                             <div
-                                className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-card/60 backdrop-blur-md border border-white/10 shadow-lg pointer-events-auto w-fit text-[10px] font-bold uppercase tracking-wider text-muted-foreground"
+                                className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-card/60 backdrop-blur-md border border-white/10 shadow-lg pointer-events-auto w-fit text-eyebrow uppercase text-muted-foreground"
                                 role="img"
                                 aria-label="Heatmap colour shows spending density, from low (purple) to high (yellow)"
                             >
@@ -783,11 +784,11 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency, 
                                         <div className="flex items-start justify-between gap-2">
                                             <div className="min-w-0">
                                                 <p className="text-sm font-black truncate">{selectedTx.description}</p>
-                                                <p className="text-[11px] text-emerald-400 font-bold mt-0.5 truncate">
+                                                <p className="text-meta text-emerald-400 font-bold mt-0.5 truncate">
                                                     📍 {selectedTx.place_name}
                                                 </p>
                                                 {selectedTx.place_address && (
-                                                    <p className="text-[11px] text-muted-foreground truncate mt-0.5">
+                                                    <p className="text-meta text-muted-foreground truncate mt-0.5">
                                                         {selectedTx.place_address}
                                                     </p>
                                                 )}
@@ -797,7 +798,7 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency, 
                                             </span>
                                         </div>
                                         <div className="flex items-center gap-2 mt-2">
-                                            <span className="px-1.5 py-0.5 rounded-md text-[10px] font-bold capitalize"
+                                            <span className="px-1.5 py-0.5 rounded-md text-caption font-bold capitalize"
                                                 style={{
                                                     backgroundColor: `${CATEGORY_COLORS[selectedTx.category as keyof typeof CATEGORY_COLORS] || CATEGORY_COLORS.others}15`,
                                                     color: CATEGORY_COLORS[selectedTx.category as keyof typeof CATEGORY_COLORS] || CATEGORY_COLORS.others,
@@ -805,7 +806,7 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency, 
                                             >
                                                 {getCategoryLabel(selectedTx.category)}
                                             </span>
-                                            <span className="text-[11px] text-muted-foreground">
+                                            <span className="text-meta text-muted-foreground">
                                                 {parseISO(selectedTx.date.slice(0, 10)).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                                             </span>
                                             <button
@@ -815,7 +816,7 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency, 
                                                         '_blank'
                                                     );
                                                 }}
-                                                className="ml-auto flex items-center gap-1 text-[11px] font-bold text-primary bg-primary/10 px-2.5 py-1.5 rounded-full hover:bg-primary/20 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                                                className="ml-auto flex items-center gap-1 text-meta font-bold text-primary bg-primary/10 px-2.5 py-1.5 rounded-full hover:bg-primary/20 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                                                 aria-label="Get directions to this place"
                                             >
                                                 <Navigation className="w-2.5 h-2.5" />
@@ -862,7 +863,7 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency, 
                                     </div>
                                     <div>
                                         <span className="capitalize">{getCategoryLabel(drillDownTxs[0].category)}</span>
-                                        <p className="text-[11px] text-muted-foreground">{drillDownTxs.length} Transactions</p>
+                                        <p className="text-meta text-muted-foreground">{drillDownTxs.length} Transactions</p>
                                     </div>
                                 </div>
                                 <button
@@ -879,8 +880,8 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency, 
                                         <div className="flex items-center gap-3 min-w-0">
                                             <div className="min-w-0">
                                                 <p className="text-sm font-bold truncate max-w-[150px]">{tx.description}</p>
-                                                <p className="text-[11px] text-emerald-400 truncate">{tx.place_name || 'Location'}</p>
-                                                <p className="text-[11px] text-muted-foreground">{new Date(tx.date.slice(0, 10) + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
+                                                <p className="text-meta text-emerald-400 truncate">{tx.place_name || 'Location'}</p>
+                                                <p className="text-meta text-muted-foreground">{new Date(tx.date.slice(0, 10) + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
                                             </div>
                                         </div>
                                         <span className="font-black text-sm shrink-0 pl-2">{formatCurrency(tx.amount, tx.currency)}</span>
@@ -918,7 +919,7 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency, 
                                         />
                                     </div>
                                     <div>
-                                        <p className="text-[10px] uppercase font-black tracking-widest text-muted-foreground">
+                                        <p className="text-eyebrow uppercase font-black text-muted-foreground">
                                             {getCategoryLabel(hoveredTower.category)}
                                         </p>
                                         <p className="text-sm font-black text-white">
@@ -927,11 +928,11 @@ export function ExpenseMapView({ isOpen, onClose, transactions, formatCurrency, 
                                     </div>
                                 </div>
                                 <div className="space-y-2 pt-2 border-t border-white/10">
-                                    <div className="flex items-center justify-between text-[11px]">
+                                    <div className="flex items-center justify-between text-meta">
                                         <span className="text-muted-foreground font-medium">Top Merchant</span>
                                         <span className="text-white font-black truncate max-w-[100px] text-right">{hoveredTower.topMerchant}</span>
                                     </div>
-                                    <div className="flex items-center justify-between text-[11px]">
+                                    <div className="flex items-center justify-between text-meta">
                                         <span className="text-muted-foreground font-medium">Transactions</span>
                                         <span className="text-white font-black">{hoveredTower.count}</span>
                                     </div>

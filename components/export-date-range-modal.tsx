@@ -3,6 +3,7 @@
 import React, { useState, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { Spinner } from '@/components/ui/spinner';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
 import {
     startOfMonth, endOfMonth, subMonths, startOfYear, endOfYear, subYears,
@@ -166,7 +167,7 @@ export function ExportDateRangeModal({
                         <DocumentHeroIcon format={fileFormat} stripe={accent.stripe} />
                         <DialogHeader className="gap-1 sm:text-center items-center">
                             <DialogTitle className="text-base font-semibold tracking-tight">{title}</DialogTitle>
-                            <p className="font-mono text-[11px] text-muted-foreground/80 truncate max-w-full">
+                            <p className="font-mono text-meta text-muted-foreground/80 truncate max-w-full">
                                 {filenamePreview}
                             </p>
                             <DialogDescription className="sr-only">{description}</DialogDescription>
@@ -177,8 +178,8 @@ export function ExportDateRangeModal({
                 {/* ── Body ──────────────────────────────────────────────────── */}
                 <div className="px-4 sm:px-5 pb-2 grid gap-3 max-h-[64vh] overflow-y-auto scrollbar-hide">
                     {/* Period card */}
-                    <section className="rounded-xl border border-white/[0.08] bg-card/40 backdrop-blur-xl p-3 sm:p-3.5">
-                        <div className="mb-2 flex items-center gap-1.5 text-[9.5px] font-semibold uppercase tracking-widest text-muted-foreground/80">
+                    <section className="rounded-xl border border-white/8 bg-card/40 backdrop-blur-xl p-3 sm:p-3.5">
+                        <div className="mb-2 flex items-center gap-1.5 text-micro font-semibold uppercase tracking-widest text-muted-foreground/80">
                             <Calendar className="h-3 w-3" /> Period
                         </div>
                         <LayoutGroup id="export-preset">
@@ -199,11 +200,11 @@ export function ExportDateRangeModal({
 
                         <div className="mt-3 border-t border-white/[0.06] pt-3">
                             <div className="mb-1.5 flex items-center justify-between">
-                                <span className="text-[10px] uppercase tracking-widest font-semibold text-muted-foreground/70">
+                                <span className="text-eyebrow uppercase text-muted-foreground/70">
                                     Custom range
                                 </span>
                                 {periodSummary && selectedPreset !== 'custom' && (
-                                    <span className="text-[10.5px] text-muted-foreground/70">{periodSummary}</span>
+                                    <span className="text-caption text-muted-foreground/70">{periodSummary}</span>
                                 )}
                             </div>
                             <DateRangePicker
@@ -216,9 +217,9 @@ export function ExportDateRangeModal({
                     </section>
 
                     {/* Scope card */}
-                    <section className="rounded-xl border border-white/[0.08] bg-card/40 backdrop-blur-xl p-3 sm:p-3.5 space-y-3">
+                    <section className="rounded-xl border border-white/8 bg-card/40 backdrop-blur-xl p-3 sm:p-3.5 space-y-3">
                         <div>
-                            <div className="mb-2 flex items-center gap-1.5 text-[9.5px] font-semibold uppercase tracking-widest text-muted-foreground/80">
+                            <div className="mb-2 flex items-center gap-1.5 text-micro font-semibold uppercase tracking-widest text-muted-foreground/80">
                                 <Layers className="h-3 w-3" /> Context
                             </div>
                             <LayoutGroup id="export-context">
@@ -248,10 +249,10 @@ export function ExportDateRangeModal({
                         {buckets.length > 0 && (
                             <div>
                                 <div className="mb-2 flex items-center justify-between">
-                                    <div className="flex items-center gap-1.5 text-[9.5px] font-semibold uppercase tracking-widest text-muted-foreground/80">
+                                    <div className="flex items-center gap-1.5 text-micro font-semibold uppercase tracking-widest text-muted-foreground/80">
                                         <Tag className="h-3 w-3" /> Bucket
                                     </div>
-                                    <span className="text-[9.5px] text-muted-foreground/50">Optional</span>
+                                    <span className="text-micro text-muted-foreground/50">Optional</span>
                                 </div>
                                 <LayoutGroup id="export-bucket">
                                     <div className="flex flex-wrap gap-1.5">
@@ -301,7 +302,7 @@ export function ExportDateRangeModal({
                         >
                             {loading ? (
                                 <span className="flex items-center gap-2">
-                                    <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+                                    <Spinner className="size-3.5 text-white" label={null} />
                                     Exporting…
                                 </span>
                             ) : (
@@ -334,7 +335,7 @@ function SelectableButton({ children, selected, onClick, layoutKey, height = 'h-
             type="button"
             onClick={onClick}
             className={cn(
-                'relative isolate flex items-center justify-center rounded-xl border text-[11px] font-medium whitespace-nowrap transition-colors',
+                'relative isolate flex items-center justify-center rounded-xl border text-meta font-medium whitespace-nowrap transition-colors',
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40',
                 height,
                 selected
@@ -368,7 +369,7 @@ function ScopeChip({ label, selected, onClick, icon }: ScopeChipProps) {
             type="button"
             onClick={onClick}
             className={cn(
-                'relative isolate flex items-center gap-1.5 rounded-full border px-3 h-7 text-[11px] font-medium transition-colors',
+                'relative isolate flex items-center gap-1.5 rounded-full border px-3 h-7 text-meta font-medium transition-colors',
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40',
                 selected
                     ? 'border-primary/60 text-primary'
@@ -394,11 +395,11 @@ function SummaryCell({
 }: { label: string; value: string | null | undefined; align?: 'left' | 'right' }) {
     return (
         <div className={cn('flex flex-col gap-0.5', align === 'right' && 'items-end text-right')}>
-            <span className="text-[9px] font-semibold uppercase tracking-widest text-muted-foreground/55">
+            <span className="text-micro font-semibold uppercase tracking-widest text-muted-foreground/55">
                 {label}
             </span>
             <span className={cn(
-                'text-[11px] font-medium truncate max-w-full',
+                'text-meta font-medium truncate max-w-full',
                 value ? 'text-foreground/90' : 'text-muted-foreground/40',
             )}>
                 {value || '—'}

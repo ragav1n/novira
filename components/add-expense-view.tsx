@@ -2,8 +2,9 @@
 
 import React, { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { CreditCard, Utensils, Car, Zap, ShoppingBag, HeartPulse, Clapperboard, Wallet, Banknote, HelpCircle, Calendar as CalendarIcon, Home, School, LayoutGrid, Building2, MapPin, Shirt, ShoppingCart, LocateFixed, ScanSearch, Sparkles, Camera, Image as ImageIcon, Plane, X, FileText, Loader2 } from 'lucide-react';
+import { CreditCard, Utensils, Car, Zap, ShoppingBag, HeartPulse, Clapperboard, Wallet, Banknote, HelpCircle, Calendar as CalendarIcon, Home, School, LayoutGrid, Building2, MapPin, Shirt, ShoppingCart, LocateFixed, ScanSearch, Sparkles, Camera, Image as ImageIcon, Plane, X, FileText } from 'lucide-react';
 import UniqueLoading from '@/components/ui/grid-loading';
+import { Spinner } from '@/components/ui/spinner';
 import { AnimatePresence, motion } from 'framer-motion';
 import { QUICK_FADE } from '@/lib/motion';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -501,7 +502,7 @@ export function AddExpenseView() {
                         if (!b) return null;
                         return (
                             <div className="flex justify-center">
-                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-300 text-[11px] font-semibold">
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-300 text-meta font-semibold">
                                     <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" aria-hidden="true" />
                                     <span className="truncate max-w-[200px]">{b.name}</span>
                                 </span>
@@ -540,7 +541,7 @@ export function AddExpenseView() {
                         </div>
                         <div className="text-left min-w-0 flex-1">
                             <p className="text-sm font-semibold text-primary">Scan Receipt</p>
-                            <p className="text-[11px] text-primary/60">Take a photo · auto-fills amount, date & more</p>
+                            <p className="text-meta text-primary/60">Take a photo · auto-fills amount, date & more</p>
                         </div>
                     </button>
                     <button
@@ -548,7 +549,7 @@ export function AddExpenseView() {
                         onClick={() => fileInputRef.current?.click()}
                         disabled={scanning}
                         aria-label="Choose a receipt image from your gallery"
-                        className="w-full flex items-center justify-center gap-2 px-4 py-2.5 min-h-[44px] rounded-xl text-[12px] font-semibold text-muted-foreground hover:text-primary hover:bg-primary/5 transition-all disabled:opacity-50 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+                        className="w-full flex items-center justify-center gap-2 px-4 py-2.5 min-h-[44px] rounded-xl text-xs font-semibold text-muted-foreground hover:text-primary hover:bg-primary/5 transition-all disabled:opacity-50 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
                     >
                         <ImageIcon className="w-3.5 h-3.5" />
                         Or choose from gallery
@@ -570,10 +571,10 @@ export function AddExpenseView() {
                                 </div>
                             )}
                             <div className="flex-1 min-w-0">
-                                <p className="text-[12px] font-semibold text-emerald-300 truncate">
+                                <p className="text-xs font-semibold text-emerald-300 truncate">
                                     Receipt attached
                                 </p>
-                                <p className="text-[10.5px] text-emerald-400/70 truncate">
+                                <p className="text-caption text-emerald-400/70 truncate">
                                     {(formState.receiptFile as File).name || (formState.receiptFile.type || 'attachment')} · {Math.round(formState.receiptFile.size / 1024)} KB
                                 </p>
                             </div>
@@ -592,7 +593,7 @@ export function AddExpenseView() {
 
                 {/* Amount Input */}
                 <div className="space-y-2">
-                    <label htmlFor="expense-amount" className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest block">Amount *</label>
+                    <label htmlFor="expense-amount" className="text-eyebrow text-muted-foreground/60 uppercase block">Amount *</label>
                     <ExpressionKeypad
                         inputRef={amountInputRef}
                         value={formState.amount}
@@ -654,7 +655,7 @@ export function AddExpenseView() {
                         const preview = evaluateExpression(formState.amount);
                         if (preview === null) return null;
                         return (
-                            <p className="text-[11px] text-muted-foreground font-medium pl-1">
+                            <p className="text-meta text-muted-foreground font-medium pl-1">
                                 = <span className="font-bold text-primary">{CURRENCY_SYMBOLS[formState.txCurrency as keyof typeof CURRENCY_SYMBOLS] || '$'}{preview.toFixed(2)}</span>
                                 <span className="text-muted-foreground/60"> · tap away or press Enter to apply</span>
                             </p>
@@ -806,7 +807,7 @@ export function AddExpenseView() {
                                     </div>
                                     <p
                                         className={cn(
-                                            "flex-1 min-w-0 text-[12.5px] leading-snug line-clamp-2",
+                                            "flex-1 min-w-0 text-body leading-snug line-clamp-2",
                                             interimTranscript ? "text-rose-100/85 italic" : "text-rose-300/60"
                                         )}
                                     >
@@ -822,7 +823,7 @@ export function AddExpenseView() {
                                     <button
                                         type="button"
                                         onClick={stopDictation}
-                                        className="shrink-0 text-[10px] font-bold uppercase tracking-wider text-rose-300 hover:text-rose-200 px-2 py-0.5 rounded-md border border-rose-500/30 hover:border-rose-500/50 transition-colors"
+                                        className="shrink-0 text-eyebrow uppercase text-rose-300 hover:text-rose-200 px-2 py-0.5 rounded-md border border-rose-500/30 hover:border-rose-500/50 transition-colors"
                                         aria-label="Stop voice input"
                                     >
                                         Stop
@@ -846,7 +847,7 @@ export function AddExpenseView() {
                             <div className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl border border-primary/20 bg-primary/10">
                                 <div className="flex items-center gap-2 min-w-0">
                                     <Sparkles className="w-3.5 h-3.5 text-primary shrink-0" aria-hidden="true" />
-                                    <p className="text-[11px] text-primary/90 font-medium truncate">
+                                    <p className="text-meta text-primary/90 font-medium truncate">
                                         Usual for <span className="font-bold text-primary">{formState.description.trim()}</span>: {parts.map((p, i) => (
                                             <span key={i} className="font-bold text-primary capitalize">{p}{i < parts.length - 1 ? ' · ' : ''}</span>
                                         ))}
@@ -864,7 +865,7 @@ export function AddExpenseView() {
                                             formState.setMerchantDefaults(null);
                                         }}
                                         aria-label="Apply usual merchant defaults"
-                                        className="text-[11px] font-bold text-primary hover:text-primary/80 px-3 py-1.5 min-h-[36px] rounded-full bg-primary/15 border border-primary/30 transition-colors active:scale-[0.96] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+                                        className="text-meta font-bold text-primary hover:text-primary/80 px-3 py-1.5 min-h-[36px] rounded-full bg-primary/15 border border-primary/30 transition-colors active:scale-[0.96] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
                                     >
                                         Apply
                                     </button>
@@ -920,7 +921,7 @@ export function AddExpenseView() {
                                         >
                                             {getIconForCategory(s.category, 'w-3 h-3')}
                                         </div>
-                                        <span className="text-[11px] font-medium truncate max-w-[140px]">{s.description}</span>
+                                        <span className="text-meta font-medium truncate max-w-[140px]">{s.description}</span>
                                     </button>
                                 );
                             })}
@@ -937,7 +938,7 @@ export function AddExpenseView() {
                                     initial={{ opacity: 0 }}
                                     animate={{ opacity: 1 }}
                                     exit={{ opacity: 0 }}
-                                    className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest flex items-center gap-1.5"
+                                    className="text-eyebrow text-muted-foreground/60 uppercase flex items-center gap-1.5"
                                 >
                                     <LocateFixed className="w-3 h-3" />
                                     Quick Pins
@@ -994,7 +995,7 @@ export function AddExpenseView() {
                                                 <div className="text-left min-w-0 flex-1">
                                                     <div className="flex items-center gap-1.5 min-w-0">
                                                         <p className={cn(
-                                                            "text-[11px] font-bold leading-tight tracking-tight truncate flex-1",
+                                                            "text-meta font-bold leading-tight tracking-tight truncate flex-1",
                                                             loc.type === 'last' ? "text-primary-foreground" :
                                                             loc.type === 'category' ? "text-cyan-50" :
                                                             "text-amber-50"
@@ -1008,7 +1009,7 @@ export function AddExpenseView() {
                                                         )}
                                                     </div>
                                                     <p className={cn(
-                                                        "text-[9px] font-bold mt-0.5 truncate max-w-[120px] uppercase tracking-tighter",
+                                                        "text-micro font-bold mt-0.5 truncate max-w-[120px] uppercase tracking-tighter",
                                                         loc.type === 'last' ? "text-primary/70" : 
                                                         loc.type === 'category' ? "text-cyan-500/80" : 
                                                         "text-amber-500/80"
@@ -1056,7 +1057,7 @@ export function AddExpenseView() {
                         <div className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl border border-amber-500/20 bg-amber-500/10">
                             <div className="flex items-center gap-2 min-w-0">
                                 <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                                <p className="text-[11px] text-amber-200/90 font-medium truncate">
+                                <p className="text-meta text-amber-200/90 font-medium truncate">
                                     Usual at <span className="font-bold text-amber-300">{formState.placeName}</span>: {parts.map((p, i) => (
                                         <span key={i} className="font-bold text-amber-300 capitalize">{p}{i < parts.length - 1 ? ' · ' : ''}</span>
                                     ))}
@@ -1073,7 +1074,7 @@ export function AddExpenseView() {
                                         formState.setSmartDefaults(null);
                                     }}
                                     aria-label="Apply suggested defaults"
-                                    className="text-[11px] font-bold text-amber-300 hover:text-amber-200 px-3 py-1.5 min-h-[36px] rounded-full bg-amber-400/15 border border-amber-400/30 transition-colors active:scale-[0.96] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/60"
+                                    className="text-meta font-bold text-amber-300 hover:text-amber-200 px-3 py-1.5 min-h-[36px] rounded-full bg-amber-400/15 border border-amber-400/30 transition-colors active:scale-[0.96] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/60"
                                 >
                                     Apply
                                 </button>
@@ -1113,7 +1114,7 @@ export function AddExpenseView() {
 
                 {activeAccounts.length > 0 && (
                     <div className="space-y-2">
-                        <p className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest">Account</p>
+                        <p className="text-eyebrow text-muted-foreground/60 uppercase">Account</p>
                         <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1 custom-scrollbar">
                             {activeAccounts.map(a => {
                                 const TypeIcon = ACCOUNT_TYPE_ICONS[a.type] || CircleDollarSign;
@@ -1147,8 +1148,8 @@ export function AddExpenseView() {
                                         >
                                             <TypeIcon className="w-4 h-4" style={{ color: a.color }} />
                                         </div>
-                                        <span className="text-[11px] font-medium truncate w-16">{a.name}</span>
-                                        <span className="text-[9.5px] uppercase tracking-wider text-muted-foreground/60 leading-none">{a.currency}</span>
+                                        <span className="text-meta font-medium truncate w-16">{a.name}</span>
+                                        <span className="text-micro uppercase tracking-wider text-muted-foreground/60 leading-none">{a.currency}</span>
                                     </button>
                                 );
                             })}
@@ -1156,7 +1157,7 @@ export function AddExpenseView() {
                     </div>
                 )}
                 {activeTripBucket && (
-                    <div className="flex items-center gap-2 text-[11px] font-bold px-3 py-1.5 rounded-full bg-cyan-500/10 text-cyan-300 border border-cyan-500/20 self-start">
+                    <div className="flex items-center gap-2 text-meta font-bold px-3 py-1.5 rounded-full bg-cyan-500/10 text-cyan-300 border border-cyan-500/20 self-start">
                         <Plane className="w-3 h-3" aria-hidden="true" />
                         <span>Trip mode: {activeTripBucket.name}</span>
                         {activeTripBucket.currency && (
@@ -1170,7 +1171,7 @@ export function AddExpenseView() {
                 {/* Date & Payment */}
                 <div className="space-y-4">
                     <div className="space-y-2">
-                        <p className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest">Date *</p>
+                        <p className="text-eyebrow text-muted-foreground/60 uppercase">Date *</p>
                         <Popover modal={true}>
                             <PopoverTrigger asChild>
                                 <Button
@@ -1201,7 +1202,7 @@ export function AddExpenseView() {
                         </Popover>
                     </div>
                     <div className="space-y-2">
-                        <p className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest">Payment Method</p>
+                        <p className="text-eyebrow text-muted-foreground/60 uppercase">Payment Method</p>
                         <div className="flex flex-wrap gap-2">
                                 {(['Cash', 'UPI', 'Debit Card', 'Credit Card', 'Bank Transfer'] as const).map((method) => {
                                     const isSelected = formState.paymentMethod === method;
@@ -1244,7 +1245,7 @@ export function AddExpenseView() {
                         <PiggyBank className="w-5 h-5 text-cyan-500 shrink-0" />
                         <div className="min-w-0">
                             <p className="text-sm font-medium">Exclude from Allowance</p>
-                            <p className="text-[11px] text-muted-foreground">Don't count against your monthly limit</p>
+                            <p className="text-meta text-muted-foreground">Don't count against your monthly limit</p>
                         </div>
                     </div>
                     <Switch
@@ -1278,7 +1279,7 @@ export function AddExpenseView() {
                                 </div>
                                 <div className="min-w-0">
                                     <p className="text-sm font-bold text-primary">Quick split 50/50 with {firstName}</p>
-                                    <p className="text-[11px] text-primary/70">Tap to split this evenly</p>
+                                    <p className="text-meta text-primary/70">Tap to split this evenly</p>
                                 </div>
                             </div>
                             <Sparkles className="w-4 h-4 text-primary/70 shrink-0" aria-hidden="true" />
@@ -1325,7 +1326,7 @@ export function AddExpenseView() {
 
                 {/* Notes */}
                 <div className="space-y-2">
-                    <label htmlFor="expense-notes" className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest block">Notes (Optional)</label>
+                    <label htmlFor="expense-notes" className="text-eyebrow text-muted-foreground/60 uppercase block">Notes (Optional)</label>
                     <Textarea
                         id="expense-notes"
                         name="notes"
@@ -1344,7 +1345,7 @@ export function AddExpenseView() {
                 >
                     {loading ? (
                         <>
-                            <Loader2 className="w-4 h-4 mr-2 animate-spin" aria-hidden="true" />
+                            <Spinner className="w-4 h-4 mr-2" label={null} />
                             Adding Expense...
                         </>
                     ) : 'Add Expense'}

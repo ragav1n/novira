@@ -45,7 +45,7 @@ export const CashflowForecast = React.memo(function CashflowForecast({
         const isFuture = dayNum > currentDayOfMonth;
         const value = payload.find(p => p.value != null)?.value ?? 0;
         return (
-            <div className="bg-card/95 backdrop-blur-xl border border-white/10 px-3 py-2 rounded-xl shadow-2xl text-[11px]">
+            <div className="bg-card/95 backdrop-blur-xl border border-white/10 px-3 py-2 rounded-xl shadow-2xl text-meta">
                 <p className="font-bold text-foreground">Day {dayNum}</p>
                 <p className="text-muted-foreground mt-0.5">
                     {isFuture ? 'Projected' : 'Actual'}:{' '}
@@ -69,7 +69,7 @@ export const CashflowForecast = React.memo(function CashflowForecast({
                         <TrendingUp className="w-4 h-4 text-muted-foreground" />
                         <h3 className="text-sm font-bold">Cashflow Forecast</h3>
                     </div>
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground bg-secondary/30 px-2 py-0.5 rounded-full">
+                    <span className="text-eyebrow uppercase text-muted-foreground bg-secondary/30 px-2 py-0.5 rounded-full">
                         End of {new Date().toLocaleDateString('en', { month: 'short' })}
                     </span>
                 </div>
@@ -122,7 +122,7 @@ export const CashflowForecast = React.memo(function CashflowForecast({
                     </ResponsiveContainer>
                 </div>
 
-                <div className="flex items-center justify-between pt-2 border-t border-white/5 text-[11px]">
+                <div className="flex items-center justify-between pt-2 border-t border-white/5 text-meta">
                     <span className="text-muted-foreground font-medium">
                         Projected: <span className="text-foreground font-bold">{formatCurrency(projectedSpend, bucketCurrency)}</span>
                     </span>

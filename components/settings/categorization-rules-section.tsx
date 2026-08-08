@@ -184,7 +184,7 @@ export function CategorizationRulesSection({ userId, rules, loading, buckets, se
 
     return (
         <div className="space-y-3">
-            <p className="text-[11px] text-muted-foreground/70 leading-relaxed">
+            <p className="text-meta text-muted-foreground/70 leading-relaxed">
                 Match a transaction&apos;s description or place name and auto-fill the
                 category, bucket, or allowance flag. Applied at add time (if you haven&apos;t
                 already picked) and on every imported row. Higher priority wins.
@@ -206,10 +206,10 @@ export function CategorizationRulesSection({ userId, rules, loading, buckets, se
                             onClick={() => openEdit(rule)}
                             className="flex-1 min-w-0 text-left"
                         >
-                            <p className={`text-[13px] font-medium truncate ${rule.is_active ? '' : 'opacity-50 line-through'}`}>
+                            <p className={`text-body font-medium truncate ${rule.is_active ? '' : 'opacity-50 line-through'}`}>
                                 {describeRule(rule, buckets)}
                             </p>
-                            <p className="text-[10.5px] text-muted-foreground/60 mt-0.5">
+                            <p className="text-caption text-muted-foreground/60 mt-0.5">
                                 Priority {rule.priority}
                             </p>
                         </button>
@@ -278,9 +278,9 @@ export function CategorizationRulesSection({ userId, rules, loading, buckets, se
                                 <div className="px-5 py-4 space-y-5">
                                     {/* When */}
                                     <div className="space-y-2">
-                                        <p className="text-[10px] font-semibold text-muted-foreground/70 uppercase tracking-wider">When</p>
+                                        <p className="text-eyebrow text-muted-foreground/70 uppercase">When</p>
                                         <div className="flex items-center gap-2">
-                                            <span className="text-[12px] text-muted-foreground shrink-0">the</span>
+                                            <span className="text-xs text-muted-foreground shrink-0">the</span>
                                             <Select
                                                 value={editing.match_field}
                                                 onValueChange={(v) => setEditing({ ...editing, match_field: v as RuleMatchField })}
@@ -311,14 +311,14 @@ export function CategorizationRulesSection({ userId, rules, loading, buckets, se
                                             className="h-9"
                                             autoFocus
                                         />
-                                        <p className="text-[10px] text-muted-foreground/50">
+                                        <p className="text-caption text-muted-foreground/50">
                                             Case-insensitive · up to 200 characters
                                         </p>
                                     </div>
 
                                     {/* Then set — toggleable action rows */}
                                     <div className="space-y-2">
-                                        <p className="text-[10px] font-semibold text-muted-foreground/70 uppercase tracking-wider">Then</p>
+                                        <p className="text-eyebrow text-muted-foreground/70 uppercase">Then</p>
 
                                         <ActionRow
                                             label="Set category"
@@ -332,7 +332,7 @@ export function CategorizationRulesSection({ userId, rules, loading, buckets, se
                                                 value={editing.category ?? defaultCategory}
                                                 onValueChange={(v) => setEditing({ ...editing, category: v })}
                                             >
-                                                <SelectTrigger className="h-8 text-[12px] w-[150px]"><SelectValue /></SelectTrigger>
+                                                <SelectTrigger className="h-8 text-xs w-[150px]"><SelectValue /></SelectTrigger>
                                                 <SelectContent>
                                                     {SYSTEM_CATEGORIES.map(c => (
                                                         <SelectItem key={c.id} value={c.id}>{c.label}</SelectItem>
@@ -354,7 +354,7 @@ export function CategorizationRulesSection({ userId, rules, loading, buckets, se
                                                 value={editing.bucket_id ?? ''}
                                                 onValueChange={(v) => setEditing({ ...editing, bucket_id: v })}
                                             >
-                                                <SelectTrigger className="h-8 text-[12px] w-[150px]"><SelectValue placeholder="Pick a bucket" /></SelectTrigger>
+                                                <SelectTrigger className="h-8 text-xs w-[150px]"><SelectValue placeholder="Pick a bucket" /></SelectTrigger>
                                                 <SelectContent>
                                                     {buckets.filter(b => !b.is_archived).map(b => (
                                                         <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
@@ -378,7 +378,7 @@ export function CategorizationRulesSection({ userId, rules, loading, buckets, se
                                                     exclude_from_allowance: v === 'exclude',
                                                 })}
                                             >
-                                                <SelectTrigger className="h-8 text-[12px] w-[150px]"><SelectValue /></SelectTrigger>
+                                                <SelectTrigger className="h-8 text-xs w-[150px]"><SelectValue /></SelectTrigger>
                                                 <SelectContent>
                                                     <SelectItem value="include">Include</SelectItem>
                                                     <SelectItem value="exclude">Exclude</SelectItem>
@@ -388,7 +388,7 @@ export function CategorizationRulesSection({ userId, rules, loading, buckets, se
                                     </div>
 
                                     {/* Live preview */}
-                                    <div className={`rounded-lg border px-3 py-2.5 text-[11.5px] leading-relaxed transition-colors ${
+                                    <div className={`rounded-lg border px-3 py-2.5 text-meta leading-relaxed transition-colors ${
                                         previewReady
                                             ? 'border-primary/20 bg-primary/5 text-primary/90'
                                             : 'border-white/5 bg-secondary/5 text-muted-foreground/50 italic'
@@ -401,19 +401,19 @@ export function CategorizationRulesSection({ userId, rules, loading, buckets, se
                                     {/* Priority + Active row */}
                                     <div className="flex items-center justify-between gap-4 pt-3 border-t border-white/5">
                                         <div className="flex items-center gap-2">
-                                            <Label htmlFor="rule-priority" className="text-[11px] text-muted-foreground">Priority</Label>
+                                            <Label htmlFor="rule-priority" className="text-meta text-muted-foreground">Priority</Label>
                                             <Input
                                                 id="rule-priority"
                                                 type="number"
                                                 inputMode="numeric"
                                                 value={editing.priority}
                                                 onChange={(e) => setEditing({ ...editing, priority: Number(e.target.value) || 0 })}
-                                                className="h-8 w-[64px] text-[12px] tabular-nums"
+                                                className="h-8 w-[64px] text-xs tabular-nums"
                                             />
-                                            <span className="text-[10px] text-muted-foreground/60">higher wins</span>
+                                            <span className="text-caption text-muted-foreground/60">higher wins</span>
                                         </div>
                                         <div className="flex items-center gap-2">
-                                            <Label htmlFor="rule-active" className="text-[11px] text-muted-foreground">Active</Label>
+                                            <Label htmlFor="rule-active" className="text-meta text-muted-foreground">Active</Label>
                                             <Switch
                                                 id="rule-active"
                                                 checked={editing.is_active}
@@ -477,11 +477,11 @@ function ActionRow({ label, enabled, onToggle, disabledReason, children }: Actio
                 disabled={!!disabledReason}
                 className="flex-1 text-left disabled:opacity-50"
             >
-                <p className={`text-[12.5px] font-medium ${enabled ? 'text-foreground' : 'text-muted-foreground'}`}>
+                <p className={`text-body font-medium ${enabled ? 'text-foreground' : 'text-muted-foreground'}`}>
                     {label}
                 </p>
                 {disabledReason && (
-                    <p className="text-[10px] text-muted-foreground/60 mt-0.5">{disabledReason}</p>
+                    <p className="text-caption text-muted-foreground/60 mt-0.5">{disabledReason}</p>
                 )}
             </button>
             {enabled

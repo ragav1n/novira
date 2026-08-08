@@ -1,9 +1,9 @@
 import React, { useMemo, useState } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { format, parseISO, differenceInCalendarDays } from 'date-fns';
-import Link from 'next/link';
 import { Plus, Settings2, LogOut, FileText, Home, Plane, Heart, ChevronDown, ChevronRight, ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { EmptyState } from '@/components/ui/empty-state';
 import { toast } from '@/utils/haptics';
 import type { Group, Friend, Split } from '@/components/providers/groups-provider';
 import { simplifyDebtsForGroup } from '@/utils/simplify-debts';
@@ -189,7 +189,7 @@ export function GroupsTabContent({
                         className="group flex items-center gap-2 w-full px-1 py-2 text-left"
                         aria-expanded={pastOpen}
                     >
-                        <span className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground/60 group-hover:text-foreground/70 transition-colors">
+                        <span className="text-eyebrow uppercase text-muted-foreground/60 group-hover:text-foreground/70 transition-colors">
                             Past trips · {pastTrips.length}
                         </span>
                         <span className="h-px flex-1 bg-white/[0.05]" />
@@ -208,9 +208,9 @@ export function GroupsTabContent({
                                     >
                                         <span className="flex items-center gap-2.5 min-w-0">
                                             <Plane className="w-3.5 h-3.5 text-muted-foreground/50 shrink-0" />
-                                            <span className="text-[13px] font-medium truncate">{g.name}</span>
+                                            <span className="text-body font-medium truncate">{g.name}</span>
                                         </span>
-                                        <span className="text-[11px] text-muted-foreground/60 tabular-nums shrink-0 ml-3">
+                                        <span className="text-meta text-muted-foreground/60 tabular-nums shrink-0 ml-3">
                                             {g.end_date && format(parseDateOnly(g.end_date), 'MMM yyyy')}
                                         </span>
                                     </button>
@@ -292,14 +292,14 @@ function GroupCard({
                         </div>
                         <div className="min-w-0">
                             <div className="flex items-center gap-2">
-                                <h4 className="text-[15px] font-semibold tracking-tight truncate">{group.name}</h4>
+                                <h4 className="text-lead font-semibold tracking-tight truncate">{group.name}</h4>
                                 {isHome && (
-                                    <span className="text-[9px] font-medium uppercase tracking-[0.14em] px-1.5 py-px rounded text-emerald-400/90 bg-emerald-400/10">
+                                    <span className="text-micro font-medium uppercase tracking-[0.14em] px-1.5 py-px rounded text-emerald-400/90 bg-emerald-400/10">
                                         Home
                                     </span>
                                 )}
                             </div>
-                            <p className="text-[11px] text-muted-foreground mt-0.5 flex items-center gap-1.5">
+                            <p className="text-meta text-muted-foreground mt-0.5 flex items-center gap-1.5">
                                 <span>{group.members.length} member{group.members.length !== 1 ? 's' : ''}</span>
                                 {isTrip && tripMeta && (
                                     <>
@@ -351,7 +351,7 @@ function GroupCard({
                             {group.members.slice(0, 2).map((m, i) => (
                                 <Avatar key={m.user_id || i} className="w-7 h-7 ring-2 ring-background">
                                     <AvatarImage src={m.avatar_url || ''} />
-                                    <AvatarFallback className="text-[10px] font-semibold">
+                                    <AvatarFallback className="text-caption font-semibold">
                                         {m.full_name?.substring(0, 1) || '?'}
                                     </AvatarFallback>
                                 </Avatar>
@@ -363,13 +363,13 @@ function GroupCard({
                             {group.members.slice(0, 4).map((m, i) => (
                                 <Avatar key={m.user_id || i} className="w-6 h-6 ring-[1.5px] ring-background">
                                     <AvatarImage src={m.avatar_url || ''} />
-                                    <AvatarFallback className="text-[9px]">
+                                    <AvatarFallback className="text-micro">
                                         {m.full_name?.substring(0, 1) || '?'}
                                     </AvatarFallback>
                                 </Avatar>
                             ))}
                             {group.members.length > 4 && (
-                                <span className="w-6 h-6 rounded-full bg-secondary text-[9px] font-semibold flex items-center justify-center ring-[1.5px] ring-background">
+                                <span className="w-6 h-6 rounded-full bg-secondary text-micro font-semibold flex items-center justify-center ring-[1.5px] ring-background">
                                     +{group.members.length - 4}
                                 </span>
                             )}
@@ -378,12 +378,12 @@ function GroupCard({
 
                     {balance && (owesYou || youOwe) ? (
                         <div className="flex items-center gap-1.5">
-                            <span className="text-[10px] uppercase tracking-wider text-muted-foreground/60">
+                            <span className="text-eyebrow uppercase text-muted-foreground/60">
                                 {youOwe ? 'You owe' : "You're owed"}
                             </span>
                             <span
                                 className={cn(
-                                    'text-[12px] font-bold tabular-nums',
+                                    'text-xs font-bold tabular-nums',
                                     youOwe ? 'text-rose-300' : 'text-emerald-300',
                                 )}
                             >
@@ -391,7 +391,7 @@ function GroupCard({
                             </span>
                         </div>
                     ) : balance ? (
-                        <span className="text-[10px] uppercase tracking-wider text-muted-foreground/60">
+                        <span className="text-eyebrow uppercase text-muted-foreground/60">
                             Settled up
                         </span>
                     ) : null}
@@ -400,7 +400,7 @@ function GroupCard({
                 {/* Trip progress micro-bar */}
                 {isTrip && tripMeta && !tripMeta.isUpcoming && (
                     <div className="mt-3 space-y-1">
-                        <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+                        <div className="flex items-center justify-between text-caption text-muted-foreground">
                             <span>Day {tripMeta.elapsed} of {tripMeta.totalDays}</span>
                         </div>
                         <div className="h-[3px] w-full bg-white/[0.04] rounded-full overflow-hidden">
@@ -412,7 +412,7 @@ function GroupCard({
                     </div>
                 )}
                 {isTrip && tripMeta?.isUpcoming && (
-                    <p className="mt-3 text-[10px] text-muted-foreground inline-flex items-center gap-1.5">
+                    <p className="mt-3 text-caption text-muted-foreground inline-flex items-center gap-1.5">
                         Starts in {Math.max(0, differenceInCalendarDays(tripMeta.start, new Date()))} days
                         <ArrowRight className="w-2.5 h-2.5" />
                     </p>
@@ -424,33 +424,12 @@ function GroupCard({
 
 function NoActiveGroupsState({ onStartGroup }: { onStartGroup: () => void }) {
     return (
-        <div className="rounded-xl border border-dashed border-white/[0.14] bg-white/[0.02] p-6 space-y-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-            <div className="space-y-1.5">
-                <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground/70">
-                    No active groups
-                </p>
-                <h3 className="text-base font-semibold tracking-tight">
-                    Make a group, start splitting.
-                </h3>
-                <p className="text-[12px] text-muted-foreground leading-relaxed">
-                    Home, trip, couple, or whatever else — Novira keeps the math.
-                </p>
-            </div>
-            <div className="flex items-center gap-2">
-                <button
-                    onClick={onStartGroup}
-                    className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-full bg-primary text-white text-[12px] font-semibold hover:bg-primary/90 transition-colors"
-                >
-                    <Plus className="w-3.5 h-3.5" />
-                    Start a group
-                </button>
-                <Link
-                    href="/guide#groups"
-                    className="text-[11px] text-muted-foreground hover:text-foreground transition-colors px-1"
-                >
-                    How groups work →
-                </Link>
-            </div>
-        </div>
+        <EmptyState
+            eyebrow="No active groups"
+            title="Make a group, start splitting."
+            description="Home, trip, couple, or whatever else — Novira keeps the math."
+            action={{ label: 'Start a group', icon: Plus, onClick: onStartGroup }}
+            secondaryAction={{ label: 'How groups work \u2192', href: '/guide#groups' }}
+        />
     );
 }

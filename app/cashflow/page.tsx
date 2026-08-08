@@ -1,19 +1,16 @@
 'use client';
 
 import dynamic from 'next/dynamic';
+import { PageSkeleton } from '@/components/ui/page-skeleton';
+import { Skeleton } from '@/components/ui/skeleton';
 import { DataBoundary } from '@/components/boundaries/data-boundary';
 import { PageTransition } from '@/components/page-transition';
 
 const CalendarSkeleton = () => (
-  <div className="flex flex-col min-h-screen p-5 space-y-6 max-w-md lg:max-w-2xl mx-auto">
-    <div className="flex justify-between items-center pt-2 gap-2 opacity-50">
-      <div className="w-10 h-10 rounded-full bg-secondary/20 animate-pulse" />
-      <div className="h-6 w-32 bg-secondary/20 rounded-lg animate-pulse" />
-      <div className="w-10 h-10 rounded-full bg-secondary/20 animate-pulse" />
-    </div>
-    <div className="h-[300px] w-full rounded-3xl bg-secondary/10 animate-pulse" />
-    <div className="h-[180px] w-full rounded-xl bg-secondary/10 animate-pulse" />
-  </div>
+  <PageSkeleton width="2xl" title="w-32">
+    <Skeleton className="h-[300px] w-full rounded-3xl" />
+    <Skeleton className="h-[180px] w-full rounded-xl" />
+  </PageSkeleton>
 );
 
 const CalendarView = dynamic(

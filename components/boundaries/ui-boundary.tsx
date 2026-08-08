@@ -68,7 +68,7 @@ function ErrorFallback({ error: unknownError, resetErrorBoundary }: FallbackProp
       
       {/* Dev only error trace */}
       {process.env.NODE_ENV === 'development' && (
-        <pre className="text-[10px] bg-black/40 p-3 rounded-xl text-left overflow-auto w-full mb-6 text-destructive/80 font-mono">
+        <pre className="text-caption bg-black/40 p-3 rounded-xl text-left overflow-auto w-full mb-6 text-destructive/80 font-mono">
           {error.name}: {error.message}
         </pre>
       )}

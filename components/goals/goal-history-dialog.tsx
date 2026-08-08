@@ -25,7 +25,7 @@ type Props = {
     onChanged?: () => void;
 };
 
-export function GoalHistorySheet({ goal, userId, open, onOpenChange, formatCurrency, onChanged }: Props) {
+export function GoalHistoryDialog({ goal, userId, open, onOpenChange, formatCurrency, onChanged }: Props) {
     const [deposits, setDeposits] = useState<SavingsDeposit[]>([]);
     const [loading, setLoading] = useState(false);
     const [loadError, setLoadError] = useState(false);
@@ -141,7 +141,7 @@ export function GoalHistorySheet({ goal, userId, open, onOpenChange, formatCurre
 
                 {hasChartData && (
                     <div className="mt-3 rounded-xl bg-secondary/10 border border-white/5 p-3">
-                        <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold mb-1">Last 6 months</p>
+                        <p className="text-eyebrow uppercase text-muted-foreground mb-1">Last 6 months</p>
                         <div className="h-20">
                             <ResponsiveContainer width="100%" height="100%">
                                 <LineChart data={monthlyChartData} margin={{ top: 4, bottom: 0, left: 0, right: 0 }}>
@@ -168,7 +168,7 @@ export function GoalHistorySheet({ goal, userId, open, onOpenChange, formatCurre
                                 </LineChart>
                             </ResponsiveContainer>
                         </div>
-                        <div className="flex justify-between text-[10px] text-muted-foreground mt-1">
+                        <div className="flex justify-between text-caption text-muted-foreground mt-1">
                             {monthlyChartData.map(m => <span key={m.key}>{m.label}</span>)}
                         </div>
                     </div>
@@ -176,7 +176,7 @@ export function GoalHistorySheet({ goal, userId, open, onOpenChange, formatCurre
 
                 {scenario && scenario.remaining > 0 && (
                     <div className="mt-3 rounded-xl bg-secondary/10 border border-white/5 p-3">
-                        <div className="flex items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground font-bold mb-2">
+                        <div className="flex items-center gap-1 text-eyebrow uppercase text-muted-foreground mb-2">
                             <Wand2 className={cn('w-3 h-3', tokens.text)} aria-hidden="true" />
                             <span>What if</span>
                         </div>
@@ -194,7 +194,7 @@ export function GoalHistorySheet({ goal, userId, open, onOpenChange, formatCurre
                             onValueChange={(v) => setScenarioRate(v[0])}
                             aria-label="Monthly savings scenario"
                         />
-                        <p className="text-[11px] text-muted-foreground mt-2">
+                        <p className="text-meta text-muted-foreground mt-2">
                             {scenario.eta ? (
                                 <>
                                     → Reaches target on{' '}
@@ -208,7 +208,7 @@ export function GoalHistorySheet({ goal, userId, open, onOpenChange, formatCurre
                 )}
 
                 <div className="mt-3 flex-1 min-h-0 overflow-y-auto -mx-1 px-1">
-                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold mb-2 px-1">Contributions</p>
+                    <p className="text-eyebrow uppercase text-muted-foreground mb-2 px-1">Contributions</p>
                     {loading ? (
                         <div className="space-y-2">
                             <div className="h-10 rounded-xl bg-secondary/10 animate-pulse" />
@@ -233,7 +233,7 @@ export function GoalHistorySheet({ goal, userId, open, onOpenChange, formatCurre
                                         <p className={cn('text-sm font-bold', tokens.text)}>
                                             {formatCurrency(Number(dep.amount), dep.currency)}
                                         </p>
-                                        <p className="text-[10px] text-muted-foreground">
+                                        <p className="text-caption text-muted-foreground">
                                             {format(parseISO(dep.created_at), 'MMM d, yyyy · h:mm a')}
                                         </p>
                                     </div>
@@ -266,7 +266,7 @@ export function GoalHistorySheet({ goal, userId, open, onOpenChange, formatCurre
 function StatTile({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
     return (
         <div className="rounded-xl bg-secondary/10 border border-white/5 p-2.5">
-            <div className="flex items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
+            <div className="flex items-center gap-1 text-eyebrow uppercase text-muted-foreground">
                 {icon}
                 <span className="truncate">{label}</span>
             </div>

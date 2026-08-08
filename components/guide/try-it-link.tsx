@@ -21,7 +21,7 @@ export function TryItLink({
     <Link
       href={href}
       className={cn(
-        'group inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-[12px] font-medium text-primary transition-all hover:border-primary/50 hover:bg-primary/15',
+        'group inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-medium text-primary transition-all hover:border-primary/50 hover:bg-primary/15',
         className
       )}
     >

@@ -5,6 +5,7 @@ import { User } from 'lucide-react';
 import { AnimatePresence } from 'framer-motion';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Spinner } from '@/components/ui/spinner';
 import { AlertBanner } from '@/components/ui/alert-banner';
 import { FileTriggerButton } from '@/components/ui/file-trigger';
 import { supabase } from '@/lib/supabase';
@@ -159,7 +160,7 @@ export function ProfileSection({ showBudgetAlert, onDismissBudgetAlert }: Props)
                             )}
                             {uploadingAvatar && (
                                 <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-20">
-                                    <div className="w-5 h-5 border-2 border-white/50 border-t-white rounded-full animate-spin" />
+                                    <Spinner className="size-5 text-white" />
                                 </div>
                             )}
                         </div>
@@ -173,13 +174,13 @@ export function ProfileSection({ showBudgetAlert, onDismissBudgetAlert }: Props)
 
                     <div className="flex-1 space-y-3">
                         {profileError && (
-                            <p className="text-[11px] text-amber-400/80">
+                            <p className="text-meta text-amber-400/80">
                                 We couldn&apos;t load your profile, so the fields below may be blank.
                                 Reload before saving, or you may overwrite your existing details.
                             </p>
                         )}
                         <div className="space-y-1">
-                            <label htmlFor="full-name" className="text-[11px] uppercase font-bold text-muted-foreground tracking-wider">Full Name</label>
+                            <label htmlFor="full-name" className="text-meta uppercase font-bold text-muted-foreground tracking-wider">Full Name</label>
                             <Input
                                 id="full-name"
                                 name="full-name"
@@ -191,7 +192,7 @@ export function ProfileSection({ showBudgetAlert, onDismissBudgetAlert }: Props)
                             />
                         </div>
                         <div className="space-y-1">
-                            <label htmlFor="monthly-allowance" className="text-[11px] uppercase font-bold text-muted-foreground tracking-wider">Monthly Allowance</label>
+                            <label htmlFor="monthly-allowance" className="text-meta uppercase font-bold text-muted-foreground tracking-wider">Monthly Allowance</label>
                             <Input
                                 id="monthly-allowance"
                                 name="monthly-allowance"

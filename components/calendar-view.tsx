@@ -28,6 +28,7 @@ import { ScheduleSheet } from '@/components/calendar/schedule-sheet';
 import { toast } from '@/utils/haptics';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { ViewHeader } from '@/components/ui/view-header';
+import { EmptyState, accentFromTheme } from '@/components/ui/empty-state';
 
 type EventKind = 'recurring' | 'goal' | 'bucket-end' | 'one-off';
 
@@ -455,7 +456,7 @@ export function CalendarView() {
                 />
 
                 <section className="space-y-3 text-center">
-                    <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground/70">
+                    <p className="text-eyebrow uppercase text-muted-foreground/70">
                         {format(viewMonth, 'MMMM yyyy')} · projected
                     </p>
                     {/* A number here is a claim about the user's month. While loading, or
@@ -463,12 +464,12 @@ export function CalendarView() {
                         "$0.00 projected" would read as "you have no bills due". */}
                     {loadError ? (
                         <div className="flex flex-col items-center gap-2 py-2">
-                            <p className="text-[15px] font-semibold text-muted-foreground/80">
+                            <p className="text-lead font-semibold text-muted-foreground/80">
                                 Couldn&apos;t load your schedule
                             </p>
                             <button
                                 onClick={() => load()}
-                                className={cn('text-[11px] font-semibold tracking-tight hover:underline transition-colors', themeConfig.text)}
+                                className={cn('text-meta font-semibold tracking-tight hover:underline transition-colors', themeConfig.text)}
                             >
                                 Try again
                             </button>
@@ -480,20 +481,20 @@ export function CalendarView() {
                     ) : (
                     <div className="flex items-end justify-center gap-3 flex-wrap">
                         <h3 className={cn(
-                            'text-[40px] leading-none font-bold tracking-tight tabular-nums',
+                            'text-hero tabular-nums',
                             monthlyTotal < 0 ? 'text-rose-400' : themeConfig.text,
                         )}>
                             {monthlyTotal >= 0 ? '+' : ''}{formatCurrency(monthlyTotal)}
                         </h3>
                         {monthCounts.total > 0 && (
-                            <span className="text-[11px] text-muted-foreground/70 mb-1.5">
+                            <span className="text-meta text-muted-foreground/70 mb-1.5">
                                 from {monthCounts.total} item{monthCounts.total === 1 ? '' : 's'}
                             </span>
                         )}
                     </div>
                     )}
                     {monthCounts.total > 0 && (
-                        <div className="flex items-center justify-center gap-2 text-[11px] text-muted-foreground/70 flex-wrap">
+                        <div className="flex items-center justify-center gap-2 text-meta text-muted-foreground/70 flex-wrap">
                             {monthCounts.recurring > 0 && (
                                 <span><span className="font-semibold text-foreground/85">{monthCounts.recurring}</span> recurring</span>
                             )}
@@ -512,7 +513,7 @@ export function CalendarView() {
                             <button
                                 type="button"
                                 onClick={() => setSelectedDate(tightestDay.date)}
-                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-rose-500/10 border border-rose-500/20 text-rose-400 hover:bg-rose-500/15 transition-colors"
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-meta font-semibold bg-rose-500/10 border border-rose-500/20 text-rose-400 hover:bg-rose-500/15 transition-colors"
                             >
                                 <TrendingDown className="w-3 h-3" />
                                 <span>Tightest {format(tightestDay.date, 'MMM d')}</span>
@@ -531,7 +532,7 @@ export function CalendarView() {
                         >
                             <ChevronLeft className="w-4 h-4" />
                         </button>
-                        <p className="text-[13px] font-semibold tracking-tight">{format(viewMonth, 'MMMM yyyy')}</p>
+                        <p className="text-body font-semibold tracking-tight">{format(viewMonth, 'MMMM yyyy')}</p>
                         <button
                             onClick={() => setViewMonth(prev => addMonths(prev, 1))}
                             aria-label="Next month"
@@ -542,7 +543,7 @@ export function CalendarView() {
                     </div>
                     {/* <abbr> so screen readers say "Sunday" rather than two
                         indistinguishable "S"es and two "T"s. */}
-                    <div className="grid grid-cols-7 gap-1 mt-1 text-center text-[10px] uppercase tracking-[0.18em] text-muted-foreground/60">
+                    <div className="grid grid-cols-7 gap-1 mt-1 text-center text-eyebrow uppercase text-muted-foreground/60">
                         {[
                             ['S', 'Sunday'], ['M', 'Monday'], ['T', 'Tuesday'], ['W', 'Wednesday'],
                             ['T', 'Thursday'], ['F', 'Friday'], ['S', 'Saturday'],
@@ -613,7 +614,7 @@ export function CalendarView() {
                                         </div>
                                     )}
                                     {delta < 0 && inMonth && (
-                                        <span className="text-[9px] font-medium text-rose-400/80 leading-none tabular-nums">
+                                        <span className="text-micro font-medium text-rose-400/80 leading-none tabular-nums">
                                             {formatCurrency(delta)}
                                         </span>
                                     )}
@@ -625,9 +626,9 @@ export function CalendarView() {
 
                 <div className="space-y-2.5">
                     <div className="flex items-center justify-between gap-2 px-0.5">
-                        <h3 className="text-[13px] font-semibold tracking-tight">{format(selectedDate, 'EEEE, MMM d')}</h3>
+                        <h3 className="text-body font-semibold tracking-tight">{format(selectedDate, 'EEEE, MMM d')}</h3>
                         {selectedEvents.length > 0 && (
-                            <span className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground/70">
+                            <span className="text-eyebrow uppercase text-muted-foreground/70">
                                 {selectedEvents.length} item{selectedEvents.length === 1 ? '' : 's'}
                             </span>
                         )}
@@ -638,29 +639,18 @@ export function CalendarView() {
                             <div className="h-14 rounded-xl bg-secondary/10 animate-pulse" />
                         </div>
                     ) : loadError ? (
-                        <div className="text-center py-8 border border-dashed border-white/[0.08] rounded-xl text-muted-foreground/70 text-[11px]">
-                            Couldn&apos;t load this day.
-                            <button
-                                onClick={() => load()}
-                                className={cn('ml-1.5 font-semibold hover:underline transition-colors', themeConfig.text)}
-                            >
-                                Try again
-                            </button>
-                        </div>
+                        <EmptyState
+                            variant="error"
+                            title="Couldn't load this day."
+                            accent={accentFromTheme(themeConfig)}
+                            action={{ label: 'Try again', onClick: () => load() }}
+                        />
                     ) : selectedEvents.length === 0 ? (
-                        <div className="flex flex-col items-center gap-3 py-8 border border-dashed border-white/[0.08] rounded-xl">
-                            <p className="text-muted-foreground/70 text-[11px]">Nothing scheduled.</p>
-                            <button
-                                onClick={() => setScheduleOpen(true)}
-                                className={cn(
-                                    'inline-flex items-center gap-1.5 min-h-[36px] px-3 rounded-full text-[11px] font-semibold tracking-tight transition-colors hover:bg-primary/10',
-                                    themeConfig.text
-                                )}
-                            >
-                                <Plus className="w-3.5 h-3.5" aria-hidden="true" />
-                                Schedule something
-                            </button>
-                        </div>
+                        <EmptyState
+                            title="Nothing scheduled."
+                            accent={accentFromTheme(themeConfig)}
+                            action={{ label: 'Schedule something', icon: Plus, onClick: () => setScheduleOpen(true) }}
+                        />
                     ) : (
                         selectedEvents.map(e => {
                             const Icon = e.kind === 'recurring' ? RotateCw
@@ -686,13 +676,13 @@ export function CalendarView() {
                                         <Icon className="w-4 h-4" style={{ color: e.color || '#8A2BE2' }} />
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                        <p className={cn('text-[13px] font-semibold truncate', e.isCompleted && 'line-through')}>{e.label}</p>
+                                        <p className={cn('text-body font-semibold truncate', e.isCompleted && 'line-through')}>{e.label}</p>
                                         {e.detail && (
-                                            <p className="text-[11px] text-muted-foreground/70 truncate">{e.detail}</p>
+                                            <p className="text-meta text-muted-foreground/70 truncate">{e.detail}</p>
                                         )}
                                     </div>
                                     {e.amount != null && (
-                                        <span className={cn('text-[13px] font-bold tabular-nums', e.amount < 0 ? 'text-rose-400' : themeConfig.text)}>
+                                        <span className={cn('text-body font-bold tabular-nums', e.amount < 0 ? 'text-rose-400' : themeConfig.text)}>
                                             {formatCurrency(e.amount, e.currency)}
                                         </span>
                                     )}

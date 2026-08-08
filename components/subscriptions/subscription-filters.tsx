@@ -98,7 +98,7 @@ export function SubscriptionFilters({
                         type="button"
                         onClick={() => onToggleFrequency(f)}
                         className={cn(
-                            "shrink-0 capitalize px-3 min-h-[36px] rounded-full text-[10px] font-bold border transition-colors",
+                            "shrink-0 capitalize px-3 min-h-[36px] rounded-full text-caption font-bold border transition-colors",
                             filterFrequencies.has(f)
                                 ? cn(themeConfig.bgMedium, themeConfig.borderMedium, themeConfig.text)
                                 : "bg-secondary/20 border-white/10 text-muted-foreground hover:text-foreground"
@@ -114,7 +114,7 @@ export function SubscriptionFilters({
                         type="button"
                         onClick={() => setBucketState(opt)}
                         className={cn(
-                            "shrink-0 px-3 min-h-[36px] rounded-full text-[10px] font-bold border transition-colors",
+                            "shrink-0 px-3 min-h-[36px] rounded-full text-caption font-bold border transition-colors",
                             bucketState === opt
                                 ? "bg-cyan-500/15 border-cyan-500/30 text-cyan-300"
                                 : "bg-secondary/20 border-white/10 text-muted-foreground hover:text-foreground"
@@ -129,7 +129,7 @@ export function SubscriptionFilters({
                             <button
                                 type="button"
                                 className={cn(
-                                    "shrink-0 px-3 min-h-[36px] rounded-full text-[10px] font-bold border transition-colors inline-flex items-center gap-1",
+                                    "shrink-0 px-3 min-h-[36px] rounded-full text-caption font-bold border transition-colors inline-flex items-center gap-1",
                                     filterCategories.size > 0
                                         ? "bg-violet-500/15 border-violet-500/30 text-violet-300"
                                         : "bg-secondary/20 border-white/10 text-muted-foreground hover:text-foreground"
@@ -166,7 +166,7 @@ export function SubscriptionFilters({
                     <button
                         type="button"
                         onClick={onClearFilters}
-                        className="shrink-0 px-3 min-h-[36px] rounded-full text-[10px] font-bold text-rose-400 hover:text-rose-300 inline-flex items-center gap-1"
+                        className="shrink-0 px-3 min-h-[36px] rounded-full text-caption font-bold text-rose-400 hover:text-rose-300 inline-flex items-center gap-1"
                     >
                         <X className="w-2.5 h-2.5" aria-hidden="true" /> Clear
                     </button>

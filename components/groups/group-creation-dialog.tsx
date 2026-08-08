@@ -94,7 +94,7 @@ export function GroupCreationDialog({ open, onOpenChange }: GroupCreationDialogP
                     </button>
                 </DialogTrigger>
             )}
-            <DialogContent className="max-w-[400px] w-[95vw] rounded-[28px] border-white/[0.08] bg-card/95 backdrop-blur-2xl p-0 overflow-hidden shadow-2xl">
+            <DialogContent className="max-w-[400px] w-[95vw] rounded-[28px] border-white/8 bg-card/95 backdrop-blur-2xl p-0 overflow-hidden shadow-2xl">
                 <div className="p-5 space-y-4">
                     <DialogHeader className="text-left flex-row items-start gap-3 space-y-0">
                         <div
@@ -110,10 +110,10 @@ export function GroupCreationDialog({ open, onOpenChange }: GroupCreationDialogP
                             )}
                         </div>
                         <div className="min-w-0">
-                            <DialogTitle className="text-[15px] font-semibold tracking-tight truncate">
+                            <DialogTitle className="text-lead font-semibold tracking-tight truncate">
                                 {creationStep === 'type' ? 'New group' : `New ${selectedMeta?.label.toLowerCase() || 'group'}`}
                             </DialogTitle>
-                            <DialogDescription className="text-[12px] mt-0.5 truncate">
+                            <DialogDescription className="text-xs mt-0.5 truncate">
                                 {creationStep === 'type'
                                     ? 'Pick a kind so we can tune the defaults.'
                                     : 'Give it a name — you can edit details later.'}
@@ -139,10 +139,10 @@ export function GroupCreationDialog({ open, onOpenChange }: GroupCreationDialogP
                                             <type.icon className={cn('w-[18px] h-[18px]', type.tint)} />
                                         </div>
                                         <div className="min-w-0 flex-1">
-                                            <p className="text-[13px] font-semibold">{type.label}</p>
-                                            <p className="text-[11px] text-muted-foreground">{type.description}</p>
+                                            <p className="text-body font-semibold">{type.label}</p>
+                                            <p className="text-meta text-muted-foreground">{type.description}</p>
                                         </div>
-                                        <span className={cn('text-[11px] font-medium opacity-0 group-hover:opacity-100 transition-opacity', type.tint)}>
+                                        <span className={cn('text-meta font-medium opacity-0 group-hover:opacity-100 transition-opacity', type.tint)}>
                                             Choose →
                                         </span>
                                     </button>
@@ -152,7 +152,7 @@ export function GroupCreationDialog({ open, onOpenChange }: GroupCreationDialogP
                     ) : (
                         <div className="space-y-4">
                             <div className="space-y-1.5">
-                                <label htmlFor="group-name" className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground/70 pl-1">
+                                <label htmlFor="group-name" className="text-eyebrow uppercase text-muted-foreground/70 pl-1">
                                     Name
                                 </label>
                                 <Input
@@ -168,7 +168,7 @@ export function GroupCreationDialog({ open, onOpenChange }: GroupCreationDialogP
 
                             {selectedType === 'trip' && (
                                 <div className="space-y-1.5">
-                                    <p className="text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground/70 pl-1">
+                                    <p className="text-eyebrow uppercase text-muted-foreground/70 pl-1">
                                         Dates
                                     </p>
                                     <DateRangePicker date={dateRange} setDate={setDateRange} />

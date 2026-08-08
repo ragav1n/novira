@@ -23,7 +23,7 @@ export function WhatIfSliderDemo() {
       aria-label="Interactive what-if simulator: drag to see what cutting Dining by a percentage would save"
       className="mx-auto max-w-lg rounded-xl border border-white/10 bg-gradient-to-br from-fuchsia-500/[0.05] via-primary/[0.05] to-transparent p-5"
     >
-      <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-widest text-fuchsia-300">
+      <div className="flex items-center gap-2 text-meta font-semibold uppercase tracking-widest text-fuchsia-300">
         <Sparkles className="h-3 w-3" />
         Try the what-if simulator
       </div>
@@ -34,7 +34,7 @@ export function WhatIfSliderDemo() {
         </div>
         <div className="min-w-0 flex-1">
           <div className="text-sm font-semibold text-foreground">Cut Dining by</div>
-          <div className="text-[11px] text-foreground/75">Currently ₹{BASE_DINING.toLocaleString('en-IN')}/mo</div>
+          <div className="text-meta text-foreground/75">Currently ₹{BASE_DINING.toLocaleString('en-IN')}/mo</div>
         </div>
         <motion.div
           key={pct}
@@ -58,9 +58,9 @@ export function WhatIfSliderDemo() {
         aria-label="Percentage to cut"
       />
 
-      <div className="mt-5 grid grid-cols-2 gap-2.5 text-[12px]">
+      <div className="mt-5 grid grid-cols-2 gap-2.5 text-xs">
         <div className="rounded-xl border border-white/10 bg-white/[0.02] px-3 py-2.5">
-          <div className="text-[10px] uppercase tracking-widest text-foreground/65">Monthly</div>
+          <div className="text-eyebrow uppercase text-foreground/65">Monthly</div>
           <motion.div
             key={monthlySavings}
             initial={{ opacity: 0, y: -3 }}
@@ -72,7 +72,7 @@ export function WhatIfSliderDemo() {
           </motion.div>
         </div>
         <div className="rounded-xl border border-white/10 bg-white/[0.02] px-3 py-2.5">
-          <div className="text-[10px] uppercase tracking-widest text-foreground/65">In 12 months</div>
+          <div className="text-eyebrow uppercase text-foreground/65">In 12 months</div>
           <motion.div
             key={yearly}
             initial={{ opacity: 0, y: -3 }}
@@ -87,7 +87,7 @@ export function WhatIfSliderDemo() {
 
       <div className="mt-3 flex items-center gap-2.5 rounded-xl border border-emerald-400/20 bg-emerald-500/[0.04] px-3 py-2.5">
         <Target className="h-4 w-4 shrink-0 text-emerald-300" />
-        <div className="min-w-0 flex-1 text-[12px] text-foreground">
+        <div className="min-w-0 flex-1 text-xs text-foreground">
           <div className="font-medium">Emergency fund</div>
           {Number.isFinite(monthsToGoal) ? (
             <div className="text-foreground/75">
@@ -100,7 +100,7 @@ export function WhatIfSliderDemo() {
         </div>
       </div>
 
-      <p className="mt-3 text-center text-[11px] text-foreground/80">
+      <p className="mt-3 text-center text-meta text-foreground/80">
         Live numbers — drag the slider above. The real simulator inside Novira works the same way.
       </p>
     </div>

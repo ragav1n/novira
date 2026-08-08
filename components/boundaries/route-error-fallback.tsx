@@ -30,7 +30,7 @@ export function RouteErrorFallback({
             </p>
 
             {process.env.NODE_ENV === 'development' && (
-                <pre className="text-[10px] bg-black/20 p-3 rounded-lg text-left overflow-auto w-full max-w-sm mb-6 text-orange-400 border border-orange-500/10">
+                <pre className="text-caption bg-black/20 p-3 rounded-lg text-left overflow-auto w-full max-w-sm mb-6 text-orange-400 border border-orange-500/10">
                     {error.message}
                 </pre>
             )}

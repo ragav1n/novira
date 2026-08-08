@@ -21,7 +21,7 @@ export function AnalyticsTooltip({ active, payload, label, formatCurrency }: Pro
     if (!visible.length) return null;
     return (
         <div className="bg-card/95 backdrop-blur-xl border border-white/10 p-3 rounded-xl shadow-2xl z-50">
-            <p className="text-[11px] font-bold uppercase tracking-wider mb-2 text-muted-foreground">{label}</p>
+            <p className="text-meta font-bold uppercase tracking-wider mb-2 text-muted-foreground">{label}</p>
             <div className="space-y-1.5">
                 {visible.map((entry, index) => (
                     <div key={index} className="flex items-center justify-between gap-4 text-xs">

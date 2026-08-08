@@ -117,12 +117,12 @@ export function GuideLayout() {
       <div className="mb-6 flex items-center justify-between">
         <Link
           href="/"
-          className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.02] px-3 py-1.5 text-[12px] text-foreground/80 transition-colors hover:bg-white/[0.06]"
+          className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.02] px-3 py-1.5 text-xs text-foreground/80 transition-colors hover:bg-white/[0.06]"
         >
           <ArrowLeft className="h-3.5 w-3.5" />
           Back to Novira
         </Link>
-        <div className="text-[11px] font-medium uppercase tracking-widest text-muted-foreground/60">
+        <div className="text-meta font-medium uppercase tracking-widest text-muted-foreground/60">
           App v{APP_VERSION}
         </div>
       </div>

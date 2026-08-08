@@ -25,10 +25,10 @@ export function LocationInsightsCard({ locationClusters, geoTxCount, formatCurre
     return (
         <div className="space-y-2">
             <div className="flex items-center justify-between px-1">
-                <span className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground/80">
+                <span className="text-meta font-bold uppercase tracking-widest text-muted-foreground/80">
                     Top Spending Zones
                 </span>
-                <span className="text-[10px] font-bold tabular-nums text-muted-foreground/60">
+                <span className="text-caption font-bold tabular-nums text-muted-foreground/60">
                     {geoTxCount} located {geoTxCount === 1 ? 'tx' : 'txns'}
                 </span>
             </div>
@@ -52,11 +52,11 @@ export function LocationInsightsCard({ locationClusters, geoTxCount, formatCurre
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-center justify-between gap-2">
-                                        <span className="text-[13px] font-bold truncate">{cluster.label}</span>
-                                        <span className="text-[12px] font-bold tabular-nums shrink-0">{formatCurrency(cluster.amount)}</span>
+                                        <span className="text-body font-bold truncate">{cluster.label}</span>
+                                        <span className="text-xs font-bold tabular-nums shrink-0">{formatCurrency(cluster.amount)}</span>
                                     </div>
                                     <div className="flex items-center justify-between gap-2 mt-0.5">
-                                        <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
+                                        <span className="text-eyebrow uppercase text-muted-foreground/70">
                                             #{idx + 1} · {cluster.count} {cluster.count === 1 ? 'visit' : 'visits'}
                                         </span>
                                         <div className="h-1 flex-1 max-w-[80px] bg-secondary/20 rounded-full overflow-hidden">

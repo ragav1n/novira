@@ -91,7 +91,7 @@ export function SearchFilterSheet({
                     <SlidersHorizontal className="w-[18px] h-[18px]" />
                     {activeFilterCount > 0 && (
                         <span className={cn(
-                            'absolute -top-0.5 -right-0.5 min-w-4 h-4 px-1 rounded-full flex items-center justify-center font-bold text-[10px] tabular-nums',
+                            'absolute -top-0.5 -right-0.5 min-w-4 h-4 px-1 rounded-full flex items-center justify-center font-bold text-caption tabular-nums',
                             themeConfig.bgSolid, themeConfig.textWhite
                         )}>
                             {activeFilterCount}
@@ -101,15 +101,15 @@ export function SearchFilterSheet({
             </SheetTrigger>
             <SheetContent side="right" className="w-[320px] sm:w-[400px] border-white/[0.06] bg-background p-0 flex flex-col">
                 <SheetHeader className="p-6 pb-2 space-y-1">
-                    <SheetTitle className="text-[15px] font-semibold tracking-tight">Filter &amp; sort</SheetTitle>
-                    <SheetDescription className="text-[12px] text-muted-foreground/70">Refine your transaction search.</SheetDescription>
+                    <SheetTitle className="text-lead font-semibold tracking-tight">Filter &amp; sort</SheetTitle>
+                    <SheetDescription className="text-xs text-muted-foreground/70">Refine your transaction search.</SheetDescription>
                 </SheetHeader>
 
                 <div className="flex-1 overflow-y-auto p-6 pt-2 space-y-8">
                     <div className="space-y-3">
-                        <Label className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground/70">Sort By</Label>
+                        <Label className="text-eyebrow uppercase text-muted-foreground/70">Sort By</Label>
                         <Select value={sortBy} onValueChange={(val: SortOption) => setSortBy(val)}>
-                            <SelectTrigger className="w-full bg-secondary/10 border-white/[0.06] h-10 rounded-xl text-[13px]">
+                            <SelectTrigger className="w-full bg-secondary/10 border-white/[0.06] h-10 rounded-xl text-body">
                                 <SelectValue placeholder="Sort by" />
                             </SelectTrigger>
                             <SelectContent>
@@ -123,7 +123,7 @@ export function SearchFilterSheet({
 
                     <div className="space-y-4">
                         <div className="flex justify-between">
-                            <Label className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground/70">Price Range</Label>
+                            <Label className="text-eyebrow uppercase text-muted-foreground/70">Price Range</Label>
                             <span className={`text-xs font-mono font-bold ${themeConfig.text}`}>
                                 {formatCurrency(priceRange[0])} - {formatCurrency(priceRange[1])}
                             </span>
@@ -139,13 +139,13 @@ export function SearchFilterSheet({
                     </div>
 
                     <div className="space-y-3">
-                        <Label className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground/70">Date Range</Label>
+                        <Label className="text-eyebrow uppercase text-muted-foreground/70">Date Range</Label>
                         <Popover modal={true}>
                             <PopoverTrigger asChild>
                                 <Button
                                     variant="outline"
                                     className={cn(
-                                        'w-full justify-start text-left font-normal h-10 rounded-xl bg-secondary/10 border-white/[0.06] hover:bg-secondary/20 text-[13px]',
+                                        'w-full justify-start text-left font-normal h-10 rounded-xl bg-secondary/10 border-white/[0.06] hover:bg-secondary/20 text-body',
                                         !dateRange.from && 'text-muted-foreground'
                                     )}
                                 >
@@ -180,7 +180,7 @@ export function SearchFilterSheet({
 
                     {buckets.length > 0 && (
                         <div className="space-y-3">
-                            <Label className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground/70">Bucket (Private)</Label>
+                            <Label className="text-eyebrow uppercase text-muted-foreground/70">Bucket (Private)</Label>
                             <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
                                 <div
                                     onClick={() => setSelectedBucketId(null)}
@@ -194,7 +194,7 @@ export function SearchFilterSheet({
                                     <div className="w-8 h-8 rounded-full flex items-center justify-center bg-secondary/20 border border-white/[0.06]">
                                         <X className="w-3.5 h-3.5 text-muted-foreground" />
                                     </div>
-                                    <span className="text-[11px] font-medium truncate w-14 text-center">All</span>
+                                    <span className="text-meta font-medium truncate w-14 text-center">All</span>
                                 </div>
                                 {buckets.map((bucket) => {
                                     const active = selectedBucketId === bucket.id;
@@ -214,7 +214,7 @@ export function SearchFilterSheet({
                                                     <BucketIcon name={bucket.icon} />
                                                 </div>
                                             </div>
-                                            <span className="text-[11px] font-medium truncate w-14 text-center">{bucket.name}</span>
+                                            <span className="text-meta font-medium truncate w-14 text-center">{bucket.name}</span>
                                         </div>
                                     );
                                 })}
@@ -224,8 +224,8 @@ export function SearchFilterSheet({
 
                     {tagsError && knownTags.length === 0 && (
                         <div className="space-y-3">
-                            <Label className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground/70">Tags</Label>
-                            <p className="text-[11px] text-muted-foreground/70">
+                            <Label className="text-eyebrow uppercase text-muted-foreground/70">Tags</Label>
+                            <p className="text-meta text-muted-foreground/70">
                                 Couldn&apos;t load your tags. Close and reopen this sheet to retry.
                             </p>
                         </div>
@@ -233,7 +233,7 @@ export function SearchFilterSheet({
 
                     {knownTags.length > 0 && (
                         <div className="space-y-3">
-                            <Label className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground/70">Tags</Label>
+                            <Label className="text-eyebrow uppercase text-muted-foreground/70">Tags</Label>
                             <div className="flex flex-wrap gap-1.5">
                                 {knownTags.slice(0, 30).map((t) => {
                                     const active = selectedTags.includes(t);
@@ -243,7 +243,7 @@ export function SearchFilterSheet({
                                             key={t}
                                             onClick={() => setSelectedTags(prev => active ? prev.filter(x => x !== t) : [...prev, t])}
                                             className={cn(
-                                                'inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold border transition-colors',
+                                                'inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-meta font-semibold border transition-colors',
                                                 active
                                                     ? 'bg-primary/20 border-primary/40 text-primary'
                                                     : 'bg-secondary/10 border-white/[0.06] text-muted-foreground hover:border-white/15'
@@ -258,7 +258,7 @@ export function SearchFilterSheet({
                     )}
 
                     <div className="space-y-3">
-                        <Label className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground/70">Categories</Label>
+                        <Label className="text-eyebrow uppercase text-muted-foreground/70">Categories</Label>
                         <div className="grid grid-cols-1 gap-2">
                             {SYSTEM_CATEGORIES.map((cat) => (
                                 <div
@@ -287,7 +287,7 @@ export function SearchFilterSheet({
                                                 style: { color: CATEGORY_COLORS[cat.id] || '#8A2BE2' }
                                             })}
                                         </div>
-                                        <span className="text-[13px] font-medium">{cat.label}</span>
+                                        <span className="text-body font-medium">{cat.label}</span>
                                     </div>
                                     {selectedCategories.includes(cat.id) && <Check className={`w-4 h-4 ${themeConfig.text}`} />}
                                 </div>
@@ -296,14 +296,14 @@ export function SearchFilterSheet({
                     </div>
 
                     <div className="space-y-3">
-                        <Label className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground/70">Payment Method</Label>
+                        <Label className="text-eyebrow uppercase text-muted-foreground/70">Payment Method</Label>
                         <div className="flex flex-wrap gap-2">
                             {paymentMethods.map((method) => (
                                 <Badge
                                     key={method}
                                     variant="outline"
                                     className={cn(
-                                        'px-3 py-1 cursor-pointer transition-colors border-white/[0.06] text-[11px]',
+                                        'px-3 py-1 cursor-pointer transition-colors border-white/[0.06] text-meta',
                                         selectedPayments.includes(method)
                                             ? `${themeConfig.bgSolid} ${themeConfig.borderSolid} text-white`
                                             : 'bg-secondary/10 hover:bg-secondary/20'
@@ -322,11 +322,13 @@ export function SearchFilterSheet({
                 </div>
 
                 <SheetFooter className="p-6 border-t border-white/[0.06] bg-secondary/5 gap-2.5 sm:flex-col items-stretch">
-                    <Button variant="secondary" onClick={onReset} className="h-10 rounded-xl text-[13px]">
+                    {/* Height and radius come from the variant now (44px / rounded-xl);
+                        the old `h-10 rounded-xl` override held this at 40px. */}
+                    <Button variant="secondary" onClick={onReset} className="text-body">
                         Reset all
                     </Button>
                     <SheetClose asChild>
-                        <Button className={cn('h-10 rounded-xl text-[13px] font-semibold', themeConfig.bgSolid, themeConfig.textWhite, themeConfig.hoverBg)}>
+                        <Button className={cn('h-10 rounded-xl text-body font-semibold', themeConfig.bgSolid, themeConfig.textWhite, themeConfig.hoverBg)}>
                             Apply
                         </Button>
                     </SheetClose>

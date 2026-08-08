@@ -71,7 +71,7 @@ export function NotificationsSection({
                         <Bell className="w-4 h-4 text-muted-foreground shrink-0" />
                         <div className="min-w-0">
                             <p className="text-sm font-medium">Push Notifications</p>
-                            <p className="text-[11px] text-muted-foreground">
+                            <p className="text-meta text-muted-foreground">
                                 {push.permission === 'denied'
                                     ? 'Blocked — enable in your browser settings'
                                     : 'Reminders, sync alerts and updates'}
@@ -104,7 +104,7 @@ export function NotificationsSection({
                             <Sparkles className="w-4 h-4 text-muted-foreground shrink-0" />
                             <div className="min-w-0">
                                 <p className="text-sm font-medium">Smart Digests</p>
-                                <p className="text-[11px] text-muted-foreground">
+                                <p className="text-meta text-muted-foreground">
                                     Morning, midday and evening check-ins
                                 </p>
                             </div>
@@ -120,7 +120,7 @@ export function NotificationsSection({
                             <Newspaper className="w-4 h-4 text-muted-foreground shrink-0" />
                             <div className="min-w-0">
                                 <p className="text-sm font-medium">Spending Digest</p>
-                                <p className="text-[11px] text-muted-foreground">
+                                <p className="text-meta text-muted-foreground">
                                     Recap of your recent spending
                                 </p>
                             </div>
@@ -145,7 +145,7 @@ export function NotificationsSection({
                             <RefreshCcw className="w-4 h-4 text-muted-foreground shrink-0" />
                             <div className="min-w-0">
                                 <p className="text-sm font-medium">Bill Reminders</p>
-                                <p className="text-[11px] text-muted-foreground">
+                                <p className="text-meta text-muted-foreground">
                                     Notify me before recurring bills are due
                                 </p>
                             </div>
@@ -174,7 +174,7 @@ export function NotificationsSection({
                             <CalendarClock className="w-4 h-4 text-muted-foreground shrink-0" />
                             <div className="min-w-0">
                                 <p className="text-sm font-medium">Bucket Deadlines</p>
-                                <p className="text-[11px] text-muted-foreground">
+                                <p className="text-meta text-muted-foreground">
                                     Alert when a bucket end date is approaching
                                 </p>
                             </div>
@@ -190,7 +190,7 @@ export function NotificationsSection({
                             <TrendingUp className="w-4 h-4 text-muted-foreground shrink-0" />
                             <div className="min-w-0">
                                 <p className="text-sm font-medium">Spending Pace</p>
-                                <p className="text-[11px] text-muted-foreground">
+                                <p className="text-meta text-muted-foreground">
                                     Mid-month projection if you&apos;re trending over budget
                                 </p>
                             </div>
@@ -206,7 +206,7 @@ export function NotificationsSection({
                             <Users className="w-4 h-4 text-muted-foreground shrink-0" />
                             <div className="min-w-0">
                                 <p className="text-sm font-medium">Settlement Reminders</p>
-                                <p className="text-[11px] text-muted-foreground">
+                                <p className="text-meta text-muted-foreground">
                                     New splits and weekly nudges for unpaid balances
                                 </p>
                             </div>
@@ -223,7 +223,7 @@ export function NotificationsSection({
                                 <Moon className="w-4 h-4 text-muted-foreground shrink-0" />
                                 <div className="min-w-0">
                                     <p className="text-sm font-medium">Quiet Hours</p>
-                                    <p className="text-[11px] text-muted-foreground">
+                                    <p className="text-meta text-muted-foreground">
                                         Mute notifications during a window
                                     </p>
                                 </div>
@@ -249,7 +249,7 @@ export function NotificationsSection({
                                         ))}
                                     </SelectContent>
                                 </Select>
-                                <span className="text-[11px] text-muted-foreground">to</span>
+                                <span className="text-meta text-muted-foreground">to</span>
                                 <Select
                                     value={String(quietHoursEnd)}
                                     onValueChange={(val) => setQuietHours(quietHoursStart, Number(val))}
@@ -272,7 +272,7 @@ export function NotificationsSection({
             {!push.isSupported && (
                 <div className="flex items-center gap-3 p-3">
                     <BellRing className="w-4 h-4 text-muted-foreground shrink-0" />
-                    <p className="text-[11px] text-muted-foreground">
+                    <p className="text-meta text-muted-foreground">
                         Push notifications aren&apos;t supported in this browser.
                     </p>
                 </div>

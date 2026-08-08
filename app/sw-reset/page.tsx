@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Wrench, AlertTriangle } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import { supabase } from '@/lib/supabase';
 
 type Stage = 'confirm' | 'running' | 'done';
@@ -116,8 +117,8 @@ export default function SWResetPage() {
 
             {stage === 'running' && (
                 <>
-                    <div className="w-6 h-6 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
-                    <p className="text-sm text-muted-foreground font-medium">Resetting app…</p>
+                    <Spinner className="size-6 text-primary" label={null} />
+                    <p role="status" className="text-sm text-muted-foreground font-medium">Resetting app…</p>
                 </>
             )}
 

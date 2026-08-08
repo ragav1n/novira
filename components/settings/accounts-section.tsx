@@ -272,14 +272,14 @@ export function AccountsSection({ defaultCurrency, formatCurrency }: Props) {
 
     return (
         <div className="space-y-3">
-            <p className="text-[11px] text-muted-foreground/70 leading-relaxed">
+            <p className="text-meta text-muted-foreground/70 leading-relaxed">
                 Track separate wallets — checking, savings, credit cards. New transactions
                 land on your primary account by default. Archived accounts stay visible in
                 history but disappear from pickers.
             </p>
 
             {balancesError && !loading && (
-                <p className="text-[11px] text-amber-400/80">
+                <p className="text-meta text-amber-400/80">
                     Balances couldn&apos;t be calculated, so they&apos;re hidden below. Your accounts and
                     transactions are unaffected.
                 </p>
@@ -373,10 +373,10 @@ export function AccountsSection({ defaultCurrency, formatCurrency }: Props) {
                                 </span>
                                 <div className="min-w-0 flex-1">
                                     <div className="flex items-center gap-1.5">
-                                        <p className="text-[13px] font-semibold truncate">{a.name}</p>
+                                        <p className="text-body font-semibold truncate">{a.name}</p>
                                         {a.is_primary && <Star className="w-3 h-3 text-amber-400 shrink-0" fill="currentColor" />}
                                     </div>
-                                    <p className="text-[10.5px] text-muted-foreground/60 truncate">
+                                    <p className="text-caption text-muted-foreground/60 truncate">
                                         {ACCOUNT_TYPE_LABELS[a.type]}
                                         {!isMultiCurrency && primaryLabel && <> · <span className="text-foreground/80 font-semibold">{primaryLabel}</span></>}
                                         {utilizationPct !== null && !isMultiCurrency && (
@@ -386,12 +386,12 @@ export function AccountsSection({ defaultCurrency, formatCurrency }: Props) {
                                     {isMultiCurrency && (
                                         <div className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5">
                                             {breakdown.map(b => (
-                                                <span key={b.currency} className="text-[11px] tabular-nums">
+                                                <span key={b.currency} className="text-meta tabular-nums">
                                                     <span className="text-foreground/85 font-semibold">{formatCurrency(b.amount, b.currency)}</span>
                                                 </span>
                                             ))}
                                             {computedBalance !== undefined && Math.abs(computedBalance) >= 0.005 && (
-                                                <span className="text-[10px] text-muted-foreground/60">
+                                                <span className="text-caption text-muted-foreground/60">
                                                     ≈ {formatCurrency(computedBalance)} {baseCurrency}
                                                 </span>
                                             )}
@@ -459,7 +459,7 @@ export function AccountsSection({ defaultCurrency, formatCurrency }: Props) {
 
             {archived.length > 0 && (
                 <details className="bg-secondary/5 rounded-xl border border-white/5">
-                    <summary className="cursor-pointer px-3 py-2 text-[11px] font-semibold text-muted-foreground/70 hover:text-muted-foreground">
+                    <summary className="cursor-pointer px-3 py-2 text-meta font-semibold text-muted-foreground/70 hover:text-muted-foreground">
                         Archived ({archived.length})
                     </summary>
                     <div className="divide-y divide-white/5 border-t border-white/5">
@@ -474,7 +474,7 @@ export function AccountsSection({ defaultCurrency, formatCurrency }: Props) {
                                         >
                                             <Icon className="w-4 h-4 text-muted-foreground" />
                                         </span>
-                                        <p className="text-[12.5px] font-medium truncate">{a.name}</p>
+                                        <p className="text-body font-medium truncate">{a.name}</p>
                                     </div>
                                     <Button
                                         variant="ghost"
@@ -603,7 +603,7 @@ export function AccountsSection({ defaultCurrency, formatCurrency }: Props) {
                                                     className="h-9 tabular-nums"
                                                 />
                                                 {isCardForm && (
-                                                    <p className="text-[10px] text-muted-foreground/60 mt-1">Owed at sign-up (enter as positive).</p>
+                                                    <p className="text-caption text-muted-foreground/60 mt-1">Owed at sign-up (enter as positive).</p>
                                                 )}
                                             </div>
                                             {isCardForm && (
@@ -623,10 +623,10 @@ export function AccountsSection({ defaultCurrency, formatCurrency }: Props) {
                                         </div>
                                         {Object.keys(editing.opening_extras).length > 0 && (
                                             <div className="space-y-2 rounded-xl border border-white/5 bg-secondary/5 p-3 mt-3">
-                                                <p className="text-[10.5px] uppercase tracking-wider text-muted-foreground/70 font-bold">Other-currency openings</p>
+                                                <p className="text-eyebrow uppercase text-muted-foreground/70">Other-currency openings</p>
                                                 {Object.entries(editing.opening_extras).map(([curr, amt]) => (
                                                     <div key={curr} className="grid grid-cols-[80px_1fr_auto] gap-2 items-center">
-                                                        <div className="text-[12px] font-semibold tabular-nums px-2 py-1 rounded bg-secondary/30 text-center">{curr}</div>
+                                                        <div className="text-xs font-semibold tabular-nums px-2 py-1 rounded bg-secondary/30 text-center">{curr}</div>
                                                         <Input
                                                             type="text"
                                                             inputMode="decimal"
@@ -655,7 +655,7 @@ export function AccountsSection({ defaultCurrency, formatCurrency }: Props) {
                                                 ))}
                                             </div>
                                         )}
-                                        <details className="text-[11px] mt-2">
+                                        <details className="text-meta mt-2">
                                             <summary className="cursor-pointer text-muted-foreground/70 hover:text-muted-foreground">
                                                 + Add another currency opening
                                             </summary>
@@ -674,7 +674,7 @@ export function AccountsSection({ defaultCurrency, formatCurrency }: Props) {
                                                     />
                                                 </div>
                                             </div>
-                                            <p className="text-[10px] text-muted-foreground/60 mt-1">Pick a currency to add a row above.</p>
+                                            <p className="text-caption text-muted-foreground/60 mt-1">Pick a currency to add a row above.</p>
                                         </details>
                                     </>
                                 );
@@ -701,7 +701,7 @@ export function AccountsSection({ defaultCurrency, formatCurrency }: Props) {
                             <div className="flex items-center justify-between pt-2 border-t border-white/5">
                                 <div>
                                     <Label className="text-xs">Primary account</Label>
-                                    <p className="text-[10px] text-muted-foreground/60 mt-0.5">Used as default when adding expenses</p>
+                                    <p className="text-caption text-muted-foreground/60 mt-0.5">Used as default when adding expenses</p>
                                 </div>
                                 <Switch
                                     checked={editing.is_primary}
@@ -800,7 +800,7 @@ function ReconcileDialog({ account, breakdown, formatCurrency, onOpenChange }: R
                 </DialogHeader>
                 <div className="px-5 py-4 space-y-3 max-h-[70vh] overflow-y-auto">
                     {breakdown.length > 1 && (
-                        <p className="text-[11px] text-muted-foreground/80 leading-relaxed">
+                        <p className="text-meta text-muted-foreground/80 leading-relaxed">
                             This account holds balances in multiple currencies. Enter what your bank or
                             wallet actually shows for each — Novira will report any mismatch per currency.
                         </p>
@@ -815,11 +815,11 @@ function ReconcileDialog({ account, breakdown, formatCurrency, onOpenChange }: R
                         return (
                             <div key={b.currency} className="space-y-2 rounded-xl border border-white/5 bg-secondary/5 p-3">
                                 <div className="flex items-center justify-between">
-                                    <span className="text-[10.5px] uppercase tracking-wider text-muted-foreground/60 font-bold">{b.currency}</span>
-                                    <span className="text-[14px] font-semibold tabular-nums">{formatComputed(b.amount, b.currency)}</span>
+                                    <span className="text-eyebrow uppercase text-muted-foreground/60">{b.currency}</span>
+                                    <span className="text-sm font-semibold tabular-nums">{formatComputed(b.amount, b.currency)}</span>
                                 </div>
                                 <div>
-                                    <Label htmlFor={`reconcile-${b.currency}`} className="text-[10.5px] text-muted-foreground/80">
+                                    <Label htmlFor={`reconcile-${b.currency}`} className="text-caption text-muted-foreground/80">
                                         Your actual{isCard ? ' (amount owed)' : ''}
                                     </Label>
                                     <Input
@@ -833,7 +833,7 @@ function ReconcileDialog({ account, breakdown, formatCurrency, onOpenChange }: R
                                     />
                                 </div>
                                 {actualValid && (
-                                    <div className={`text-[11.5px] rounded-lg px-2 py-1.5 ${
+                                    <div className={`text-meta rounded-lg px-2 py-1.5 ${
                                         inAgreement
                                             ? 'bg-emerald-500/10 text-emerald-300'
                                             : 'bg-amber-500/10 text-amber-300'
@@ -855,7 +855,7 @@ function ReconcileDialog({ account, breakdown, formatCurrency, onOpenChange }: R
                             </div>
                         );
                     })}
-                    <p className="text-[10.5px] text-muted-foreground/60 leading-relaxed">
+                    <p className="text-caption text-muted-foreground/60 leading-relaxed">
                         Read-only check. To fix a mismatch, add the missing transaction(s) and Novira will recompute.
                     </p>
                 </div>

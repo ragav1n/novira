@@ -349,7 +349,7 @@ export function DashboardView() {
         const txBucket = buckets.find(b => b.id === tx.bucket_id);
         if (!txBucket) return null;
         return (
-            <span className="flex items-center gap-1.5 text-[11px] font-bold px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-300 border border-cyan-500/20 shadow-sm">
+            <span className="flex items-center gap-1.5 text-meta font-bold px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-300 border border-cyan-500/20 shadow-sm">
                 <div className="w-2.5 h-2.5 shrink-0 opacity-90">
                     {getBucketIcon(txBucket.icon)}
                 </div>
@@ -406,7 +406,7 @@ export function DashboardView() {
 
                 {/* Empty State */}
                 {(!loading && groups.length === 0 && friends.length === 0 && transactions.length === 0) && (
-                    <Card className="bg-card/40 border-primary/20 overflow-hidden relative rounded-xl shadow-[inset_0_1px_0_rgb(255_255_255_/0.06)]">
+                    <Card className="bg-card/40 border-primary/20 overflow-hidden relative rounded-xl shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
                         <div className="absolute top-0 right-0 p-8 opacity-5">
                             <Users className="w-24 h-24" />
                         </div>

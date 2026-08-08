@@ -134,11 +134,11 @@ function SpendingTrendCardInner({
         <Card className="bg-card/40 backdrop-blur-md border-white/5 shadow-none overflow-hidden">
             <CardContent className="p-4 space-y-3">
                 <div className="flex justify-between items-center gap-2">
-                    <h3 className="font-bold text-[13px] uppercase tracking-wider text-muted-foreground/80">Spending Trend</h3>
+                    <h3 className="font-bold text-body uppercase tracking-wider text-muted-foreground/80">Spending Trend</h3>
                     {hasForecast && (
                         <span
                             className={cn(
-                                'text-[10px] px-2 py-0.5 rounded-md font-bold border',
+                                'text-caption px-2 py-0.5 rounded-md font-bold border',
                                 themeConfig.bgLight,
                                 themeConfig.borderMedium,
                                 themeConfig.text,
@@ -217,7 +217,7 @@ function SpendingTrendCardInner({
                             </LineChart>
                         </ResponsiveContainer>
                     ) : (
-                        <div className="flex items-center justify-center h-full text-muted-foreground text-[11px] font-bold uppercase tracking-widest">
+                        <div className="flex items-center justify-center h-full text-muted-foreground text-meta font-bold uppercase tracking-widest">
                             No spending in this range
                         </div>
                     )}
@@ -226,18 +226,18 @@ function SpendingTrendCardInner({
                 {activeCategories.length > 0 && (
                     <div className="flex flex-wrap gap-1.5">
                         {activeCategories.slice(0, 6).map(cat => (
-                            <span key={cat} className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-secondary/20 border border-white/5">
+                            <span key={cat} className="flex items-center gap-1.5 text-eyebrow uppercase px-2 py-0.5 rounded-full bg-secondary/20 border border-white/5">
                                 <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: CATEGORY_COLORS[cat] || CATEGORY_COLORS.others }} />
                                 <span className="text-muted-foreground/90">{getCategoryLabel(cat)}</span>
                             </span>
                         ))}
                         {activeCategories.length > 6 && (
-                            <span className="flex items-center text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-secondary/20 border border-white/5 text-muted-foreground/70">
+                            <span className="flex items-center text-eyebrow uppercase px-2 py-0.5 rounded-full bg-secondary/20 border border-white/5 text-muted-foreground/70">
                                 +{activeCategories.length - 6} more
                             </span>
                         )}
                         {dateRange !== 'ALL' && priorTotal > 0 && (
-                            <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-secondary/10 border border-white/5 text-muted-foreground/70">
+                            <span className="flex items-center gap-1.5 text-eyebrow uppercase px-2 py-0.5 rounded-full bg-secondary/10 border border-white/5 text-muted-foreground/70">
                                 <span className="inline-block w-3 border-t border-dashed border-white/40" />
                                 Prior
                             </span>

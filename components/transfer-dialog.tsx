@@ -182,7 +182,7 @@ export function TransferDialog({ open, onOpenChange }: TransferDialogProps) {
                     </div>
 
                     {sameAccount && (
-                        <p className="text-[11px] text-amber-300/80">Source and destination must be different.</p>
+                        <p className="text-meta text-amber-300/80">Source and destination must be different.</p>
                     )}
 
                     <div className={crossCurrency ? 'grid grid-cols-2 gap-3' : ''}>
@@ -222,7 +222,7 @@ export function TransferDialog({ open, onOpenChange }: TransferDialogProps) {
                         )}
                     </div>
                     {crossCurrency && amountValid && toAmountValid && (
-                        <p className="text-[10.5px] text-muted-foreground/70">
+                        <p className="text-caption text-muted-foreground/70">
                             Rate: 1 {fromAccount?.currency} ≈ {(parsedToAmount / parsedAmount).toFixed(4)} {toAccount?.currency} · adjust if your bank uses a different rate
                         </p>
                     )}
@@ -251,7 +251,7 @@ export function TransferDialog({ open, onOpenChange }: TransferDialogProps) {
                         </div>
                     </div>
 
-                    <p className="text-[10.5px] text-muted-foreground/60 leading-relaxed pt-1">
+                    <p className="text-caption text-muted-foreground/60 leading-relaxed pt-1">
                         Transfers don&apos;t count as spending. Both legs are tagged so they stay out of budgets, allowance, and analytics.
                     </p>
                 </div>
@@ -292,8 +292,8 @@ function AccountSelect({ label, value, onChange, accounts, excludeId }: AccountS
                                 <Icon className="w-3 h-3" style={{ color: current.color }} />
                             </span>
                             <div className="min-w-0 text-left">
-                                <p className="text-[12.5px] font-semibold truncate leading-tight">{current.name}</p>
-                                <p className="text-[9.5px] text-muted-foreground/70 leading-tight">
+                                <p className="text-body font-semibold truncate leading-tight">{current.name}</p>
+                                <p className="text-micro text-muted-foreground/70 leading-tight">
                                     {ACCOUNT_TYPE_LABELS[current.type]} · {current.currency}
                                 </p>
                             </div>
@@ -308,7 +308,7 @@ function AccountSelect({ label, value, onChange, accounts, excludeId }: AccountS
                                 <div className="flex items-center gap-2">
                                     <TypeIcon className="w-3.5 h-3.5 shrink-0" style={{ color: a.color }} />
                                     <span>{a.name}</span>
-                                    <span className="text-[10px] text-muted-foreground/60">· {a.currency}</span>
+                                    <span className="text-caption text-muted-foreground/60">· {a.currency}</span>
                                 </div>
                             </SelectItem>
                         );

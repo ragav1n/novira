@@ -90,7 +90,7 @@ export function SearchPlaygroundDemo() {
       aria-label="Try Novira's search syntax — type a query and watch results filter live"
       className="mx-auto max-w-2xl rounded-xl border border-white/10 bg-gradient-to-br from-primary/[0.04] to-transparent p-5"
     >
-      <div className="mb-3 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-widest text-primary/85">
+      <div className="mb-3 flex items-center gap-2 text-meta font-semibold uppercase tracking-widest text-primary/85">
         <SearchIcon className="h-3 w-3" />
         Try the search syntax — live
       </div>
@@ -126,7 +126,7 @@ export function SearchPlaygroundDemo() {
             key={p}
             type="button"
             onClick={() => setQ(p)}
-            className="rounded-full border border-white/10 bg-white/[0.02] px-2.5 py-0.5 font-mono text-[11px] text-foreground/75 transition-colors hover:border-primary/40 hover:bg-primary/10 hover:text-primary"
+            className="rounded-full border border-white/10 bg-white/[0.02] px-2.5 py-0.5 font-mono text-meta text-foreground/75 transition-colors hover:border-primary/40 hover:bg-primary/10 hover:text-primary"
           >
             {p}
           </button>
@@ -135,7 +135,7 @@ export function SearchPlaygroundDemo() {
 
       {/* What we understood */}
       {tokens.length > 0 && (
-        <div className="mt-3 flex flex-wrap items-center gap-1.5 text-[11px]">
+        <div className="mt-3 flex flex-wrap items-center gap-1.5 text-meta">
           <span className="text-foreground/65">Looking for:</span>
           {tokens.map((t, i) => {
             const tone =
@@ -166,7 +166,7 @@ export function SearchPlaygroundDemo() {
 
       {/* Results */}
       <div className="mt-4 rounded-xl border border-white/10 bg-background/40">
-        <div className="flex items-center justify-between border-b border-white/5 px-3 py-2 text-[11px]">
+        <div className="flex items-center justify-between border-b border-white/5 px-3 py-2 text-meta">
           <span className="text-foreground/65">
             {results.length} {results.length === 1 ? 'result' : 'results'} of {TXNS.length}
           </span>
@@ -182,11 +182,11 @@ export function SearchPlaygroundDemo() {
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -8 }}
                 transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1], layout: { duration: 0.32, ease: [0.22, 1, 0.36, 1] } }}
-                className="grid grid-cols-[1fr_auto] items-center gap-3 px-3 py-2.5 text-[12px] transform-gpu"
+                className="grid grid-cols-[1fr_auto] items-center gap-3 px-3 py-2.5 text-xs transform-gpu"
               >
                 <div className="min-w-0">
                   <div className="truncate text-foreground/95">{tx.desc}</div>
-                  <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[10px] text-foreground/75">
+                  <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-caption text-foreground/75">
                     <span>{tx.category}</span>
                     <span>·</span>
                     <span>{tx.date}</span>
@@ -202,14 +202,14 @@ export function SearchPlaygroundDemo() {
             ))}
           </AnimatePresence>
           {results.length === 0 && (
-            <li className="px-3 py-6 text-center text-[12px] text-foreground/75">
+            <li className="px-3 py-6 text-center text-xs text-foreground/75">
               No matches. Try one of the chips above.
             </li>
           )}
         </ul>
       </div>
 
-      <p className="mt-3 text-center text-[11px] text-foreground/80">
+      <p className="mt-3 text-center text-meta text-foreground/80">
         This works exactly like the real Search inside the app. Mix words, amounts (<code className="rounded bg-white/5 px-1">{'>'}500</code>), and tags (<code className="rounded bg-white/5 px-1">#travel</code>) — every part has to match.
       </p>
     </div>

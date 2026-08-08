@@ -19,7 +19,7 @@ export function CodePill({
   return (
     <code
       className={cn(
-        'inline-flex items-center rounded-md border px-1.5 py-0.5 font-mono text-[12px] tracking-tight',
+        'inline-flex items-center rounded-md border px-1.5 py-0.5 font-mono text-xs tracking-tight',
         tone,
         className
       )}

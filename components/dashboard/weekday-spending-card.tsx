@@ -71,10 +71,10 @@ export const WeekdaySpendingCard = React.memo(function WeekdaySpendingCard({
                     <CalendarDays className={cn('w-4 h-4 shrink-0', iconClass)} />
                     <div className="min-w-0">
                         <h3 className="text-sm font-bold truncate">Weekday Pattern</h3>
-                        <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">Last 30 days</p>
+                        <p className="text-eyebrow uppercase text-muted-foreground/70">Last 30 days</p>
                     </div>
                 </div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground bg-secondary/30 px-2 py-0.5 rounded-full whitespace-nowrap">
+                <span className="text-eyebrow uppercase text-muted-foreground bg-secondary/30 px-2 py-0.5 rounded-full whitespace-nowrap">
                     Peak {DAY_NAMES[peakIndex]}
                 </span>
             </div>
@@ -101,7 +101,7 @@ export const WeekdaySpendingCard = React.memo(function WeekdaySpendingCard({
                     <button
                         type="button"
                         onClick={() => setSelectedIdx(null)}
-                        className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors"
+                        className="text-eyebrow uppercase text-muted-foreground hover:text-foreground transition-colors"
                     >
                         Clear
                     </button>
@@ -149,7 +149,7 @@ export const WeekdaySpendingCard = React.memo(function WeekdaySpendingCard({
                         onClick={() => setSelectedIdx(prev => (prev === i ? null : i))}
                         aria-label={`${DAY_NAMES[i]}: ${formatCurrency(totals[i], displayCurrency)}`}
                         className={cn(
-                            'flex-1 text-center text-[10px] font-bold uppercase tracking-wider transition-colors cursor-pointer hover:text-foreground',
+                            'flex-1 text-center text-caption font-bold uppercase tracking-wider transition-colors cursor-pointer hover:text-foreground',
                             i === selectedIdx
                                 ? 'text-foreground'
                                 : i === todayIndex

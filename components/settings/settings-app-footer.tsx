@@ -41,7 +41,7 @@ export function SettingsAppFooter({ onSignOut, signingOut = false }: Props) {
                         <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:translate-x-0.5 transition-all" />
                     </button>
                 </div>
-                <p className="text-[11px] text-muted-foreground px-1">
+                <p className="text-meta text-muted-foreground px-1">
                     A complete walkthrough of every feature, with live animated demos.
                 </p>
             </div>
@@ -59,7 +59,7 @@ export function SettingsAppFooter({ onSignOut, signingOut = false }: Props) {
                         <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:translate-x-0.5 transition-all" />
                     </button>
                 </div>
-                <p className="text-[11px] text-muted-foreground px-1">
+                <p className="text-meta text-muted-foreground px-1">
                     Clears cached data, the offline queue, and signs you out on this device. Your account stays intact.
                 </p>
             </div>
@@ -78,19 +78,19 @@ export function SettingsAppFooter({ onSignOut, signingOut = false }: Props) {
                         }
                     />
                 </div>
-                <p className="text-[11px] text-muted-foreground px-1">
+                <p className="text-meta text-muted-foreground px-1">
                     Permanently delete your account and all associated data.
                 </p>
             </div>
 
             <div className="text-center py-4 space-y-2">
                 <p className="text-xs text-muted-foreground font-medium">Novira v{APP_VERSION}</p>
-                <div className="flex justify-center items-center gap-3 text-[11px] text-muted-foreground">
+                <div className="flex justify-center items-center gap-3 text-meta text-muted-foreground">
                     <Link href="/privacy" className="hover:text-primary transition-colors">Privacy Policy</Link>
                     <span className="w-1 h-1 rounded-full bg-white/10" />
                     <Link href="/terms" className="hover:text-primary transition-colors">Terms of Service</Link>
                 </div>
-                <div className="flex justify-center items-center gap-2 text-[11px] text-muted-foreground">
+                <div className="flex justify-center items-center gap-2 text-meta text-muted-foreground">
                     <Shield className="w-3 h-3" />
                     <span>Secure &amp; Encrypted</span>
                 </div>

@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, AlertTriangle, Eye, EyeClosed, Lock } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import { toast } from '@/utils/haptics';
 import { getErrorMessage } from '@/lib/error-utils';
 import { cn } from "@/lib/utils";
@@ -123,7 +124,7 @@ export function DeleteAccountDialog({ trigger }: DeleteAccountDialogProps) {
                             <h2 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-b from-white to-white/70">
                                 Delete Account
                             </h2>
-                            <div className="text-white/60 text-[13px] px-2 leading-relaxed space-y-2">
+                            <div className="text-white/60 text-body px-2 leading-relaxed space-y-2">
                                 <p>You are about to <span className="text-destructive font-bold uppercase tracking-tight">permanently delete</span> your account.</p>
                                 <div className="bg-destructive/10 rounded-lg p-3 border border-destructive/20 text-destructive-foreground/90 text-xs text-left">
                                     <p className="font-bold mb-1 decoration-destructive/30">What will happen:</p>
@@ -191,7 +192,7 @@ export function DeleteAccountDialog({ trigger }: DeleteAccountDialogProps) {
                                                 exit={{ opacity: 0 }}
                                                 className="flex items-center justify-center"
                                             >
-                                                <div className="w-4 h-4 border-2 border-white/70 border-t-transparent rounded-full animate-spin" />
+                                                <Spinner className="text-white/70" label={null} />
                                             </motion.div>
                                         ) : (
                                             <motion.span
@@ -208,7 +209,7 @@ export function DeleteAccountDialog({ trigger }: DeleteAccountDialogProps) {
                                 </div>
                             </motion.button>
 
-                            <p className="text-[11px] text-center text-muted-foreground pt-2">
+                            <p className="text-meta text-center text-muted-foreground pt-2">
                                 By clicking continue, you agree to our Terms of Service.
                             </p>
                         </div>

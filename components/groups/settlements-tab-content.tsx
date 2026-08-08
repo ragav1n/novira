@@ -89,15 +89,15 @@ export function SettlementsTabContent({
             {simplifiedDebts.length > 0 && pendingSplits.length >= 2 && (
                 <section>
                     <div className="flex items-baseline justify-between mb-2 px-1">
-                        <h3 className="text-[10px] font-medium uppercase tracking-[0.18em] text-amber-400 inline-flex items-center gap-1.5">
+                        <h3 className="text-eyebrow uppercase text-amber-400 inline-flex items-center gap-1.5">
                             <Sparkles className="w-3 h-3" aria-hidden="true" />
                             Smart settle
                         </h3>
-                        <span className="text-[10px] text-muted-foreground/70 tabular-nums">
+                        <span className="text-caption text-muted-foreground/70 tabular-nums">
                             {simplifiedDebts.length} of {pendingSplits.length} payments
                         </span>
                     </div>
-                    <p className="text-[11px] text-muted-foreground px-1 mb-3 leading-relaxed">
+                    <p className="text-meta text-muted-foreground px-1 mb-3 leading-relaxed">
                         Fewer transfers, same outcome. We combined splits across this network.
                     </p>
                     <ul className="space-y-1.5">
@@ -112,17 +112,17 @@ export function SettlementsTabContent({
                                     <span className="absolute left-0 top-3 bottom-3 w-[2px] rounded-r bg-amber-400" aria-hidden="true" />
                                     <div className="p-3 pl-4 flex items-center justify-between gap-3">
                                         <div className="min-w-0 flex-1">
-                                            <p className="text-[13px] font-semibold truncate flex items-center gap-1.5">
+                                            <p className="text-body font-semibold truncate flex items-center gap-1.5">
                                                 <span>{payment.fromName}</span>
                                                 <ArrowRight className="w-3 h-3 text-muted-foreground/60 shrink-0" />
                                                 <span>{payment.toName}</span>
                                             </p>
-                                            <p className="text-[11px] text-muted-foreground mt-0.5">
+                                            <p className="text-meta text-muted-foreground mt-0.5">
                                                 {payment.splitIds.length} split{payment.splitIds.length !== 1 ? 's' : ''} combined
                                             </p>
                                         </div>
                                         <div className="flex flex-col items-end gap-1.5 shrink-0">
-                                            <span className="text-[13px] font-bold text-amber-300 tabular-nums">
+                                            <span className="text-body font-bold text-amber-300 tabular-nums">
                                                 {formatCurrency(payment.amount)}
                                             </span>
                                             <button
@@ -147,7 +147,7 @@ export function SettlementsTabContent({
                                                         setSettlingPaymentIndex(null);
                                                     }
                                                 }}
-                                                className="inline-flex items-center gap-1 h-7 px-2.5 rounded-full bg-amber-400 text-amber-950 text-[11px] font-semibold hover:bg-amber-300 transition-colors disabled:opacity-60"
+                                                className="inline-flex items-center gap-1 h-7 px-2.5 rounded-full bg-amber-400 text-amber-950 text-meta font-semibold hover:bg-amber-300 transition-colors disabled:opacity-60"
                                             >
                                                 {isSettling ? 'Settling…' : isMyPayment ? 'Settle' : 'Mark received'}
                                             </button>
@@ -163,7 +163,7 @@ export function SettlementsTabContent({
             {pendingSplits.length > 0 ? (
                 <section>
                     <div className="flex items-baseline justify-between mb-2 px-1">
-                        <h3 className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground/60">
+                        <h3 className="text-eyebrow uppercase text-muted-foreground/60">
                             All open splits · {pendingSplits.length}
                         </h3>
                         {debtorSplits.length >= 2 && (
@@ -196,7 +196,7 @@ export function SettlementsTabContent({
                                         },
                                     });
                                 }}
-                                className="inline-flex items-center gap-1 min-h-[44px] px-2 text-[11px] font-medium text-primary hover:text-primary/80 transition-colors disabled:opacity-60"
+                                className="inline-flex items-center gap-1 min-h-[44px] px-2 text-meta font-medium text-primary hover:text-primary/80 transition-colors disabled:opacity-60"
                             >
                                 <Check className="w-3 h-3" aria-hidden="true" />
                                 {isSettlingAll ? 'Settling…' : `Settle ${debtorSplits.length} debts`}
@@ -229,7 +229,7 @@ export function SettlementsTabContent({
                                             <Avatar className="w-9 h-9 ring-1 ring-white/[0.06] shrink-0">
                                                 <AvatarFallback
                                                     className={cn(
-                                                        'text-[11px] font-semibold',
+                                                        'text-meta font-semibold',
                                                         isDebtor ? 'bg-rose-400/10 text-rose-300' : 'bg-emerald-400/10 text-emerald-300',
                                                     )}
                                                 >
@@ -237,10 +237,10 @@ export function SettlementsTabContent({
                                                 </AvatarFallback>
                                             </Avatar>
                                             <div className="min-w-0">
-                                                <p className="text-[13px] font-semibold truncate">
+                                                <p className="text-body font-semibold truncate">
                                                     {isDebtor ? `You owe ${group.name}` : `${group.name} owes you`}
                                                 </p>
-                                                <p className="text-[11px] text-muted-foreground">
+                                                <p className="text-meta text-muted-foreground">
                                                     {group.splits.length} split{group.splits.length !== 1 ? 's' : ''}
                                                 </p>
                                             </div>
@@ -248,7 +248,7 @@ export function SettlementsTabContent({
                                         <div className="flex items-center gap-2 shrink-0">
                                             <span
                                                 className={cn(
-                                                    'text-[13px] font-bold tabular-nums',
+                                                    'text-body font-bold tabular-nums',
                                                     isDebtor ? 'text-rose-300' : 'text-emerald-300',
                                                 )}
                                             >
@@ -281,7 +281,7 @@ export function SettlementsTabContent({
                                                                     ? <ArrowUpRight className="w-3 h-3" />
                                                                     : <ArrowDownLeft className="w-3 h-3" />}
                                                             </span>
-                                                            <p className="text-[12px] font-medium truncate">
+                                                            <p className="text-xs font-medium truncate">
                                                                 {split.transaction?.description || 'Expense'}
                                                             </p>
                                                         </div>
@@ -289,7 +289,7 @@ export function SettlementsTabContent({
                                                             <div className="text-right">
                                                                 <span
                                                                     className={cn(
-                                                                        'text-[12px] font-bold tabular-nums whitespace-nowrap',
+                                                                        'text-xs font-bold tabular-nums whitespace-nowrap',
                                                                         isDebtor ? 'text-rose-300' : 'text-emerald-300',
                                                                     )}
                                                                 >
@@ -299,7 +299,7 @@ export function SettlementsTabContent({
                                                                         : formatCurrency(split.amount)}
                                                                 </span>
                                                                 {isCrossCurrency && (
-                                                                    <p className="text-[10px] text-muted-foreground/70 tabular-nums">
+                                                                    <p className="text-caption text-muted-foreground/70 tabular-nums">
                                                                         ≈ {formatCurrency(convertAmount(split.amount, native!))}
                                                                     </p>
                                                                 )}
@@ -323,7 +323,7 @@ export function SettlementsTabContent({
                                                                             setSettlingSplitId(null);
                                                                         }
                                                                     }}
-                                                                    className="inline-flex items-center justify-center min-h-[44px] px-3 -my-2 rounded-full text-[10px] font-semibold text-primary border border-primary/30 hover:bg-primary/10 transition-colors disabled:opacity-60 disabled:pointer-events-none"
+                                                                    className="inline-flex items-center justify-center min-h-[44px] px-3 -my-2 rounded-full text-caption font-semibold text-primary border border-primary/30 hover:bg-primary/10 transition-colors disabled:opacity-60 disabled:pointer-events-none"
                                                                 >
                                                                     {settlingSplitId === split.id ? 'Settling…' : 'Settle'}
                                                                 </button>
@@ -344,8 +344,8 @@ export function SettlementsTabContent({
                     <div className="w-10 h-10 mx-auto rounded-full bg-emerald-400/10 flex items-center justify-center">
                         <Check className="w-5 h-5 text-emerald-400" />
                     </div>
-                    <p className="text-[13px] font-semibold">All settled up</p>
-                    <p className="text-[11px] text-muted-foreground">No pending payments.</p>
+                    <p className="text-body font-semibold">All settled up</p>
+                    <p className="text-meta text-muted-foreground">No pending payments.</p>
                 </div>
             )}
             {dialog}

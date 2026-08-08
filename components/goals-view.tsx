@@ -4,14 +4,13 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { SOFT } from '@/lib/motion';
 
 import React, { useCallback, useEffect, useMemo, useRef, useState, useDeferredValue } from 'react';
-import Link from 'next/link';
 import { useUserPreferences, CURRENCY_SYMBOLS, type Currency } from '@/components/providers/user-preferences-provider';
 import { useWorkspaceTheme } from '@/hooks/useWorkspaceTheme';
 import { supabase } from '@/lib/supabase';
 import { useRefreshRequest } from '@/hooks/useRefreshRequest';
 import {
     Target, Plus, Calendar, PiggyBank, Search, X, ArrowUpDown, Check,
-    ChevronDown, BookOpen, WifiOff,
+    ChevronDown, BookOpen,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format, parseISO } from 'date-fns';
@@ -35,13 +34,14 @@ import {
 import type { SavingsGoal, SavingsDeposit, GoalIcon, GoalColor } from '@/types/goal';
 import dynamic from 'next/dynamic';
 import { GoalCard } from '@/components/goals/goal-card';
-const GoalHistorySheet = dynamic(
-    () => import('@/components/goals/goal-history-sheet').then(m => m.GoalHistorySheet),
+const GoalHistoryDialog = dynamic(
+    () => import('@/components/goals/goal-history-dialog').then(m => m.GoalHistoryDialog),
     { ssr: false }
 );
 import { IconColorPicker } from '@/components/goals/icon-color-picker';
 import { resolveGoalColor, resolveGoalIcon } from '@/lib/goal-styles';
 import { ViewHeader } from '@/components/ui/view-header';
+import { EmptyState, accentFromTheme } from '@/components/ui/empty-state';
 
 type SortBy = 'deadline' | 'progress' | 'remaining' | 'name' | 'recent';
 type FilterKey = 'all' | 'in-progress' | 'due-soon' | 'overdue';
@@ -529,7 +529,7 @@ export function GoalsView() {
                             onClick={openAddModal}
                             aria-label="Add savings goal"
                             className={cn(
-                                'h-9 px-3 rounded-full inline-flex items-center gap-1.5 text-[12px] font-semibold border transition-colors',
+                                'h-9 px-3 rounded-full inline-flex items-center gap-1.5 text-xs font-semibold border transition-colors',
                                 themeConfig.bg, themeConfig.hoverBg, themeConfig.border, themeConfig.textLight
                             )}
                         >
@@ -544,7 +544,7 @@ export function GoalsView() {
                     asserting zero right above an error card saying we couldn't load. */}
                 {!loadError && (
                     <section className="space-y-2 text-center">
-                        <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground/70">
+                        <p className="text-eyebrow uppercase text-muted-foreground/70">
                             Total saved
                         </p>
                         {loading ? (
@@ -553,10 +553,10 @@ export function GoalsView() {
                             </div>
                         ) : (
                             <>
-                                <h2 className={cn('text-[40px] leading-none font-bold tracking-tight tabular-nums', themeConfig.text)}>
+                                <h2 className={cn('text-hero tabular-nums', themeConfig.text)}>
                                     {formatCurrency(totalSaved)}
                                 </h2>
-                                <p className="text-[11px] text-muted-foreground/70">
+                                <p className="text-meta text-muted-foreground/70">
                                     {goals.length} {goals.length === 1 ? 'goal' : 'goals'}
                                     {achievedGoals.length > 0 && ` · ${achievedGoals.length} achieved`}
                                     {dueSoonCount > 0 && ` · ${dueSoonCount} due soon`}
@@ -578,7 +578,7 @@ export function GoalsView() {
                                     placeholder="Search goals"
                                     value={search}
                                     onChange={(e) => setSearch(e.target.value)}
-                                    className={cn('pl-10 pr-10 h-10 rounded-full bg-secondary/15 border-white/[0.06] text-[14px]', themeConfig.ring)}
+                                    className={cn('pl-10 pr-10 h-10 rounded-full bg-secondary/15 border-white/[0.06] text-sm', themeConfig.ring)}
                                 />
                                 {search && (
                                     <button
@@ -631,7 +631,7 @@ export function GoalsView() {
                                     type="button"
                                     onClick={() => setFilterKey(key)}
                                     className={cn(
-                                        'shrink-0 px-3 py-1.5 rounded-full text-[11px] font-semibold border transition-colors',
+                                        'shrink-0 px-3 py-1.5 rounded-full text-meta font-semibold border transition-colors',
                                         filterKey === key
                                             ? cn(themeConfig.bgMedium, themeConfig.borderMedium, themeConfig.text)
                                             : 'bg-transparent border-white/[0.06] text-muted-foreground hover:border-white/15 hover:text-foreground/80'
@@ -651,57 +651,33 @@ export function GoalsView() {
                             <div className="h-32 w-full rounded-3xl bg-secondary/10 animate-pulse" />
                         </div>
                     ) : loadError ? (
-                        <div className="text-center py-16 px-4 border border-dashed border-white/10 rounded-3xl bg-card/20 backdrop-blur-sm">
-                            <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 border border-white/10 bg-secondary/20">
-                                <WifiOff className="w-8 h-8 opacity-70 text-muted-foreground" />
-                            </div>
-                            <h3 className="text-lg font-bold mb-2">Couldn&apos;t load your goals</h3>
-                            <p className="text-sm text-muted-foreground mb-6 max-w-[250px] mx-auto">
-                                Your goals are safe — we just couldn&apos;t reach them. Check your connection and try again.
-                            </p>
-                            <Button
-                                onClick={() => loadGoals()}
-                                className={`text-white font-bold rounded-xl transition-all ${themeConfig.bgSolid} ${themeConfig.hoverBtnBg} ${themeConfig.shadowStrong}`}
-                            >
-                                Try again
-                            </Button>
-                        </div>
+                        <EmptyState
+                            size="page"
+                            variant="error"
+                            iconVariant="tile"
+                            title="Couldn't load your goals"
+                            description="Your goals are safe — we just couldn't reach them. Check your connection and try again."
+                            accent={accentFromTheme(themeConfig)}
+                            action={{ label: 'Try again', onClick: () => loadGoals() }}
+                        />
                     ) : goals.length === 0 ? (
-                        <div className="text-center py-16 px-4 border border-dashed border-white/10 rounded-3xl bg-card/20 backdrop-blur-sm">
-                            <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 border ${themeConfig.bgLight} ${themeConfig.border}`}>
-                                <Target className={`w-8 h-8 opacity-80 ${themeConfig.textLight}`} />
-                            </div>
-                            <h3 className="text-lg font-bold mb-2">No savings goals yet</h3>
-                            <p className="text-sm text-muted-foreground mb-6 max-w-[250px] mx-auto">
-                                Set a target for a vacation, emergency fund, or a new gadget and track your progress.
-                            </p>
-                            <Button
-                                onClick={openAddModal}
-                                className={`text-white font-bold rounded-xl transition-all ${themeConfig.bgSolid} ${themeConfig.hoverBtnBg} ${themeConfig.shadowStrong}`}
-                            >
-                                <Plus className="w-4 h-4 mr-2" />
-                                Create your first goal
-                            </Button>
-                            <div className="mt-4">
-                                <Link
-                                    href="/guide#goals"
-                                    className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground transition-colors hover:text-primary"
-                                >
-                                    <BookOpen className="h-3 w-3" />
-                                    New here? Read about Goals in the guide
-                                </Link>
-                            </div>
-                        </div>
+                        <EmptyState
+                            size="page"
+                            iconVariant="tile"
+                            icon={Target}
+                            title="No savings goals yet"
+                            description="Set a target for a vacation, emergency fund, or a new gadget and track your progress."
+                            accent={accentFromTheme(themeConfig)}
+                            action={{ label: 'Create your first goal', icon: Plus, onClick: openAddModal }}
+                            secondaryAction={{ label: 'Read about Goals', icon: BookOpen, href: '/guide#goals' }}
+                        />
                     ) : activeGoals.length === 0 && achievedGoals.length === 0 ? (
-                        <div className="flex flex-col items-center gap-3 py-12">
-                            <p className="text-sm text-muted-foreground">No goals match the current filters.</p>
-                            <button
-                                onClick={clearGoalFilters}
-                                className={cn('min-h-[36px] px-3 rounded-full text-[11px] font-semibold tracking-tight transition-colors hover:bg-primary/10', themeConfig.text)}
-                            >
-                                Clear filters
-                            </button>
-                        </div>
+                        <EmptyState
+                            size="page"
+                            title="No goals match the current filters."
+                            accent={accentFromTheme(themeConfig)}
+                            secondaryAction={{ label: 'Clear filters', onClick: clearGoalFilters }}
+                        />
                     ) : (
                         <>
                             <AnimatePresence initial={false} mode="popLayout">
@@ -734,18 +710,15 @@ export function GoalsView() {
                                     initial={{ opacity: 0, y: 8 }}
                                     animate={{ opacity: 1, y: 0 }}
                                     transition={{ delay: 0.05 }}
-                                    className={cn(
-                                        'text-center py-10 px-4 border border-dashed rounded-3xl bg-card/20 backdrop-blur-sm',
-                                        themeConfig.border
-                                    )}
                                 >
-                                    <div className={cn('inline-flex w-12 h-12 rounded-full items-center justify-center mb-3 border', themeConfig.bgLight, themeConfig.border)}>
-                                        <PiggyBank className={cn('w-6 h-6', themeConfig.textLight)} aria-hidden="true" />
-                                    </div>
-                                    <p className="text-sm font-bold">Every goal is funded.</p>
-                                    <p className="text-xs text-muted-foreground mt-1 max-w-[260px] mx-auto">
-                                        Time to dream up the next one. Tap New above to start.
-                                    </p>
+                                    <EmptyState
+                                        size="page"
+                                        iconVariant="tile"
+                                        icon={PiggyBank}
+                                        title="Every goal is funded."
+                                        description="Time to dream up the next one. Tap New above to start."
+                                        accent={accentFromTheme(themeConfig)}
+                                    />
                                 </motion.div>
                             )}
                             {achievedGoals.length > 0 && (
@@ -796,7 +769,7 @@ export function GoalsView() {
                             <div className={cn('relative overflow-hidden p-5 bg-gradient-to-br', previewTokens.gradient)}>
                                 <span aria-hidden="true" className={cn('pointer-events-none absolute -top-10 -right-10 w-40 h-40 rounded-full blur-3xl opacity-30', previewTokens.swatch)} />
                                 <DialogHeader className="gap-1 relative z-10">
-                                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
+                                    <p className="text-eyebrow uppercase text-muted-foreground">
                                         {goalModalMode === 'add' ? 'New goal' : 'Editing'}
                                     </p>
                                     <DialogTitle className="flex items-center gap-2.5 text-xl">
@@ -817,7 +790,7 @@ export function GoalsView() {
                     })()}
                     <div className="px-5 py-4 space-y-4 overflow-y-auto">
                         <div className="space-y-1.5">
-                            <Label className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">Goal Name</Label>
+                            <Label className="text-eyebrow uppercase text-muted-foreground">Goal Name</Label>
                             <Input
                                 autoFocus
                                 placeholder="e.g. Dream Vacation"
@@ -828,7 +801,7 @@ export function GoalsView() {
                             />
                         </div>
                         <div className="space-y-1.5">
-                            <Label className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">Target Amount</Label>
+                            <Label className="text-eyebrow uppercase text-muted-foreground">Target Amount</Label>
                             <div className="flex gap-2">
                                 <Input
                                     type="number"
@@ -845,7 +818,7 @@ export function GoalsView() {
                             </div>
                         </div>
                         <div className="space-y-1.5">
-                            <Label className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">Appearance</Label>
+                            <Label className="text-eyebrow uppercase text-muted-foreground">Appearance</Label>
                             <div className="rounded-xl bg-secondary/10 border border-white/5 p-3">
                                 <IconColorPicker
                                     icon={goalIcon}
@@ -856,7 +829,7 @@ export function GoalsView() {
                             </div>
                         </div>
                         <div className="space-y-1.5 flex flex-col">
-                            <Label className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">Target Date (Optional)</Label>
+                            <Label className="text-eyebrow uppercase text-muted-foreground">Target Date (Optional)</Label>
                             <div className="flex gap-2">
                                 <Popover modal={true}>
                                     <PopoverTrigger asChild>
@@ -896,7 +869,7 @@ export function GoalsView() {
                         </div>
                     </div>
                     <DialogFooter className="px-5 py-4 border-t border-white/5 flex gap-2 sm:gap-2">
-                        <Button variant="ghost" className="flex-1 h-10 rounded-xl" onClick={() => setIsGoalModalOpen(false)}>Cancel</Button>
+                        <Button variant="ghost" className="flex-1" onClick={() => setIsGoalModalOpen(false)}>Cancel</Button>
                         <Button
                             className={cn('flex-[1.5] h-10 rounded-xl font-bold text-white transition-all',
                                 themeConfig.bgSolid, themeConfig.hoverBtnBg, themeConfig.shadowStrong)}
@@ -943,7 +916,7 @@ export function GoalsView() {
                                 <div className={cn('relative overflow-hidden p-5 bg-gradient-to-br', depositTokens.gradient)}>
                                     <span aria-hidden="true" className={cn('pointer-events-none absolute -top-10 -right-10 w-40 h-40 rounded-full blur-3xl opacity-30', depositTokens.swatch)} />
                                     <DialogHeader className="gap-1 relative z-10">
-                                        <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">Contribute</p>
+                                        <p className="text-eyebrow uppercase text-muted-foreground">Contribute</p>
                                         <DialogTitle className="flex items-center gap-2.5 text-xl">
                                             <span className={cn('w-9 h-9 rounded-xl border flex items-center justify-center', depositTokens.bg, depositTokens.border)}>
                                                 <DepositIcon className={cn('w-5 h-5', depositTokens.text)} aria-hidden="true" />
@@ -959,7 +932,7 @@ export function GoalsView() {
                                 </div>
                                 <div className="px-5 py-4 space-y-3">
                                     <div className="space-y-1.5">
-                                        <Label className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">Deposit Amount</Label>
+                                        <Label className="text-eyebrow uppercase text-muted-foreground">Deposit Amount</Label>
                                         <div className="relative">
                                             <Input
                                                 autoFocus
@@ -979,7 +952,7 @@ export function GoalsView() {
                                     </div>
                                     {presets.length > 0 && (
                                         <div className="space-y-1.5">
-                                            <Label className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">Quick presets</Label>
+                                            <Label className="text-eyebrow uppercase text-muted-foreground">Quick presets</Label>
                                             <div className="flex flex-wrap gap-1.5">
                                                 {presets.map((p, i) => (
                                                     <button
@@ -987,7 +960,7 @@ export function GoalsView() {
                                                         type="button"
                                                         onClick={() => setDepositAmount(p.value.toFixed(2))}
                                                         className={cn(
-                                                            'px-3 py-1.5 rounded-full text-[11px] font-bold border transition-all',
+                                                            'px-3 py-1.5 rounded-full text-meta font-bold border transition-all',
                                                             depositTokens.bgLight, depositTokens.border, depositTokens.textLight, 'hover:opacity-80'
                                                         )}
                                                     >
@@ -999,7 +972,7 @@ export function GoalsView() {
                                     )}
                                 </div>
                                 <DialogFooter className="px-5 py-4 border-t border-white/5 flex gap-2 sm:gap-2">
-                                    <Button variant="ghost" className="flex-1 h-10 rounded-xl" onClick={() => { setIsAddDepositOpen(false); setDepositAmount(''); }}>Cancel</Button>
+                                    <Button variant="ghost" className="flex-1" onClick={() => { setIsAddDepositOpen(false); setDepositAmount(''); }}>Cancel</Button>
                                     <Button
                                         className={cn('flex-[1.5] h-10 rounded-xl font-bold text-white transition-all',
                                             themeConfig.bgSolid, themeConfig.hoverBtnBg, themeConfig.shadowStrong)}
@@ -1015,7 +988,7 @@ export function GoalsView() {
                 </DialogContent>
             </Dialog>
 
-            <GoalHistorySheet
+            <GoalHistoryDialog
                 goal={historyGoal}
                 userId={userId}
                 open={historyOpen}

@@ -156,7 +156,7 @@ export function BulkAssignByPaymentDialog({ open, onOpenChange, onApplied }: Bul
                 </DialogHeader>
 
                 <div className="px-5 py-4 space-y-4">
-                    <p className="text-[11.5px] text-muted-foreground/80 leading-relaxed">
+                    <p className="text-meta text-muted-foreground/80 leading-relaxed">
                         Map each payment method to the account that actually paid. Every
                         matching transaction moves at once. Leave a row as &ldquo;Keep&rdquo; to skip it.
                     </p>
@@ -176,18 +176,18 @@ export function BulkAssignByPaymentDialog({ open, onOpenChange, onApplied }: Bul
 
                     <div className="space-y-2 border-t border-white/5 pt-3">
                         {loading && (
-                            <p className="text-[12px] text-muted-foreground/60 text-center py-4">Counting…</p>
+                            <p className="text-xs text-muted-foreground/60 text-center py-4">Counting…</p>
                         )}
                         {!loading && sortedMethods.length === 0 && (
-                            <p className="text-[12px] text-muted-foreground/60 text-center py-4">
+                            <p className="text-xs text-muted-foreground/60 text-center py-4">
                                 No matching transactions on this account.
                             </p>
                         )}
                         {!loading && sortedMethods.map(([method, count]) => (
                             <div key={method} className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
                                 <div className="min-w-0">
-                                    <p className="text-[12.5px] font-semibold truncate">{method}</p>
-                                    <p className="text-[10.5px] text-muted-foreground/60">
+                                    <p className="text-body font-semibold truncate">{method}</p>
+                                    <p className="text-caption text-muted-foreground/60">
                                         {count} transaction{count === 1 ? '' : 's'}
                                     </p>
                                 </div>
@@ -209,7 +209,7 @@ export function BulkAssignByPaymentDialog({ open, onOpenChange, onApplied }: Bul
                     </div>
 
                     {totalAffected > 0 && (
-                        <div className="rounded-xl border border-primary/20 bg-primary/10 px-3 py-2.5 text-[11.5px] text-primary/90">
+                        <div className="rounded-xl border border-primary/20 bg-primary/10 px-3 py-2.5 text-meta text-primary/90">
                             <span className="font-bold">{totalAffected}</span> transaction{totalAffected === 1 ? '' : 's'} will move accounts when you tap Apply.
                         </div>
                     )}

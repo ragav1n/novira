@@ -3,13 +3,11 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { SOFT } from '@/lib/motion';
 import React, { useEffect, useRef, useState, useCallback, useMemo, useDeferredValue } from 'react';
-import Link from 'next/link';
 import { useUserPreferences } from '@/components/providers/user-preferences-provider';
 import { useWorkspaceTheme } from '@/hooks/useWorkspaceTheme';
 import { supabase } from '@/lib/supabase';
 import { useRefreshRequest } from '@/hooks/useRefreshRequest';
 import { Calendar, BookOpen } from 'lucide-react';
-import { cn } from '@/lib/utils';
 import { differenceInCalendarDays, parseISO } from 'date-fns';
 import { toast } from '@/utils/haptics';
 import type { SubscriptionMetadata } from '@/types/transaction';
@@ -26,6 +24,7 @@ import { InactiveSubscriptions } from '@/components/subscriptions/inactive-subsc
 import { PriceChangeDialog, CancelSubscriptionDialog } from '@/components/subscriptions/subscription-dialogs';
 import { EditSubscriptionDialog } from '@/components/subscriptions/edit-subscription-dialog';
 import { ViewHeader } from '@/components/ui/view-header';
+import { EmptyState, accentFromTheme } from '@/components/ui/empty-state';
 
 export function SubscriptionsView() {
     const { userId, formatCurrency, convertAmount, currency, activeWorkspaceId } = useUserPreferences();
@@ -444,7 +443,7 @@ export function SubscriptionsView() {
                     )}
 
                     {lastChargesError && !loading && (
-                        <p className="text-[11px] text-amber-400/80 text-center">
+                        <p className="text-meta text-amber-400/80 text-center">
                             Couldn&apos;t check recent charges, so price-change badges may be missing.
                         </p>
                     )}
@@ -477,11 +476,11 @@ export function SubscriptionsView() {
 
                     <div className="space-y-3">
                         <div className="flex items-end justify-between">
-                            <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground/70">
+                            <p className="text-eyebrow uppercase text-muted-foreground/70">
                                 Upcoming renewals
                             </p>
                             {!loading && visibleTemplates.length > 0 && (
-                                <span className="text-[11px] text-muted-foreground/70 tabular-nums">
+                                <span className="text-meta text-muted-foreground/70 tabular-nums">
                                     {visibleTemplates.length} item{visibleTemplates.length === 1 ? '' : 's'}
                                 </span>
                             )}
@@ -494,29 +493,22 @@ export function SubscriptionsView() {
                                 <div className="h-20 w-full rounded-3xl bg-secondary/10 animate-pulse" />
                             </div>
                         ) : templates.filter(t => t.is_active).length === 0 ? (
-                            <div className="text-center py-12 text-muted-foreground border border-dashed border-white/10 rounded-3xl">
-                                <Calendar className="w-12 h-12 mx-auto mb-3 opacity-20" />
-                                <p>No active subscriptions found.</p>
-                                <p className="text-xs opacity-70 mt-1">Add a recurring expense to see it here.</p>
-                                <Link
-                                    href="/guide#recurring"
-                                    className="mt-4 inline-flex items-center gap-1.5 text-[11px] text-muted-foreground transition-colors hover:text-primary"
-                                >
-                                    <BookOpen className="h-3 w-3" />
-                                    New here? Read about Recurring &amp; subscriptions
-                                </Link>
-                            </div>
+                            <EmptyState
+                                size="page"
+                                iconVariant="tile"
+                                icon={Calendar}
+                                title="No active subscriptions found."
+                                description="Add a recurring expense to see it here."
+                                accent={accentFromTheme(themeConfig)}
+                                secondaryAction={{ label: 'Read about Recurring & subscriptions', icon: BookOpen, href: '/guide#recurring' }}
+                            />
                         ) : visibleTemplates.length === 0 ? (
-                            <div className="text-center py-10 text-muted-foreground border border-dashed border-white/10 rounded-3xl">
-                                <p className="text-sm">No subscriptions match your filters.</p>
-                                <button
-                                    type="button"
-                                    onClick={() => { setSearch(''); clearFilters(); }}
-                                    className={cn("text-xs font-bold mt-2", themeConfig.text)}
-                                >
-                                    Clear all
-                                </button>
-                            </div>
+                            <EmptyState
+                                size="page"
+                                title="No subscriptions match your filters."
+                                accent={accentFromTheme(themeConfig)}
+                                secondaryAction={{ label: 'Clear all', onClick: () => { setSearch(''); clearFilters(); } }}
+                            />
                         ) : (
                             <AnimatePresence initial={false} mode="popLayout">
                                 {visibleTemplates.map((template) => (

@@ -114,11 +114,11 @@ function AnalyticsHeroInner({
 
             <div className="relative p-5 sm:p-6 space-y-4">
                 <div className="flex items-center gap-2 flex-wrap">
-                    <span className={cn('text-[10px] font-bold uppercase tracking-[0.22em]', themeConfig.text)}>
+                    <span className={cn('text-eyebrow uppercase', themeConfig.text)}>
                         {DATE_RANGE_LABEL[dateRange]}
                     </span>
                     {showDateRange && (
-                        <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">
+                        <span className="text-eyebrow uppercase text-muted-foreground/60">
                             · {dateLabel}
                         </span>
                     )}
@@ -135,7 +135,7 @@ function AnalyticsHeroInner({
                         {momDelta && (
                             <span
                                 className={cn(
-                                    'text-[11px] font-bold tabular-nums px-2 py-0.5 rounded-md border',
+                                    'text-meta font-bold tabular-nums px-2 py-0.5 rounded-md border',
                                     momDelta.direction === 'up'
                                         ? 'bg-rose-500/15 border-rose-500/30 text-rose-300'
                                         : momDelta.direction === 'down'
@@ -191,7 +191,7 @@ function AnalyticsHeroInner({
                     <div className="flex items-center gap-2 pt-1">
                         <span
                             className={cn(
-                                'text-[10px] px-2.5 py-1 rounded-md font-bold border tabular-nums',
+                                'text-caption px-2.5 py-1 rounded-md font-bold border tabular-nums',
                                 pacingChip.isExceeding
                                     ? 'bg-rose-500/15 border-rose-500/30 text-rose-200'
                                     : pacingChip.hasBudget && pacingChip.percentOfBudget !== null && pacingChip.percentOfBudget > 85
@@ -220,12 +220,12 @@ function AnalyticsHeroInner({
 function HeroStat({ label, value, muted }: { label: string; value: string; muted?: boolean }) {
     return (
         <div className="rounded-xl bg-background/40 border border-white/5 px-3 py-2 backdrop-blur-sm">
-            <p className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground/70">
+            <p className="text-eyebrow uppercase text-muted-foreground/70">
                 {label}
             </p>
             <p
                 className={cn(
-                    'text-[13px] font-bold mt-0.5 tabular-nums truncate',
+                    'text-body font-bold mt-0.5 tabular-nums truncate',
                     muted && 'text-muted-foreground'
                 )}
             >

@@ -76,7 +76,7 @@ export function RowActionsMenu({ template, meta, paused, onTogglePin, onSetPause
                                     setOpen(false);
                                 }
                             }}
-                            className="bg-transparent text-[10px] w-[88px] text-muted-foreground"
+                            className="bg-transparent text-caption w-[88px] text-muted-foreground"
                             aria-label="Pause until date"
                         />
                     </label>
@@ -104,7 +104,7 @@ export function RowActionsMenu({ template, meta, paused, onTogglePin, onSetPause
                                     setOpen(false);
                                 }
                             }}
-                            className="bg-transparent text-[10px] w-[88px] text-muted-foreground"
+                            className="bg-transparent text-caption w-[88px] text-muted-foreground"
                             aria-label="Trial ends date"
                         />
                     </label>

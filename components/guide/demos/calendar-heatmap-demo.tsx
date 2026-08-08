@@ -60,10 +60,10 @@ function Inner({ play }: { play: boolean }) {
       <div className="rounded-xl border border-white/10 bg-zinc-950/60 p-5">
         <div className="flex items-center justify-between">
           <div>
-            <div className="text-[10px] uppercase tracking-widest text-foreground/65">April</div>
+            <div className="text-eyebrow uppercase text-foreground/65">April</div>
             <div className="text-sm font-semibold text-foreground">Spending heatmap</div>
           </div>
-          <div className="flex items-center gap-1 text-[10px] text-foreground/75">
+          <div className="flex items-center gap-1 text-caption text-foreground/75">
             <span>less</span>
             {[0, 1, 2, 3, 4].map((n) => (
               <span key={n} className={`h-2 w-2 rounded-sm ${tone(n)}`} />
@@ -107,7 +107,7 @@ function Inner({ play }: { play: boolean }) {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0 }}
                 transition={FADE}
-                className="flex items-center gap-2 rounded-xl border border-amber-400/20 bg-amber-500/[0.05] px-3 py-2 text-[12px] text-amber-200 transform-gpu"
+                className="flex items-center gap-2 rounded-xl border border-amber-400/20 bg-amber-500/[0.05] px-3 py-2 text-xs text-amber-200 transform-gpu"
               >
                 <TrendingDown className="h-3.5 w-3.5 shrink-0" />
                 <span>

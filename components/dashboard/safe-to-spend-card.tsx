@@ -75,7 +75,7 @@ export const SafeToSpendCard = React.memo(function SafeToSpendCard({
                         )}
                         <h3 className="text-sm font-bold">Safe to spend</h3>
                     </div>
-                    <span className="text-[11px] font-bold text-muted-foreground bg-secondary/30 px-2 py-0.5 rounded-full whitespace-nowrap tabular-nums">
+                    <span className="text-meta font-bold text-muted-foreground bg-secondary/30 px-2 py-0.5 rounded-full whitespace-nowrap tabular-nums">
                         {daysRemaining} {daysRemaining === 1 ? 'day' : 'days'} left
                     </span>
                 </div>

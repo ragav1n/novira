@@ -13,12 +13,12 @@ function RecapEmpty({ monthLabel, onAdd }: { monthLabel: string; onAdd: () => vo
     return (
         <div className="space-y-3 py-2">
             <div className="rounded-xl bg-secondary/30 border border-white/10 p-4 text-center space-y-1">
-                <p className="text-[13px] font-semibold text-foreground">Nothing to recap for {monthLabel}.</p>
-                <p className="text-[11px] text-muted-foreground">Log a few expenses and we'll have a real story for you next time.</p>
+                <p className="text-body font-semibold text-foreground">Nothing to recap for {monthLabel}.</p>
+                <p className="text-meta text-muted-foreground">Log a few expenses and we'll have a real story for you next time.</p>
             </div>
             <button
                 onClick={onAdd}
-                className="w-full h-11 text-[13px] font-bold rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 active:scale-[0.99] shadow-[0_6px_22px_-6px_rgba(168,85,247,0.7)] ring-1 ring-inset ring-white/15 transition-all flex items-center justify-center gap-2"
+                className="w-full h-11 text-body font-bold rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 active:scale-[0.99] shadow-[0_6px_22px_-6px_rgba(168,85,247,0.7)] ring-1 ring-inset ring-white/15 transition-all flex items-center justify-center gap-2"
             >
                 <PencilLine className="w-3.5 h-3.5" />
                 Add a transaction
@@ -177,7 +177,7 @@ export function MonthlyRecapModal() {
                                             <Sparkles className="w-[18px] h-[18px] text-primary-foreground" />
                                         </div>
                                         <div>
-                                            <p className="text-[10px] font-bold uppercase tracking-widest text-primary">Your {monthLabel} recap</p>
+                                            <p className="text-eyebrow uppercase text-primary">Your {monthLabel} recap</p>
                                             <h2 id="recap-modal-title" className="text-base font-bold text-foreground">A new month is here</h2>
                                         </div>
                                     </div>
@@ -214,13 +214,13 @@ export function MonthlyRecapModal() {
                                 {!(recap && recap.transactionCount === 0) && (
                                     <button
                                         onClick={dismiss}
-                                        className="w-full h-11 text-[13px] font-bold rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 active:scale-[0.99] shadow-[0_6px_22px_-6px_rgba(168,85,247,0.7)] ring-1 ring-inset ring-white/15 transition-all flex items-center justify-center gap-2"
+                                        className="w-full h-11 text-body font-bold rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 active:scale-[0.99] shadow-[0_6px_22px_-6px_rgba(168,85,247,0.7)] ring-1 ring-inset ring-white/15 transition-all flex items-center justify-center gap-2"
                                     >
                                         <ChartLine className="w-3.5 h-3.5" />
                                         Got it
                                     </button>
                                 )}
-                                <p className="text-[10px] text-muted-foreground/70 text-center">
+                                <p className="text-caption text-muted-foreground/70 text-center">
                                     You can revisit any month's recap anytime from Analytics.
                                 </p>
                             </div>

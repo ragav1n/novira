@@ -159,7 +159,7 @@ export function TripForm({ open, onOpenChange, onSaved, editing }: Props) {
                     <div className="flex items-center justify-between rounded-xl bg-secondary/10 border border-white/5 px-3 py-2.5">
                         <div className="flex flex-col gap-0.5">
                             <Label htmlFor="trip-autotag" className="cursor-pointer">Auto-tag transactions</Label>
-                            <p className="text-[11px] text-muted-foreground">Adds the trip tag to expenses with dates inside the window.</p>
+                            <p className="text-meta text-muted-foreground">Adds the trip tag to expenses with dates inside the window.</p>
                         </div>
                         <Switch
                             id="trip-autotag"

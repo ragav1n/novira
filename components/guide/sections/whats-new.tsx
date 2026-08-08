@@ -133,19 +133,19 @@ export function WhatsNewSection() {
           <div key={release.version} className="relative">
             {/* Version header */}
             <div className="mb-4 flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b border-white/8 pb-3">
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/15 px-2.5 py-1 font-mono text-[11px] font-semibold text-primary">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/15 px-2.5 py-1 font-mono text-meta font-semibold text-primary">
                 v{release.version}
               </span>
-              <span className="text-[12px] font-medium uppercase tracking-widest text-foreground/55">
+              <span className="text-xs font-medium uppercase tracking-widest text-foreground/55">
                 {formatReleaseDate(release.date)}
               </span>
               {i === 0 && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-300">
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-eyebrow uppercase text-emerald-300">
                   <Sparkles className="h-2.5 w-2.5" />
                   Latest
                 </span>
               )}
-              <p className="basis-full text-[14px] leading-relaxed text-foreground/85">
+              <p className="basis-full text-sm leading-relaxed text-foreground/85">
                 {release.headline}
               </p>
             </div>
@@ -160,8 +160,8 @@ export function WhatsNewSection() {
                         <item.icon className="h-4 w-4" />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <h4 className="mb-1 text-[14px] font-semibold text-foreground">{item.title}</h4>
-                        <p className="text-[13px] leading-relaxed text-foreground/75">{item.description}</p>
+                        <h4 className="mb-1 text-sm font-semibold text-foreground">{item.title}</h4>
+                        <p className="text-body leading-relaxed text-foreground/75">{item.description}</p>
                       </div>
                     </div>
                   </div>

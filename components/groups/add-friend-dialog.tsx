@@ -52,7 +52,7 @@ export function AddFriendDialog({ userId, open, onOpenChange }: AddFriendDialogP
     };
 
     const triggerClasses = cn(
-        'rounded-md text-[11px] font-medium tracking-tight h-7 data-[state=active]:text-primary text-muted-foreground/70 data-[state=active]:bg-primary/10 transition-colors gap-1.5',
+        'rounded-md text-meta font-medium tracking-tight h-7 data-[state=active]:text-primary text-muted-foreground/70 data-[state=active]:bg-primary/10 transition-colors gap-1.5',
     );
 
     return (
@@ -64,15 +64,15 @@ export function AddFriendDialog({ userId, open, onOpenChange }: AddFriendDialogP
                     </button>
                 </DialogTrigger>
             )}
-            <DialogContent className="max-w-[400px] w-[95vw] rounded-[28px] border-white/[0.08] bg-card/95 backdrop-blur-2xl p-0 overflow-hidden shadow-2xl">
+            <DialogContent className="max-w-[400px] w-[95vw] rounded-[28px] border-white/8 bg-card/95 backdrop-blur-2xl p-0 overflow-hidden shadow-2xl">
                 <div className="p-5 space-y-4">
                     <DialogHeader className="text-left flex-row items-start gap-3 space-y-0">
                         <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 bg-primary/[0.06]">
                             <UserPlus className="w-[18px] h-[18px] text-primary" />
                         </div>
                         <div className="min-w-0">
-                            <DialogTitle className="text-[15px] font-semibold tracking-tight">Add a friend</DialogTitle>
-                            <DialogDescription className="text-[12px] mt-0.5">
+                            <DialogTitle className="text-lead font-semibold tracking-tight">Add a friend</DialogTitle>
+                            <DialogDescription className="text-xs mt-0.5">
                                 By email, ID, or by scanning a code.
                             </DialogDescription>
                         </div>
@@ -117,7 +117,7 @@ export function AddFriendDialog({ userId, open, onOpenChange }: AddFriendDialogP
                         </TabsContent>
 
                         <TabsContent value="scan" className="pt-4 space-y-2 focus-visible:outline-none">
-                            <div className="aspect-square w-full bg-black rounded-xl overflow-hidden relative border border-white/[0.08]">
+                            <div className="aspect-square w-full bg-black rounded-xl overflow-hidden relative border border-white/8">
                                 <QrScanner
                                     onScan={async (scannedId) => {
                                         if (isProcessing) return;
@@ -141,7 +141,7 @@ export function AddFriendDialog({ userId, open, onOpenChange }: AddFriendDialogP
                                     className="w-full h-full"
                                 />
                             </div>
-                            <p className="text-[11px] text-center text-muted-foreground">
+                            <p className="text-meta text-center text-muted-foreground">
                                 Align the QR code within the frame.
                             </p>
                         </TabsContent>
@@ -150,12 +150,12 @@ export function AddFriendDialog({ userId, open, onOpenChange }: AddFriendDialogP
                             <div className="p-3 rounded-3xl bg-white">
                                 <NoviraQrCode value={userId || ''} width={200} height={200} />
                             </div>
-                            <p className="text-[11px] text-muted-foreground text-center max-w-[220px] leading-relaxed">
+                            <p className="text-meta text-muted-foreground text-center max-w-[220px] leading-relaxed">
                                 Have your friend scan this from their device.
                             </p>
                             <Button
                                 variant="ghost"
-                                className="h-9 rounded-full gap-1.5 text-[12px] font-medium text-primary hover:bg-primary/10"
+                                className="h-9 rounded-full gap-1.5 text-xs font-medium text-primary hover:bg-primary/10"
                                 onClick={async () => {
                                     if (!userId) return;
                                     // clipboard.writeText rejects when the document isn't

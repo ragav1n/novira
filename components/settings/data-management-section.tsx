@@ -56,7 +56,7 @@ export function DataManagementSection({ loading, exportType = null, onImport, on
                 >
                     <CalendarDays className="w-5 h-5 text-primary group-hover:scale-110 transition-transform" />
                     <span className="text-xs font-medium">{icsLoading ? 'Building calendar...' : 'Export to Calendar (.ics)'}</span>
-                    <span className="text-[10px] text-muted-foreground">Bills, income, goals, buckets & trial endings</span>
+                    <span className="text-caption text-muted-foreground">Bills, income, goals, buckets & trial endings</span>
                 </Button>
                 <Button
                     variant="outline"
@@ -65,10 +65,10 @@ export function DataManagementSection({ loading, exportType = null, onImport, on
                 >
                     <Paperclip className="w-5 h-5 text-primary group-hover:scale-110 transition-transform" />
                     <span className="text-xs font-medium">Browse Receipts</span>
-                    <span className="text-[10px] text-muted-foreground">Gallery of scanned receipts</span>
+                    <span className="text-caption text-muted-foreground">Gallery of scanned receipts</span>
                 </Button>
             </div>
-            <p className="text-[11px] text-muted-foreground">Import bank statements, export your expense data, browse receipts, or sync upcoming events to your calendar.</p>
+            <p className="text-meta text-muted-foreground">Import bank statements, export your expense data, browse receipts, or sync upcoming events to your calendar.</p>
         </div>
     );
 }

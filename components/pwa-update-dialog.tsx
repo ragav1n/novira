@@ -31,13 +31,13 @@ export function PWAUpdateDialog({ open, onUpdate, onLater }: PWAUpdateDialogProp
                             <Download className="w-4.5 h-4.5 text-primary" aria-hidden="true" />
                         </div>
                         <div className="min-w-0 flex-1">
-                            <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-primary mb-1">
+                            <div className="text-eyebrow uppercase text-primary mb-1">
                                 Update
                             </div>
                             <DialogTitle className="text-lg font-bold text-white leading-tight">
                                 New version ready
                             </DialogTitle>
-                            <DialogDescription className="text-[12.5px] text-white/60 leading-relaxed mt-1">
+                            <DialogDescription className="text-body text-white/60 leading-relaxed mt-1">
                                 Restart to apply. Drafts and offline queue are kept.
                             </DialogDescription>
                         </div>
@@ -45,7 +45,7 @@ export function PWAUpdateDialog({ open, onUpdate, onLater }: PWAUpdateDialogProp
 
                     <ul className="space-y-2 rounded-xl border border-white/5 bg-white/[0.02] p-3">
                         {bullets.map((b) => (
-                            <li key={b.title} className="flex items-start gap-2.5 text-[12px] text-white/80 leading-snug">
+                            <li key={b.title} className="flex items-start gap-2.5 text-xs text-white/80 leading-snug">
                                 <span className="mt-1.5 w-1 h-1 rounded-full bg-primary shrink-0" aria-hidden="true" />
                                 <span><span className="font-semibold text-white">{b.title}.</span> {b.description}</span>
                             </li>
@@ -53,20 +53,20 @@ export function PWAUpdateDialog({ open, onUpdate, onLater }: PWAUpdateDialogProp
                     </ul>
 
                     <div className="flex items-center justify-between gap-3">
-                        <span className="text-[10px] font-mono uppercase tracking-widest text-white/35">
+                        <span className="text-eyebrow font-mono uppercase text-white/35">
                             on v{version}
                         </span>
                         <div className="flex items-center gap-2">
                             <Button
                                 variant="ghost"
                                 onClick={onLater}
-                                className="h-10 px-4 rounded-xl text-[12px] font-semibold text-white/70 hover:text-white hover:bg-white/5"
+                                className="h-10 px-4 rounded-xl text-xs font-semibold text-white/70 hover:text-white hover:bg-white/5"
                             >
                                 Later
                             </Button>
                             <Button
                                 onClick={onUpdate}
-                                className="h-10 px-4 rounded-xl bg-white text-black hover:bg-white/90 font-bold text-[12px] inline-flex items-center gap-1.5"
+                                className="h-10 px-4 rounded-xl bg-white text-black hover:bg-white/90 font-bold text-xs inline-flex items-center gap-1.5"
                             >
                                 <RefreshCcw className="w-3.5 h-3.5" aria-hidden="true" />
                                 Update now

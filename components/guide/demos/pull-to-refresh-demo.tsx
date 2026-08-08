@@ -94,17 +94,17 @@ function Inner({ play }: { play: boolean }) {
             </div>
           </div>
           <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
-            <div className="text-[10px] uppercase tracking-widest text-foreground/65">Available this month</div>
+            <div className="text-eyebrow uppercase text-foreground/65">Available this month</div>
             <div className="mt-1 text-2xl font-semibold text-foreground">₹42,180</div>
             <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
               <div className="h-full w-[63%] bg-gradient-to-r from-primary to-fuchsia-400" />
             </div>
           </div>
           <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
-            <div className="text-[10px] uppercase tracking-widest text-foreground/65">Recent</div>
+            <div className="text-eyebrow uppercase text-foreground/65">Recent</div>
             <div className="mt-2 space-y-2">
               {['Zara', 'Uber', 'Blue Tokai'].map((n, i) => (
-                <div key={n} className="flex items-center justify-between text-[12px]">
+                <div key={n} className="flex items-center justify-between text-xs">
                   <span className="text-foreground">{n}</span>
                   <span className="text-foreground/75">−₹{[2340, 156, 380][i]}</span>
                 </div>

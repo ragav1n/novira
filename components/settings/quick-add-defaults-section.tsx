@@ -37,7 +37,7 @@ export function QuickAddDefaultsSection({
                     <Tag className="w-4 h-4 text-muted-foreground shrink-0" />
                     <div className="min-w-0">
                         <p className="text-sm font-medium">Default Category</p>
-                        <p className="text-[11px] text-muted-foreground">
+                        <p className="text-meta text-muted-foreground">
                             Pre-selected when adding an expense
                         </p>
                     </div>
@@ -63,7 +63,7 @@ export function QuickAddDefaultsSection({
                     <Wallet className="w-4 h-4 text-muted-foreground shrink-0" />
                     <div className="min-w-0">
                         <p className="text-sm font-medium">Default Payment Method</p>
-                        <p className="text-[11px] text-muted-foreground">
+                        <p className="text-meta text-muted-foreground">
                             Pre-selected when adding an expense
                         </p>
                     </div>
@@ -89,7 +89,7 @@ export function QuickAddDefaultsSection({
                     <Layers className="w-4 h-4 text-muted-foreground shrink-0" />
                     <div className="min-w-0">
                         <p className="text-sm font-medium">Default Bucket</p>
-                        <p className="text-[11px] text-muted-foreground">
+                        <p className="text-meta text-muted-foreground">
                             Auto-attach new expenses to this bucket
                         </p>
                     </div>

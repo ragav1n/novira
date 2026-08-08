@@ -72,7 +72,7 @@ function Inner({ play }: { play: boolean }) {
           </div>
           <div className="min-w-0 flex-1">
             <div className="truncate text-sm font-medium text-foreground">Blue Tokai</div>
-            <div className="text-[11px] text-foreground/75">Food · Today</div>
+            <div className="text-meta text-foreground/75">Food · Today</div>
           </div>
           <div className="text-sm font-semibold text-foreground">−₹380</div>
         </motion.div>

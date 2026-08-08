@@ -229,7 +229,7 @@ export const SpendingOverview = React.memo(function SpendingOverview({
                                     
                                     {activeBuckets.length > 0 && (
                                         <motion.div variants={itemVariants} className="px-3 py-1.5 border-t border-white/5">
-                                            <p className="text-[11px] font-bold text-muted-foreground">Buckets</p>
+                                            <p className="text-meta font-bold text-muted-foreground">Buckets</p>
                                         </motion.div>
                                     )}
 
@@ -310,7 +310,7 @@ export const SpendingOverview = React.memo(function SpendingOverview({
                                     {lastMonthComparison && (
                                         <span
                                             className={cn(
-                                                "inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full border",
+                                                "inline-flex items-center gap-1 text-meta font-bold px-2 py-0.5 rounded-full border",
                                                 lastMonthComparison.isUp
                                                     ? "bg-black/25 text-white border-white/15"
                                                     : "bg-white/15 text-white border-white/20"
@@ -321,7 +321,7 @@ export const SpendingOverview = React.memo(function SpendingOverview({
                                             {lastMonthComparison.isUp ? '+' : ''}{lastMonthComparison.deltaPct.toFixed(0)}% vs last month
                                         </span>
                                     )}
-                                    <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-white/15 text-white border border-white/20">
+                                    <span className="inline-flex items-center gap-1 text-meta font-bold px-2 py-0.5 rounded-full bg-white/15 text-white border border-white/20">
                                         Today {formatCurrency(todaySpent, bucketCurrency)}
                                     </span>
                                 </div>
@@ -356,7 +356,7 @@ export const SpendingOverview = React.memo(function SpendingOverview({
                         {!isBucketFocused && (lastMonthCarryover > 0 || incomeThisMonth > 0) && (
                             <div className="flex flex-wrap items-center gap-1.5 self-start">
                                 {incomeThisMonth > 0 && (
-                                    <div className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-200/90 bg-emerald-500/10 border border-emerald-400/20 rounded-full px-2 py-0.5">
+                                    <div className="flex items-center gap-1.5 text-caption font-bold text-emerald-200/90 bg-emerald-500/10 border border-emerald-400/20 rounded-full px-2 py-0.5">
                                         <ArrowDownLeft className="w-2.5 h-2.5" aria-hidden="true" />
                                         Income: {formatCurrency(incomeThisMonth, bucketCurrency)}
                                         {totalSpent > 0 && (
@@ -367,14 +367,14 @@ export const SpendingOverview = React.memo(function SpendingOverview({
                                     </div>
                                 )}
                                 {lastMonthCarryover > 0 && (
-                                    <div className="flex items-center gap-1.5 text-[10px] font-bold text-cyan-200/90 bg-cyan-500/10 border border-cyan-400/20 rounded-full px-2 py-0.5">
+                                    <div className="flex items-center gap-1.5 text-caption font-bold text-cyan-200/90 bg-cyan-500/10 border border-cyan-400/20 rounded-full px-2 py-0.5">
                                         <ArrowDownLeft className="w-2.5 h-2.5" aria-hidden="true" />
                                         Carryover: {formatCurrency(lastMonthCarryover, bucketCurrency)}
                                     </div>
                                 )}
                             </div>
                         )}
-                        <div className="flex justify-between text-[11px] text-white/60 gap-2">
+                        <div className="flex justify-between text-meta text-white/60 gap-2">
                             <span>{progress.toFixed(1)}% used</span>
                             <span className={isBucketFocused ? "flex flex-col items-end gap-1 text-right" : "text-right"}>
                                 {isBucketFocused ? (
@@ -415,7 +415,7 @@ export const SpendingOverview = React.memo(function SpendingOverview({
                 animate={{ opacity: 1, y: 0 }}
                 onClick={() => setIsAddFundsOpen(true)}
                 className={cn(
-                    "w-full flex items-center justify-center gap-2 py-4 rounded-xl border text-white font-bold transition-all active:scale-95 group shadow-[inset_0_1px_0_rgb(255_255_255_/0.06)]",
+                    "w-full flex items-center justify-center gap-2 py-4 rounded-xl border text-white font-bold transition-all active:scale-95 group shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]",
                     isCoupleWorkspace
                         ? "bg-rose-500/20 border-rose-500/30 hover:bg-rose-500/30 hover:border-rose-500/50"
                         : isHomeWorkspace
@@ -446,7 +446,7 @@ export const SpendingOverview = React.memo(function SpendingOverview({
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     className={cn(
-                        "p-4 rounded-xl border relative overflow-hidden shadow-[inset_0_1px_0_rgb(255_255_255_/0.06)]",
+                        "p-4 rounded-xl border relative overflow-hidden shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]",
                         runRateData.isExceeding
                             ? isCoupleWorkspace ? "bg-rose-500/10 border-rose-500/20" : isHomeWorkspace ? "bg-amber-500/10 border-amber-500/20" : "bg-red-500/10 border-red-500/20"
                             : isCoupleWorkspace ? "bg-rose-500/5 border-rose-500/10" : isHomeWorkspace ? "bg-amber-500/5 border-amber-500/10" : "bg-emerald-500/10 border-emerald-500/20"
@@ -478,14 +478,14 @@ export const SpendingOverview = React.memo(function SpendingOverview({
                                             <span className="text-muted-foreground">Last 7 days</span>
                                             <span className="flex items-center gap-1.5">
                                                 <span className="font-bold tabular-nums">{formatCurrency(runRateData.last7DayRate, bucketCurrency)}/day</span>
-                                                <span className="text-[10px] font-bold uppercase tracking-wider bg-secondary/50 px-1.5 py-0.5 rounded">60%</span>
+                                                <span className="text-eyebrow uppercase bg-secondary/50 px-1.5 py-0.5 rounded">60%</span>
                                             </span>
                                         </div>
                                         <div className="flex items-center justify-between gap-2">
                                             <span className="text-muted-foreground">This month so far</span>
                                             <span className="flex items-center gap-1.5">
                                                 <span className="font-bold tabular-nums">{formatCurrency(runRateData.mtdRate, bucketCurrency)}/day</span>
-                                                <span className="text-[10px] font-bold uppercase tracking-wider bg-secondary/50 px-1.5 py-0.5 rounded">40%</span>
+                                                <span className="text-eyebrow uppercase bg-secondary/50 px-1.5 py-0.5 rounded">40%</span>
                                             </span>
                                         </div>
                                         <div className="border-t border-white/10 my-1" />
@@ -500,7 +500,7 @@ export const SpendingOverview = React.memo(function SpendingOverview({
                                     </PopoverContent>
                                 </Popover>
                             </div>
-                            <span className="text-[11px] font-bold text-muted-foreground bg-secondary/30 px-2 py-0.5 rounded-full tabular-nums">
+                            <span className="text-meta font-bold text-muted-foreground bg-secondary/30 px-2 py-0.5 rounded-full tabular-nums">
                                 Day {runRateData.currentDayOfMonth} of {runRateData.daysInMonth}
                             </span>
                         </div>
@@ -572,13 +572,13 @@ export const SpendingOverview = React.memo(function SpendingOverview({
             {/* Balance strip — one connected unit, divided by a center rule.
                 Replaces the previous twin-card grid which read as a generic
                 mirrored layout. */}
-            <div className="rounded-xl bg-card/60 border border-white/5 shadow-[inset_0_1px_0_rgb(255_255_255_/0.06)] grid grid-cols-2 divide-x divide-white/5 overflow-hidden">
+            <div className="rounded-xl bg-card/60 border border-white/5 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] grid grid-cols-2 divide-x divide-white/5 overflow-hidden">
                 <div className="p-4 flex items-center gap-3 min-w-0">
                     <div className={cn("w-9 h-9 rounded-xl flex items-center justify-center shrink-0", balances.totalOwedToMe > 0 ? "bg-emerald-500/15" : "bg-white/5")}>
                         <ArrowDownLeft className={cn("w-4 h-4", balances.totalOwedToMe > 0 ? "text-emerald-400" : "text-muted-foreground/60")} />
                     </div>
                     <div className="min-w-0">
-                        <p className="text-[11px] text-muted-foreground font-medium">Owed to you</p>
+                        <p className="text-meta text-muted-foreground font-medium">Owed to you</p>
                         <p className={cn("text-base font-bold tabular-nums truncate", balances.totalOwedToMe > 0 ? "text-emerald-300" : "text-foreground/60")}>
                             {formatCurrency(balances.totalOwedToMe, baseCurrency)}
                         </p>
@@ -589,7 +589,7 @@ export const SpendingOverview = React.memo(function SpendingOverview({
                         <ArrowUpRight className={cn("w-4 h-4", balances.totalOwed > 0 ? "text-rose-400" : "text-muted-foreground/60")} />
                     </div>
                     <div className="min-w-0">
-                        <p className="text-[11px] text-muted-foreground font-medium">You owe</p>
+                        <p className="text-meta text-muted-foreground font-medium">You owe</p>
                         <p className={cn("text-base font-bold tabular-nums truncate", balances.totalOwed > 0 ? "text-rose-300" : "text-foreground/60")}>
                             {formatCurrency(balances.totalOwed, baseCurrency)}
                         </p>
@@ -620,7 +620,7 @@ export const SpendingOverview = React.memo(function SpendingOverview({
                                     disabled={!onCategorySelect}
                                     aria-pressed={isActiveFilter}
                                     className={cn(
-                                        "inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full border whitespace-nowrap transition-colors",
+                                        "inline-flex items-center gap-1 text-meta font-bold px-2 py-0.5 rounded-full border whitespace-nowrap transition-colors",
                                         onCategorySelect && "active:scale-95 cursor-pointer",
                                         topCategoryMover.direction === 'up' ? upStyles : downStyles
                                     )}
@@ -633,14 +633,14 @@ export const SpendingOverview = React.memo(function SpendingOverview({
                             );
                         })()}
                         <span className={cn(
-                            "text-[11px] bg-secondary/50 px-3 py-1 rounded-full border font-bold whitespace-nowrap",
+                            "text-meta bg-secondary/50 px-3 py-1 rounded-full border font-bold whitespace-nowrap",
                             isCoupleWorkspace ? "text-rose-400 border-rose-500/20" : isHomeWorkspace ? "text-amber-500 border-amber-500/20" : "text-primary border-primary/20"
                         )}>
                             {isBucketFocused ? (focusedBucket?.name ?? 'Bucket') : format(new Date(), 'MMMM')} overview
                         </span>
                     </div>
                 </div>
-                <Card className="border border-white/5 bg-card/60 shadow-[inset_0_1px_0_rgb(255_255_255_/0.06)] rounded-xl overflow-hidden">
+                <Card className="border border-white/5 bg-card/60 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] rounded-xl overflow-hidden">
                     <CardContent className="p-4 flex flex-col sm:flex-row items-center justify-start gap-4">
                         {spendingData.length > 0 ? (
                             <>
@@ -677,7 +677,7 @@ export const SpendingOverview = React.memo(function SpendingOverview({
                                                 disabled={!clickable}
                                                 onClick={clickable ? () => onCategorySelect(isSelected ? null : itemKey) : undefined}
                                                 className={cn(
-                                                    "flex items-center justify-between text-[11px] w-full text-left rounded-md py-1 px-1 -mx-1 transition-colors",
+                                                    "flex items-center justify-between text-meta w-full text-left rounded-md py-1 px-1 -mx-1 transition-colors",
                                                     clickable && "hover:bg-white/5 active:scale-[0.98] cursor-pointer",
                                                     isDimmed && "opacity-50"
                                                 )}

@@ -24,10 +24,10 @@ export function RecategorizeSheet({ open, onOpenChange, selectedCount, onRecateg
         <Sheet open={open} onOpenChange={(o) => { if (!busy) onOpenChange(o); }}>
             <SheetContent side="bottom" className="border-white/[0.06] bg-background rounded-t-xl">
                 <SheetHeader className="space-y-1">
-                    <SheetTitle className="text-[15px] font-semibold tracking-tight">
+                    <SheetTitle className="text-lead font-semibold tracking-tight">
                         Recategorize <span className="text-muted-foreground/70 font-medium tabular-nums">{selectedCount}</span>
                     </SheetTitle>
-                    <SheetDescription className="text-[12px] text-muted-foreground/70">Pick a new category for the selected transactions.</SheetDescription>
+                    <SheetDescription className="text-xs text-muted-foreground/70">Pick a new category for the selected transactions.</SheetDescription>
                 </SheetHeader>
                 <div className="grid grid-cols-1 gap-2 max-h-[60vh] overflow-y-auto py-4">
                     {SYSTEM_CATEGORIES.map(cat => (
@@ -50,9 +50,9 @@ export function RecategorizeSheet({ open, onOpenChange, selectedCount, onRecateg
                                     style: { color: CATEGORY_COLORS[cat.id] || '#8A2BE2' },
                                 })}
                             </div>
-                            <span className="text-[13px] font-medium">{cat.label}</span>
+                            <span className="text-body font-medium">{cat.label}</span>
                             {busy && pendingCategory === cat.id && (
-                                <span className="ml-auto text-[11px] text-muted-foreground">Applying…</span>
+                                <span className="ml-auto text-meta text-muted-foreground">Applying…</span>
                             )}
                         </button>
                     ))}

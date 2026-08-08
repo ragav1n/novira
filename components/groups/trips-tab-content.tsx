@@ -9,6 +9,7 @@ import { useUserPreferences } from '@/components/providers/user-preferences-prov
 import { useActiveTrip } from '@/components/providers/active-trip-provider';
 import { TripService } from '@/lib/services/trip-service';
 import { TripForm } from '@/components/trips/trip-form';
+import { EmptyState, EMPTY_ACCENTS } from '@/components/ui/empty-state';
 import { supabase } from '@/lib/supabase';
 import type { Trip } from '@/types/trip';
 
@@ -121,7 +122,7 @@ export function TripsTabContent() {
                     onClick={openCreate}
                     disabled={loading}
                     aria-label="New trip"
-                    className="inline-flex items-center gap-1 h-7 px-3 rounded-full text-[11px] font-semibold text-sky-300 hover:text-sky-200 hover:bg-sky-400/10 disabled:opacity-50 transition-colors"
+                    className="inline-flex items-center gap-1 h-7 px-3 rounded-full text-meta font-semibold text-sky-300 hover:text-sky-200 hover:bg-sky-400/10 disabled:opacity-50 transition-colors"
                 >
                     <Plus className="w-3.5 h-3.5" />
                     New trip
@@ -134,7 +135,13 @@ export function TripsTabContent() {
                     <div className="h-[88px] rounded-xl bg-secondary/10 animate-pulse" />
                 </div>
             ) : trips.length === 0 ? (
-                <EmptyState onCreate={openCreate} />
+                <EmptyState
+                    eyebrow="No trips yet"
+                    title="Plan one and Novira will auto-tag."
+                    description="Create a trip and any expense while you're away gets tagged automatically, with a clean summary at the end."
+                    accent={EMPTY_ACCENTS.sky}
+                    action={{ label: 'New trip', icon: Plus, onClick: openCreate }}
+                />
             ) : (
                 <>
                     <Section title="Active" trips={grouped.active} totals={totalsError ? null : tripTotals} formatCurrency={formatCurrency} onEdit={openEdit} />
@@ -166,7 +173,7 @@ function Section({
     if (trips.length === 0) return null;
     return (
         <section className="space-y-2">
-            <h2 className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground/60 px-1">
+            <h2 className="text-eyebrow uppercase text-muted-foreground/60 px-1">
                 {title} · {trips.length}
             </h2>
             <div className="space-y-2">
@@ -211,8 +218,8 @@ function TripCard({
                                 <Plane className="w-[18px] h-[18px]" />
                             </div>
                             <div className="min-w-0">
-                                <h3 className="text-[15px] font-semibold tracking-tight truncate">{trip.name}</h3>
-                                <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5 text-[11px] text-muted-foreground">
+                                <h3 className="text-lead font-semibold tracking-tight truncate">{trip.name}</h3>
+                                <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5 text-meta text-muted-foreground">
                                     <span className="inline-flex items-center gap-1">
                                         <CalendarIcon className="w-3 h-3" aria-hidden="true" />
                                         {format(start, 'MMM d')} – {format(end, 'MMM d, yyyy')}
@@ -238,7 +245,7 @@ function TripCard({
 
                 {status !== 'upcoming' && (
                     <div className="mt-3 space-y-1.5">
-                        <div className="flex items-center justify-between text-[11px]">
+                        <div className="flex items-center justify-between text-meta">
                             <span className="text-muted-foreground">
                                 {status === 'active' ? `Day ${elapsed} of ${totalDays}` : `${totalDays} days`}
                             </span>
@@ -255,37 +262,11 @@ function TripCard({
                     </div>
                 )}
                 {status === 'upcoming' && (
-                    <p className="mt-3 text-[11px] text-muted-foreground">
+                    <p className="mt-3 text-meta text-muted-foreground">
                         Starts in {Math.max(0, differenceInCalendarDays(start, today))} days
                     </p>
                 )}
             </div>
         </article>
-    );
-}
-
-function EmptyState({ onCreate }: { onCreate: () => void }) {
-    return (
-        <div className="rounded-xl border border-dashed border-white/[0.14] bg-white/[0.02] p-6 space-y-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-            <div className="space-y-1.5">
-                <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground/70">
-                    No trips yet
-                </p>
-                <h3 className="text-base font-semibold tracking-tight">
-                    Plan one and Novira will auto-tag.
-                </h3>
-                <p className="text-[12px] text-muted-foreground leading-relaxed max-w-xs">
-                    Create a trip and any expense while you&apos;re away gets tagged automatically,
-                    with a clean summary at the end.
-                </p>
-            </div>
-            <button
-                onClick={onCreate}
-                className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-full bg-sky-400 text-sky-950 text-[12px] font-semibold hover:bg-sky-300 transition-colors"
-            >
-                <Plus className="w-3.5 h-3.5" />
-                New trip
-            </button>
-        </div>
     );
 }

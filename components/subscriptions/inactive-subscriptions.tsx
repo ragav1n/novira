@@ -33,7 +33,7 @@ export function InactiveSubscriptions({ templates, showAll, onToggleShowAll, onR
                     <button
                         type="button"
                         onClick={onToggleShowAll}
-                        className={cn("text-[10px] font-bold uppercase tracking-wider", themeConfig.text)}
+                        className={cn("text-eyebrow uppercase", themeConfig.text)}
                     >
                         {showAll ? 'Show less' : `Show all (${templates.length})`}
                     </button>
@@ -52,7 +52,7 @@ export function InactiveSubscriptions({ templates, showAll, onToggleShowAll, onR
                             onClick={() => onReactivate(template.id)}
                             disabled={busyId === template.id}
                             aria-busy={busyId === template.id}
-                            className={cn("text-[10px] font-bold uppercase tracking-wider px-3 min-h-[44px] rounded-lg bg-secondary/30 hover:bg-secondary/50 transition-colors disabled:opacity-50 disabled:pointer-events-none", themeConfig.text)}
+                            className={cn("text-eyebrow uppercase px-3 min-h-[44px] rounded-lg bg-secondary/30 hover:bg-secondary/50 transition-colors disabled:opacity-50 disabled:pointer-events-none", themeConfig.text)}
                         >
                             {busyId === template.id ? 'Working…' : 'Re-activate'}
                         </button>

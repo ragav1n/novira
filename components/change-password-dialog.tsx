@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ICON_POP } from '@/lib/motion';
 import { Lock, Eye, EyeClosed, X } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import { supabase } from '@/lib/supabase';
 import { toast } from '@/utils/haptics';
 import { cn } from "@/lib/utils";
@@ -294,7 +295,7 @@ export function ChangePasswordDialog({ trigger, mode = 'change', onSuccess }: Ch
                                                 exit={{ opacity: 0 }}
                                                 className="flex items-center justify-center"
                                             >
-                                                <div className="w-4 h-4 border-2 border-black/70 border-t-transparent rounded-full animate-spin" />
+                                                <Spinner className="text-black/70" label={null} />
                                             </motion.div>
                                         ) : (
                                             <motion.span

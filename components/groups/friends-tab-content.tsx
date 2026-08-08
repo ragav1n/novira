@@ -6,6 +6,7 @@ import { toast } from '@/utils/haptics';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import type { Friend, Split } from '@/components/providers/groups-provider';
 import { simplifyDebtsForFriend } from '@/utils/simplify-debts';
+import { EmptyState } from '@/components/ui/empty-state';
 
 interface FriendsTabContentProps {
     friendRequests: Friend[];
@@ -62,7 +63,7 @@ export function FriendsTabContent({
                             <span className="animate-ping absolute inset-0 rounded-full bg-amber-400/50" />
                             <span className="relative rounded-full h-2 w-2 bg-amber-400" />
                         </span>
-                        <h3 className="text-[10px] font-medium uppercase tracking-[0.18em] text-amber-400">
+                        <h3 className="text-eyebrow uppercase text-amber-400">
                             Needs review · {friendRequests.length}
                         </h3>
                     </div>
@@ -75,15 +76,15 @@ export function FriendsTabContent({
                                 <div className="flex items-center gap-3 min-w-0">
                                     <Avatar className="w-9 h-9 ring-1 ring-amber-400/20 shrink-0">
                                         <AvatarImage src={request.avatar_url || ''} />
-                                        <AvatarFallback className="text-[11px] font-semibold bg-amber-400/10 text-amber-300">
+                                        <AvatarFallback className="text-meta font-semibold bg-amber-400/10 text-amber-300">
                                             {(request.full_name || request.email)?.substring(0, 2).toUpperCase()}
                                         </AvatarFallback>
                                     </Avatar>
                                     <div className="min-w-0">
-                                        <p className="text-[13px] font-semibold truncate">
+                                        <p className="text-body font-semibold truncate">
                                             {request.full_name || request.email?.split('@')[0]}
                                         </p>
-                                        <p className="text-[11px] text-muted-foreground truncate">{request.email}</p>
+                                        <p className="text-meta text-muted-foreground truncate">{request.email}</p>
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-1 shrink-0">
@@ -126,7 +127,7 @@ export function FriendsTabContent({
                                                 setPendingRequestId(null);
                                             }
                                         }}
-                                        className="inline-flex items-center gap-1 min-h-[44px] px-3 rounded-full bg-amber-400 text-amber-950 text-[11px] font-semibold hover:bg-amber-300 transition-colors disabled:opacity-50 disabled:pointer-events-none"
+                                        className="inline-flex items-center gap-1 min-h-[44px] px-3 rounded-full bg-amber-400 text-amber-950 text-meta font-semibold hover:bg-amber-300 transition-colors disabled:opacity-50 disabled:pointer-events-none"
                                     >
                                         <Check className="w-3.5 h-3.5" aria-hidden="true" />
                                         {pendingRequestId === request.request_id ? 'Working…' : 'Accept'}
@@ -140,7 +141,7 @@ export function FriendsTabContent({
 
             <section>
                 {friends.length > 0 && (
-                    <h3 className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground/60 px-1 mb-2">
+                    <h3 className="text-eyebrow uppercase text-muted-foreground/60 px-1 mb-2">
                         Friends · {friends.length}
                     </h3>
                 )}
@@ -159,15 +160,15 @@ export function FriendsTabContent({
                                     <div className="flex items-center gap-3 min-w-0">
                                         <Avatar className="w-9 h-9 ring-1 ring-white/[0.06] shrink-0">
                                             <AvatarImage src={friend.avatar_url || ''} />
-                                            <AvatarFallback className="text-[11px] font-semibold">
+                                            <AvatarFallback className="text-meta font-semibold">
                                                 {(friend.full_name || friend.email)?.substring(0, 2).toUpperCase()}
                                             </AvatarFallback>
                                         </Avatar>
                                         <div className="min-w-0">
-                                            <p className="text-[13px] font-semibold truncate">
+                                            <p className="text-body font-semibold truncate">
                                                 {friend.full_name || friend.email?.split('@')[0]}
                                             </p>
-                                            <p className="text-[11px] text-muted-foreground truncate">
+                                            <p className="text-meta text-muted-foreground truncate">
                                                 {friend.email}
                                                 {sharedSplits > 0 && (
                                                     <>
@@ -181,12 +182,12 @@ export function FriendsTabContent({
                                     <div className="flex items-center gap-2 shrink-0">
                                         {youOwe || owedToYou ? (
                                             <div className="flex items-center gap-1.5">
-                                                <span className="text-[10px] uppercase tracking-wider text-muted-foreground/60">
+                                                <span className="text-eyebrow uppercase text-muted-foreground/60">
                                                     {youOwe ? 'You owe' : 'Owes you'}
                                                 </span>
                                                 <span
                                                     className={cn(
-                                                        'text-[12px] font-bold tabular-nums',
+                                                        'text-xs font-bold tabular-nums',
                                                         youOwe ? 'text-rose-300' : 'text-emerald-300',
                                                     )}
                                                 >
@@ -194,7 +195,7 @@ export function FriendsTabContent({
                                                 </span>
                                             </div>
                                         ) : (
-                                            <span className="text-[10px] uppercase tracking-wider text-muted-foreground/50">
+                                            <span className="text-eyebrow uppercase text-muted-foreground/50">
                                                 Settled
                                             </span>
                                         )}
@@ -231,17 +232,11 @@ export function FriendsTabContent({
                     </ul>
                 ) : (
                     friendRequests.length === 0 && (
-                        <div className="rounded-xl border border-dashed border-white/[0.14] bg-white/[0.02] p-6 space-y-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-                            <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground/70">
-                                No friends yet
-                            </p>
-                            <h3 className="text-base font-semibold tracking-tight">
-                                Add someone to split with.
-                            </h3>
-                            <p className="text-[12px] text-muted-foreground leading-relaxed">
-                                Use the add-friend button in the header — by email, ID, or QR scan.
-                            </p>
-                        </div>
+                        <EmptyState
+                            eyebrow="No friends yet"
+                            title="Add someone to split with."
+                            description="Use the add-friend button in the header — by email, ID, or QR scan."
+                        />
                     )
                 )}
             </section>

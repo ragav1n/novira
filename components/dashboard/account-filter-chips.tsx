@@ -43,7 +43,7 @@ export function AccountFilterChips() {
             onClick={onClick}
             aria-pressed={selected}
             className={cn(
-                'shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-[12px] font-semibold transition-colors',
+                'shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-semibold transition-colors',
                 selected
                     ? 'shadow-[0_0_12px_rgba(138,43,226,0.18)]'
                     : 'bg-secondary/10 border-white/5 text-muted-foreground/80 hover:border-white/15 hover:text-foreground',
@@ -84,7 +84,7 @@ export function AccountFilterChips() {
                 <button
                     type="button"
                     onClick={() => setTransferOpen(true)}
-                    className="shrink-0 ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-cyan-500/30 bg-cyan-500/10 text-cyan-300 text-[12px] font-semibold hover:bg-cyan-500/15 transition-colors"
+                    className="shrink-0 ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-cyan-500/30 bg-cyan-500/10 text-cyan-300 text-xs font-semibold hover:bg-cyan-500/15 transition-colors"
                     aria-label="Record a transfer between accounts"
                 >
                     <ArrowRightLeft className="w-3 h-3" />

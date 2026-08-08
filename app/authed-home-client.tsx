@@ -4,22 +4,25 @@ import dynamic from 'next/dynamic'
 import Image from 'next/image'
 import { AnimatePresence, motion } from 'framer-motion'
 import { WaveLoader } from '@/components/ui/wave-loader'
+import { Skeleton } from '@/components/ui/skeleton'
 import { useUserPreferences } from '@/components/providers/user-preferences-provider'
 import { DataBoundary } from '@/components/boundaries/data-boundary'
 
 const DashboardSkeleton = () => (
-  <div className="flex flex-col min-h-[100dvh] p-5 space-y-6 max-w-md mx-auto">
+  <div role="status" aria-label="Loading" className="flex flex-col min-h-[100dvh] p-5 space-y-6 max-w-md mx-auto">
+    {/* Keeps its own header: the dashboard greets with an avatar plus two stacked
+        lines, not the avatar/title/action triplet PageSkeleton models. */}
     <div className="flex justify-between items-center pt-2 gap-2 opacity-50">
       <div className="flex items-center gap-2">
-        <div className="w-10 h-10 rounded-full bg-secondary/20 animate-pulse" />
+        <Skeleton tone="chip" className="w-10 h-10 rounded-full" />
         <div className="space-y-1">
-          <div className="h-5 w-24 bg-secondary/20 rounded animate-pulse" />
-          <div className="h-3 w-32 bg-secondary/20 rounded animate-pulse" />
+          <Skeleton tone="chip" className="h-5 w-24 rounded" />
+          <Skeleton tone="chip" className="h-3 w-32 rounded" />
         </div>
       </div>
     </div>
-    <div className="h-[200px] w-full rounded-3xl bg-secondary/10 animate-pulse" />
-    <div className="h-[300px] w-full rounded-3xl bg-secondary/10 animate-pulse mt-4" />
+    <Skeleton className="h-[200px] w-full rounded-3xl" />
+    <Skeleton className="h-[300px] w-full rounded-3xl mt-4" />
   </div>
 )
 

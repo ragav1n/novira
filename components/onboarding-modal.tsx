@@ -65,7 +65,7 @@ export function OnboardingModal({ open, onComplete }: Props) {
             <DialogContent className="max-w-[400px] w-[95vw] rounded-3xl border-white/10 bg-card/95 backdrop-blur-xl p-0 overflow-hidden shadow-2xl">
                 <div className="p-6 space-y-5">
                     <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest font-bold text-primary">
+                        <div className="flex items-center gap-2 text-eyebrow uppercase text-primary">
                             <Sparkles className="w-3 h-3" aria-hidden="true" />
                             Welcome
                         </div>
@@ -86,7 +86,7 @@ export function OnboardingModal({ open, onComplete }: Props) {
                             {current.icon}
                         </div>
                         <DialogTitle className="text-lg font-bold">{current.title}</DialogTitle>
-                        <DialogDescription className="text-[12.5px] text-muted-foreground leading-relaxed max-w-[300px]">
+                        <DialogDescription className="text-body text-muted-foreground leading-relaxed max-w-[300px]">
                             {current.body}
                         </DialogDescription>
                     </div>
@@ -94,7 +94,7 @@ export function OnboardingModal({ open, onComplete }: Props) {
                         <Button
                             variant="ghost"
                             onClick={skip}
-                            className="flex-1 h-11 rounded-xl text-[12px] font-bold text-muted-foreground hover:text-foreground"
+                            className="flex-1 h-11 rounded-xl text-xs font-bold text-muted-foreground hover:text-foreground"
                         >
                             {step < STEPS.length - 1 ? 'Skip' : 'Close'}
                         </Button>
@@ -103,7 +103,7 @@ export function OnboardingModal({ open, onComplete }: Props) {
                                 current.onCta(router);
                                 onComplete();
                             }}
-                            className="flex-1 h-11 rounded-xl bg-primary hover:bg-primary/90 text-white font-bold text-[12px]"
+                            className="flex-1 h-11 rounded-xl bg-primary hover:bg-primary/90 text-white font-bold text-xs"
                         >
                             {current.cta}
                         </Button>

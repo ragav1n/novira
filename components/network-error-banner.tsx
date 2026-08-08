@@ -50,7 +50,7 @@ export function NetworkErrorBanner() {
                 >
                     <div className="flex items-center gap-3 rounded-xl border border-rose-500/30 bg-rose-950/80 backdrop-blur-md px-3 py-2.5 shadow-[0_8px_30px_-8px_rgba(0,0,0,0.5)]">
                         <WifiOff className="w-4 h-4 text-rose-300 shrink-0" strokeWidth={2} />
-                        <p className="flex-1 text-[12px] font-bold text-rose-100 truncate">
+                        <p className="flex-1 text-xs font-bold text-rose-100 truncate">
                             {active.message}
                         </p>
                         {active.retry && (
@@ -59,7 +59,7 @@ export function NetworkErrorBanner() {
                                     active.retry?.();
                                     setActive(null);
                                 }}
-                                className="text-[11px] font-bold uppercase tracking-wider text-rose-200 hover:text-white transition-colors flex items-center gap-1 shrink-0 min-h-[44px] px-2 -my-2"
+                                className="text-meta font-bold uppercase tracking-wider text-rose-200 hover:text-white transition-colors flex items-center gap-1 shrink-0 min-h-[44px] px-2 -my-2"
                                 aria-label="Retry"
                             >
                                 <RotateCw className="w-3.5 h-3.5" aria-hidden="true" />

@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils';
 import { CATEGORIES, CATEGORY_COLORS, getIconForCategory } from '@/lib/categories';
 import { CURRENCY_SYMBOLS } from '@/components/providers/user-preferences-provider';
 import { CurrencyDropdown } from '@/components/ui/currency-dropdown';
+import { Spinner } from '@/components/ui/spinner';
 import { geocodePlace, type GeocodedPlace } from '@/lib/geocode-place';
 import type { ParsedVoiceExpense, VoicePaymentMethod } from '@/lib/voice-expense-parser';
 
@@ -48,8 +49,8 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
     return (
         <motion.div variants={itemVariants} className="space-y-1.5">
             <div className="flex items-baseline gap-2 px-1">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">{label}</span>
-                {hint && <span className="text-[10px] text-muted-foreground/50">{hint}</span>}
+                <span className="text-meta font-bold uppercase tracking-wider text-muted-foreground">{label}</span>
+                {hint && <span className="text-caption text-muted-foreground/50">{hint}</span>}
             </div>
             {children}
         </motion.div>
@@ -194,7 +195,7 @@ export function VoiceReviewModal({ parsed, currentCurrency, proximity, onApply, 
                                         />
                                     </div>
                                     <div className="min-w-0 flex-1">
-                                        <DialogPrimitive.Title className="text-[15px] font-bold text-foreground">
+                                        <DialogPrimitive.Title className="text-lead font-bold text-foreground">
                                             Review &amp; edit
                                         </DialogPrimitive.Title>
                                         <DialogPrimitive.Description className="truncate text-xs text-muted-foreground">
@@ -206,7 +207,7 @@ export function VoiceReviewModal({ parsed, currentCurrency, proximity, onApply, 
                                 {/* Raw transcript */}
                                 {parsed.raw && (
                                     <div className="relative mx-5 mb-1 shrink-0 rounded-xl border border-white/[0.06] bg-white/[0.03] px-3 py-2">
-                                        <p className="text-[12px] italic leading-snug text-muted-foreground">
+                                        <p className="text-xs italic leading-snug text-muted-foreground">
                                             <span className="not-italic text-rose-300/70">“</span>
                                             {parsed.raw}
                                             <span className="not-italic text-rose-300/70">”</span>
@@ -301,7 +302,7 @@ export function VoiceReviewModal({ parsed, currentCurrency, proximity, onApply, 
                                         <Field label="Location" hint="from voice">
                                             {geoState === 'loading' && (
                                                 <div className="flex items-center gap-2.5 rounded-xl border border-white/10 bg-secondary/10 px-3.5 py-3">
-                                                    <div className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-rose-400/30 border-t-rose-400" />
+                                                    <Spinner className="shrink-0 text-rose-400" label={null} />
                                                     <span className="truncate text-sm text-muted-foreground">
                                                         Finding <span className="text-foreground">“{parsed.location}”</span>…
                                                     </span>
@@ -315,7 +316,7 @@ export function VoiceReviewModal({ parsed, currentCurrency, proximity, onApply, 
                                                     <div className="min-w-0 flex-1">
                                                         <p className="truncate text-sm font-semibold text-emerald-300">{resolvedLoc.place_name}</p>
                                                         {resolvedLoc.place_address && (
-                                                            <p className="truncate text-[11px] text-muted-foreground">{resolvedLoc.place_address}</p>
+                                                            <p className="truncate text-meta text-muted-foreground">{resolvedLoc.place_address}</p>
                                                         )}
                                                     </div>
                                                     <button
@@ -333,11 +334,11 @@ export function VoiceReviewModal({ parsed, currentCurrency, proximity, onApply, 
                                                     <p className="text-sm text-muted-foreground">
                                                         Couldn't find <span className="text-foreground">“{parsed.location}”</span>
                                                     </p>
-                                                    <p className="mt-0.5 text-[11px] text-muted-foreground/60">Add a location on the form after applying.</p>
+                                                    <p className="mt-0.5 text-meta text-muted-foreground/60">Add a location on the form after applying.</p>
                                                 </div>
                                             )}
                                             {geoState === 'idle' && (
-                                                <p className="px-1 text-[11px] text-muted-foreground/50">
+                                                <p className="px-1 text-meta text-muted-foreground/50">
                                                     Location skipped — add one on the form if you need it.
                                                 </p>
                                             )}
@@ -356,7 +357,7 @@ export function VoiceReviewModal({ parsed, currentCurrency, proximity, onApply, 
                                                         animate={{ opacity: 1, scale: 1 }}
                                                         exit={{ opacity: 0, scale: 0.6 }}
                                                         transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-                                                        className="inline-flex items-center gap-1 rounded-full border border-rose-400/25 bg-rose-500/15 py-0.5 pl-2 pr-1 text-[11px] font-semibold text-rose-200"
+                                                        className="inline-flex items-center gap-1 rounded-full border border-rose-400/25 bg-rose-500/15 py-0.5 pl-2 pr-1 text-meta font-semibold text-rose-200"
                                                     >
                                                         #{t}
                                                         <button

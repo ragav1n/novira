@@ -1,6 +1,8 @@
 'use client';
 
 import dynamic from 'next/dynamic';
+import { PageSkeleton } from '@/components/ui/page-skeleton';
+import { Skeleton } from '@/components/ui/skeleton';
 import { DataBoundary } from '@/components/boundaries/data-boundary';
 import { PageTransition } from '@/components/page-transition';
 
@@ -8,21 +10,16 @@ import { PageTransition } from '@/components/page-transition';
 // this route showed a blank frame while its chunk downloaded — every other dynamic
 // route supplies one.
 const AddExpenseSkeleton = () => (
-    <div className="flex flex-col min-h-screen p-5 space-y-6 max-w-md lg:max-w-4xl mx-auto">
-        <div className="flex justify-between items-center pt-2 gap-2 opacity-50">
-            <div className="w-10 h-10 rounded-full bg-secondary/20 animate-pulse" />
-            <div className="h-6 w-32 bg-secondary/20 rounded-lg animate-pulse" />
-            <div className="w-10 h-10 rounded-full bg-secondary/20 animate-pulse" />
-        </div>
-        <div className="h-20 w-full rounded-3xl bg-secondary/10 animate-pulse mt-2" />
-        <div className="h-12 w-full rounded-xl bg-secondary/10 animate-pulse" />
+    <PageSkeleton width="4xl" title="w-32">
+        <Skeleton className="h-20 w-full rounded-3xl mt-2" />
+        <Skeleton className="h-12 w-full rounded-xl" />
         <div className="grid grid-cols-4 gap-2">
             {Array.from({ length: 8 }).map((_, i) => (
-                <div key={i} className="h-16 rounded-xl bg-secondary/10 animate-pulse" />
+                <Skeleton key={i} className="h-16 rounded-xl" />
             ))}
         </div>
-        <div className="h-12 w-full rounded-xl bg-secondary/10 animate-pulse" />
-    </div>
+        <Skeleton className="h-12 w-full rounded-xl" />
+    </PageSkeleton>
 );
 
 const AddExpenseView = dynamic(

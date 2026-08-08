@@ -120,14 +120,14 @@ export function CalendarHeatmapCard({
         <Card className="bg-card/40 backdrop-blur-md border-white/5 shadow-none">
             <CardContent className="p-4 space-y-3">
                 <div className="flex items-center justify-between gap-2">
-                    <h3 className="font-bold text-[13px] uppercase tracking-wider text-muted-foreground/80 flex items-center gap-1.5">
+                    <h3 className="font-bold text-body uppercase tracking-wider text-muted-foreground/80 flex items-center gap-1.5">
                         <Calendar className="w-3.5 h-3.5" />
                         Daily Heatmap
                     </h3>
                     {peakDay && (
                         <span
                             className={cn(
-                                'text-[10px] font-bold tabular-nums px-2 py-0.5 rounded-md border',
+                                'text-caption font-bold tabular-nums px-2 py-0.5 rounded-md border',
                                 themeConfig.bgLight,
                                 themeConfig.borderMedium,
                                 themeConfig.text,
@@ -175,7 +175,7 @@ export function CalendarHeatmapCard({
                     </div>
                 </div>
 
-                <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70 pt-1 border-t border-white/5">
+                <div className="flex items-center justify-between text-eyebrow uppercase text-muted-foreground/70 pt-1 border-t border-white/5">
                     <span>{totalDays} days · {formatCurrency(Math.round(totalSpend))}</span>
                     <div className="flex items-center gap-1">
                         <span>Less</span>

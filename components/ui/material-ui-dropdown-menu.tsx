@@ -331,7 +331,7 @@ DropdownMenuSeparator.displayName = "DropdownMenuSeparator";
 
 const DropdownMenuLabel = React.forwardRef<React.ElementRef<typeof DropdownMenuPrimitive.Label>, React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Label> & { inset?: boolean }>(
   ({ className, inset, ...props }, ref) => (
-    <DropdownMenuPrimitive.Label ref={ref} className={cn("px-5 py-2.5 text-[10px] font-black tracking-[0.15em] text-primary/80 uppercase m3-item-enter", inset && "pl-12", className)} {...props} />
+    <DropdownMenuPrimitive.Label ref={ref} className={cn("px-5 py-2.5 text-eyebrow font-black text-primary/80 uppercase m3-item-enter", inset && "pl-12", className)} {...props} />
   )
 );
 DropdownMenuLabel.displayName = "DropdownMenuLabel";

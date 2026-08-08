@@ -19,7 +19,7 @@ function DataErrorFallback({ error, resetErrorBoundary }: FallbackProps) {
       
       {/* Dev only error trace */}
       {process.env.NODE_ENV === 'development' && (
-        <pre className="text-[10px] bg-black/20 p-2 rounded text-left overflow-auto w-full mb-4 text-orange-400">
+        <pre className="text-caption bg-black/20 p-2 rounded text-left overflow-auto w-full mb-4 text-orange-400">
           {getErrorMessage(error)}
         </pre>
       )}

@@ -28,10 +28,10 @@ export function Callout({
           <Icon className={cn('h-3.5 w-3.5', s.text)} />
         </div>
         <div className="flex-1 text-sm leading-relaxed text-foreground">
-          <div className={cn('mb-1 text-[11px] font-semibold uppercase tracking-wider', s.text)}>
+          <div className={cn('mb-1 text-meta font-semibold uppercase tracking-wider', s.text)}>
             {title ?? s.label}
           </div>
-          <div className="space-y-2 [&_code]:rounded-md [&_code]:bg-white/5 [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:text-[12px] [&_code]:text-foreground/95 [&_strong]:text-foreground">
+          <div className="space-y-2 [&_code]:rounded-md [&_code]:bg-white/5 [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:text-xs [&_code]:text-foreground/95 [&_strong]:text-foreground">
             {children}
           </div>
         </div>

@@ -79,17 +79,17 @@ export function RecapBody({
         <div className="space-y-4" aria-live="polite">
             {/* Headline + change */}
             <div className="space-y-3">
-                <p className="text-[15px] leading-snug font-semibold text-foreground">
+                <p className="text-lead leading-snug font-semibold text-foreground">
                     <RichText text={recap.headline} />
                 </p>
                 <div className="flex items-center gap-3 flex-wrap">
                     <div className="flex flex-col">
-                        <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/80">Spent</span>
+                        <span className="text-micro font-bold uppercase tracking-widest text-muted-foreground/80">Spent</span>
                         <span className="text-lg font-bold text-foreground">{formatCurrency(recap.totalSpent)}</span>
                     </div>
                     <div className="h-8 w-px bg-border/60" />
                     <div className="flex flex-col">
-                        <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/80">{comparisonLabel}</span>
+                        <span className="text-micro font-bold uppercase tracking-widest text-muted-foreground/80">{comparisonLabel}</span>
                         <span className={cn(
                             'text-sm font-bold flex items-center gap-1',
                             recap.changePercent > 0 ? 'text-rose-400' : recap.changePercent < 0 ? 'text-emerald-400' : 'text-foreground/70'
@@ -102,7 +102,7 @@ export function RecapBody({
                         <>
                             <div className="h-8 w-px bg-border/60" />
                             <div className="flex flex-col">
-                                <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/80">Transactions</span>
+                                <span className="text-micro font-bold uppercase tracking-widest text-muted-foreground/80">Transactions</span>
                                 <span className="text-sm font-bold text-foreground">{recap.transactionCount}</span>
                             </div>
                         </>
@@ -122,12 +122,12 @@ export function RecapBody({
                                     <Icon className="w-3.5 h-3.5 text-primary" />
                                 </div>
                                 <div className="min-w-0 flex-1">
-                                    <p className="text-[10px] font-bold uppercase tracking-widest text-primary/90">{ins.label}</p>
-                                    <p className="text-[13px] leading-snug text-foreground/85 mt-0.5">
+                                    <p className="text-eyebrow uppercase text-primary/90">{ins.label}</p>
+                                    <p className="text-body leading-snug text-foreground/85 mt-0.5">
                                         <RichText text={ins.detail} />
                                     </p>
                                     {drillable && (
-                                        <p className="text-[10px] text-primary/70 font-medium mt-1.5">
+                                        <p className="text-caption text-primary/70 font-medium mt-1.5">
                                             View matching transactions →
                                         </p>
                                     )}
@@ -154,8 +154,8 @@ export function RecapBody({
             <div className="rounded-xl bg-gradient-to-br from-amber-400/15 to-amber-400/5 border border-amber-400/25 p-3 flex gap-2.5">
                 <Lightbulb className="w-4 h-4 text-amber-300 shrink-0 mt-0.5" />
                 <div>
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-amber-300/90 mb-1">Takeaway</p>
-                    <p className="text-[13px] leading-snug text-foreground/95">
+                    <p className="text-eyebrow uppercase text-amber-300/90 mb-1">Takeaway</p>
+                    <p className="text-body leading-snug text-foreground/95">
                         <RichText text={recap.takeaway} />
                     </p>
                 </div>
@@ -163,7 +163,7 @@ export function RecapBody({
 
             {/* Analyzed footer */}
             {analyzed && (
-                <div className="flex items-center gap-1.5 pt-1 text-[10px] text-muted-foreground/70 font-medium">
+                <div className="flex items-center gap-1.5 pt-1 text-caption text-muted-foreground/70 font-medium">
                     <Database className="w-3 h-3" />
                     <span>Analyzed {analyzed.transactions} txns · {analyzed.categories} categories · {analyzed.merchants} merchants · {analyzed.paymentMethods} payment methods</span>
                 </div>

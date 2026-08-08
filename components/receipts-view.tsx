@@ -1,9 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import Link from 'next/link';
 import { useSafeBack } from '@/hooks/useSafeBack';
-import { Paperclip, FileWarning, FileText, ImageOff, WifiOff } from 'lucide-react';
+import { Paperclip, FileWarning, FileText, ImageOff } from 'lucide-react';
 import { parseISO } from 'date-fns';
 import { supabase } from '@/lib/supabase';
 import { useRefreshRequest } from '@/hooks/useRefreshRequest';
@@ -15,6 +14,7 @@ import { useFormattedDate } from '@/utils/format-date';
 import { toast } from '@/utils/haptics';
 import { cn } from '@/lib/utils';
 import { ViewHeader } from '@/components/ui/view-header';
+import { EmptyState } from '@/components/ui/empty-state';
 
 /** Server-side cap on the grid. Surfaced in the header only when it actually bites. */
 const RECEIPT_LIMIT = 300;
@@ -119,7 +119,7 @@ export function ReceiptsView() {
                 />
 
                 {!loading && !loadError && rows.length > 0 && (
-                    <p className="text-[11px] text-muted-foreground/70 text-center">
+                    <p className="text-meta text-muted-foreground/70 text-center">
                         {/* Only claim a cap when we actually hit it — the old copy said
                             "Showing 300 receipts" regardless of the real count. */}
                         {rows.length === RECEIPT_LIMIT
@@ -129,7 +129,7 @@ export function ReceiptsView() {
                 )}
 
                 {urlError && !loading && !loadError && (
-                    <p className="text-[11px] text-amber-400/80 text-center">
+                    <p className="text-meta text-amber-400/80 text-center">
                         Previews couldn&apos;t load. Tap any receipt to try opening it.
                     </p>
                 )}
@@ -141,37 +141,23 @@ export function ReceiptsView() {
                         ))}
                     </div>
                 ) : loadError ? (
-                    <div className="text-center py-20 space-y-3">
-                        <div className="w-12 h-12 rounded-xl bg-secondary/30 flex items-center justify-center mx-auto">
-                            <WifiOff className="w-5 h-5 text-muted-foreground/70" />
-                        </div>
-                        <p className="text-sm font-bold">Couldn&apos;t load your receipts</p>
-                        <p className="text-[12px] text-muted-foreground max-w-[260px] mx-auto">
-                            Your receipts are safe — we just couldn&apos;t reach them.
-                        </p>
-                        <button
-                            onClick={() => load()}
-                            className="mt-1 min-h-[36px] px-4 rounded-full text-[11px] font-bold uppercase tracking-wider bg-primary/20 hover:bg-primary/30 border border-primary/30 text-primary transition-colors"
-                        >
-                            Try again
-                        </button>
-                    </div>
+                    <EmptyState
+                        size="page"
+                        variant="error"
+                        iconVariant="tile"
+                        title="Couldn't load your receipts"
+                        description="Your receipts are safe — we just couldn't reach them."
+                        action={{ label: 'Try again', onClick: () => load() }}
+                    />
                 ) : rows.length === 0 ? (
-                    <div className="text-center py-20 space-y-3">
-                        <div className="w-12 h-12 rounded-xl bg-secondary/30 flex items-center justify-center mx-auto">
-                            <ImageOff className="w-5 h-5 text-muted-foreground/70" />
-                        </div>
-                        <p className="text-sm font-bold">No receipts yet</p>
-                        <p className="text-[12px] text-muted-foreground max-w-[260px] mx-auto">
-                            Scan or attach a receipt when adding an expense and it&apos;ll appear here.
-                        </p>
-                        <Link
-                            href="/add"
-                            className="inline-flex items-center justify-center mt-1 min-h-[36px] px-4 rounded-full text-[11px] font-bold uppercase tracking-wider bg-primary/20 hover:bg-primary/30 border border-primary/30 text-primary transition-colors"
-                        >
-                            Add an expense
-                        </Link>
-                    </div>
+                    <EmptyState
+                        size="page"
+                        iconVariant="tile"
+                        icon={ImageOff}
+                        title="No receipts yet"
+                        description="Scan or attach a receipt when adding an expense and it'll appear here."
+                        action={{ label: 'Add an expense', href: '/add' }}
+                    />
                 ) : (
                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                         {rows.map(r => (
@@ -223,7 +209,7 @@ function ReceiptCell({
                 {isPdf ? (
                     <div className="flex flex-col items-center gap-1.5 text-muted-foreground/70">
                         <FileText className="w-7 h-7" aria-hidden="true" />
-                        <span className="text-[9px] uppercase tracking-widest font-bold">PDF</span>
+                        <span className="text-micro uppercase tracking-widest font-bold">PDF</span>
                     </div>
                 ) : url ? (
                     /* eslint-disable-next-line @next/next/no-img-element */
@@ -238,8 +224,8 @@ function ReceiptCell({
                 )}
             </div>
             <div className="mt-1.5 px-0.5 space-y-0.5">
-                <p className="text-[11.5px] font-semibold truncate">{row.description}</p>
-                <p className="text-[10.5px] text-muted-foreground/80 tabular-nums truncate">
+                <p className="text-meta font-semibold truncate">{row.description}</p>
+                <p className="text-caption text-muted-foreground/80 tabular-nums truncate">
                     {formatCurrency(Number(row.amount), row.currency)} · {formatDate(parseISO(row.date.slice(0, 10)), 'short')}
                 </p>
             </div>

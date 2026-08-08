@@ -3,8 +3,9 @@
 import React, { useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { SHEET } from '@/lib/motion';
-import { Trash2, FolderInput, Tag as TagIcon, Check, Wallet, Landmark, PiggyBank, CreditCard as CardIcon, Smartphone, CircleDollarSign, Loader2 } from 'lucide-react';
+import { Trash2, FolderInput, Tag as TagIcon, Check, Wallet, Landmark, PiggyBank, CreditCard as CardIcon, Smartphone, CircleDollarSign } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Spinner } from '@/components/ui/spinner';
 import {
     AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
     AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -92,7 +93,7 @@ export function BulkActionBar({
                 className="fixed bottom-0 left-0 right-0 z-[120] pointer-events-none px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]"
             >
                 <div className="max-w-md lg:max-w-2xl mx-auto pointer-events-auto rounded-xl bg-card/95 backdrop-blur-xl border border-white/10 shadow-2xl flex items-center gap-1 p-1.5">
-                    <div className="px-2.5 text-[12px] font-semibold tabular-nums">
+                    <div className="px-2.5 text-xs font-semibold tabular-nums">
                         <span className="text-primary">{count}</span>
                         <span className="text-muted-foreground/70"> selected</span>
                     </div>
@@ -102,7 +103,7 @@ export function BulkActionBar({
                         size="sm"
                         onClick={() => setCategoryPickerOpen(true)}
                         disabled={count === 0}
-                        className="flex-1 min-h-[44px] gap-1.5 text-[12px]"
+                        className="flex-1 min-h-[44px] gap-1.5 text-xs"
                     >
                         <TagIcon className="w-3.5 h-3.5" />
                         <span className="hidden sm:inline">Recategorize</span>
@@ -114,7 +115,7 @@ export function BulkActionBar({
                         size="sm"
                         onClick={() => setBucketPickerOpen(true)}
                         disabled={count === 0}
-                        className="flex-1 min-h-[44px] gap-1.5 text-[12px]"
+                        className="flex-1 min-h-[44px] gap-1.5 text-xs"
                     >
                         <FolderInput className="w-3.5 h-3.5" />
                         <span className="sm:inline">Bucket</span>
@@ -125,7 +126,7 @@ export function BulkActionBar({
                             size="sm"
                             onClick={() => setAccountPickerOpen(true)}
                             disabled={count === 0}
-                            className="flex-1 min-h-[44px] gap-1.5 text-[12px]"
+                            className="flex-1 min-h-[44px] gap-1.5 text-xs"
                         >
                             <Wallet className="w-3.5 h-3.5" />
                             <span className="sm:inline">Account</span>
@@ -136,7 +137,7 @@ export function BulkActionBar({
                         size="sm"
                         onClick={() => setConfirmDelete(true)}
                         disabled={count === 0}
-                        className="flex-1 min-h-[44px] gap-1.5 text-[12px] text-rose-300 hover:text-rose-200 hover:bg-rose-500/10"
+                        className="flex-1 min-h-[44px] gap-1.5 text-xs text-rose-300 hover:text-rose-200 hover:bg-rose-500/10"
                     >
                         <Trash2 className="w-3.5 h-3.5" />
                         <span>Delete</span>
@@ -146,7 +147,7 @@ export function BulkActionBar({
                         variant="ghost"
                         size="sm"
                         onClick={onCancel}
-                        className="min-h-[44px] text-[12px] text-muted-foreground"
+                        className="min-h-[44px] text-xs text-muted-foreground"
                     >
                         Cancel
                     </Button>
@@ -229,9 +230,9 @@ export function BulkActionBar({
                                             { style: { color } },
                                         )}
                                     </span>
-                                    <span className="text-[12px] font-semibold truncate flex-1">{cat.label}</span>
+                                    <span className="text-xs font-semibold truncate flex-1">{cat.label}</span>
                                     {applyingKey === `cat:${cat.id}` ? (
-                                        <Loader2 className="w-3.5 h-3.5 text-primary shrink-0 animate-spin" />
+                                        <Spinner className="size-3.5 text-primary shrink-0" label={null} />
                                     ) : isCurrent ? (
                                         <Check className="w-3.5 h-3.5 text-primary shrink-0" strokeWidth={3} />
                                     ) : null}
@@ -248,13 +249,13 @@ export function BulkActionBar({
                         <DialogTitle>Move {count} to account</DialogTitle>
                     </DialogHeader>
                     {currentAccountId === undefined && count > 0 && (
-                        <p className="px-1 pt-1 text-[11px] text-amber-300/80">
+                        <p className="px-1 pt-1 text-meta text-amber-300/80">
                             Mixed selection — these transactions are currently on different accounts.
                         </p>
                     )}
                     <div className="space-y-1.5 pt-2 max-h-[60vh] overflow-y-auto">
                         {activeAccounts.length === 0 && (
-                            <p className="px-3 py-6 text-center text-[12px] text-muted-foreground/60">
+                            <p className="px-3 py-6 text-center text-xs text-muted-foreground/60">
                                 No accounts yet. Add one in settings.
                             </p>
                         )}
@@ -286,11 +287,11 @@ export function BulkActionBar({
                                         <TypeIcon className="w-3.5 h-3.5" style={{ color: a.color }} />
                                     </span>
                                     <div className="min-w-0 flex-1">
-                                        <p className="text-[12px] font-semibold truncate">{a.name}</p>
-                                        <p className="text-[10px] text-muted-foreground/60">{ACCOUNT_TYPE_LABELS[a.type]} · {a.currency}</p>
+                                        <p className="text-xs font-semibold truncate">{a.name}</p>
+                                        <p className="text-caption text-muted-foreground/60">{ACCOUNT_TYPE_LABELS[a.type]} · {a.currency}</p>
                                     </div>
                                     {applyingKey === `acct:${a.id}` ? (
-                                        <Loader2 className="w-3.5 h-3.5 text-primary shrink-0 animate-spin" />
+                                        <Spinner className="size-3.5 text-primary shrink-0" label={null} />
                                     ) : isCurrent ? (
                                         <Check className="w-3.5 h-3.5 text-primary shrink-0" strokeWidth={3} />
                                     ) : null}
@@ -307,7 +308,7 @@ export function BulkActionBar({
                         <DialogTitle>Move {count} to bucket</DialogTitle>
                     </DialogHeader>
                     {currentBucketId === undefined && count > 0 && (
-                        <p className="px-1 pt-1 text-[11px] text-amber-300/80">
+                        <p className="px-1 pt-1 text-meta text-amber-300/80">
                             Mixed selection — these transactions are currently in different buckets.
                         </p>
                     )}
@@ -333,19 +334,19 @@ export function BulkActionBar({
                                     <span className="w-7 h-7 rounded-full bg-secondary/30 flex items-center justify-center shrink-0">
                                         <FolderInput className="w-3.5 h-3.5 text-muted-foreground" />
                                     </span>
-                                    <span className="text-[12px] font-semibold flex-1">No bucket</span>
+                                    <span className="text-xs font-semibold flex-1">No bucket</span>
                                     {applyingKey === 'bkt:none' ? (
-                                        <Loader2 className="w-3.5 h-3.5 text-primary shrink-0 animate-spin" />
+                                        <Spinner className="size-3.5 text-primary shrink-0" label={null} />
                                     ) : isNoneCurrent ? (
                                         <Check className="w-3.5 h-3.5 text-primary shrink-0" strokeWidth={3} />
                                     ) : (
-                                        <span className="text-[10px] text-muted-foreground/60">Clear</span>
+                                        <span className="text-caption text-muted-foreground/60">Clear</span>
                                     )}
                                 </button>
                             );
                         })()}
                         {activeBuckets.length === 0 && (
-                            <p className="px-3 py-6 text-center text-[12px] text-muted-foreground/60">
+                            <p className="px-3 py-6 text-center text-xs text-muted-foreground/60">
                                 No buckets yet. Create one in the dashboard.
                             </p>
                         )}
@@ -372,16 +373,16 @@ export function BulkActionBar({
                                         className="w-7 h-7 rounded-full flex items-center justify-center shrink-0"
                                         style={{ backgroundColor: `${b.color || '#8A2BE2'}20`, border: `1px solid ${b.color || '#8A2BE2'}40` }}
                                     >
-                                        <span className="text-[10px] font-bold" style={{ color: b.color || '#8A2BE2' }}>
+                                        <span className="text-caption font-bold" style={{ color: b.color || '#8A2BE2' }}>
                                             {b.name.charAt(0).toUpperCase()}
                                         </span>
                                     </span>
                                     <div className="min-w-0 flex-1">
-                                        <p className="text-[12px] font-semibold truncate">{b.name}</p>
-                                        {b.type && <p className="text-[10px] text-muted-foreground/60 capitalize">{b.type}</p>}
+                                        <p className="text-xs font-semibold truncate">{b.name}</p>
+                                        {b.type && <p className="text-caption text-muted-foreground/60 capitalize">{b.type}</p>}
                                     </div>
                                     {applyingKey === `bkt:${b.id}` ? (
-                                        <Loader2 className="w-3.5 h-3.5 text-primary shrink-0 animate-spin" />
+                                        <Spinner className="size-3.5 text-primary shrink-0" label={null} />
                                     ) : isCurrent ? (
                                         <Check className="w-3.5 h-3.5 text-primary shrink-0" strokeWidth={3} />
                                     ) : null}

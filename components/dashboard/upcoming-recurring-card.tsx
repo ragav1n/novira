@@ -81,7 +81,7 @@ export const UpcomingRecurringCard = React.memo(function UpcomingRecurringCard({
                     <CalendarClock className={cn('w-4 h-4 shrink-0', iconClass)} />
                     <h3 className="text-sm font-bold truncate">Coming Up This Month</h3>
                 </div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground bg-secondary/30 px-2 py-0.5 rounded-full whitespace-nowrap">
+                <span className="text-eyebrow uppercase text-muted-foreground bg-secondary/30 px-2 py-0.5 rounded-full whitespace-nowrap">
                     {formatCurrency(totalThisMonth, displayCurrency)}
                 </span>
             </div>
@@ -89,7 +89,7 @@ export const UpcomingRecurringCard = React.memo(function UpcomingRecurringCard({
             {showBudgetContext && (
                 <div
                     className={cn(
-                        'flex items-center gap-1.5 text-[11px] font-bold mb-3 px-2 py-1 rounded-lg border',
+                        'flex items-center gap-1.5 text-meta font-bold mb-3 px-2 py-1 rounded-lg border',
                         exceedsRemaining
                             ? 'bg-rose-500/10 text-rose-400 border-rose-500/20'
                             : 'bg-secondary/20 text-muted-foreground border-white/5'
@@ -125,7 +125,7 @@ export const UpcomingRecurringCard = React.memo(function UpcomingRecurringCard({
                             </div>
                             <div className="min-w-0 flex-1">
                                 <p className="text-sm font-bold truncate">{it.description}</p>
-                                <p className="text-[11px] text-muted-foreground font-medium">
+                                <p className="text-meta text-muted-foreground font-medium">
                                     {dueLabel(it.daysUntil)}
                                 </p>
                             </div>
@@ -138,7 +138,7 @@ export const UpcomingRecurringCard = React.memo(function UpcomingRecurringCard({
                     );
                 })}
                 {overflow > 0 && (
-                    <p className="text-[11px] text-muted-foreground font-medium pt-1 text-center">
+                    <p className="text-meta text-muted-foreground font-medium pt-1 text-center">
                         +{overflow} more this month
                     </p>
                 )}

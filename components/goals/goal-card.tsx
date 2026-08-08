@@ -115,7 +115,7 @@ export function GoalCard({ goal, deposits, formatCurrency, onAddDeposit, onEdit,
             />
             {isCompleted && (
                 <div className={cn(
-                    'absolute top-3 left-1/2 -translate-x-1/2 text-white text-[10px] uppercase tracking-wider font-bold px-3 py-1 rounded-full flex items-center gap-1 z-10 shadow-lg',
+                    'absolute top-3 left-1/2 -translate-x-1/2 text-white text-eyebrow uppercase px-3 py-1 rounded-full flex items-center gap-1 z-10 shadow-lg',
                     tokens.swatch
                 )}>
                     <CheckCircle2 className="w-3 h-3" />
@@ -135,14 +135,14 @@ export function GoalCard({ goal, deposits, formatCurrency, onAddDeposit, onEdit,
                             <h3 className="text-lg font-bold truncate" title={goal.name}>{goal.name}</h3>
                             <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                                 {goal.deadline && (
-                                    <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                                    <span className="text-caption text-muted-foreground flex items-center gap-1">
                                         <Calendar className="w-3 h-3" aria-hidden="true" />
                                         {format(new Date(goal.deadline), 'MMM d, yyyy')}
                                     </span>
                                 )}
                                 {deadlinePill && (
                                     <span className={cn(
-                                        'text-[10px] px-1.5 py-0.5 rounded-full border font-bold',
+                                        'text-caption px-1.5 py-0.5 rounded-full border font-bold',
                                         deadlinePill.className
                                     )}>
                                         {deadlinePill.label}
@@ -150,7 +150,7 @@ export function GoalCard({ goal, deposits, formatCurrency, onAddDeposit, onEdit,
                                 )}
                                 {statusPill && StatusIcon && (
                                     <span className={cn(
-                                        'text-[10px] px-1.5 py-0.5 rounded-full border font-bold inline-flex items-center gap-1',
+                                        'text-caption px-1.5 py-0.5 rounded-full border font-bold inline-flex items-center gap-1',
                                         statusPill.className
                                     )}>
                                         <StatusIcon className="w-2.5 h-2.5" aria-hidden="true" />
@@ -159,7 +159,7 @@ export function GoalCard({ goal, deposits, formatCurrency, onAddDeposit, onEdit,
                                 )}
                                 {etaPill && (
                                     <span className={cn(
-                                        'text-[10px] px-1.5 py-0.5 rounded-full border font-bold inline-flex items-center gap-1',
+                                        'text-caption px-1.5 py-0.5 rounded-full border font-bold inline-flex items-center gap-1',
                                         etaPill.className
                                     )}>
                                         <CalendarClock className="w-2.5 h-2.5" aria-hidden="true" />
@@ -226,14 +226,14 @@ export function GoalCard({ goal, deposits, formatCurrency, onAddDeposit, onEdit,
                             />
                         ))}
                     </div>
-                    <div className="flex justify-between text-[11px]">
+                    <div className="flex justify-between text-meta">
                         <span className="text-muted-foreground">{progress.toFixed(1)}% funded</span>
                         <span className={cn('font-bold', tokens.text)}>
                             {isCompleted ? 'Goal Reached! 🎉' : `${formatCurrency(remaining, goal.currency)} to go`}
                         </span>
                     </div>
                     {!isCompleted && ((required !== null && required > 0) || velocity > 0) && (
-                        <div className="flex flex-wrap justify-between gap-x-3 gap-y-1 text-[11px] text-muted-foreground pt-1 border-t border-white/5 mt-1">
+                        <div className="flex flex-wrap justify-between gap-x-3 gap-y-1 text-meta text-muted-foreground pt-1 border-t border-white/5 mt-1">
                             {required !== null && required > 0 && (
                                 <span>
                                     Need <span className="text-foreground font-bold">{formatCurrency(required, goal.currency)}</span>/mo

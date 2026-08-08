@@ -83,7 +83,7 @@ export function WorkspaceHeader({
                             <h1 className="text-xl font-bold flex items-center gap-1.5 min-w-0 mb-0.5">
                                 <span className="bg-clip-text text-transparent bg-gradient-to-r from-white to-white/80 truncate">Hello, {userName.split(' ')[0]}</span>
                             </h1>
-                            <p className="text-[11px] text-muted-foreground font-medium truncate">
+                            <p className="text-meta text-muted-foreground font-medium truncate">
                                 {format(new Date(), 'MMMM')} overview
                             </p>
                         </>

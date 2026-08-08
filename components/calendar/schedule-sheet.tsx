@@ -3,7 +3,8 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
-import { Bell, RotateCw, Tag, Target, Loader2 } from 'lucide-react';
+import { Bell, RotateCw, Tag, Target } from 'lucide-react';
+import { Spinner } from '@/components/ui/spinner';
 import { supabase } from '@/lib/supabase';
 import { useUserPreferences, CURRENCY_DETAILS, type Currency } from '@/components/providers/user-preferences-provider';
 import { useWorkspaceTheme } from '@/hooks/useWorkspaceTheme';
@@ -111,7 +112,7 @@ export function ScheduleSheet({ open, onOpenChange, selectedDate, onCreated }: S
                     <div className="px-5 pb-6 space-y-5">
                         <div className="space-y-3">
                             <div className="space-y-1.5">
-                                <label htmlFor="schedule-label" className="text-[11px] uppercase tracking-wider font-bold text-muted-foreground">
+                                <label htmlFor="schedule-label" className="text-meta uppercase tracking-wider font-bold text-muted-foreground">
                                     Label
                                 </label>
                                 <Input
@@ -125,7 +126,7 @@ export function ScheduleSheet({ open, onOpenChange, selectedDate, onCreated }: S
                             </div>
 
                             <div className="space-y-1.5">
-                                <label htmlFor="schedule-amount" className="text-[11px] uppercase tracking-wider font-bold text-muted-foreground">
+                                <label htmlFor="schedule-amount" className="text-meta uppercase tracking-wider font-bold text-muted-foreground">
                                     Amount <span className="text-muted-foreground/60 normal-case">(optional)</span>
                                 </label>
                                 <div className="flex gap-2">
@@ -161,7 +162,7 @@ export function ScheduleSheet({ open, onOpenChange, selectedDate, onCreated }: S
                             </div>
 
                             <div className="space-y-1.5">
-                                <label htmlFor="schedule-notes" className="text-[11px] uppercase tracking-wider font-bold text-muted-foreground">
+                                <label htmlFor="schedule-notes" className="text-meta uppercase tracking-wider font-bold text-muted-foreground">
                                     Notes <span className="text-muted-foreground/60 normal-case">(optional)</span>
                                 </label>
                                 <Textarea
@@ -179,13 +180,13 @@ export function ScheduleSheet({ open, onOpenChange, selectedDate, onCreated }: S
                                 disabled={saving || !label.trim()}
                                 className="w-full h-10 font-semibold"
                             >
-                                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Bell className="w-4 h-4" />}
+                                {saving ? <Spinner className="w-4 h-4" label={null} /> : <Bell className="w-4 h-4" />}
                                 <span className="ml-1">Save one-off</span>
                             </Button>
                         </div>
 
                         <div className="space-y-1 pt-3 border-t border-white/5">
-                            <p className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground/70 px-1 pb-1">
+                            <p className="text-eyebrow uppercase text-muted-foreground/70 px-1 pb-1">
                                 Or schedule something bigger
                             </p>
                             <button

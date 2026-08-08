@@ -75,16 +75,16 @@ export function FailedSyncSection({ failedItems }: Props) {
                                 <div className="min-w-0 flex-1">
                                     <div className="flex items-center gap-1.5 flex-wrap">
                                         <p className="text-sm font-bold truncate">{description}</p>
-                                        <span className={`text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-full ${badge.className} inline-flex items-center gap-0.5`}>
+                                        <span className={`text-micro uppercase tracking-wider px-1.5 py-0.5 rounded-full ${badge.className} inline-flex items-center gap-0.5`}>
                                             {isExpired && <Clock className="w-2.5 h-2.5" />}
                                             {badge.label}
                                         </span>
                                     </div>
-                                    <p className="text-[10px] font-bold text-destructive/80 mt-0.5 uppercase tracking-tighter break-words">
+                                    <p className="text-eyebrow text-destructive/80 mt-0.5 uppercase tracking-tighter break-words">
                                         {item.errorReason || 'Server Conflict'}
                                     </p>
                                 </div>
-                                {item.failedAt && <span className="text-[9px] text-muted-foreground whitespace-nowrap">{format(new Date(item.failedAt), 'HH:mm')}</span>}
+                                {item.failedAt && <span className="text-micro text-muted-foreground whitespace-nowrap">{format(new Date(item.failedAt), 'HH:mm')}</span>}
                             </div>
                             <div className="flex gap-2 justify-end mt-1">
                                 <Button
@@ -93,8 +93,8 @@ export function FailedSyncSection({ failedItems }: Props) {
                                     onClick={() => handleDiscard(item, description)}
                                     className={
                                         isExpired || kind === 'permanent'
-                                            ? 'min-h-[44px] px-4 text-[11px] font-bold bg-destructive hover:bg-destructive/90 text-white rounded-xl shadow-lg shadow-destructive/20'
-                                            : 'min-h-[44px] px-4 text-[11px] font-bold hover:bg-destructive/10 hover:text-destructive text-muted-foreground border border-transparent hover:border-destructive/20 rounded-xl transition-all'
+                                            ? 'min-h-[44px] px-4 text-meta font-bold bg-destructive hover:bg-destructive/90 text-white rounded-xl shadow-lg shadow-destructive/20'
+                                            : 'min-h-[44px] px-4 text-meta font-bold hover:bg-destructive/10 hover:text-destructive text-muted-foreground border border-transparent hover:border-destructive/20 rounded-xl transition-all'
                                     }
                                 >
                                     Discard
@@ -108,8 +108,8 @@ export function FailedSyncSection({ failedItems }: Props) {
                                         aria-busy={retryingId === item.id}
                                         className={
                                             kind === 'permanent'
-                                                ? 'min-h-[44px] px-4 text-[11px] font-bold hover:bg-primary/10 hover:text-primary text-muted-foreground border border-transparent hover:border-primary/20 rounded-xl transition-all'
-                                                : 'min-h-[44px] px-4 text-[11px] font-bold bg-primary hover:bg-primary/90 text-white rounded-xl shadow-lg shadow-primary/20'
+                                                ? 'min-h-[44px] px-4 text-meta font-bold hover:bg-primary/10 hover:text-primary text-muted-foreground border border-transparent hover:border-primary/20 rounded-xl transition-all'
+                                                : 'min-h-[44px] px-4 text-meta font-bold bg-primary hover:bg-primary/90 text-white rounded-xl shadow-lg shadow-primary/20'
                                         }
                                     >
                                         {retryingId === item.id ? 'Retrying…' : 'Retry Sync'}

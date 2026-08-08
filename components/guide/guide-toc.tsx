@@ -49,13 +49,13 @@ export function GuideTocDesktop() {
 
   return (
     <nav className="sticky top-24 max-h-[calc(100vh-7rem)] w-[260px] shrink-0 overflow-y-auto pr-2" aria-label="Table of contents">
-      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-foreground/65">
+      <div className="text-meta font-semibold uppercase tracking-[0.18em] text-foreground/65">
         On this page
       </div>
       <div className="mt-3 space-y-5">
         {GUIDE_GROUPS.map((group) => (
           <div key={group}>
-            <div className="mb-1.5 text-[11px] font-medium uppercase tracking-wider text-foreground/55">
+            <div className="mb-1.5 text-meta font-medium uppercase tracking-wider text-foreground/55">
               {group}
             </div>
             <ul className="space-y-0.5">
@@ -67,7 +67,7 @@ export function GuideTocDesktop() {
                     <a
                       href={`#${s.id}`}
                       className={cn(
-                        'group flex items-center gap-2 rounded-lg px-2 py-1.5 text-[13px] transition-colors',
+                        'group flex items-center gap-2 rounded-lg px-2 py-1.5 text-body transition-colors',
                         isActive
                           ? 'bg-primary/10 text-primary'
                           : 'text-foreground/75 hover:bg-white/5 hover:text-foreground'
@@ -110,7 +110,7 @@ export function GuideTocMobile() {
         <div className="flex min-w-0 items-center gap-2.5">
           {activeSection && <activeSection.icon className="h-4 w-4 shrink-0 text-primary" />}
           <div className="min-w-0">
-            <div className="text-[10px] font-medium uppercase tracking-widest text-muted-foreground/70">
+            <div className="text-eyebrow uppercase text-muted-foreground/70">
               On this page
             </div>
             <div className="truncate text-sm font-medium text-foreground">
@@ -132,7 +132,7 @@ export function GuideTocMobile() {
           >
             {GUIDE_GROUPS.map((group) => (
               <div key={group} className="px-1 py-1">
-                <div className="px-2 py-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60">
+                <div className="px-2 py-1 text-eyebrow uppercase text-muted-foreground/60">
                   {group}
                 </div>
                 <ul>

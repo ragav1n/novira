@@ -17,7 +17,7 @@ export function MapHeader({ summary, onClose, children }: MapHeaderProps) {
                     </div>
                     <div className="min-w-0">
                         <h2 className="text-lg font-black tracking-tight truncate">Expense Map</h2>
-                        <p className="text-[11px] text-muted-foreground font-medium truncate">
+                        <p className="text-meta text-muted-foreground font-medium truncate">
                             {summary.places > 0 ? (
                                 <>
                                     <span className="text-foreground font-bold">{summary.total}</span>

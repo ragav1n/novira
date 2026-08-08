@@ -45,14 +45,14 @@ export function TagsFilterCard({ tagBreakdown, activeTags, onToggle, onClear, fo
     return (
         <div className="space-y-2">
             <div className="flex items-center justify-between px-1">
-                <span className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground/80 flex items-center gap-1.5">
+                <span className="text-meta font-bold uppercase tracking-widest text-muted-foreground/80 flex items-center gap-1.5">
                     <Tags className="w-3 h-3" />
                     Tags
                 </span>
                 {activeTags.length > 0 && (
                     <button
                         onClick={onClear}
-                        className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors"
+                        className="flex items-center gap-1 text-eyebrow uppercase text-muted-foreground hover:text-foreground transition-colors"
                         aria-label="Clear tag filters"
                     >
                         <X className="w-3 h-3" />
@@ -74,7 +74,7 @@ export function TagsFilterCard({ tagBreakdown, activeTags, onToggle, onClear, fo
                                         key={tag}
                                         onClick={() => onToggle(tag)}
                                         className={cn(
-                                            'shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-wider border transition-all',
+                                            'shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-meta font-bold uppercase tracking-wider border transition-all',
                                             selected
                                                 ? cn(themeConfig.bgMedium, themeConfig.borderGlow, themeConfig.text)
                                                 : 'bg-secondary/20 border-white/5 text-muted-foreground hover:bg-secondary/40 hover:text-foreground'
@@ -109,7 +109,7 @@ export function TagsFilterCard({ tagBreakdown, activeTags, onToggle, onClear, fo
                     </div>
 
                     {activeTags.length > 0 && (
-                        <p className="text-[10px] text-muted-foreground/70 px-1">
+                        <p className="text-caption text-muted-foreground/70 px-1">
                             Showing data for transactions with {activeTags.length === 1 ? 'tag' : 'all tags'}: {activeTags.map(t => `#${t}`).join(', ')}
                         </p>
                     )}

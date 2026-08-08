@@ -43,14 +43,14 @@ export function Glossary() {
             <BookMarked className="h-4 w-4" />
           </div>
           <div>
-            <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-primary/85">
+            <div className="text-eyebrow uppercase text-primary/85">
               New here?
             </div>
             <div className="text-base font-semibold text-foreground">Quick glossary</div>
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <div className="hidden text-[12px] text-foreground/65 sm:block">
+          <div className="hidden text-xs text-foreground/65 sm:block">
             {TERMS.length} terms · click to {open ? 'hide' : 'expand'}
           </div>
           <ChevronDown className={cn('h-4 w-4 text-foreground/65 transition-transform', open && 'rotate-180')} />
@@ -77,9 +77,9 @@ export function Glossary() {
                   <>
                     <div className="flex items-center gap-2">
                       <Icon className="h-3.5 w-3.5 shrink-0 text-primary/85" />
-                      <span className="text-[13px] font-semibold text-foreground">{t.word}</span>
+                      <span className="text-body font-semibold text-foreground">{t.word}</span>
                     </div>
-                    <p className="mt-1.5 text-[13px] leading-relaxed text-foreground/85">
+                    <p className="mt-1.5 text-body leading-relaxed text-foreground/85">
                       {t.short}
                     </p>
                   </>
@@ -92,7 +92,7 @@ export function Glossary() {
                   >
                     {inner}
                     {t.href && (
-                      <div className="mt-2 text-[11px] font-medium text-primary/80 opacity-0 transition-opacity group-hover:opacity-100">
+                      <div className="mt-2 text-meta font-medium text-primary/80 opacity-0 transition-opacity group-hover:opacity-100">
                         Read the full section →
                       </div>
                     )}

@@ -38,7 +38,7 @@ export function MapSummaryPanel({ open, onClose, topPlaces, totalLabel, formatCu
                             </div>
                             <div className="min-w-0">
                                 <p className="text-sm font-black truncate">Top places</p>
-                                <p className="text-[10px] text-muted-foreground">{totalLabel} total</p>
+                                <p className="text-caption text-muted-foreground">{totalLabel} total</p>
                             </div>
                         </div>
                         <button
@@ -74,7 +74,7 @@ export function MapSummaryPanel({ open, onClose, topPlaces, totalLabel, formatCu
                                                 <div className="h-1.5 flex-1 rounded-full bg-white/5 overflow-hidden">
                                                     <div className="h-full rounded-full" style={{ width: `${pct}%`, background: color }} />
                                                 </div>
-                                                <span className="text-[10px] text-muted-foreground shrink-0 capitalize">
+                                                <span className="text-caption text-muted-foreground shrink-0 capitalize">
                                                     {getCategoryLabel(place.topCategory)} · {place.count}
                                                 </span>
                                             </div>

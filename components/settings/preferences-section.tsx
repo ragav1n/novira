@@ -23,7 +23,7 @@ export function PreferencesSection({
                     <AlertTriangle className="w-4 h-4 text-muted-foreground" />
                     <div>
                         <p className="text-sm font-medium">Budget Alerts</p>
-                        <p className="text-[11px] text-muted-foreground">Alert when overspending</p>
+                        <p className="text-meta text-muted-foreground">Alert when overspending</p>
                     </div>
                 </div>
                 <Switch
@@ -37,7 +37,7 @@ export function PreferencesSection({
                     <EyeOff className="w-4 h-4 text-muted-foreground shrink-0" />
                     <div className="min-w-0">
                         <p className="text-sm font-medium">Privacy Mode</p>
-                        <p className="text-[11px] text-muted-foreground">Hide amounts; tap eye in header to reveal</p>
+                        <p className="text-meta text-muted-foreground">Hide amounts; tap eye in header to reveal</p>
                     </div>
                 </div>
                 <Switch

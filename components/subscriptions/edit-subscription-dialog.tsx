@@ -164,7 +164,7 @@ export function EditSubscriptionDialog({ template, onClose }: Props) {
                             onClick={() => setIsIncome(false)}
                             aria-pressed={!isIncome}
                             className={cn(
-                                'flex items-center justify-center gap-1.5 py-2 text-[11px] font-bold uppercase tracking-wider rounded-xl border transition-all',
+                                'flex items-center justify-center gap-1.5 py-2 text-meta font-bold uppercase tracking-wider rounded-xl border transition-all',
                                 !isIncome
                                     ? 'bg-rose-500/15 text-rose-300 border-rose-500/30'
                                     : 'bg-background/20 border-white/5 text-muted-foreground hover:border-white/10'
@@ -178,7 +178,7 @@ export function EditSubscriptionDialog({ template, onClose }: Props) {
                             onClick={() => setIsIncome(true)}
                             aria-pressed={isIncome}
                             className={cn(
-                                'flex items-center justify-center gap-1.5 py-2 text-[11px] font-bold uppercase tracking-wider rounded-xl border transition-all',
+                                'flex items-center justify-center gap-1.5 py-2 text-meta font-bold uppercase tracking-wider rounded-xl border transition-all',
                                 isIncome
                                     ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
                                     : 'bg-background/20 border-white/5 text-muted-foreground hover:border-white/10'
@@ -190,7 +190,7 @@ export function EditSubscriptionDialog({ template, onClose }: Props) {
                     </div>
 
                     <div className="space-y-2">
-                        <label htmlFor="edit-sub-description" className="text-[11px] uppercase font-bold text-muted-foreground tracking-wider">
+                        <label htmlFor="edit-sub-description" className="text-meta uppercase font-bold text-muted-foreground tracking-wider">
                             Description
                         </label>
                         <Input
@@ -204,7 +204,7 @@ export function EditSubscriptionDialog({ template, onClose }: Props) {
 
                     <div className="grid grid-cols-[1fr_auto] gap-2">
                         <div className="space-y-2">
-                            <label htmlFor="edit-sub-amount" className="text-[11px] uppercase font-bold text-muted-foreground tracking-wider">
+                            <label htmlFor="edit-sub-amount" className="text-meta uppercase font-bold text-muted-foreground tracking-wider">
                                 Amount
                             </label>
                             <Input
@@ -220,7 +220,7 @@ export function EditSubscriptionDialog({ template, onClose }: Props) {
                             />
                         </div>
                         <div className="space-y-2">
-                            <label className="text-[11px] uppercase font-bold text-muted-foreground tracking-wider">
+                            <label className="text-meta uppercase font-bold text-muted-foreground tracking-wider">
                                 Currency
                             </label>
                             <CurrencyDropdown
@@ -232,7 +232,7 @@ export function EditSubscriptionDialog({ template, onClose }: Props) {
                     </div>
 
                     <div className="space-y-2">
-                        <p className="text-[11px] uppercase font-bold text-muted-foreground tracking-wider">Frequency</p>
+                        <p className="text-meta uppercase font-bold text-muted-foreground tracking-wider">Frequency</p>
                         <div className="grid grid-cols-4 gap-2">
                             {FREQUENCIES.map((f) => (
                                 <button
@@ -241,7 +241,7 @@ export function EditSubscriptionDialog({ template, onClose }: Props) {
                                     onClick={() => setFrequency(f)}
                                     aria-pressed={frequency === f}
                                     className={cn(
-                                        'py-2 text-[11px] font-bold uppercase tracking-wider rounded-xl border transition-all',
+                                        'py-2 text-meta font-bold uppercase tracking-wider rounded-xl border transition-all',
                                         frequency === f
                                             ? 'bg-primary text-white border-primary shadow-lg shadow-primary/20'
                                             : 'bg-background/20 border-white/5 text-muted-foreground hover:border-white/10'
@@ -254,7 +254,7 @@ export function EditSubscriptionDialog({ template, onClose }: Props) {
                     </div>
 
                     <div className="space-y-2">
-                        <label htmlFor="edit-sub-next" className="text-[11px] uppercase font-bold text-muted-foreground tracking-wider">
+                        <label htmlFor="edit-sub-next" className="text-meta uppercase font-bold text-muted-foreground tracking-wider">
                             Next {isIncome ? 'deposit' : 'bill'}
                         </label>
                         <Input
@@ -265,7 +265,7 @@ export function EditSubscriptionDialog({ template, onClose }: Props) {
                             className="bg-secondary/10 border-white/5 h-11 rounded-xl"
                         />
                         {nextPreview && (
-                            <p className="text-[11px] text-muted-foreground italic">{nextPreview}</p>
+                            <p className="text-meta text-muted-foreground italic">{nextPreview}</p>
                         )}
                     </div>
 
@@ -276,7 +276,7 @@ export function EditSubscriptionDialog({ template, onClose }: Props) {
                     />
 
                     <div className="space-y-2">
-                        <p className="text-[11px] uppercase font-bold text-muted-foreground tracking-wider">Payment method</p>
+                        <p className="text-meta uppercase font-bold text-muted-foreground tracking-wider">Payment method</p>
                         <div className="grid grid-cols-2 gap-2">
                             {PAYMENT_METHODS.map((method, idx) => {
                                 const isSelected = paymentMethod === method;
@@ -321,7 +321,7 @@ export function EditSubscriptionDialog({ template, onClose }: Props) {
                     </div>
 
                     <div className="space-y-2">
-                        <label htmlFor="edit-sub-notes" className="text-[11px] uppercase font-bold text-muted-foreground tracking-wider">
+                        <label htmlFor="edit-sub-notes" className="text-meta uppercase font-bold text-muted-foreground tracking-wider">
                             Notes
                         </label>
                         <Textarea

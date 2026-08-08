@@ -1,6 +1,8 @@
 'use client'
 
 import dynamic from 'next/dynamic'
+import { PageSkeleton } from '@/components/ui/page-skeleton'
+import { Skeleton } from '@/components/ui/skeleton'
 import { DataBoundary } from '@/components/boundaries/data-boundary'
 import { PageTransition } from '@/components/page-transition'
 
@@ -9,19 +11,16 @@ import { PageTransition } from '@/components/page-transition'
 // different skeleton — two loading languages back to back — and imported GroupsView
 // statically, so it was never code-split.
 const GroupsSkeleton = () => (
-  <div className="flex flex-col min-h-screen p-5 space-y-6 max-w-md lg:max-w-2xl mx-auto">
-    <div className="flex items-center gap-3 pt-2 opacity-50">
-      <div className="w-9 h-9 rounded-full bg-secondary/20 animate-pulse" />
-      <div className="h-6 w-40 bg-secondary/20 rounded-lg animate-pulse mx-auto" />
-      <div className="w-9 h-9 rounded-full bg-secondary/20 animate-pulse" />
-    </div>
-    <div className="h-24 w-full rounded-3xl bg-secondary/10 animate-pulse" />
-    <div className="h-10 w-full rounded-xl bg-secondary/10 animate-pulse" />
+  // Was a near-miss copy of the shared header: `items-center gap-3` instead of
+  // `justify-between`, and 36px chips where the real ViewHeader's targets are 44px.
+  <PageSkeleton width="2xl" title="w-40">
+    <Skeleton className="h-24 w-full rounded-3xl" />
+    <Skeleton className="h-10 w-full rounded-xl" />
     <div className="space-y-2">
-      <div className="h-20 w-full rounded-xl bg-secondary/10 animate-pulse" />
-      <div className="h-20 w-full rounded-xl bg-secondary/10 animate-pulse" />
+      <Skeleton className="h-20 w-full rounded-xl" />
+      <Skeleton className="h-20 w-full rounded-xl" />
     </div>
-  </div>
+  </PageSkeleton>
 )
 
 const GroupsView = dynamic(

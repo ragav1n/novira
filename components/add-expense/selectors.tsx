@@ -24,12 +24,12 @@ export function CategorySelector({ categories, selectedCategory, onSelect, sugge
     return (
         <div className="space-y-2">
             <div className="flex items-center justify-between gap-2">
-                <p className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest">Category *</p>
+                <p className="text-eyebrow text-muted-foreground/60 uppercase">Category *</p>
                 {suggestion && onApplySuggestion && (
                     <button
                         type="button"
                         onClick={onApplySuggestion}
-                        className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary/15 hover:bg-primary/25 border border-primary/30 text-primary text-[11px] font-medium transition-colors"
+                        className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary/15 hover:bg-primary/25 border border-primary/30 text-primary text-meta font-medium transition-colors"
                     >
                         <Sparkles className="w-3 h-3" />
                         <span>Try {suggestion.label}</span>
@@ -70,7 +70,7 @@ export function BucketSelector({ buckets, selectedBucketId, setSelectedBucketId 
 
     return (
         <div className="space-y-2">
-            <p className="text-[10px] font-bold text-muted-foreground/60 uppercase tracking-widest">Personal Bucket (Private)</p>
+            <p className="text-eyebrow text-muted-foreground/60 uppercase">Personal Bucket (Private)</p>
             <div className="flex gap-2 overflow-x-auto pb-2 -mx-1 px-1 custom-scrollbar">
                 <div
                     onClick={() => setSelectedBucketId(null)}
@@ -84,7 +84,7 @@ export function BucketSelector({ buckets, selectedBucketId, setSelectedBucketId 
                     <div className="w-10 h-10 rounded-full flex items-center justify-center bg-secondary/20 border border-white/5">
                         <X className="w-4 h-4 text-muted-foreground" />
                     </div>
-                    <span className="text-[11px] font-medium truncate w-16 text-center">None</span>
+                    <span className="text-meta font-medium truncate w-16 text-center">None</span>
                 </div>
                 {buckets.filter(b => !b.is_archived).map((bucket) => (
                     <div
@@ -102,7 +102,7 @@ export function BucketSelector({ buckets, selectedBucketId, setSelectedBucketId 
                                 {getBucketIcon(bucket.icon)}
                             </div>
                         </div>
-                        <span className="text-[11px] font-medium truncate w-16 text-center">{bucket.name}</span>
+                        <span className="text-meta font-medium truncate w-16 text-center">{bucket.name}</span>
                     </div>
                 ))}
             </div>

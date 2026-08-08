@@ -49,7 +49,7 @@ function Inner({ play }: { play: boolean }) {
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.85 }}
                 transition={POP}
-                className="flex items-center gap-1.5 transform-gpu rounded-full border border-amber-400/30 bg-amber-500/10 px-2.5 py-1 text-[11px] text-amber-300"
+                className="flex items-center gap-1.5 transform-gpu rounded-full border border-amber-400/30 bg-amber-500/10 px-2.5 py-1 text-meta text-amber-300"
               >
                 <WifiOff className="h-3 w-3" />
                 Offline
@@ -61,7 +61,7 @@ function Inner({ play }: { play: boolean }) {
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.85 }}
                 transition={POP}
-                className="flex items-center gap-1.5 transform-gpu rounded-full border border-emerald-400/30 bg-emerald-500/10 px-2.5 py-1 text-[11px] text-emerald-300"
+                className="flex items-center gap-1.5 transform-gpu rounded-full border border-emerald-400/30 bg-emerald-500/10 px-2.5 py-1 text-meta text-emerald-300"
               >
                 <Wifi className="h-3 w-3" />
                 Online
@@ -114,7 +114,7 @@ function Inner({ play }: { play: boolean }) {
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-sm font-medium text-foreground">Lunch — Café Coffee Day</div>
-                  <div className={`text-[11px] transition-colors duration-300 ${phase === 3 ? 'text-emerald-300' : 'text-amber-300'}`}>
+                  <div className={`text-meta transition-colors duration-300 ${phase === 3 ? 'text-emerald-300' : 'text-amber-300'}`}>
                     {phase === 3 ? 'Synced' : 'Waiting to sync'}
                   </div>
                 </div>
@@ -125,7 +125,7 @@ function Inner({ play }: { play: boolean }) {
         </AnimatePresence>
         </div>
 
-        <p className="mt-4 text-[11px] leading-relaxed text-foreground/75">
+        <p className="mt-4 text-meta leading-relaxed text-foreground/75">
           Add transactions on the train, in airplane mode, in a basement. They land on your device and sync the moment your connection comes back.
         </p>
       </div>

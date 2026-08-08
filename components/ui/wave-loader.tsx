@@ -68,7 +68,7 @@ export function WaveLoader({
             </div>
             {message && (
                 <div
-                    className="text-[11px] font-bold uppercase tracking-widest text-primary/60 animate-pulse mt-4 ml-1"
+                    className="text-meta font-bold uppercase tracking-widest text-primary/60 animate-pulse mt-4 ml-1"
                 >
                     {message}
                 </div>

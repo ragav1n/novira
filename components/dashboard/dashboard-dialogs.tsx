@@ -18,6 +18,7 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { Button } from "@/components/ui/button"
+import { Spinner } from '@/components/ui/spinner';
 import { Wallet, Landmark, PiggyBank, CreditCard as CardIcon, Smartphone, CircleDollarSign, X } from 'lucide-react';
 import { useAccounts } from '@/components/providers/accounts-provider';
 import type { AccountType } from '@/types/account';
@@ -45,11 +46,11 @@ const LocationPicker = dynamic(
 );
 const ExpenseMapView = dynamic(
     () => import('@/components/expense-map-view').then(mod => mod.ExpenseMapView),
-    { ssr: false, loading: () => <div className="fixed inset-0 flex items-center justify-center bg-background/50 backdrop-blur-sm z-[150]"><div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" /></div> }
+    { ssr: false, loading: () => <div className="fixed inset-0 flex items-center justify-center bg-background/50 backdrop-blur-sm z-[150]"><Spinner className="size-8 text-primary" /></div> }
 );
 const AddFundsDialog = dynamic(
     () => import('@/components/add-funds-dialog').then(module => ({ default: module.AddFundsDialog })),
-    { ssr: false, loading: () => <div className="fixed inset-0 min-h-[300px] flex items-center justify-center bg-background/50 backdrop-blur-sm z-[150]"><div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" /></div> }
+    { ssr: false, loading: () => <div className="fixed inset-0 min-h-[300px] flex items-center justify-center bg-background/50 backdrop-blur-sm z-[150]"><Spinner className="size-8 text-primary" /></div> }
 );
 const HowToUseDialog = dynamic(
     () => import('@/components/how-to-use-dialog').then(module => ({ default: module.HowToUseDialog })),
@@ -245,7 +246,7 @@ export function DashboardDialogs({
                                         <div className="w-8 h-8 rounded-full flex items-center justify-center bg-secondary/20 border border-white/5">
                                             <X className="w-3.5 h-3.5 text-muted-foreground" />
                                         </div>
-                                        <span className="text-[9px] font-medium truncate w-14 text-center">None</span>
+                                        <span className="text-micro font-medium truncate w-14 text-center">None</span>
                                     </div>
                                     {activeBuckets.map((bucket) => (
                                         <div
@@ -263,7 +264,7 @@ export function DashboardDialogs({
                                                     {getBucketIcon(bucket.icon)}
                                                 </div>
                                             </div>
-                                            <span className="text-[9px] font-medium truncate w-14 text-center">{bucket.name}</span>
+                                            <span className="text-micro font-medium truncate w-14 text-center">{bucket.name}</span>
                                         </div>
                                     ))}
                                 </div>
@@ -296,7 +297,7 @@ export function DashboardDialogs({
                                                     >
                                                         <TypeIcon className="w-3.5 h-3.5" style={{ color: a.color }} />
                                                     </div>
-                                                    <span className="text-[9px] font-medium truncate w-14 text-center">{a.name}</span>
+                                                    <span className="text-micro font-medium truncate w-14 text-center">{a.name}</span>
                                                 </div>
                                             );
                                         })}

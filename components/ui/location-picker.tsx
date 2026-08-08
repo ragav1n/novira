@@ -7,6 +7,7 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 import { MapPin, X, Search, Navigation, LocateFixed, Globe, Crosshair } from 'lucide-react';
 import { getDistance } from '@/lib/location';
 import { getErrorName } from '@/lib/error-utils';
+import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { toast } from '@/utils/haptics';
@@ -1057,7 +1058,7 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                                     className="w-full h-[100px] bg-secondary/20 cursor-pointer relative overflow-hidden active:opacity-80 transition-opacity">
                                     <Image src={mapUrl} alt="Map" fill className="object-cover opacity-80" sizes="400px" />
                                     <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
-                                    <div className="absolute bottom-2 right-2 flex items-center gap-1 text-[10px] font-bold text-white bg-black/40 backdrop-blur-sm rounded-full px-2 py-1">
+                                    <div className="absolute bottom-2 right-2 flex items-center gap-1 text-caption font-bold text-white bg-black/40 backdrop-blur-sm rounded-full px-2 py-1">
                                         <Navigation className="w-2.5 h-2.5" /> Directions
                                     </div>
                                 </div>
@@ -1076,7 +1077,7 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                                 </div>
                                 <div className="min-w-0 flex-1">
                                     <p className={cn("text-sm font-bold break-words line-clamp-2", isOnline ? "text-blue-400" : "text-emerald-400")}>{placeName}</p>
-                                    {placeAddress && <p className="text-[10px] text-muted-foreground break-words line-clamp-2 mt-0.5">{placeAddress}</p>}
+                                    {placeAddress && <p className="text-caption text-muted-foreground break-words line-clamp-2 mt-0.5">{placeAddress}</p>}
                                 </div>
                             </div>
                             <button type="button" onClick={(e) => { e.stopPropagation(); handleClear(); }}
@@ -1110,7 +1111,7 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                 <label htmlFor="location-search" className="text-sm font-medium">Search Location</label>
                 <button type="button"
                     onClick={() => { setIsExpanded(false); setQuery(''); setPredictions([]); }}
-                    className="text-[11px] font-medium text-muted-foreground active:text-foreground transition-colors px-2 py-1 touch-manipulation">
+                    className="text-meta font-medium text-muted-foreground active:text-foreground transition-colors px-2 py-1 touch-manipulation">
                     Cancel
                 </button>
             </div>
@@ -1131,7 +1132,7 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                 />
                 <div className="absolute left-4 top-1/2 -translate-y-1/2">
                     {isSearching && query.length > 0
-                        ? <div className="w-4 h-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+                        ? <Spinner className="size-4 text-primary" label={null} />
                         : <div className="p-1 rounded-lg bg-primary/10"><Search className="w-4 h-4 text-primary" /></div>
                     }
                 </div>
@@ -1144,7 +1145,7 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                     <div className={cn('w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center shrink-0', isLocating && 'animate-pulse')}>
                         <LocateFixed className="w-4 h-4 text-primary" />
                     </div>
-                    <p className="text-[10px] font-bold text-primary text-center leading-tight">
+                    <p className="text-caption font-bold text-primary text-center leading-tight">
                         {isLocating ? 'Locating…' : 'My Location'}
                     </p>
                 </button>
@@ -1156,7 +1157,7 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                     <div className="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center shrink-0">
                         <Globe className="w-4 h-4 text-blue-400" />
                     </div>
-                    <p className="text-[10px] font-bold text-blue-400 text-center leading-tight">Online</p>
+                    <p className="text-caption font-bold text-blue-400 text-center leading-tight">Online</p>
                 </button>
                 {mapboxToken && (
                     <button type="button"
@@ -1170,7 +1171,7 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                         <div className={cn("w-8 h-8 rounded-full bg-rose-500/20 flex items-center justify-center shrink-0", dropPinMode && "ring-1 ring-rose-500/40")}>
                             <Crosshair className="w-4 h-4 text-rose-400" />
                         </div>
-                        <p className="text-[10px] font-bold text-rose-400 text-center leading-tight">
+                        <p className="text-caption font-bold text-rose-400 text-center leading-tight">
                             {dropPinMode ? 'Cancel' : 'Drop Pin'}
                         </p>
                     </button>
@@ -1213,11 +1214,11 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                             <div className="bg-black/70 backdrop-blur-md rounded-xl px-3 py-2 border border-white/10 min-h-[36px] flex flex-col justify-center">
                                 {dropPinResult ? (
                                     <>
-                                        <p className="text-[11px] font-semibold text-white line-clamp-1">{dropPinResult.name}</p>
-                                        <p className="text-[10px] text-white/50 line-clamp-1 mt-0.5">{dropPinResult.address}</p>
+                                        <p className="text-meta font-semibold text-white line-clamp-1">{dropPinResult.name}</p>
+                                        <p className="text-caption text-white/50 line-clamp-1 mt-0.5">{dropPinResult.address}</p>
                                     </>
                                 ) : (
-                                    <p className="text-[11px] text-white/30 animate-pulse">Finding location…</p>
+                                    <p className="text-meta text-white/30 animate-pulse">Finding location…</p>
                                 )}
                             </div>
                         </div>
@@ -1245,7 +1246,7 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                                             }
                                         }}
                                         className={cn(
-                                            "shrink-0 flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-medium border transition-colors touch-manipulation",
+                                            "shrink-0 flex items-center gap-1.5 rounded-full px-3 py-1.5 text-meta font-medium border transition-colors touch-manipulation",
                                             active
                                                 ? "bg-rose-500/20 border-rose-500/40 text-rose-200"
                                                 : "bg-white/5 border-white/10 text-white/70 active:bg-white/10"
@@ -1289,7 +1290,7 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
 
             {/* Nearby loading shimmer */}
             {!dropPinMode && isLoadingNearby && query.length === 0 && (
-                <p className="text-[10px] text-primary/40 text-center py-1 animate-pulse">Finding nearby places…</p>
+                <p className="text-caption text-primary/40 text-center py-1 animate-pulse">Finding nearby places…</p>
             )}
 
             {/* Recent locations */}
@@ -1300,7 +1301,7 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                         className="absolute left-0 right-0 top-full mt-2 z-[100] rounded-xl border border-white/10 bg-gradient-to-b from-[#0E0E14] to-[#08080B] shadow-[0_24px_60px_-12px_rgba(0,0,0,0.7)] overflow-hidden ring-1 ring-white/[0.04] backdrop-blur-xl">
                         <div className="flex items-center gap-1.5 px-4 pt-3 pb-1.5">
                             <div className="w-1 h-1 rounded-full bg-primary/60" />
-                            <p className="text-[9px] font-bold text-muted-foreground/60 uppercase tracking-[0.15em]">Recent</p>
+                            <p className="text-micro font-bold text-muted-foreground/60 uppercase tracking-[0.15em]">Recent</p>
                         </div>
                         <div className="max-h-[280px] overflow-y-auto no-scrollbar" ref={listRef}>
                             {recentLocations.map((loc, i) => {
@@ -1320,19 +1321,19 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                                             <MapPin className="w-[18px] h-[18px] text-primary" strokeWidth={2.5} />
                                         </div>
                                         <div className="min-w-0 flex-1">
-                                            <p className="text-[13.5px] font-semibold tracking-tight line-clamp-1 text-foreground">{loc.place_name}</p>
+                                            <p className="text-body font-semibold tracking-tight line-clamp-1 text-foreground">{loc.place_name}</p>
                                             {loc.place_address && (
-                                                <p className="text-[11px] text-muted-foreground/70 line-clamp-1 mt-0.5 truncate">{loc.place_address}</p>
+                                                <p className="text-meta text-muted-foreground/70 line-clamp-1 mt-0.5 truncate">{loc.place_address}</p>
                                             )}
                                         </div>
                                         <div className="flex items-center gap-1.5 shrink-0 ml-1">
                                             {loc.visitCount > 1 && (
-                                                <span className="text-[9px] font-bold text-primary/70 bg-primary/10 ring-1 ring-inset ring-primary/15 px-1.5 py-0.5 rounded-full tabular-nums">
+                                                <span className="text-micro font-bold text-primary/70 bg-primary/10 ring-1 ring-inset ring-primary/15 px-1.5 py-0.5 rounded-full tabular-nums">
                                                     {loc.visitCount}×
                                                 </span>
                                             )}
                                             {dist !== undefined && (
-                                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold tabular-nums tracking-tight bg-white/5 text-primary/80 ring-1 ring-inset ring-primary/15">
+                                                <span className="px-2 py-0.5 rounded-full text-caption font-bold tabular-nums tracking-tight bg-white/5 text-primary/80 ring-1 ring-inset ring-primary/15">
                                                     {formatDist(dist)}
                                                 </span>
                                             )}
@@ -1380,17 +1381,17 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                                         </div>
 
                                         <div className="min-w-0 flex-1">
-                                            <p className="text-[13.5px] font-semibold tracking-tight break-words line-clamp-1 text-foreground">
+                                            <p className="text-body font-semibold tracking-tight break-words line-clamp-1 text-foreground">
                                                 <HighlightedText text={prediction.structured_formatting.main_text} query={query} />
                                             </p>
-                                            <p className="text-[11px] text-muted-foreground/70 line-clamp-1 mt-0.5 truncate">
+                                            <p className="text-meta text-muted-foreground/70 line-clamp-1 mt-0.5 truncate">
                                                 {prediction.structured_formatting.secondary_text}
                                             </p>
                                         </div>
 
                                         {prediction._distance !== undefined && (
                                             <div className={cn(
-                                                'shrink-0 ml-1 px-2 py-0.5 rounded-full text-[10px] font-bold tabular-nums tracking-tight ring-1 ring-inset',
+                                                'shrink-0 ml-1 px-2 py-0.5 rounded-full text-caption font-bold tabular-nums tracking-tight ring-1 ring-inset',
                                                 prediction._is_nearby
                                                     ? 'bg-emerald-500/10 text-emerald-400 ring-emerald-500/20'
                                                     : 'bg-white/5 text-primary/80 ring-primary/15'
@@ -1404,7 +1405,7 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                         </div>
                         {activeSource && (
                             <div className="flex items-center justify-end gap-1 px-3 py-1.5 bg-white/[0.015] border-t border-white/[0.04]">
-                                <span className="text-[9px] text-muted-foreground/40 tracking-wide">
+                                <span className="text-micro text-muted-foreground/40 tracking-wide">
                                     {activeSource === 'google' ? 'via Google' :
                                         activeSource === 'mapbox' ? 'via Mapbox' :
                                             'via OpenStreetMap'}
@@ -1422,8 +1423,8 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                         <Search className="w-5 h-5 text-muted-foreground/40" strokeWidth={2} />
                     </div>
                     <div className="text-center">
-                        <p className="text-[13px] font-semibold text-foreground/80">No places found</p>
-                        <p className="text-[11px] text-muted-foreground/60 mt-0.5">Try a different search or drop a pin</p>
+                        <p className="text-body font-semibold text-foreground/80">No places found</p>
+                        <p className="text-meta text-muted-foreground/60 mt-0.5">Try a different search or drop a pin</p>
                     </div>
                 </div>
             )}

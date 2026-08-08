@@ -35,7 +35,7 @@ export function SubscriptionSummaryCard({
 
     return (
         <section className="space-y-3 text-center">
-            <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground/70">
+            <p className="text-eyebrow uppercase text-muted-foreground/70">
                 Estimated monthly
                 <span className="opacity-70">
                     {' · '}{totalActiveCount} active
@@ -44,11 +44,11 @@ export function SubscriptionSummaryCard({
             </p>
 
             <div className="flex items-end justify-center gap-3 flex-wrap">
-                <h3 className={cn('text-[40px] leading-none font-bold tracking-tight tabular-nums', themeConfig.text)}>
+                <h3 className={cn('text-hero tabular-nums', themeConfig.text)}>
                     {formatCurrency(totalMonthly)}
                 </h3>
                 {totalActiveCount > 0 && (
-                    <span className="text-[11px] text-muted-foreground/70 mb-1.5 tabular-nums">
+                    <span className="text-meta text-muted-foreground/70 mb-1.5 tabular-nums">
                         ≈ {formatCurrency(totalYearly)} / yr
                     </span>
                 )}
@@ -56,7 +56,7 @@ export function SubscriptionSummaryCard({
 
             {nextTrialEnding && (
                 <div className="flex justify-center pt-0.5">
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-amber-500/10 border border-amber-500/25 text-amber-300">
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-meta font-semibold bg-amber-500/10 border border-amber-500/25 text-amber-300">
                         <Sparkles className="w-3 h-3" aria-hidden="true" />
                         <span>
                             Trial ends in {Math.max(0, nextTrialEnding.daysLeft)}d
@@ -72,7 +72,7 @@ export function SubscriptionSummaryCard({
                     {activeFrequencies.map(f => (
                         <span
                             key={f}
-                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] bg-card/40 border border-white/[0.06] backdrop-blur-sm"
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-meta bg-card/40 border border-white/[0.06] backdrop-blur-sm"
                         >
                             <span className="font-semibold text-foreground/85 tabular-nums">{breakdown[f].count}</span>
                             <span className="capitalize text-muted-foreground/70">{f}</span>

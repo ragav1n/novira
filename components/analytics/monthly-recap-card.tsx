@@ -7,6 +7,7 @@ import { format } from 'date-fns';
 import { HolographicCard } from '@/components/ui/holographic-card';
 import { RecapBody, RecapSkeleton, formatRecapPeriod, isYearlyPeriod, type RecapData, type RecapAnalyzed } from '@/components/recap/recap-card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Spinner } from '@/components/ui/spinner';
 import { toast } from '@/utils/haptics';
 
 interface Props {
@@ -128,10 +129,10 @@ export function MonthlyRecapCard({ currency, formatCurrency }: Props) {
                             <ChartLine className="w-[18px] h-[18px] text-primary-foreground" />
                         </div>
                         <div className="min-w-0">
-                            <h3 className="font-bold text-[12px] uppercase tracking-wider text-foreground">
+                            <h3 className="font-bold text-xs uppercase tracking-wider text-foreground">
                                 {viewingYear ? 'Yearly Recap' : 'Monthly Recap'}
                             </h3>
-                            <p className="text-[10px] text-muted-foreground font-medium truncate">
+                            <p className="text-caption text-muted-foreground font-medium truncate">
                                 {viewingYear ? 'A look back at the whole year' : "A look at last month's spending"}
                             </p>
                         </div>
@@ -141,19 +142,19 @@ export function MonthlyRecapCard({ currency, formatCurrency }: Props) {
                             value={recapMonth || availableMonths[0]}
                             onValueChange={(v) => loadRecap(v)}
                         >
-                            <SelectTrigger className="h-8 w-auto min-w-[120px] text-[10px] font-bold uppercase tracking-wider bg-primary/15 border-primary/30 text-foreground/90 rounded-full px-3">
+                            <SelectTrigger className="h-8 w-auto min-w-[120px] text-eyebrow uppercase bg-primary/15 border-primary/30 text-foreground/90 rounded-full px-3">
                                 <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
                                 {availableMonths.map((m) => (
-                                    <SelectItem key={m} value={m} className="text-[11px]">
+                                    <SelectItem key={m} value={m} className="text-meta">
                                         {formatRecapPeriod(m)}
                                     </SelectItem>
                                 ))}
                             </SelectContent>
                         </Select>
                     ) : recapMonthLabel ? (
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-foreground/80 bg-primary/15 border border-primary/30 px-2 py-1 rounded-full whitespace-nowrap">
+                        <span className="text-eyebrow uppercase text-foreground/80 bg-primary/15 border border-primary/30 px-2 py-1 rounded-full whitespace-nowrap">
                             {recapMonthLabel}
                         </span>
                     ) : null}
@@ -191,11 +192,11 @@ export function MonthlyRecapCard({ currency, formatCurrency }: Props) {
                     />
                 ) : (
                     <div className="space-y-3">
-                        <p className="text-[13px] text-foreground/80 leading-relaxed">
+                        <p className="text-body text-foreground/80 leading-relaxed">
                             Compare last month against the one before, in plain language.
                         </p>
                         <div className="space-y-2">
-                            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70">You'll see</p>
+                            <p className="text-eyebrow uppercase text-muted-foreground/70">You'll see</p>
                             <ul className="space-y-2">
                                 {[
                                     { icon: Tags, label: 'Where you spent more or less', sub: 'by category' },
@@ -208,7 +209,7 @@ export function MonthlyRecapCard({ currency, formatCurrency }: Props) {
                                         <div className="w-6 h-6 rounded-lg bg-primary/15 border border-primary/25 flex items-center justify-center shrink-0 mt-0.5">
                                             <Icon className="w-3 h-3 text-primary" />
                                         </div>
-                                        <div className="text-[12px] leading-snug">
+                                        <div className="text-xs leading-snug">
                                             <span className="text-foreground/90 font-medium">{label}</span>
                                             <span className="text-muted-foreground"> — {sub}</span>
                                         </div>
@@ -222,11 +223,11 @@ export function MonthlyRecapCard({ currency, formatCurrency }: Props) {
                 <button
                     onClick={() => generateRecap(recap ? recapMonth || priorMonthKey : priorMonthKey, !!recap)}
                     disabled={recapLoading}
-                    className="w-full h-11 text-[13px] font-bold rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 active:scale-[0.99] shadow-[0_6px_22px_-6px_rgba(168,85,247,0.7)] ring-1 ring-inset ring-white/15 transition-all disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    className="w-full h-11 text-body font-bold rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 active:scale-[0.99] shadow-[0_6px_22px_-6px_rgba(168,85,247,0.7)] ring-1 ring-inset ring-white/15 transition-all disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
                     {recapLoading ? (
                         <>
-                            <span className="w-3.5 h-3.5 rounded-full border-2 border-primary-foreground/30 border-t-primary-foreground animate-spin" />
+                            <Spinner className="size-3.5 text-primary-foreground" label={null} />
                             Analyzing your spending…
                         </>
                     ) : recap ? (

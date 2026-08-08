@@ -49,7 +49,7 @@ export function DashboardLayoutSection() {
 
     return (
         <div className="space-y-3">
-            <p className="text-[11px] text-muted-foreground">
+            <p className="text-meta text-muted-foreground">
                 Hide widgets you don&apos;t use. Saved on this device.
             </p>
             <div className="space-y-2">
@@ -63,7 +63,7 @@ export function DashboardLayoutSection() {
                         </div>
                         <div className="flex-1 min-w-0">
                             <p className="text-sm font-semibold">{card.label}</p>
-                            <p className="text-[11px] text-muted-foreground truncate">{card.description}</p>
+                            <p className="text-meta text-muted-foreground truncate">{card.description}</p>
                         </div>
                         <Switch
                             checked={layout[card.id]}
