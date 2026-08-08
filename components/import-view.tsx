@@ -1,12 +1,13 @@
 'use client';
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSafeBack } from '@/hooks/useSafeBack';
 import { useDropzone } from 'react-dropzone';
 import Papa from 'papaparse';
+import { Spinner } from '@/components/ui/spinner';
 import { parse, isValid, format } from 'date-fns';
-import { Upload, ChevronRight, ChevronLeft, Check, AlertCircle, X, FileSpreadsheet, Loader2 } from 'lucide-react';
+import { Upload, ChevronRight, ChevronLeft, Check, AlertCircle, X, FileSpreadsheet } from 'lucide-react';
 import { toast } from '@/utils/haptics';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
@@ -65,6 +66,9 @@ interface ParsedTransaction {
     paymentMethod: string;
 }
 
+/** Max rows mounted in the preview table. Does not limit what gets imported. */
+const IMPORT_PREVIEW_LIMIT = 200;
+
 export function ImportView() {
     const router = useRouter();
     const goBack = useSafeBack('/settings');
@@ -90,6 +94,25 @@ export function ImportView() {
     const [amountMode, setAmountMode] = useState<'single' | 'split'>('single');
 
     const [parsedTransactions, setParsedTransactions] = useState<ParsedTransaction[]>([]);
+    /**
+     * The preview table renders one `<TableRow>` with five cells, an icon lookup and
+     * two inline style objects per row. A bank export is routinely thousands of rows
+     * and there is no server-side ceiling here — the file is parsed locally — so this
+     * mapped over the whole array and mounted every row inside a 400px ScrollArea.
+     *
+     * Only the *preview* is capped. `handleImport` reads `parsedTransactions`
+     * directly, so every valid row is still committed.
+     *
+     * Invalid rows sort first: the preview exists to catch parse failures, and with a
+     * cap those are exactly the rows that must not be the ones hidden.
+     */
+    const previewRows = useMemo(() => {
+        if (parsedTransactions.length <= IMPORT_PREVIEW_LIMIT) return parsedTransactions;
+        const invalid = parsedTransactions.filter(t => !t.isValid);
+        const valid = parsedTransactions.filter(t => t.isValid);
+        return [...invalid, ...valid].slice(0, IMPORT_PREVIEW_LIMIT);
+    }, [parsedTransactions]);
+    const hiddenRowCount = parsedTransactions.length - previewRows.length;
     const [isImporting, setIsImporting] = useState(false);
     const [parsing, setParsing] = useState(false);
     /** Rows committed so far, so a large import reports progress instead of hanging. */
@@ -517,7 +540,7 @@ export function ImportView() {
                         {parsing ? (
                             <div className="flex flex-col items-center justify-center p-10" role="status" aria-live="polite">
                                 <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-4">
-                                    <Loader2 className="w-8 h-8 text-primary animate-spin" aria-hidden="true" />
+                                    <Spinner className="size-8 text-primary" label={null} />
                                 </div>
                                 <h3 className="text-lg font-semibold mb-1">Reading your file…</h3>
                                 <p className="text-sm text-muted-foreground text-center max-w-xs break-all">
@@ -560,13 +583,13 @@ export function ImportView() {
                     </CardHeader>
                     <CardContent className="space-y-4 pt-4">
                         {/* Header Row Info */}
-                        <div className="bg-secondary/20 p-2.5 rounded-lg text-[11px] text-muted-foreground">
+                        <div className="bg-secondary/20 p-2.5 rounded-lg text-meta text-muted-foreground">
                             Detected Header Row: <strong>Row {headerRowIndex + 1}</strong>
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             <div className="space-y-1">
-                                <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Date Column <span className="text-rose-500">*</span></p>
+                                <p className="text-meta font-medium uppercase tracking-wider text-muted-foreground">Date Column <span className="text-rose-500">*</span></p>
                                 <Select value={mapping.date} onValueChange={(val) => setMapping({ ...mapping, date: val })}>
                                     <SelectTrigger className="h-10 text-sm"><SelectValue placeholder="Select column" /></SelectTrigger>
                                     <SelectContent>
@@ -575,7 +598,7 @@ export function ImportView() {
                                 </Select>
                             </div>
                             <div className="space-y-1">
-                                <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Description Column <span className="text-rose-500">*</span></p>
+                                <p className="text-meta font-medium uppercase tracking-wider text-muted-foreground">Description Column <span className="text-rose-500">*</span></p>
                                 <Select value={mapping.description} onValueChange={(val) => setMapping({ ...mapping, description: val })}>
                                     <SelectTrigger className="h-10 text-sm"><SelectValue placeholder="Select column" /></SelectTrigger>
                                     <SelectContent>
@@ -586,7 +609,7 @@ export function ImportView() {
                         </div>
 
                         <div className="space-y-1">
-                            <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Currency of File <span className="text-rose-500">*</span></p>
+                            <p className="text-meta font-medium uppercase tracking-wider text-muted-foreground">Currency of File <span className="text-rose-500">*</span></p>
                             <Select value={importCurrency} onValueChange={(val) => setImportCurrency(val)}>
                                 <SelectTrigger className="w-full h-10 text-sm"><SelectValue placeholder="Select currency" /></SelectTrigger>
                                 <SelectContent>
@@ -595,7 +618,7 @@ export function ImportView() {
                                     ))}
                                 </SelectContent>
                             </Select>
-                            <p className="text-[9px] text-muted-foreground">Currency used in your uploaded statement.</p>
+                            <p className="text-micro text-muted-foreground">Currency used in your uploaded statement.</p>
                         </div>
 
                         <Separator />
@@ -604,20 +627,20 @@ export function ImportView() {
                             <div className="flex items-center justify-between">
                                 <Label htmlFor="amount-mode" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Amount Mapping Mode</Label>
                                 <div className="flex items-center gap-2">
-                                    <span className={`text-[10px] ${amountMode === 'single' ? 'text-primary font-bold' : 'text-muted-foreground'}`}>Single</span>
+                                    <span className={`text-caption ${amountMode === 'single' ? 'text-primary font-bold' : 'text-muted-foreground'}`}>Single</span>
                                     <Switch
                                         id="amount-mode"
                                         checked={amountMode === 'split'}
                                         onCheckedChange={(checked) => setAmountMode(checked ? 'split' : 'single')}
                                         className="scale-75"
                                     />
-                                    <span className={`text-[10px] ${amountMode === 'split' ? 'text-primary font-bold' : 'text-muted-foreground'}`}>Split</span>
+                                    <span className={`text-caption ${amountMode === 'split' ? 'text-primary font-bold' : 'text-muted-foreground'}`}>Split</span>
                                 </div>
                             </div>
 
                             {amountMode === 'single' ? (
                                 <div className="space-y-1">
-                                    <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Amount Column <span className="text-rose-500">*</span></p>
+                                    <p className="text-meta font-medium uppercase tracking-wider text-muted-foreground">Amount Column <span className="text-rose-500">*</span></p>
                                     <Select value={mapping.amount} onValueChange={(val) => setMapping({ ...mapping, amount: val })}>
                                         <SelectTrigger className="h-10 text-sm"><SelectValue placeholder="Select column" /></SelectTrigger>
                                         <SelectContent>
@@ -628,7 +651,7 @@ export function ImportView() {
                             ) : (
                                 <div className="grid grid-cols-2 gap-3">
                                     <div className="space-y-1">
-                                        <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Debit</p>
+                                        <p className="text-meta font-medium uppercase tracking-wider text-muted-foreground">Debit</p>
                                         <Select value={mapping.debit || "none"} onValueChange={(val) => setMapping({ ...mapping, debit: val === "none" ? "" : val })}>
                                             <SelectTrigger className="h-10 text-sm"><SelectValue placeholder="Select column" /></SelectTrigger>
                                             <SelectContent>
@@ -638,7 +661,7 @@ export function ImportView() {
                                         </Select>
                                     </div>
                                     <div className="space-y-1">
-                                        <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Credit</p>
+                                        <p className="text-meta font-medium uppercase tracking-wider text-muted-foreground">Credit</p>
                                         <Select value={mapping.credit || "none"} onValueChange={(val) => setMapping({ ...mapping, credit: val === "none" ? "" : val })}>
                                             <SelectTrigger className="h-10 text-sm"><SelectValue placeholder="Select column" /></SelectTrigger>
                                             <SelectContent>
@@ -654,7 +677,7 @@ export function ImportView() {
                         <Separator />
 
                         <div className="space-y-1">
-                            <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Category Column (Optional)</p>
+                            <p className="text-meta font-medium uppercase tracking-wider text-muted-foreground">Category Column (Optional)</p>
                             {/* Defaults to "none" rather than '': the empty value showed
                                 the "Select column" placeholder even though the actual
                                 behaviour is auto-categorise, so the real default was
@@ -698,7 +721,7 @@ export function ImportView() {
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                        {parsedTransactions.map((tx, idx) => (
+                                        {previewRows.map((tx, idx) => (
                                             <TableRow key={idx} className={!tx.isValid ? 'bg-rose-500/5' : ''}>
                                                 <TableCell>
                                                     {tx.isValid ? (
@@ -720,7 +743,7 @@ export function ImportView() {
                                                             {getIconForCategory(tx.category, "w-full h-full", { style: { color: CATEGORY_COLORS[tx.category] || CATEGORY_COLORS.others } })}
                                                         </div>
                                                         <span 
-                                                            className="px-1.5 py-0.5 rounded border text-[10px] font-bold capitalize"
+                                                            className="px-1.5 py-0.5 rounded border text-caption font-bold capitalize"
                                                             style={{
                                                                 backgroundColor: `${CATEGORY_COLORS[tx.category] || CATEGORY_COLORS.others}20`,
                                                                 borderColor: `${CATEGORY_COLORS[tx.category] || CATEGORY_COLORS.others}40`,
@@ -736,6 +759,14 @@ export function ImportView() {
                                                 </TableCell>
                                             </TableRow>
                                         ))}
+                                        {hiddenRowCount > 0 && (
+                                            <TableRow className="hover:bg-transparent">
+                                                <TableCell colSpan={5} className="text-center text-xs text-muted-foreground/70 py-4">
+                                                    {hiddenRowCount.toLocaleString()} more row{hiddenRowCount === 1 ? '' : 's'} not shown.
+                                                    All valid rows will still be imported.
+                                                </TableCell>
+                                            </TableRow>
+                                        )}
                                     </TableBody>
                                 </Table>
                             </ScrollArea>
@@ -758,7 +789,7 @@ export function ImportView() {
                             className="bg-emerald-500 hover:bg-emerald-600 text-white"
                         >
                             {isImporting ? (
-                                <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Importing...</>
+                                <><Spinner className="mr-2" label={null} /> Importing...</>
                             ) : (
                                 <><FileSpreadsheet className="w-4 h-4 mr-2" /> Import {parsedTransactions.filter(t => t.isValid).length} Transactions</>
                             )}

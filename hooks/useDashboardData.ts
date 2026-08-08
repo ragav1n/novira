@@ -777,7 +777,11 @@ export function useDashboardData(
         }
     };
 
-    const loadAuditLogs = async (tx: Transaction) => {
+    // useCallback with no deps: the body touches only useState setters (stable) and
+    // the module-level `supabase`/`toast`. Stable identity matters because this is
+    // handed straight to every TransactionRow as `onHistory`, and an unstable
+    // function prop defeats that row's memo on its own.
+    const loadAuditLogs = useCallback(async (tx: Transaction) => {
         setSelectedAuditTx(tx);
         setLoadingAudit(true);
         try {
@@ -797,7 +801,7 @@ export function useDashboardData(
         } finally {
             setLoadingAudit(false);
         }
-    };
+    }, []);
 
     // Merge pending (offline-queued) items on top of server-fetched transactions.
     // Dedupe by id to handle the rare case where a server row arrives with the same id

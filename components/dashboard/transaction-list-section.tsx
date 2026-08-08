@@ -6,7 +6,7 @@ import { AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { Transaction } from '@/types/transaction';
 import { TransactionRow } from '@/components/transaction-row';
-import { getIconForCategory, CATEGORY_COLORS } from '@/lib/categories';
+import { CATEGORY_COLORS } from '@/lib/categories';
 import { useConfirm } from '@/components/ui/confirm-dialog';
 import { Currency } from '@/components/providers/user-preferences-provider';
 import { Bucket } from '@/components/providers/buckets-provider';
@@ -90,6 +90,13 @@ export function TransactionListSection({
             onConfirm: () => handleDeleteTransaction(tx),
         });
     }, [confirm, handleDeleteTransaction]);
+
+    // Stable adapter for the row's `onEdit(tx)` contract.
+    const handleEdit = useCallback((tx: Transaction) => {
+        setEditingTransaction(tx);
+        setIsEditOpen(true);
+    }, [setEditingTransaction, setIsEditOpen]);
+
     // When filtering by category, also exclude settlements AND bound to the pie's
     // scope so the visible rows reconcile with the pie slice value:
     //   - non-bucket: pie covers the current calendar month, so filter rows to the
@@ -117,7 +124,7 @@ export function TransactionListSection({
                             type="button"
                             onClick={onClearCategory}
                             className={cn(
-                                "inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full border transition-colors",
+                                "inline-flex items-center gap-1 text-meta font-bold px-2 py-0.5 rounded-full border transition-colors",
                                 isCoupleWorkspace
                                     ? "bg-rose-500/10 text-rose-300 border-rose-500/20 hover:bg-rose-500/15"
                                     : isHomeWorkspace
@@ -134,7 +141,7 @@ export function TransactionListSection({
                     {filteredRecents.some(tx => tx.place_lat && tx.place_lng) && (
                         <button
                             onClick={() => setIsMapOpen(true)}
-                            className="text-[13px] text-emerald-400 font-semibold hover:text-emerald-300 transition-colors px-2 py-1 flex items-center gap-1"
+                            className="text-body text-emerald-400 font-semibold hover:text-emerald-300 transition-colors px-2 py-1 flex items-center gap-1"
                         >
                             <MapPin className="w-3.5 h-3.5" />
                             Map
@@ -143,7 +150,7 @@ export function TransactionListSection({
                     <button
                         onClick={() => setIsViewAllOpen(true)}
                         className={cn(
-                            "text-[13px] font-semibold transition-colors px-2 py-1",
+                            "text-body font-semibold transition-colors px-2 py-1",
                             isCoupleWorkspace ? "text-rose-400 hover:text-rose-300" : isHomeWorkspace ? "text-amber-500 hover:text-amber-400" : "text-primary hover:text-primary/80"
                         )}
                     >
@@ -171,13 +178,12 @@ export function TransactionListSection({
                             }
                             showConverted={!!showConverted}
                             canEdit={canEditTransaction(tx)}
-                            icon={getIconForCategory(tx.category, 'w-4 h-4')}
                             color={CATEGORY_COLORS[tx.category.toLowerCase()] || CATEGORY_COLORS.uncategorized}
-                            bucketChip={getBucketChip(tx)}
-                            onHistory={() => loadAuditLogs(tx)}
-                            onEdit={() => { setEditingTransaction(tx); setIsEditOpen(true); }}
-                            onDelete={() => confirmDelete(tx)}
-                            onViewReceipt={onViewReceipt ? () => onViewReceipt(tx) : undefined}
+                            renderBucketChip={getBucketChip}
+                            onHistory={loadAuditLogs}
+                            onEdit={handleEdit}
+                            onDelete={confirmDelete}
+                            onViewReceipt={onViewReceipt}
                         />
                     );
                 })}
@@ -219,7 +225,6 @@ export function TransactionListSection({
                     currency={currency}
                     buckets={buckets}
                     calculateUserShare={calculateUserShare}
-                    getIconForCategory={getIconForCategory}
                     formatCurrency={formatCurrency}
                     convertAmount={convertAmount}
                     canEditTransaction={canEditTransaction}

@@ -54,6 +54,7 @@ import { InsightsChatCard } from '@/components/analytics/insights-chat-card';
 import { LazyMount } from '@/components/analytics/lazy-mount';
 import { WhatIfCard } from '@/components/analytics/what-if-card';
 import { ViewHeader } from '@/components/ui/view-header';
+import { EmptyState } from '@/components/ui/empty-state';
 
 function BucketIcon({ icon, className }: { icon?: string; className?: string }) {
     const el = getIconForCategory(icon || 'Tag') as React.ReactElement<{ className?: string }>;
@@ -355,11 +356,18 @@ export function AnalyticsView() {
     return (
         <div className="relative min-h-[100dvh]">
             <div className={cn(
-                'p-5 space-y-6 max-w-md lg:max-w-4xl mx-auto relative transition-all duration-300',
-                loading ? 'opacity-50 blur-[2px] pointer-events-none' : 'opacity-100 blur-0'
+                'p-5 space-y-6 max-w-md lg:max-w-4xl mx-auto relative',
+                // No dim or blur while loading: AnalyticsSkeleton renders *inside* this
+                // wrapper, so the old `opacity-50 blur-[2px]` was blurring its own
+                // placeholder. A dim is only meaningful over real, stale content, and there
+                // is none here. `blur-[2px]` over every Recharts SVG also forced a full-page
+                // offscreen raster on each range/tag toggle, animated across 300ms by
+                // `transition-all`. Pointer-events stay suppressed so the range picker can't
+                // be driven mid-fetch.
+                loading && 'pointer-events-none'
             )}>
                 {/* Sticky Header — slim: back / title / period badge + total chip when scrolled */}
-                <div className="sticky top-0 z-20 -mx-5 px-5 py-2 bg-background/85 backdrop-blur-xl border-b border-white/[0.05]">
+                <div className="sticky top-0 z-20 -mx-5 px-5 py-2 bg-background/85 backdrop-blur-xl border-b border-white/5">
                     <ViewHeader
                         title="Analytics"
                         onBack
@@ -367,7 +375,7 @@ export function AnalyticsView() {
                             <>
                             {!loading && totalSpentInRange > 0 && (
                                 <span className={cn(
-                                    'text-[10px] font-bold tabular-nums px-2 py-0.5 rounded-md border',
+                                    'text-caption font-bold tabular-nums px-2 py-0.5 rounded-md border',
                                     themeConfig.bgLight,
                                     themeConfig.borderMedium,
                                     themeConfig.text,
@@ -375,7 +383,7 @@ export function AnalyticsView() {
                                     {formatCurrency(Math.round(totalSpentInRange))}
                                 </span>
                             )}
-                            <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-secondary/30 text-muted-foreground">
+                            <span className="text-eyebrow uppercase px-2 py-0.5 rounded-md bg-secondary/30 text-muted-foreground">
                                 {dateRange === 'ALL' ? 'All' : dateRange}
                             </span>
                             </>
@@ -390,7 +398,7 @@ export function AnalyticsView() {
                         toast.haptic(ImpactStyle.Light);
                     }}>
                         <SelectTrigger className={cn(
-                            'w-full px-3 h-10 text-[12px] rounded-xl font-bold border transition-colors',
+                            'w-full px-3 h-10 text-xs rounded-xl font-bold border transition-colors',
                             selectedBucketId === 'all'
                                 ? 'bg-secondary/20 border-white/5 text-foreground/80'
                                 : cn(themeConfig.bgLight, themeConfig.borderMedium, themeConfig.text),
@@ -413,7 +421,7 @@ export function AnalyticsView() {
                                             <span className="flex-1 truncate">{b.name}</span>
                                             {Number(b.budget) > 0 && (
                                                 <span className={cn(
-                                                    'ml-2 text-[10px] font-bold tabular-nums shrink-0',
+                                                    'ml-2 text-caption font-bold tabular-nums shrink-0',
                                                     remaining < 0 ? 'text-rose-400' : 'text-muted-foreground/70'
                                                 )}>
                                                     {formatCurrency(remaining)}
@@ -429,7 +437,7 @@ export function AnalyticsView() {
                         setDateRange(val);
                         toast.haptic(ImpactStyle.Medium);
                     }}>
-                        <SelectTrigger className="w-full px-3 h-10 text-[12px] bg-secondary/20 border-white/5 rounded-xl font-bold">
+                        <SelectTrigger className="w-full px-3 h-10 text-xs bg-secondary/20 border-white/5 rounded-xl font-bold">
                             <SelectValue placeholder="Period" />
                         </SelectTrigger>
                         <SelectContent align="center">
@@ -460,7 +468,7 @@ export function AnalyticsView() {
                                         setCustomEnd(p.to());
                                         toast.haptic(ImpactStyle.Light);
                                     }}
-                                    className="h-7 px-3 rounded-full text-[10px] font-bold uppercase tracking-wider bg-secondary/30 hover:bg-secondary/50 border border-white/5 transition-colors"
+                                    className="h-7 px-3 rounded-full text-eyebrow uppercase bg-secondary/30 hover:bg-secondary/50 border border-white/5 transition-colors"
                                 >
                                     {p.label}
                                 </button>
@@ -468,23 +476,23 @@ export function AnalyticsView() {
                         </div>
                         <div className="flex gap-2">
                             <div className="flex-1">
-                                <label className="text-[10px] font-bold uppercase tracking-wider text-white/40 mb-1 block">From</label>
+                                <label className="text-eyebrow uppercase text-white/40 mb-1 block">From</label>
                                 <input
                                     type="date"
                                     value={customStart}
                                     max={customEnd || undefined}
                                     onChange={(e) => setCustomStart(e.target.value)}
-                                    className="w-full h-10 px-3 rounded-xl bg-secondary/20 border border-white/5 text-[12px] font-bold text-white focus:outline-none focus:ring-1 focus:ring-primary/50 [color-scheme:dark]"
+                                    className="w-full h-10 px-3 rounded-xl bg-secondary/20 border border-white/5 text-xs font-bold text-white focus:outline-none focus:ring-1 focus:ring-primary/50 [color-scheme:dark]"
                                 />
                             </div>
                             <div className="flex-1">
-                                <label className="text-[10px] font-bold uppercase tracking-wider text-white/40 mb-1 block">To</label>
+                                <label className="text-eyebrow uppercase text-white/40 mb-1 block">To</label>
                                 <input
                                     type="date"
                                     value={customEnd}
                                     min={customStart || undefined}
                                     onChange={(e) => setCustomEnd(e.target.value)}
-                                    className="w-full h-10 px-3 rounded-xl bg-secondary/20 border border-white/5 text-[12px] font-bold text-white focus:outline-none focus:ring-1 focus:ring-primary/50 [color-scheme:dark]"
+                                    className="w-full h-10 px-3 rounded-xl bg-secondary/20 border border-white/5 text-xs font-bold text-white focus:outline-none focus:ring-1 focus:ring-primary/50 [color-scheme:dark]"
                                 />
                             </div>
                         </div>
@@ -497,10 +505,10 @@ export function AnalyticsView() {
                     <Card className="bg-card/40 border-destructive/30 shadow-none">
                         <CardContent className="p-5 space-y-3 text-center">
                             <p className="text-sm font-bold text-destructive">Couldn&apos;t load analytics</p>
-                            <p className="text-[12px] text-muted-foreground">{error}</p>
+                            <p className="text-xs text-muted-foreground">{error}</p>
                             <button
                                 onClick={() => fetchData()}
-                                className="h-9 px-4 text-[12px] font-bold rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-all"
+                                className="h-9 px-4 text-xs font-bold rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-all"
                             >
                                 Retry
                             </button>
@@ -546,11 +554,11 @@ export function AnalyticsView() {
                                             </div>
                                             <div>
                                                 <h4 className={cn('text-sm font-bold', themeConfig.text)}>{focusedBucket.name}</h4>
-                                                <p className={cn('text-[11px] font-bold uppercase tracking-widest', themeConfig.textOpacity)}>Targeted View</p>
+                                                <p className={cn('text-meta font-bold uppercase tracking-widest', themeConfig.textOpacity)}>Targeted View</p>
                                             </div>
                                         </div>
                                         <div className="text-right">
-                                            <p className={cn('text-[11px] font-bold uppercase tracking-widest', themeConfig.textOpacity)}>Budget Remaining</p>
+                                            <p className={cn('text-meta font-bold uppercase tracking-widest', themeConfig.textOpacity)}>Budget Remaining</p>
                                             <p className={cn('text-sm font-bold', themeConfig.text)}>
                                                 {formatCurrency(remaining)}
                                             </p>
@@ -563,23 +571,15 @@ export function AnalyticsView() {
                         <MonthlyRecapCard currency={currency} formatCurrency={formatCurrency} />
 
                         {transactions.length === 0 ? (
-                            <Card className="bg-card/40 border-white/5 shadow-none">
-                                <CardContent className="p-8 flex flex-col items-center justify-center text-center space-y-3">
-                                    <div className="w-12 h-12 rounded-xl bg-secondary/30 flex items-center justify-center mb-1">
-                                        <ChartLine className="w-5 h-5 text-muted-foreground/70" />
-                                    </div>
-                                    <p className="text-sm font-bold">No transactions in this range</p>
-                                    <p className="text-[12px] text-muted-foreground max-w-[260px]">
-                                        Try a wider period from the picker above, or add an expense to start seeing trends.
-                                    </p>
-                                    <button
-                                        onClick={() => router.push('/add')}
-                                        className="mt-1 inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-primary text-white text-xs font-bold hover:bg-primary/90 transition-colors"
-                                    >
-                                        <Plus className="w-3.5 h-3.5" />
-                                        Add expense
-                                    </button>
-                                </CardContent>
+                            <Card className="bg-card/40 border-white/5 shadow-none py-0">
+                                <EmptyState
+                                    size="page"
+                                    iconVariant="tile"
+                                    icon={ChartLine}
+                                    title="No transactions in this range"
+                                    description="Try a wider period from the picker above, or add an expense to start seeing trends."
+                                    action={{ label: 'Add expense', icon: Plus, onClick: () => router.push('/add') }}
+                                />
                             </Card>
                         ) : (
                             <>
@@ -735,13 +735,13 @@ export function AnalyticsView() {
 
                                 {/* Currency conversion staleness footnote */}
                                 {usedConversion && ratesLastUpdated && (Date.now() - ratesLastUpdated) > 24 * 60 * 60 * 1000 && (
-                                    <p className="text-[10px] text-muted-foreground/60 text-center px-2">
+                                    <p className="text-caption text-muted-foreground/60 text-center px-2">
                                         Some amounts converted using exchange rates last refreshed {format(new Date(ratesLastUpdated), 'd MMM, h:mm a')}.
                                     </p>
                                 )}
 
                                 {allViewTruncated && (
-                                    <p className="text-[10px] text-muted-foreground/60 text-center px-2">
+                                    <p className="text-caption text-muted-foreground/60 text-center px-2">
                                         Showing your most recent 5,000 transactions. Pick a narrower range for more detail.
                                     </p>
                                 )}

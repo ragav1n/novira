@@ -9,6 +9,7 @@ import { CATEGORY_COLORS } from '@/lib/categories';
 import type { Transaction } from '@/types/transaction';
 import type { Bucket } from '@/components/providers/buckets-provider';
 import { useAccounts } from '@/components/providers/accounts-provider';
+import { EmptyState } from '@/components/ui/empty-state';
 
 interface TransactionListProps {
   transactions: Transaction[];
@@ -16,7 +17,6 @@ interface TransactionListProps {
   currency: string;
   buckets: Bucket[];
   calculateUserShare: (tx: Transaction, currentUserId: string | null) => number;
-  getIconForCategory: (category: string, className?: string) => React.ReactNode;
   formatCurrency: (amount: number, currencyCode?: string) => string;
   convertAmount: (amount: number, fromCurrency: string, toCurrency?: string) => number;
   setEditingTransaction: (tx: Transaction) => void;
@@ -38,7 +38,7 @@ interface TransactionListProps {
 
 export const TransactionList = React.memo(function TransactionList({
   transactions, userId, currency, buckets,
-  calculateUserShare, getIconForCategory, formatCurrency,
+  calculateUserShare, formatCurrency,
   convertAmount, setEditingTransaction, setIsEditOpen,
   handleDeleteTransaction, getBucketChip, loadAuditLogs,
   canEditTransaction, loading, hasMore, loadingMore, onLoadMore, onViewReceipt,
@@ -64,6 +64,16 @@ export const TransactionList = React.memo(function TransactionList({
       return next;
     });
   }, []);
+
+  // Stable adapters so every TransactionRow below receives the same function
+  // identity on each render and its `memo` can actually skip. These used to be
+  // inline arrows, which is why the memo never hit and ticking one checkbox
+  // re-rendered the whole list.
+  const handleToggleSelect = useCallback((tx: Transaction) => toggleId(tx.id), [toggleId]);
+  const handleEdit = useCallback((tx: Transaction) => {
+    setEditingTransaction(tx);
+    setIsEditOpen(true);
+  }, [setEditingTransaction, setIsEditOpen]);
 
   const exitSelect = useCallback(() => {
     setSelectMode(false);
@@ -147,21 +157,14 @@ export const TransactionList = React.memo(function TransactionList({
 
   if (transactions.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-14 px-6 text-center">
-        <div className="w-14 h-14 rounded-xl bg-secondary/20 border border-white/5 flex items-center justify-center mb-3">
-          <Receipt className="w-6 h-6 text-muted-foreground/50" strokeWidth={1.75} />
-        </div>
-        <p className="text-sm font-bold text-muted-foreground/80">No transactions yet</p>
-        <p className="text-xs text-muted-foreground/50 mt-1 max-w-[220px]">
-          Add your first expense to start seeing patterns and insights.
-        </p>
-        <button
-          onClick={() => router.push('/add')}
-          className="mt-4 text-xs font-bold uppercase tracking-wider px-4 py-2 rounded-full bg-primary/20 hover:bg-primary/30 border border-primary/30 text-primary transition-colors"
-        >
-          Add expense
-        </button>
-      </div>
+      <EmptyState
+        size="page"
+        iconVariant="tile"
+        icon={Receipt}
+        title="No transactions yet"
+        description="Add your first expense to start seeing patterns and insights."
+        action={{ label: 'Add expense', onClick: () => router.push('/add') }}
+      />
     );
   }
 
@@ -173,14 +176,14 @@ export const TransactionList = React.memo(function TransactionList({
         <div className="flex items-center justify-between gap-2 px-2 py-2 sticky top-0 z-10 bg-background/95 backdrop-blur-sm">
           {!selectMode ? (
             <>
-              <span className="text-[11px] text-muted-foreground/60 font-medium">
+              <span className="text-meta text-muted-foreground/60 font-medium">
                 {transactions.length} transaction{transactions.length === 1 ? '' : 's'}
               </span>
               <button
                 type="button"
                 onClick={() => setSelectMode(true)}
                 disabled={eligibleForSelect.length === 0}
-                className="flex items-center gap-1.5 text-[11px] font-semibold text-primary hover:text-primary/80 disabled:opacity-50 disabled:cursor-not-allowed px-2.5 py-1 rounded-full bg-primary/10 border border-primary/20 hover:bg-primary/15 transition-colors"
+                className="flex items-center gap-1.5 text-meta font-semibold text-primary hover:text-primary/80 disabled:opacity-50 disabled:cursor-not-allowed px-2.5 py-1 rounded-full bg-primary/10 border border-primary/20 hover:bg-primary/15 transition-colors"
               >
                 <CheckSquare className="w-3 h-3" />
                 Select
@@ -191,11 +194,11 @@ export const TransactionList = React.memo(function TransactionList({
               <button
                 type="button"
                 onClick={allSelected ? () => setSelectedIds(new Set()) : selectAll}
-                className="text-[11px] font-semibold text-primary hover:text-primary/80"
+                className="text-meta font-semibold text-primary hover:text-primary/80"
               >
                 {allSelected ? 'Clear' : 'Select all'}
               </button>
-              <span className="text-[11px] text-muted-foreground/60 font-medium tabular-nums">
+              <span className="text-meta text-muted-foreground/60 font-medium tabular-nums">
                 {selectedIds.size} / {eligibleForSelect.length}
               </span>
             </>
@@ -216,7 +219,11 @@ export const TransactionList = React.memo(function TransactionList({
               // after the fade. Kept deliberately; don't copy it to bulk-swap lists.
               exit={{ opacity: 0, height: 0, marginTop: 0, scale: 0.97 }}
               transition={ROW}
-              style={{ contentVisibility: 'auto', containIntrinsicSize: '0 64px', overflow: 'hidden' }}
+              // `overflow: hidden` is what lets the height-collapse exit above read as
+              // a collapse rather than a clip-less jump. The content-visibility pair
+              // that used to sit here moved onto TransactionRow itself, so every list
+              // gets it — search included, which never had it.
+              style={{ overflow: 'hidden' }}
             >
               <TransactionRow
                 tx={tx}
@@ -230,19 +237,17 @@ export const TransactionList = React.memo(function TransactionList({
                 }
                 showConverted={!!showConverted}
                 canEdit={canEditTransaction(tx)}
-                icon={getIconForCategory(tx.category, 'w-4 h-4')}
+                // Grows unbounded via "Load more" (100 at a time).
+                deferOffscreen
                 color={CATEGORY_COLORS[tx.category.toLowerCase()] || CATEGORY_COLORS.uncategorized}
-                bucketChip={getBucketChip(tx)}
-                onHistory={() => loadAuditLogs(tx)}
-                onEdit={() => {
-                  setEditingTransaction(tx);
-                  setIsEditOpen(true);
-                }}
-                onDelete={() => handleDeleteTransaction(tx)}
-                onViewReceipt={onViewReceipt ? () => onViewReceipt(tx) : undefined}
+                renderBucketChip={getBucketChip}
+                onHistory={loadAuditLogs}
+                onEdit={handleEdit}
+                onDelete={handleDeleteTransaction}
+                onViewReceipt={onViewReceipt}
                 selectable={selectMode}
                 selected={selectedIds.has(tx.id)}
-                onToggleSelect={() => toggleId(tx.id)}
+                onToggleSelect={handleToggleSelect}
               />
             </motion.div>
           );

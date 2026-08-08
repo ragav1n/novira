@@ -16,6 +16,7 @@ import { Transaction } from '@/types/transaction';
 import { enqueueMutation } from '@/lib/sync-manager';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Input } from '@/components/ui/input';
+import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
 import { toast, ImpactStyle } from '@/utils/haptics';
@@ -36,6 +37,23 @@ import { SearchBulkActionBar } from '@/components/search/search-bulk-action-bar'
 import { RecategorizeSheet } from '@/components/search/recategorize-sheet';
 import { ViewHeader } from '@/components/ui/view-header';
 
+/**
+ * Hard cap on rendered search results.
+ *
+ * This query used to run with no `.limit()` at all, while two comments (here and
+ * in transaction-row) asserted a 300-row ceiling that did not exist — the only
+ * `.limit(300)` in this file is on the tag-vocabulary query below. The real
+ * ceiling was PostgREST's `max-rows` (1000 by default), so an empty query on a
+ * mature account mounted up to a thousand `TransactionRow`s on every debounced
+ * keystroke. Each row is not cheap: a framer drag handler, a Radix menu, and a
+ * conditional Popover.
+ *
+ * Fetching `LIMIT + 1` lets us tell "exactly 300 results" from "more than 300"
+ * without a second count query, so the UI can say so instead of silently
+ * truncating.
+ */
+const SEARCH_RESULT_LIMIT = 300;
+
 const bucketIcons: Record<string, React.ElementType> = {
     Tag, Plane, Home, Gift, Car, Utensils, ShoppingCart,
     Heart, Gamepad2, School, Laptop, Music,
@@ -53,6 +71,9 @@ export function SearchView() {
     const [searchQuery, setSearchQuery] = useState(() => searchParams?.get('q') || '');
     const [loading, setLoading] = useState(true);
     const [loadError, setLoadError] = useState(false);
+    // True when the query matched more rows than SEARCH_RESULT_LIMIT, so the
+    // list is showing a prefix rather than the whole result set.
+    const [truncated, setTruncated] = useState(false);
     const { formatCurrency, convertAmount, activeWorkspaceId, userId } = useUserPreferences();
     const { buckets } = useBucketsList();
     const { theme: themeConfig } = useWorkspaceTheme();
@@ -302,7 +323,7 @@ export function SearchView() {
 
             const ascending = sortBy === 'date-asc' || sortBy === 'amount-asc';
             const sortColumn = sortBy.startsWith('date') ? 'date' : 'amount';
-            query = query.order(sortColumn, { ascending });
+            query = query.order(sortColumn, { ascending }).limit(SEARCH_RESULT_LIMIT + 1);
 
             const { data, error } = await query;
 
@@ -318,22 +339,52 @@ export function SearchView() {
                     hint: error.hint,
                 });
                 setFilteredTransactions([]);
+                setTruncated(false);
                 setLoadError(true);
                 if (!opts.silent) toast.error("Couldn't search transactions");
                 return;
             }
             setLoadError(false);
             if (data) {
-                const formatted = data.map(tx => ({
+                // We asked for LIMIT + 1; the extra row is a truncation probe, not
+
+                // something to render.
+
+                const isTruncated = data.length > SEARCH_RESULT_LIMIT;
+
+                setTruncated(isTruncated);
+
+                const page = isTruncated ? data.slice(0, SEARCH_RESULT_LIMIT) : data;
+
+                const formatted = page.map(tx => ({
                     ...tx,
                     profile: Array.isArray(tx.profile) ? tx.profile[0] : tx.profile,
                     splits: tx.splits || []
                 })) as Transaction[];
                 setFilteredTransactions(formatted);
 
-                // Update max price on first load (no filters active)
+                // Update max price on first load (no filters active).
+                //
+                // Only when the result set is COMPLETE. Once a cap is in play this
+                // page is the top 300 *in the current sort order*, so deriving the
+                // ceiling from it made the slider sort-dependent: sorting by
+                // "Lowest amount" returned the 300 smallest, collapsing a £4,800
+                // ceiling to the £1,000 floor and making every larger amount
+                // unfilterable. When truncated we ask the server for the real
+                // maximum instead — one row, and only on the unfiltered view.
                 if (!debouncedSearchQuery && selectedCategories.length === 0 && selectedPayments.length === 0 && !dateRange.from && !dateRange.to && !selectedBucketId && debouncedPriceRange[0] === 0 && debouncedPriceRange[1] >= maxPossiblePrice) {
-                    const max = Math.max(...formatted.map(tx => tx.amount), 1000);
+                    let max: number;
+                    if (isTruncated) {
+                        let maxQuery = supabase.from('transactions').select('amount')
+                            .order('amount', { ascending: false }).limit(1);
+                        if (activeWorkspaceId) maxQuery = maxQuery.eq('group_id', activeWorkspaceId);
+                        else if (activeAccountId) maxQuery = maxQuery.eq('account_id', activeAccountId);
+                        const { data: topRow } = await maxQuery;
+                        if (fetchGenRef.current !== myGen) return;
+                        max = Math.max(Number(topRow?.[0]?.amount ?? 0), 1000);
+                    } else {
+                        max = Math.max(...formatted.map(tx => tx.amount), 1000);
+                    }
                     const rounded = Math.ceil(max / 100) * 100;
                     if (rounded !== maxPossiblePrice) {
                         setMaxPossiblePrice(rounded);
@@ -345,6 +396,7 @@ export function SearchView() {
             console.error('Error fetching transactions:', error);
             if (fetchGenRef.current !== myGen) return;
             setFilteredTransactions([]);
+            setTruncated(false);
             setLoadError(true);
             if (!opts.silent) toast.error("Couldn't search transactions");
         } finally {
@@ -673,25 +725,28 @@ export function SearchView() {
                     // aria-live so the result count is announced when a query or filter
                     // changes — results updated silently for screen-reader users before.
                     <section className="space-y-2 shrink-0 text-center" role="status" aria-live="polite">
-                        <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground/70">
-                            Total matching
+                        <p className="text-eyebrow uppercase text-muted-foreground/70">
+                            {/* The total is summed over the rows we actually fetched, so when the
+                                result set is capped it is a partial sum — say so rather than
+                                letting it read as the true total. */}
+                            {truncated ? `Total of first ${SEARCH_RESULT_LIMIT}` : 'Total matching'}
                         </p>
                         <div className="flex items-end justify-center gap-3 flex-wrap">
                             <h3 className={cn(
-                                'text-[40px] leading-none font-bold tracking-tight tabular-nums',
+                                'text-hero tabular-nums',
                                 themeConfig.text
                             )}>
                                 {formatCurrency(filterStats.total)}
                             </h3>
-                            <span className="text-[11px] text-muted-foreground/70 mb-1.5">
-                                {filterStats.count} txn{filterStats.count === 1 ? '' : 's'} &middot; avg {formatCurrency(filterStats.avg)}
+                            <span className="text-meta text-muted-foreground/70 mb-1.5">
+                                {truncated ? `${filterStats.count}+` : filterStats.count} txn{filterStats.count === 1 ? '' : 's'} &middot; avg {formatCurrency(filterStats.avg)}
                             </span>
                         </div>
                         {filterStats.topCategory && (
                             <div className="flex items-center justify-center gap-2 pt-0.5">
-                                <span className="text-[10px] text-muted-foreground/60 uppercase tracking-[0.18em]">Top</span>
+                                <span className="text-eyebrow text-muted-foreground/60 uppercase">Top</span>
                                 <span
-                                    className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-bold capitalize"
+                                    className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-meta font-bold capitalize"
                                     style={{
                                         backgroundColor: `${CATEGORY_COLORS[filterStats.topCategory] || '#8A2BE2'}20`,
                                         color: CATEGORY_COLORS[filterStats.topCategory] || '#8A2BE2',
@@ -709,10 +764,10 @@ export function SearchView() {
                     </section>
                 ) : (activeFilterCount === 0 && !debouncedSearchQuery) ? (
                     <section className="space-y-1.5 shrink-0 text-center">
-                        <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground/70">
+                        <p className="text-eyebrow uppercase text-muted-foreground/70">
                             Search &amp; filter
                         </p>
-                        <p className="text-[14px] text-muted-foreground/70 leading-snug">
+                        <p className="text-sm text-muted-foreground/70 leading-snug">
                             Find transactions by description, place, notes or tags.
                         </p>
                     </section>
@@ -735,14 +790,14 @@ export function SearchView() {
                         // Delay so a tap on a history row registers before blur closes the dropdown.
                         onBlur={() => setTimeout(() => setInputFocused(false), 150)}
                         className={cn(
-                            'pl-10 pr-10 h-11 rounded-xl bg-secondary/15 border-white/[0.06] text-[14px]',
+                            'pl-10 pr-10 h-11 rounded-xl bg-secondary/15 border-white/[0.06] text-sm',
                             themeConfig.ring
                         )}
                     />
                     {/* The `!!searchQuery` gate meant toggling a filter chip with an
                         empty query showed no spinner at all — only the results blur. */}
                     {(searchQuery !== debouncedSearchQuery || loading) ? (
-                        <div className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full border-2 border-primary border-t-transparent animate-spin" aria-hidden="true" />
+                        <Spinner className="absolute right-3.5 top-1/2 -translate-y-1/2 size-4 text-primary" label={null} />
                     ) : searchQuery ? (
                         // The other search field in the app (subscription-filters) has a
                         // clear button; this one reserved pr-10 but never filled it.
@@ -757,7 +812,7 @@ export function SearchView() {
                     ) : null}
                     {inputFocused && searchQuery === '' && history.length > 0 && (
                         <div className="absolute top-full left-0 right-0 mt-1.5 z-40 rounded-xl bg-card/95 backdrop-blur-xl border border-white/[0.06] shadow-2xl overflow-hidden">
-                            <div className="px-3 py-2 text-[10px] uppercase tracking-[0.18em] font-medium text-muted-foreground/70 border-b border-white/[0.04]">
+                            <div className="px-3 py-2 text-eyebrow uppercase text-muted-foreground/70 border-b border-white/[0.04]">
                                 Recent
                             </div>
                             {history.map(h => (
@@ -769,7 +824,7 @@ export function SearchView() {
                                         setSearchQuery(h);
                                         setInputFocused(false);
                                     }}
-                                    className="w-full flex items-center gap-2 px-3 py-2 text-left text-[12px] hover:bg-white/[0.04] transition-colors"
+                                    className="w-full flex items-center gap-2 px-3 py-2 text-left text-xs hover:bg-white/[0.04] transition-colors"
                                 >
                                     <Clock className="w-3 h-3 text-muted-foreground/60 shrink-0" />
                                     <span className="truncate">{h}</span>
@@ -779,7 +834,7 @@ export function SearchView() {
                                 type="button"
                                 onMouseDown={(e) => e.preventDefault()}
                                 onClick={clearHistory}
-                                className="w-full px-3 py-2 text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground/60 hover:text-foreground hover:bg-white/[0.04] transition-colors border-t border-white/[0.04]"
+                                className="w-full px-3 py-2 text-eyebrow uppercase text-muted-foreground/60 hover:text-foreground hover:bg-white/[0.04] transition-colors border-t border-white/[0.04]"
                             >
                                 Clear history
                             </button>
@@ -790,8 +845,8 @@ export function SearchView() {
                 {/* Numeric query hint — inline minimal */}
                 {numericQueryActive && (
                     <div className="flex items-center justify-between gap-2 -mt-3 shrink-0">
-                        <span className={cn('inline-flex items-center gap-2 text-[11px] font-semibold', themeConfig.text)}>
-                            <span className="uppercase tracking-[0.18em] text-muted-foreground/60 font-medium text-[10px]">
+                        <span className={cn('inline-flex items-center gap-2 text-meta font-semibold', themeConfig.text)}>
+                            <span className="uppercase text-muted-foreground/60 text-eyebrow">
                                 Amount
                             </span>
                             {numericQueryActive.op} {formatCurrency(numericQueryActive.value)}
@@ -822,7 +877,7 @@ export function SearchView() {
                                 type="button"
                                 onClick={() => toggleQuickRange(id)}
                                 className={cn(
-                                    'shrink-0 px-3 py-1.5 rounded-full text-[11px] font-semibold border transition-colors',
+                                    'shrink-0 px-3 py-1.5 rounded-full text-meta font-semibold border transition-colors',
                                     active
                                         ? `${themeConfig.bgMedium} ${themeConfig.borderMedium} ${themeConfig.text}`
                                         : 'bg-transparent border-white/[0.06] text-muted-foreground hover:border-white/15 hover:text-foreground/80'
@@ -836,7 +891,7 @@ export function SearchView() {
                         type="button"
                         onClick={() => setShowRecurringOnly(v => !v)}
                         className={cn(
-                            'shrink-0 inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-[11px] font-semibold border transition-colors',
+                            'shrink-0 inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-meta font-semibold border transition-colors',
                             showRecurringOnly
                                 ? 'bg-cyan-500/15 border-cyan-500/40 text-cyan-300'
                                 : 'bg-transparent border-white/[0.06] text-muted-foreground hover:border-white/15 hover:text-foreground/80'
@@ -849,7 +904,7 @@ export function SearchView() {
                         type="button"
                         onClick={() => setShowExcludedOnly(v => !v)}
                         className={cn(
-                            'shrink-0 inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-[11px] font-semibold border transition-colors',
+                            'shrink-0 inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-meta font-semibold border transition-colors',
                             showExcludedOnly
                                 ? 'bg-rose-500/15 border-rose-500/40 text-rose-300'
                                 : 'bg-transparent border-white/[0.06] text-muted-foreground hover:border-white/15 hover:text-foreground/80'
@@ -873,7 +928,7 @@ export function SearchView() {
 
                     {dateRange.from && (
                         <div className={cn(
-                            'shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold border whitespace-nowrap',
+                            'shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-meta font-semibold border whitespace-nowrap',
                             themeConfig.bgMedium, themeConfig.borderMedium, themeConfig.text
                         )}>
                             Date
@@ -889,7 +944,7 @@ export function SearchView() {
                     )}
                     {(priceRange[0] > 0 || priceRange[1] < maxPossiblePrice) && (
                         <div className={cn(
-                            'shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold border whitespace-nowrap tabular-nums',
+                            'shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-meta font-semibold border whitespace-nowrap tabular-nums',
                             themeConfig.bgMedium, themeConfig.borderMedium, themeConfig.text
                         )}>
                             {formatCurrency(priceRange[0])}&ndash;{formatCurrency(priceRange[1])}
@@ -907,7 +962,7 @@ export function SearchView() {
                         <div
                             key={cat}
                             className={cn(
-                                'shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold border whitespace-nowrap capitalize',
+                                'shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-meta font-semibold border whitespace-nowrap capitalize',
                                 themeConfig.bgMedium, themeConfig.borderMedium, themeConfig.text
                             )}
                         >
@@ -926,7 +981,7 @@ export function SearchView() {
                         <div
                             key={p}
                             className={cn(
-                                'shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold border whitespace-nowrap',
+                                'shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-meta font-semibold border whitespace-nowrap',
                                 themeConfig.bgMedium, themeConfig.borderMedium, themeConfig.text
                             )}
                         >
@@ -942,7 +997,7 @@ export function SearchView() {
                         </div>
                     ))}
                     {selectedBucketId && buckets.find(b => b.id === selectedBucketId) && (
-                        <div className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold border whitespace-nowrap bg-cyan-500/15 border-cyan-500/30 text-cyan-300">
+                        <div className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-meta font-semibold border whitespace-nowrap bg-cyan-500/15 border-cyan-500/30 text-cyan-300">
                             <span className="w-3 h-3 shrink-0">
                                 <BucketIcon name={buckets.find(b => b.id === selectedBucketId)?.icon} />
                             </span>
@@ -960,7 +1015,7 @@ export function SearchView() {
                     {selectedTags.map(t => (
                         <div
                             key={t}
-                            className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold border whitespace-nowrap bg-primary/15 border-primary/30 text-primary"
+                            className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-meta font-semibold border whitespace-nowrap bg-primary/15 border-primary/30 text-primary"
                         >
                             #{t}
                             <button
@@ -979,7 +1034,7 @@ export function SearchView() {
                 {(presets.length > 0 || activeFilterCount > 0) && (
                     <div className="flex gap-1.5 items-center overflow-x-auto pb-1 scrollbar-hide shrink-0 -mt-3">
                         {presets.map((p) => (
-                            <div key={p.id} className="shrink-0 inline-flex items-center gap-1 pl-3 pr-1 rounded-full text-[11px] font-semibold bg-secondary/15 border border-white/[0.06] text-foreground/80">
+                            <div key={p.id} className="shrink-0 inline-flex items-center gap-1 pl-3 pr-1 rounded-full text-meta font-semibold bg-secondary/15 border border-white/[0.06] text-foreground/80">
                                 <button type="button" onClick={() => applySnapshot(p.filters)} className="inline-flex items-center gap-1.5 min-h-[44px]">
                                     <Bookmark className="w-3 h-3" aria-hidden="true" />
                                     {p.name}
@@ -1007,14 +1062,14 @@ export function SearchView() {
                                             if (e.key === 'Enter') handleSavePreset();
                                             if (e.key === 'Escape') { setShowPresetInput(false); setPresetNameDraft(''); }
                                         }}
-                                        className="h-7 text-[11px] bg-transparent border-0 rounded-full px-2 w-32 focus-visible:ring-0"
+                                        className="h-7 text-meta bg-transparent border-0 rounded-full px-2 w-32 focus-visible:ring-0"
                                     />
                                     <button
                                         type="button"
                                         onClick={handleSavePreset}
                                         disabled={!presetNameDraft.trim()}
                                         className={cn(
-                                            'text-[10px] font-bold uppercase tracking-[0.14em] px-2 py-1 rounded-full disabled:opacity-40 transition-opacity',
+                                            'text-caption font-bold uppercase tracking-[0.14em] px-2 py-1 rounded-full disabled:opacity-40 transition-opacity',
                                             themeConfig.text
                                         )}
                                     >
@@ -1033,7 +1088,7 @@ export function SearchView() {
                                 <button
                                     type="button"
                                     onClick={() => setShowPresetInput(true)}
-                                    className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold border border-dashed border-white/[0.08] text-muted-foreground hover:text-foreground hover:border-white/20 transition-colors"
+                                    className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-meta font-semibold border border-dashed border-white/8 text-muted-foreground hover:text-foreground hover:border-white/20 transition-colors"
                                 >
                                     <BookmarkPlus className="w-3 h-3" />
                                     Save preset
@@ -1057,6 +1112,11 @@ export function SearchView() {
                         debouncedSearchQuery={debouncedSearchQuery}
                         onViewReceipt={receiptViewer.view}
                         onResetFilters={resetFilters}
+                        // The hero above only renders once a query or filter is active,
+                        // but the query that actually truncates is the *empty* one — so
+                        // the list has to carry the notice itself or the default view
+                        // silently shows a 300-row prefix.
+                        truncatedAt={truncated ? SEARCH_RESULT_LIMIT : null}
                     />
                 </div>
             </div>

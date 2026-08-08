@@ -1,6 +1,6 @@
 'use client';
 
-import React, { memo, useState, useEffect, useRef } from 'react';
+import React, { memo, useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { parseISO } from 'date-fns';
 import { useFormattedDate } from '@/utils/format-date';
@@ -13,7 +13,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { cn } from '@/lib/utils';
 import { motion, useMotionValue, animate, useReducedMotion } from 'framer-motion';
 import { ROW, rowVariants } from '@/lib/motion';
-import { getCategoryLabel } from '@/lib/categories';
+import { getCategoryLabel, getIconForCategory } from '@/lib/categories';
 
 interface TransactionRowProps {
   tx: Transaction;
@@ -23,23 +23,52 @@ interface TransactionRowProps {
   formattedConverted?: string;
   showConverted: boolean;
   canEdit: boolean;
-  icon: React.ReactNode;
   color?: string;
-  bucketChip: React.ReactNode | null;
-  descriptionNode?: React.ReactNode;
-  onHistory: () => void;
-  onEdit: () => void;
-  onDelete: () => void;
-  onViewReceipt?: () => void;
+  /**
+   * Render props, not rendered nodes — and callbacks that take the transaction
+   * rather than closing over it.
+   *
+   * This is what makes the `memo` below actually work. Every call site used to
+   * pass freshly-built elements (`bucketChip={getBucketChip(tx)}`) and inline
+   * arrows (`onEdit={() => …}`), so no two renders ever produced equal props and
+   * the memo never hit once: one parent render re-rendered every row, and in bulk
+   * mode that meant ticking a single checkbox re-rendered all 300.
+   *
+   * An element's identity can't be stabilised; a function's can, with
+   * `useCallback`. So the row takes the function and calls it itself.
+   */
+  renderBucketChip?: (tx: Transaction) => React.ReactNode;
+  /** Overrides the plain description — search uses it to highlight the match. */
+  renderDescription?: (tx: Transaction) => React.ReactNode;
+  onHistory: (tx: Transaction) => void;
+  onEdit: (tx: Transaction) => void;
+  onDelete: (tx: Transaction) => void;
+  onViewReceipt?: (tx: Transaction) => void;
   selectable?: boolean;
   selected?: boolean;
-  onToggleSelect?: () => void;
+  onToggleSelect?: (tx: Transaction) => void;
   /** Plays the fade-up entrance on mount. Pass `false` for lists that swap their
-   *  whole contents at once — search returns up to 300 rows per query, and firing
+   *  whole contents at once — search returns up to SEARCH_RESULT_LIMIT (300) rows, and firing
    *  300 simultaneous entrance tweens on every keystroke is what made results feel
    *  heavy. Bounded lists (dashboard's 5, the paginated main list) leave it on. */
   animateEntrance?: boolean;
+  /**
+   * Lets the browser skip layout and paint for this row while it's scrolled out of
+   * view. Only for long lists.
+   *
+   * Off by default because `contain-intrinsic-size` has to guess a height, and the
+   * guess (64px) is the height of a *plain* row — one carrying tag or bucket chips is
+   * taller, so an off-screen row is under-reserved and grows as it scrolls in. That's
+   * an acceptable trade for a 300-row list and a pointless risk for a 5-row one.
+   */
+  deferOffscreen?: boolean;
 }
+
+/** Hoisted so the style object identity is stable and can't defeat the memo. */
+const OFFSCREEN_STYLE: React.CSSProperties = {
+  contentVisibility: 'auto',
+  containIntrinsicSize: '0 64px',
+};
 
 function CategoryIcon({ icon, color }: { icon: React.ReactNode; color: string }) {
   if (!React.isValidElement(icon)) return <>{icon}</>;
@@ -53,6 +82,53 @@ let _swipeHintLock = false;
 const SWIPE_THRESHOLD = 72;  // minimum drag distance to trigger snap
 const SWIPE_VELOCITY = 400;  // px/s — a fast flick opens even below the distance threshold
 const SNAP_DISTANCE = 130;   // full reveal: 2 × w-16 (64px) buttons + gap
+const SNAP_SPRING = { type: 'spring', stiffness: 320, damping: 34, mass: 0.8 } as const;
+
+/**
+ * The one row currently swiped open, with its own close function.
+ *
+ * Only one row can be open at a time, so this used to be coordinated by having
+ * *every* row subscribe to a `novira-row-swiped` window event — one listener per
+ * row, re-subscribed on every swipe because `swiped` was in the dep array. On an
+ * unfiltered search that was hundreds of listeners, and each `openSwipe()`
+ * dispatched an event that fanned out to all of them. Holding one entry here
+ * turns that fan-out into a single call.
+ */
+let _openRow: { key: object; close: () => void } | null = null;
+
+/**
+ * One IntersectionObserver shared by every row.
+ *
+ * Each row used to construct its own, unconditionally on mount and regardless of
+ * scroll position — hundreds of observers for a job one can do. `rootMargin` is a
+ * per-observer setting and identical for all rows, so there is nothing to lose by
+ * sharing. Callers get an unsubscribe; a target is dropped as soon as it fires,
+ * since `isNear` is one-way.
+ */
+let _nearObserver: IntersectionObserver | null = null;
+const _nearTargets = new Map<Element, () => void>();
+
+function observeNear(el: Element, onNear: () => void): () => void {
+    if (typeof IntersectionObserver === 'undefined') { onNear(); return () => {}; }
+    if (!_nearObserver) {
+        _nearObserver = new IntersectionObserver((entries) => {
+            for (const entry of entries) {
+                if (!entry.isIntersecting) continue;
+                const cb = _nearTargets.get(entry.target);
+                if (!cb) continue;
+                _nearTargets.delete(entry.target);
+                _nearObserver?.unobserve(entry.target);
+                cb();
+            }
+        }, { rootMargin: '400px' });
+    }
+    _nearTargets.set(el, onNear);
+    _nearObserver.observe(el);
+    return () => {
+        _nearTargets.delete(el);
+        _nearObserver?.unobserve(el);
+    };
+}
 
 // Deterministic hue per tag so the same tag always renders in the same color.
 // Hash → hue keeps the palette stable across reloads without needing storage.
@@ -63,13 +139,21 @@ function hashTag(tag: string): number {
     }
     return Math.abs(hash);
 }
+// Memoised: this ran per tag per row per render, and `hashTag` loops over every
+// character. The tag vocabulary is tiny and stable, so a plain module cache ends
+// the repeated work for the whole session.
+const _tagColorCache = new Map<string, { bg: string; border: string; text: string }>();
 function tagColors(tag: string): { bg: string; border: string; text: string } {
+    const cached = _tagColorCache.get(tag);
+    if (cached) return cached;
     const hue = hashTag(tag) % 360;
-    return {
+    const colors = {
         bg: `hsla(${hue}, 80%, 60%, 0.14)`,
         border: `hsla(${hue}, 80%, 60%, 0.32)`,
         text: `hsl(${hue}, 80%, 78%)`,
     };
+    _tagColorCache.set(tag, colors);
+    return colors;
 }
 
 export const TransactionRow = memo(function TransactionRow({
@@ -80,10 +164,9 @@ export const TransactionRow = memo(function TransactionRow({
   formattedConverted,
   showConverted,
   canEdit,
-  icon,
   color = '#8A2BE2',
-  bucketChip,
-  descriptionNode,
+  renderBucketChip,
+  renderDescription,
   onHistory,
   onEdit,
   onDelete,
@@ -92,6 +175,7 @@ export const TransactionRow = memo(function TransactionRow({
   selected = false,
   onToggleSelect,
   animateEntrance = true,
+  deferOffscreen = false,
 }: TransactionRowProps) {
   const hasSplits = tx.splits && tx.splits.length > 0;
   const isSettlement = tx.is_settlement;
@@ -118,15 +202,7 @@ export const TransactionRow = memo(function TransactionRow({
   useEffect(() => {
     const el = rowRef.current;
     if (!el || isNear) return;
-    if (typeof IntersectionObserver === 'undefined') { setIsNear(true); return; }
-    const io = new IntersectionObserver((entries) => {
-      if (entries.some(e => e.isIntersecting)) {
-        setIsNear(true);
-        io.disconnect();
-      }
-    }, { rootMargin: '400px' });
-    io.observe(el);
-    return () => io.disconnect();
+    return observeNear(el, () => setIsNear(true));
   }, [isNear]);
 
   useEffect(() => {
@@ -170,16 +246,44 @@ export const TransactionRow = memo(function TransactionRow({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [swipeEnabled, prefersReducedMotion]);
 
-  const snapTo = (target: number) => animate(x, target, { type: 'spring', stiffness: 320, damping: 34, mass: 0.8 });
+  /**
+   * Per-instance identity for the open-row registry.
+   *
+   * Deliberately NOT `tx.id`: the same transaction can be mounted twice at once.
+   * The dashboard renders the top-5 inline list and, while "View all" is open, a
+   * full list inside the drawer — so up to 5 ids have two live rows, both
+   * swipe-enabled. Keyed by `tx.id`, closing the drawer let the drawer's row
+   * deregister the *inline* row's entry, leaving it visually open but untracked;
+   * and opening the inline copy of an already-open drawer row was skipped by the
+   * `!==` guard, leaving two rows open. An empty object is unique per mount, which
+   * is exactly the identity this needs.
+   */
+  const instanceKey = useRef<object>({});
 
-  const openSwipe = () => {
-    snapTo(-SNAP_DISTANCE);
+  // Both stable for the row's lifetime: `x` is a motion value, `setSwiped` is a
+  // setter, and the ref object never changes identity.
+  const closeSwipe = useCallback(() => {
+    animate(x, 0, SNAP_SPRING);
+    setSwiped(false);
+    // Deregister, so a row closed by tap or drag-back doesn't stay on record as
+    // the open one and get closed a second time when the next row opens.
+    if (_openRow?.key === instanceKey.current) _openRow = null;
+  }, [x]);
+
+  const openSwipe = useCallback(() => {
+    // Close whichever row was open before us, so only one swipe stays open.
+    if (_openRow && _openRow.key !== instanceKey.current) _openRow.close();
+    animate(x, -SNAP_DISTANCE, SNAP_SPRING);
     setSwiped(true);
-    // Tell sibling rows to close themselves so only one swipe stays open at a time.
-    window.dispatchEvent(new CustomEvent('novira-row-swiped', { detail: { id: tx.id } }));
-  };
+    _openRow = { key: instanceKey.current, close: closeSwipe };
+  }, [x, closeSwipe]);
 
-  const closeSwipe = () => { snapTo(0); setSwiped(false); };
+  // Don't leave a closer pointing at an unmounted row — it would setState on it,
+  // and the next row to open would think a gone row was still open.
+  useEffect(() => {
+    const key = instanceKey.current;
+    return () => { if (_openRow?.key === key) _openRow = null; };
+  }, []);
 
   const handleDragEnd = (_: unknown, info: { offset: { x: number }; velocity: { x: number } }) => {
     if (!canEdit) return;
@@ -189,17 +293,10 @@ export const TransactionRow = memo(function TransactionRow({
     else closeSwipe();
   };
 
-  // When another row opens its swipe panel, close ours.
-  useEffect(() => {
-    const onOtherSwiped = (e: Event) => {
-      const detail = (e as CustomEvent<{ id: string }>).detail;
-      if (!detail || detail.id === tx.id) return;
-      if (swiped) closeSwipe();
-    };
-    window.addEventListener('novira-row-swiped', onOtherSwiped);
-    return () => window.removeEventListener('novira-row-swiped', onOtherSwiped);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tx.id, swiped]);
+  // Resolved once per render: it's both a truthiness gate for the badge row and
+  // the badge itself. Building the element here is cheap — the win is that the
+  // *prop* is now a stable function, so the memo can skip this render entirely.
+  const bucketChip = renderBucketChip ? renderBucketChip(tx) : null;
 
   const paidByLabel = tx.user_id === userId ? 'You' : (tx.profile?.full_name?.split(' ')[0] ?? 'Other');
   const canBulkSelect = selectable && !isPending && !isFailed;
@@ -213,19 +310,20 @@ export const TransactionRow = memo(function TransactionRow({
       exit="exit"
       transition={ROW}
       className="relative overflow-hidden rounded-xl mt-1.5 first:mt-0"
+      style={deferOffscreen ? OFFSCREEN_STYLE : undefined}
     >
       {/* Swipe action buttons */}
       {swipeEnabled && (
         <div className="absolute inset-y-0 right-0 flex items-stretch gap-px bg-black/10">
           <button
-            onClick={() => { closeSwipe(); onEdit(); }}
+            onClick={() => { closeSwipe(); onEdit(tx); }}
             className="w-16 flex items-center justify-center bg-indigo-500 text-white active:brightness-90 hover:brightness-110 transition-[filter] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/70"
             aria-label="Edit transaction"
           >
             <Pencil className="w-5 h-5" strokeWidth={1.75} />
           </button>
           <button
-            onClick={() => { closeSwipe(); onDelete(); }}
+            onClick={() => { closeSwipe(); onDelete(tx); }}
             className="w-16 flex items-center justify-center bg-rose-500 text-white active:brightness-90 hover:brightness-110 transition-[filter] rounded-r-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/70"
             aria-label="Delete transaction"
           >
@@ -247,7 +345,7 @@ export const TransactionRow = memo(function TransactionRow({
         onClick={(e) => {
           if (canBulkSelect && onToggleSelect) {
             e.stopPropagation();
-            onToggleSelect();
+            onToggleSelect(tx);
             return;
           }
           if (swiped) closeSwipe();
@@ -262,7 +360,7 @@ export const TransactionRow = memo(function TransactionRow({
           onKeyDown: (e: React.KeyboardEvent) => {
             if (e.key === 'Enter' || e.key === ' ') {
               e.preventDefault();
-              onToggleSelect();
+              onToggleSelect(tx);
             }
           },
         } : {})}
@@ -295,7 +393,10 @@ export const TransactionRow = memo(function TransactionRow({
             className="w-9 h-9 rounded-full flex items-center justify-center"
             style={{ backgroundColor: `${color}18`, border: `1.5px solid ${color}28` }}
           >
-            <CategoryIcon icon={icon} color={color} />
+            {/* Derived here rather than passed in: all three call sites built the
+                identical `getIconForCategory(tx.category, 'w-4 h-4')` element, and a
+                fresh element as a prop is what kept the memo from ever hitting. */}
+            <CategoryIcon icon={getIconForCategory(tx.category, 'w-4 h-4')} color={color} />
           </div>
           {hasSplits && (
             <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-primary flex items-center justify-center border-2 border-background">
@@ -309,18 +410,18 @@ export const TransactionRow = memo(function TransactionRow({
 
           {/* Row 1: description + amount */}
           <div className="flex items-baseline gap-2">
-            <p className="flex-1 min-w-0 truncate text-[13.5px] font-semibold text-white/90 leading-none">
-              {descriptionNode ?? tx.description}
+            <p className="flex-1 min-w-0 truncate text-body font-semibold text-white/90 leading-none">
+              {renderDescription ? renderDescription(tx) : tx.description}
             </p>
             <div className="shrink-0 text-right leading-none">
               <span className={cn(
-                'text-[14px] font-bold tabular-nums',
+                'text-sm font-bold tabular-nums',
                 myShare < 0 ? 'text-emerald-400' : 'text-white/85'
               )}>
                 {myShare < 0 ? '+' : '−'}{formattedAmount}
               </span>
               {showConverted && formattedConverted && (
-                <p className="text-[10px] font-bold tabular-nums mt-0.5 px-1 py-[1px] rounded bg-primary/15 text-primary/80">
+                <p className="text-caption font-bold tabular-nums mt-0.5 px-1 py-[1px] rounded bg-primary/15 text-primary/80">
                   ≈ {formattedConverted}
                 </p>
               )}
@@ -332,15 +433,15 @@ export const TransactionRow = memo(function TransactionRow({
             {/* Left meta — all shrink-0, no wrap */}
             <div className="flex items-center gap-1 overflow-hidden">
               <span
-                className="shrink-0 text-[10px] font-bold px-1.5 py-[2px] rounded capitalize leading-none"
+                className="shrink-0 text-caption font-bold px-1.5 py-[2px] rounded capitalize leading-none"
                 style={{ backgroundColor: `${color}18`, color }}
               >
                 {isSettlement ? 'Settlement' : getCategoryLabel(tx.category)}
               </span>
-              <span className="shrink-0 text-white/20 text-[10px]">·</span>
-              <span className="shrink-0 text-[11px] text-white/35 font-medium leading-none">{paidByLabel}</span>
-              <span className="shrink-0 text-white/20 text-[10px]">·</span>
-              <span className="shrink-0 text-[11px] text-white/35 font-medium tabular-nums leading-none">
+              <span className="shrink-0 text-white/20 text-caption">·</span>
+              <span className="shrink-0 text-meta text-white/35 font-medium leading-none">{paidByLabel}</span>
+              <span className="shrink-0 text-white/20 text-caption">·</span>
+              <span className="shrink-0 text-meta text-white/35 font-medium tabular-nums leading-none">
                 {formatDate(parseISO(tx.date.slice(0, 10)), 'short')}
               </span>
               {/* Location indicator */}
@@ -353,7 +454,7 @@ export const TransactionRow = memo(function TransactionRow({
               {tx.receipt_path && onViewReceipt && (
                 <button
                   type="button"
-                  onClick={(e) => { e.stopPropagation(); onViewReceipt(); }}
+                  onClick={(e) => { e.stopPropagation(); onViewReceipt(tx); }}
                   className="shrink-0 ml-0.5 p-2 -m-1.5 rounded text-sky-300/70 hover:text-sky-300 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/60"
                   aria-label="View attached receipt"
                 >
@@ -384,20 +485,20 @@ export const TransactionRow = memo(function TransactionRow({
                 </Popover>
               )}
               {isPending && (
-                <span className="shrink-0 flex items-center gap-1 px-1.5 py-[2px] rounded bg-sky-500/10 text-sky-400 border border-sky-500/15 text-[10px] font-medium ml-1" aria-label="Waiting to sync">
+                <span className="shrink-0 flex items-center gap-1 px-1.5 py-[2px] rounded bg-sky-500/10 text-sky-400 border border-sky-500/15 text-caption font-medium ml-1" aria-label="Waiting to sync">
                   <Cloud className="w-2.5 h-2.5 animate-pulse" aria-hidden="true" />
                   Syncing
                 </span>
               )}
               {isFailed && (
-                <span className="shrink-0 flex items-center gap-1 px-1.5 py-[2px] rounded bg-rose-500/10 text-rose-400 border border-rose-500/15 text-[10px] font-medium ml-1" title={tx._syncError || undefined} aria-label="Sync failed">
+                <span className="shrink-0 flex items-center gap-1 px-1.5 py-[2px] rounded bg-rose-500/10 text-rose-400 border border-rose-500/15 text-caption font-medium ml-1" title={tx._syncError || undefined} aria-label="Sync failed">
                   <AlertTriangle className="w-2.5 h-2.5" aria-hidden="true" />
                   Failed
                 </span>
               )}
               {tx.tags && tx.tags.length > 0 && (
                 <span className="shrink-0 flex items-center gap-1 ml-0.5" aria-label={`Tags: ${tx.tags.join(', ')}`}>
-                  <span className="text-white/20 text-[10px]">·</span>
+                  <span className="text-white/20 text-caption">·</span>
                   {tx.tags.slice(0, 2).map(t => {
                     const c = tagColors(t);
                     return (
@@ -409,7 +510,7 @@ export const TransactionRow = memo(function TransactionRow({
                           router.push(`/search?tag=${encodeURIComponent(t)}`);
                           window.dispatchEvent(new CustomEvent('novira:apply-tag-filter', { detail: { tag: t } }));
                         }}
-                        className="shrink-0 text-[10px] font-bold leading-none px-1.5 py-[2px] rounded border tabular-nums hover:brightness-110 transition-[filter] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+                        className="shrink-0 text-caption font-bold leading-none px-1.5 py-[2px] rounded border tabular-nums hover:brightness-110 transition-[filter] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
                         style={{ backgroundColor: c.bg, borderColor: c.border, color: c.text }}
                         aria-label={`Filter by tag ${t}`}
                       >
@@ -418,7 +519,7 @@ export const TransactionRow = memo(function TransactionRow({
                     );
                   })}
                   {tx.tags.length > 2 && (
-                    <span className="shrink-0 text-[10px] text-white/40 font-semibold">+{tx.tags.length - 2}</span>
+                    <span className="shrink-0 text-caption text-white/40 font-semibold">+{tx.tags.length - 2}</span>
                   )}
                 </span>
               )}
@@ -436,8 +537,8 @@ export const TransactionRow = memo(function TransactionRow({
               <DropdownMenuContent align="end" className="bg-card/98 backdrop-blur-xl border-white/10 rounded-xl shadow-2xl min-w-[140px]">
                 <DropdownMenuItem
                   delayDuration={0}
-                  onClick={(e) => { e.stopPropagation(); onHistory(); }}
-                  className="rounded-lg cursor-pointer gap-2 text-[13px]"
+                  onClick={(e) => { e.stopPropagation(); onHistory(tx); }}
+                  className="rounded-lg cursor-pointer gap-2 text-body"
                 >
                   <History className="w-3.5 h-3.5" />
                   History
@@ -445,8 +546,8 @@ export const TransactionRow = memo(function TransactionRow({
                 {tx.receipt_path && onViewReceipt && (
                   <DropdownMenuItem
                     delayDuration={0}
-                    onClick={(e) => { e.stopPropagation(); onViewReceipt(); }}
-                    className="rounded-lg cursor-pointer gap-2 text-[13px]"
+                    onClick={(e) => { e.stopPropagation(); onViewReceipt(tx); }}
+                    className="rounded-lg cursor-pointer gap-2 text-body"
                   >
                     <Paperclip className="w-3.5 h-3.5" />
                     View receipt
@@ -459,8 +560,8 @@ export const TransactionRow = memo(function TransactionRow({
                 {canEdit && !isSettlement && !hasSplits && (
                   <DropdownMenuItem
                     delayDuration={0}
-                    onClick={(e) => { e.stopPropagation(); onEdit(); }}
-                    className="rounded-lg cursor-pointer gap-2 text-[13px]"
+                    onClick={(e) => { e.stopPropagation(); onEdit(tx); }}
+                    className="rounded-lg cursor-pointer gap-2 text-body"
                   >
                     <Pencil className="w-3.5 h-3.5" />
                     Edit
@@ -469,8 +570,8 @@ export const TransactionRow = memo(function TransactionRow({
                 {canEdit && !isSettlement && !hasSplits && (
                   <DropdownMenuItem
                     delayDuration={0}
-                    onClick={(e) => { e.stopPropagation(); onDelete(); }}
-                    className="rounded-lg cursor-pointer text-destructive focus:text-destructive gap-2 text-[13px]"
+                    onClick={(e) => { e.stopPropagation(); onDelete(tx); }}
+                    className="rounded-lg cursor-pointer text-destructive focus:text-destructive gap-2 text-body"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                     Delete
@@ -485,19 +586,19 @@ export const TransactionRow = memo(function TransactionRow({
             <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
               {bucketChip}
               {isSettlement && (
-                <span className="flex items-center gap-1 px-1.5 py-[2px] rounded-md bg-emerald-500/10 text-[10px] text-emerald-400 border border-emerald-500/10 font-medium shrink-0">
+                <span className="flex items-center gap-1 px-1.5 py-[2px] rounded-md bg-emerald-500/10 text-caption text-emerald-400 border border-emerald-500/10 font-medium shrink-0">
                   <ArrowLeftRight className="w-2.5 h-2.5 shrink-0" />
                   Settlement
                 </span>
               )}
               {tx.is_recurring && (
-                <span className="flex items-center gap-1 px-1.5 py-[2px] rounded-md bg-cyan-500/10 text-[10px] text-cyan-400 border border-cyan-500/10 font-medium shrink-0">
+                <span className="flex items-center gap-1 px-1.5 py-[2px] rounded-md bg-cyan-500/10 text-caption text-cyan-400 border border-cyan-500/10 font-medium shrink-0">
                   <RefreshCcw className="w-2.5 h-2.5 shrink-0" />
                   Recurring
                 </span>
               )}
               {tx.exclude_from_allowance && (
-                <span className="flex items-center gap-1 px-1.5 py-[2px] rounded-md bg-rose-500/10 text-[10px] text-rose-400 border border-rose-500/10 font-medium shrink-0">
+                <span className="flex items-center gap-1 px-1.5 py-[2px] rounded-md bg-rose-500/10 text-caption text-rose-400 border border-rose-500/10 font-medium shrink-0">
                   <Ban className="w-2.5 h-2.5 shrink-0" />
                   Excluded
                 </span>
@@ -511,7 +612,7 @@ export const TransactionRow = memo(function TransactionRow({
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="absolute bottom-2 right-10 flex items-center gap-0.5 text-[9px] text-white/25 font-medium pointer-events-none select-none"
+            className="absolute bottom-2 right-10 flex items-center gap-0.5 text-micro text-white/25 font-medium pointer-events-none select-none"
           >
             swipe
             <svg width="10" height="7" viewBox="0 0 10 7" fill="none" aria-hidden="true">
