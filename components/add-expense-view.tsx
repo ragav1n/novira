@@ -90,7 +90,22 @@ const PAYMENT_METHOD_COLORS: Record<string, string> = {
     'Bank Transfer': '#06B6D4',
 };
 
+/**
+ * The draft key is scoped by user and workspace, but both ids start as null in
+ * UserPreferencesProvider and only resolve after an async auth call — and
+ * useExpenseForm reads sessionStorage once, on first render. That meant a hard
+ * refresh of /add always read the pre-auth `anon` key, never the key the previous
+ * session wrote to, so the draft the feature exists to protect was never
+ * restored. Remounting once the ids settle re-runs the read against the real key
+ * (React's own state-reset idiom); the anon fallback inside useExpenseForm covers
+ * anything typed before auth landed.
+ */
 export function AddExpenseView() {
+    const { userId, activeWorkspaceId } = useUserPreferences();
+    return <AddExpenseForm key={`${userId ?? 'anon'}:${activeWorkspaceId ?? 'personal'}`} />;
+}
+
+function AddExpenseForm() {
     const router = useRouter();
     const isNative = useIsNative();
     const { currency, userId, CURRENCY_SYMBOLS, activeWorkspaceId, fullName, avatarUrl, defaultCategory, defaultPaymentMethod, defaultBucketId } = useUserPreferences();

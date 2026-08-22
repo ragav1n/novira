@@ -58,7 +58,18 @@ export function useExpenseForm(
     // Lazy-init: only read sessionStorage once on mount, not on every render.
     const initialDraftRef = useRef<Partial<DraftShape> | null>(null);
     if (initialDraftRef.current === null) {
-        initialDraftRef.current = readDraft(draftKey) ?? {};
+        let draft = readDraft(draftKey);
+        // AddExpenseView remounts this hook once userId/activeWorkspaceId resolve,
+        // so anything typed before auth landed was written under the 'anon' key.
+        // Adopt it rather than dropping it on the floor.
+        if (!draft && userId) {
+            const anonKey = `${DRAFT_KEY_PREFIX}_anon_${activeWorkspaceId ?? 'personal'}`;
+            draft = readDraft(anonKey);
+            if (draft && typeof window !== 'undefined') {
+                try { sessionStorage.removeItem(anonKey); } catch { /* noop */ }
+            }
+        }
+        initialDraftRef.current = draft ?? {};
     }
     const initialDraft = initialDraftRef.current;
     const hadDraftCurrencyRef = useRef(!!initialDraft.txCurrency);

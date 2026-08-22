@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { format } from 'date-fns';
 import { toast } from '@/utils/haptics';
 import { getExpenseFormErrors, parseAmountStrict, toCents, type ExpenseFormErrors } from '@/lib/expense-validation';
+import { nextOccurrence } from '@/lib/recurrence';
 import { Haptics, NotificationType } from '@capacitor/haptics';
 import { TransactionService } from '@/lib/services/transaction-service';
 import { TripService } from '@/lib/services/trip-service';
@@ -136,21 +137,7 @@ function buildRecurringRecord(
     isIncome: boolean,
 ): RecurringRecord {
     const intendedDay = date.getDate();
-    const nextDate = new Date(date);
-    if (frequency === 'daily') {
-        nextDate.setDate(nextDate.getDate() + 1);
-    } else if (frequency === 'weekly') {
-        nextDate.setDate(nextDate.getDate() + 7);
-    } else if (frequency === 'monthly') {
-        // JS setMonth overflows short months (e.g. Jan 31 → Mar 3).
-        // Fix: step to the 1st, advance the month, then clamp to intended day.
-        nextDate.setDate(1);
-        nextDate.setMonth(nextDate.getMonth() + 1);
-        const lastDayOfMonth = new Date(nextDate.getFullYear(), nextDate.getMonth() + 1, 0).getDate();
-        nextDate.setDate(Math.min(intendedDay, lastDayOfMonth));
-    } else if (frequency === 'yearly') {
-        nextDate.setFullYear(nextDate.getFullYear() + 1);
-    }
+    const nextDate = nextOccurrence(date, frequency);
 
     return {
         user_id: userId,

@@ -2,6 +2,7 @@ import React from 'react';
 import { RefreshCcw, ArrowDownLeft, ArrowUpRight } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { format } from 'date-fns';
+import { nextOccurrence } from '@/lib/recurrence';
 import { cn } from '@/lib/utils';
 
 interface RecurringExpenseSectionProps {
@@ -90,14 +91,7 @@ export function RecurringExpenseSection({
                         ))}
                     </div>
                     <p className="text-meta text-center text-muted-foreground italic">
-                        {isIncome ? 'Next deposit' : 'Next bill'}: {(() => {
-                            const next = new Date(date || new Date());
-                            if (frequency === 'daily') next.setDate(next.getDate() + 1);
-                            else if (frequency === 'weekly') next.setDate(next.getDate() + 7);
-                            else if (frequency === 'monthly') next.setMonth(next.getMonth() + 1);
-                            else if (frequency === 'yearly') next.setFullYear(next.getFullYear() + 1);
-                            return format(next, 'PPPP');
-                        })()}
+                        {isIncome ? 'Next deposit' : 'Next bill'}: {format(nextOccurrence(date || new Date(), frequency), 'PPPP')}
                     </p>
                 </div>
             )}
