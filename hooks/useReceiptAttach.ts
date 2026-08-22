@@ -41,8 +41,8 @@ export function useReceiptAttach(userId: string | null | undefined) {
         // Storage RLS requires the path's first folder to be auth.uid(), so a
         // receipt can only ever be written into the uploader's own folder. A group
         // list shows other members' rows, and uploading against one of those would
-        // be rejected — then retried five times before surfacing. The row's
-        // `canEdit` already implies ownership; this is the belt to that braces.
+        // be rejected — then retried five times before surfacing. The row gates the
+        // affordance on the same check; this is the belt to that braces.
         if (tx.user_id && tx.user_id !== userId) {
             console.warn('[useReceiptAttach] refusing to attach to another user\'s transaction', tx.id);
             toast.error('You can only attach receipts to your own expenses');

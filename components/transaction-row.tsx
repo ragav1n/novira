@@ -555,7 +555,13 @@ export const TransactionRow = memo(function TransactionRow({
                     View receipt
                   </DropdownMenuItem>
                 )}
-                {canEdit && onAttachReceipt && (
+                {/* Ownership, not canEdit. canEdit also caps edits to the current
+                    month, which is right for changing an amount and wrong here: a
+                    receipt is documentation attached to a record, not a change to
+                    it, and the one you forgot is usually last month's. Ownership
+                    still matters — storage RLS writes into auth.uid()'s folder, so
+                    a receipt can only go on your own row. */}
+                {onAttachReceipt && tx.user_id === userId && (
                   <DropdownMenuItem
                     delayDuration={0}
                     onClick={(e) => { e.stopPropagation(); onAttachReceipt(tx); }}
