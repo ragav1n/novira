@@ -14,6 +14,12 @@ export async function proxy(request: NextRequest) {
         "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.frankfurter.dev https://*.gstatic.com https://va.vercel-scripts.com https://*.mapbox.com https://maps.googleapis.com https://places.googleapis.com https://photon.komoot.io",
         "worker-src 'self' blob:",
         "child-src 'self' blob:",
+        // Receipt PDFs render in an <iframe> pointed at a short-lived Supabase
+        // signed URL (receipt-viewer-dialog). Without an explicit frame-src, CSP
+        // falls back to child-src, which has no supabase.co origin — so every PDF
+        // receipt was silently blocked. object-src stays 'none': we don't use
+        // <object>/<embed>, and frame-src is what governs an iframe.
+        "frame-src 'self' blob: https://*.supabase.co",
         "frame-ancestors 'none'",
         "object-src 'none'",
         "base-uri 'self'",

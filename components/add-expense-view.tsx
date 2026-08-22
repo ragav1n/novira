@@ -57,7 +57,7 @@ import { useExpenseSubmission, getExpenseFormErrors, type ExpenseFormErrors } fr
 import { TransactionService } from '@/lib/services/transaction-service';
 import { getDistance } from '@/lib/location';
 import { takePendingSharedFile } from '@/lib/share-target';
-import { validateReceiptFile } from '@/lib/receipt-storage';
+import { validateReceiptFile, RECEIPT_ACCEPT, isPdf } from '@/lib/receipt-storage';
 import { toast } from '@/utils/haptics';
 
 import { CATEGORY_COLORS, getIconForCategory, CATEGORIES as SYSTEM_CATEGORIES } from '@/lib/categories';
@@ -250,6 +250,15 @@ function AddExpenseForm() {
         // gating the stash behind the online check made it impossible to add a
         // receipt while offline at all.
         stashAsReceipt(shrunk);
+        // PDFs are stored and viewable but there is nothing to send the scanner —
+        // it reads images. Attaching succeeded, so this is information, not an error.
+        if (isPdf(shrunk)) {
+            toast('PDF attached — auto-fill only works on photos', {
+                icon: '📄',
+                style: { background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.2)', color: '#6EE7B7' }
+            });
+            return;
+        }
         if (typeof navigator !== 'undefined' && navigator.onLine === false) {
             toast.error('Receipt scanning needs an internet connection');
             return;
@@ -529,7 +538,7 @@ function AddExpenseForm() {
                 <input
                     ref={fileInputRef}
                     type="file"
-                    accept="image/*"
+                    accept={RECEIPT_ACCEPT}
                     className="hidden"
                     onChange={handleScan}
                 />
@@ -565,7 +574,7 @@ function AddExpenseForm() {
                         className="w-full flex items-center justify-center gap-2 px-4 py-2.5 min-h-[44px] rounded-xl text-xs font-semibold text-muted-foreground hover:text-primary hover:bg-primary/5 transition-all disabled:opacity-50 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
                     >
                         <ImageIcon className="w-3.5 h-3.5" />
-                        Or choose from gallery
+                        Or choose an image or PDF
                     </button>
                     {formState.receiptFile && (
                         <div className="flex items-center gap-3 px-3 py-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10">

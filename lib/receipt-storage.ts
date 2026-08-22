@@ -1,32 +1,19 @@
 import { supabase } from '@/lib/supabase';
+import { validateReceiptFile, extFromMime } from '@/lib/receipt-file';
+
+// The file rules live in lib/receipt-file.ts so they can be unit-tested without
+// pulling in the Supabase client. Re-exported here so existing importers are
+// unaffected.
+export {
+    validateReceiptFile,
+    isPdf,
+    RECEIPT_ACCEPT,
+    RECEIPT_MIME_TYPES,
+    type ReceiptValidation,
+} from '@/lib/receipt-file';
 
 const BUCKET = 'receipts';
-const MAX_BYTES = 8 * 1024 * 1024; // 8 MB
-const ALLOWED_MIME = /^(image\/(jpeg|png|webp|heic|heif)|application\/pdf)$/;
 const SIGNED_URL_TTL = 60 * 60; // 1 hour
-
-export type ReceiptValidation = { valid: true } | { valid: false; reason: string };
-
-export function validateReceiptFile(file: File | Blob): ReceiptValidation {
-    if (file.size > MAX_BYTES) {
-        return { valid: false, reason: `File is too large (max ${Math.round(MAX_BYTES / 1024 / 1024)}MB).` };
-    }
-    const mime = (file as File).type || '';
-    if (!ALLOWED_MIME.test(mime)) {
-        return { valid: false, reason: 'Unsupported file type. Use JPEG, PNG, WebP, HEIC, or PDF.' };
-    }
-    return { valid: true };
-}
-
-function extFromMime(mime: string): string {
-    if (mime === 'application/pdf') return 'pdf';
-    if (mime === 'image/jpeg') return 'jpg';
-    if (mime === 'image/png') return 'png';
-    if (mime === 'image/webp') return 'webp';
-    if (mime === 'image/heic') return 'heic';
-    if (mime === 'image/heif') return 'heif';
-    return 'bin';
-}
 
 /**
  * Upload a receipt against an existing transaction. Returns the storage path
