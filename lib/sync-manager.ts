@@ -19,7 +19,7 @@ import {
 } from './offline-sync-queue';
 import { TransactionService } from './services/transaction-service';
 import { invalidateTransactionCaches } from './sw-cache';
-import { getOfflineReceipt, deleteOfflineReceipt } from './offline-receipt-store';
+import { getOfflineReceipt, saveOfflineReceipt, deleteOfflineReceipt } from './offline-receipt-store';
 import { uploadReceipt } from './receipt-storage';
 
 const LEGACY_QUEUE_KEY = 'novira-offline-queue';
@@ -364,6 +364,35 @@ export async function attemptSync() {
     }
 }
 
+/**
+ * The row is already on the server, so a failed receipt upload must not fail the
+ * transaction — but the photo is the only part with no server copy, so it must
+ * not be thrown away either. Re-key the Blob under a fresh queue id and enqueue a
+ * receipt-only item, which then rides the queue's normal backoff and retry.
+ *
+ * Re-keying (rather than reusing the original id) keeps the capacity-eviction and
+ * expiry sweeps correct: both delete Blobs by queue-item id.
+ */
+async function handOffReceiptForRetry(queueId: string, txId: string, ownerId: string) {
+    try {
+        const blob = await getOfflineReceipt(queueId);
+        if (!blob) return;
+        const retryId = uuidv4();
+        await saveOfflineReceipt(retryId, blob);
+        await deleteOfflineReceipt(queueId);
+        await enqueueMutation('UPLOAD_RECEIPT', { txId, ownerId }, { id: retryId });
+    } catch (e) {
+        // Couldn't even park it (storage full, IDB unavailable) — now the photo
+        // really is unrecoverable, so say so.
+        console.error('[sync-manager] could not queue receipt for retry:', e);
+        await deleteOfflineReceipt(queueId);
+        window.dispatchEvent(new CustomEvent('novira-receipt-upload-failed', {
+            detail: { txId, queueId }
+        }));
+        broadcast('novira-receipt-upload-failed', { txId, queueId });
+    }
+}
+
 async function runSyncLoop(): Promise<void> {
     let queue = await readQueue();
     const now = Date.now();
@@ -445,9 +474,9 @@ async function runSyncLoop(): Promise<void> {
                         const idempotent = (result as { idempotent?: boolean }).idempotent;
                         // Upload any queued offline receipt against the freshly-created row.
                         // Failures here don't block markSynced — the transaction is safe on
-                        // the server. The Blob is deleted either way: on success it's no
-                        // longer needed, on failure the user re-attaches from their photo
-                        // library via the row's detail view (orphans would just leak IDB).
+                        // the server, and the photo is handed to its own retryable queue
+                        // item rather than discarded. The Blob is only deleted once it has
+                        // actually landed.
                         if (hasOfflineReceipt) {
                             if (realTxId && ownerId) {
                                 try {
@@ -472,13 +501,14 @@ async function runSyncLoop(): Promise<void> {
                                     }
                                     await deleteOfflineReceipt(item.id);
                                 } catch (uploadErr) {
-                                    console.warn('[sync-manager] offline receipt upload failed:', uploadErr);
-                                    await deleteOfflineReceipt(item.id);
-                                    window.dispatchEvent(new CustomEvent('novira-receipt-upload-failed', {
-                                        detail: { txId: realTxId, queueId: item.id }
-                                    }));
-                                    broadcast('novira-receipt-upload-failed', { txId: realTxId, queueId: item.id });
+                                    console.warn('[sync-manager] offline receipt upload failed, handing off to retry:', uploadErr);
+                                    await handOffReceiptForRetry(item.id, realTxId, ownerId);
                                 }
+                            } else {
+                                // Should not happen: the RPC returns the full row
+                                // and user_id is required. Log rather than drop the
+                                // photo silently, which is what used to happen.
+                                console.error('[sync-manager] cannot upload receipt — missing tx id or owner', { realTxId, ownerId, queueId: item.id });
                             }
                         }
                         queue = await mutateQueue(q => markSynced(q, item.id));
@@ -531,6 +561,40 @@ async function runSyncLoop(): Promise<void> {
                         }
                     } else {
                         throw new Error('Failed to create transaction via sync');
+                    }
+                } else if (item.type === 'UPLOAD_RECEIPT') {
+                    // A receipt whose first upload attempt failed. The transaction
+                    // itself is already on the server; only the photo is outstanding.
+                    const { txId, ownerId } = item.data;
+                    const blob = await getOfflineReceipt(item.id);
+                    if (!blob) {
+                        // Nothing left to upload — treat as done rather than
+                        // retrying against a Blob that will never come back.
+                        console.warn('[sync-manager] UPLOAD_RECEIPT has no stored photo, dropping', item.id);
+                        queue = await mutateQueue(q => markSynced(q, item.id));
+                    } else {
+                        const { path } = await withTimeout(
+                            uploadReceipt(ownerId, txId, blob),
+                            RECEIPT_UPLOAD_TIMEOUT_MS,
+                            'UPLOAD_RECEIPT'
+                        );
+                        const { error } = await withTimeout(
+                            Promise.resolve(
+                                supabase
+                                    .from('transactions')
+                                    .update({ receipt_path: path })
+                                    .eq('id', txId)
+                            ),
+                            MUTATION_TIMEOUT_MS,
+                            'UPLOAD_RECEIPT_UPDATE'
+                        );
+                        if (error) throw error;
+                        await deleteOfflineReceipt(item.id);
+                        queue = await mutateQueue(q => markSynced(q, item.id));
+                        window.dispatchEvent(new CustomEvent('novira-receipt-uploaded', {
+                            detail: { txId, path }
+                        }));
+                        broadcast('novira-receipt-uploaded', { txId, path });
                     }
                 } else if (item.type === 'DELETE_TRANSACTION') {
                     const { error } = await withTimeout(
@@ -709,6 +773,9 @@ if (typeof window !== 'undefined') {
                     break;
                 case 'novira-queue-evicted':
                     window.dispatchEvent(new CustomEvent('novira-queue-evicted', { detail: msg.payload }));
+                    break;
+                case 'novira-receipt-uploaded':
+                    window.dispatchEvent(new CustomEvent('novira-receipt-uploaded', { detail: msg.payload }));
                     break;
                 case 'novira-receipt-upload-failed':
                     window.dispatchEvent(new CustomEvent('novira-receipt-upload-failed', { detail: msg.payload }));

@@ -29,13 +29,19 @@ export function FailedSyncSection({ failedItems }: Props) {
         // discardFailedItem drops the mutation from IndexedDB and deletes its offline
         // receipt — there is no server copy to recover from, so this is the one place in
         // the app where a single tap destroys data outright.
+        //
+        // A receipt-only item is a different story and must not claim the expense was
+        // lost: the row is already on the server, and only the photo is outstanding.
+        const receiptOnly = item.type === 'UPLOAD_RECEIPT';
         confirm({
-            title: 'Discard this change?',
-            description: `"${description}" was never saved to your account. Discarding removes it from the queue permanently, along with any receipt attached to it. This can't be undone.`,
+            title: receiptOnly ? 'Discard this receipt photo?' : 'Discard this change?',
+            description: receiptOnly
+                ? "The expense itself was saved — only its receipt photo is still waiting to upload. Discarding deletes the photo permanently. This can't be undone."
+                : `"${description}" was never saved to your account. Discarding removes it from the queue permanently, along with any receipt attached to it. This can't be undone.`,
             confirmLabel: 'Discard',
             onConfirm: async () => {
                 await discardFailedItem(item.id);
-                toast.success('Change discarded');
+                toast.success(receiptOnly ? 'Receipt discarded' : 'Change discarded');
             },
         });
     };
@@ -61,14 +67,18 @@ export function FailedSyncSection({ failedItems }: Props) {
                 <h3 className="font-semibold text-sm">Offline Sync Failures</h3>
             </div>
             <p className="text-xs text-muted-foreground">
-                {failedItems.length} item{failedItems.length > 1 ? 's' : ''} couldn&apos;t sync. Review below — retry transient errors, discard permanent or expired ones.
+                {failedItems.length} item{failedItems.length > 1 ? 's' : ''} couldn&apos;t sync. Review below — retry
+                transient errors, discard permanent or expired ones. A &ldquo;Receipt photo&rdquo; row means the
+                expense saved but its photo didn&apos;t.
             </p>
             <div className="space-y-2">
                 {failedItems.map(item => {
                     const kind = (item.errorKind ?? 'permanent') as SyncErrorKind;
                     const badge = KIND_BADGE[kind];
                     const isExpired = kind === 'expired';
-                    const description = item.data?.transaction?.description ?? item.data?.description ?? 'Unknown Item';
+                    const description = item.type === 'UPLOAD_RECEIPT'
+                        ? 'Receipt photo'
+                        : item.data?.transaction?.description ?? item.data?.description ?? 'Unknown Item';
                     return (
                         <div key={item.id} className="bg-background/80 p-3 rounded-xl flex flex-col gap-2 shadow-sm border border-destructive/20 backdrop-blur-md">
                             <div className="flex items-start justify-between gap-2">

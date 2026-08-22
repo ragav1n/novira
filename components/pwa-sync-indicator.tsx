@@ -106,10 +106,12 @@ export function SyncIndicator() {
             if (count > 0) setExpiredNotice({ count });
         };
 
-        // Row synced fine but the queued receipt failed to upload. The Blob is
-        // kept in IDB so the user can re-attach from the row's detail view.
+        // The row synced but the photo could not even be parked for retry — this
+        // only fires when the Blob is genuinely unrecoverable. An ordinary upload
+        // failure is silent here, because it becomes a retrying queue item and
+        // surfaces in Settings only if it exhausts its attempts.
         const onReceiptUploadFailed = () => {
-            toast("Receipt couldn't upload — open the expense to re-attach.", {
+            toast("Receipt couldn't be saved — the expense was added without it.", {
                 icon: '⚠️',
                 style: { background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.2)', color: '#FBBF24' }
             });
