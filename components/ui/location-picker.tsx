@@ -778,10 +778,20 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
 
     // ── Nearby POIs on open ─────────────────────────────────────────────────
 
+    // Typing a query overwrites `predictions` with search results, so clearing it
+    // again leaves the list empty. The once-only ref then blocked any refetch, and
+    // the Nearby list stayed gone until the picker was closed and reopened.
+    useEffect(() => {
+        if (query.length > 0) nearbyFetchedRef.current = false;
+    }, [query]);
+
     useEffect(() => {
         if (!isExpanded || !lastPosition || query.length > 0 || nearbyFetchedRef.current) return;
         if (!googleMapsKey && !mapboxToken) return;
+        // Set optimistically so a re-render can't start a second concurrent fetch;
+        // cleared again below if nothing came back, so a failure can retry.
         nearbyFetchedRef.current = true;
+        let loaded = false;
 
         const ac = new AbortController();
         (async () => {
@@ -834,6 +844,7 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                         setPredictions(results);
                         setActiveSource('google');
                         setIsLoadingNearby(false);
+                        loaded = true;
                         return;
                     }
                     console.warn('[LocationPicker] Google nearby search non-OK:', response.status);
@@ -864,13 +875,17 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
                         }).sort((a, b) => (a._distance || 0) - (b._distance || 0));
                         setPredictions(features);
                         setActiveSource('mapbox');
+                        loaded = true;
                     }
                 } catch (e: unknown) {
                     if ((e as { name?: string })?.name === 'AbortError') return;
                     console.warn('[LocationPicker] Nearby POI fetch failed:', e);
                 }
             }
-            if (!ac.signal.aborted) setIsLoadingNearby(false);
+            if (!ac.signal.aborted) {
+                setIsLoadingNearby(false);
+                if (!loaded) nearbyFetchedRef.current = false;
+            }
         })();
         return () => ac.abort();
     }, [isExpanded, lastPosition, query.length, googleMapsKey, mapboxToken]);

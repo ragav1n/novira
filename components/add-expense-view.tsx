@@ -925,11 +925,11 @@ function AddExpenseForm() {
                                             formState.setSuggestedBucket(null);
                                             formState.setMerchantDefaults(null);
                                         }}
-                                        className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/10 bg-secondary/20 hover:bg-secondary/40 transition-colors shrink-0"
+                                        className="relative tap-target flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/10 bg-secondary/20 hover:bg-secondary/40 transition-colors shrink-0"
                                         aria-label={`Use previous: ${s.description}`}
                                     >
                                         <div
-                                            className="relative tap-target w-5 h-5 rounded-full flex items-center justify-center shrink-0"
+                                            className="w-5 h-5 rounded-full flex items-center justify-center shrink-0"
                                             style={{ backgroundColor: `${color}25`, color }}
                                         >
                                             {getIconForCategory(s.category, 'w-3 h-3')}

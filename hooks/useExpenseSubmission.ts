@@ -317,6 +317,14 @@ export function useExpenseSubmission() {
                 // Leave inFlightRef locked — the page unmounts on navigation.
                 setLoading(false);
                 router.push('/');
+            } else {
+                // Unreachable today: queueTransaction either returns success or
+                // throws. Without this branch a falsy result left inFlightRef
+                // locked with no toast, disabling Save for the rest of the visit.
+                console.error('[useExpenseSubmission] queueTransaction returned no success', result);
+                toast.error("Couldn't save the expense — please try again");
+                inFlightRef.current = false;
+                setLoading(false);
             }
         } catch (error) {
             // Allow the user to retry after a failure.

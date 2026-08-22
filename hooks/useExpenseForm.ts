@@ -257,6 +257,11 @@ export function useExpenseForm(
             return;
         }
 
+        // The debounce timer alone doesn't prevent overlap: once a fetch is past
+        // the timeout it runs to completion, so two in flight can resolve out of
+        // order and the stale one wins. Matches the guard the sibling effects use.
+        let cancelled = false;
+
         const fetchSuggestions = async () => {
             try {
                 const suggestions: { name: string; address: string; lat: number; lng: number; type: 'last' | 'frequent' | 'category' }[] = [];
@@ -335,14 +340,19 @@ export function useExpenseForm(
                     }
                 }
 
+                if (cancelled) return;
                 setSuggestedLocations(suggestions);
             } catch (error) {
+                if (cancelled) return;
                 console.error('Error fetching location suggestions:', error);
             }
         };
 
         const timer = setTimeout(fetchSuggestions, 400);
-        return () => clearTimeout(timer);
+        return () => {
+            cancelled = true;
+            clearTimeout(timer);
+        };
     }, [description, selectedCategory, userId, placeName]);
 
     // Load the user's existing tag vocabulary once per session for autocomplete.
