@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { format } from 'date-fns';
 import { toast } from '@/utils/haptics';
+import { getExpenseFormErrors, type ExpenseFormErrors } from '@/lib/expense-validation';
 import { Haptics, NotificationType } from '@capacitor/haptics';
 import { TransactionService } from '@/lib/services/transaction-service';
 import { TripService } from '@/lib/services/trip-service';
@@ -51,27 +52,7 @@ interface ExpenseSubmissionParams {
     selectedAccountId?: string | null;
 }
 
-export type ExpenseFormErrors = {
-    amount?: string;
-    description?: string;
-    date?: string;
-};
-
-export function getExpenseFormErrors(amount: string, description: string, date: Date | undefined): ExpenseFormErrors | null {
-    const errors: ExpenseFormErrors = {};
-    const parsed = parseFloat(amount);
-    if (!amount) errors.amount = 'Amount is required';
-    else if (isNaN(parsed)) errors.amount = 'Amount must be a number';
-    else if (parsed <= 0) errors.amount = 'Amount must be greater than 0';
-    else if (parsed > 999_999_999) errors.amount = 'Amount is too large';
-
-    const trimmed = description?.trim();
-    if (!trimmed) errors.description = 'Description is required';
-    else if (trimmed.length > 300) errors.description = 'Description is too long (max 300 chars)';
-    if (!date) errors.date = 'Date is required';
-
-    return Object.keys(errors).length > 0 ? errors : null;
-}
+export { getExpenseFormErrors, type ExpenseFormErrors };
 
 function validateExpenseForm(amount: string, description: string, date: Date | undefined): boolean {
     const errors = getExpenseFormErrors(amount, description, date);
