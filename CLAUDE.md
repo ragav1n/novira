@@ -107,5 +107,24 @@ Supabase backend (PostgreSQL + Auth + Realtime). Deployed on Vercel at novira-on
 These require backend/infrastructure setup and cannot be implemented as pure frontend code:
 
 - **Biometric auth** — WebAuthn/Passkeys; requires storing credential IDs in Supabase and a separate auth flow
-- **Receipt photo attach** — requires a Supabase Storage bucket + RLS policies to be created first
-- **Recurring income tracking** — requires schema changes (extend `recurring_templates` with an `is_income` flag + new UI + income-aware budget calculations)
+
+Already shipped, despite once being listed here:
+
+- **Receipt photo attach** — shipped in `f2f54764`. The `receipts` bucket, its
+  owner-folder RLS policies and `transactions.receipt_path` all exist
+  (`202605131400_receipts.sql`). There is no way to attach a receipt to an
+  *existing* transaction — attach happens only at creation.
+- **Recurring income tracking** — `is_income` exists on both `transactions` and
+  `recurring_templates`, and the form has an Income toggle.
+
+## Migrations awaiting manual application
+
+No DDL access from the agent environment, so these are committed as files and
+must be run in the Supabase SQL editor:
+
+- `202608210100_atomic_rpc_account_and_income.sql` — `create_transaction_atomic`
+  never persisted `account_id` or `is_income` (it predates both columns), so the
+  account selector was inert and recurring income saved as an expense.
+- `202608210200_recurring_processor_restore.sql` — `process_recurring_transactions`
+  lost month-end clamping, location and tags in `202605070100`, and never
+  propagated `exclude_from_allowance`.
