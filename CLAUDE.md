@@ -117,14 +117,20 @@ Already shipped, despite once being listed here:
 - **Recurring income tracking** — `is_income` exists on both `transactions` and
   `recurring_templates`, and the form has an Income toggle.
 
-## Migrations awaiting manual application
+## Migrations (manual application — no DDL access from the agent environment)
 
-No DDL access from the agent environment, so these are committed as files and
-must be run in the Supabase SQL editor:
+Committed as files and run by hand in the Supabase SQL editor:
 
 - `202608210100_atomic_rpc_account_and_income.sql` — `create_transaction_atomic`
   never persisted `account_id` or `is_income` (it predates both columns), so the
   account selector was inert and recurring income saved as an expense.
-- `202608210200_recurring_processor_restore.sql` — `process_recurring_transactions`
-  lost month-end clamping, location and tags in `202605070100`, and never
-  propagated `exclude_from_allowance`.
+- ~~`202608210100_atomic_rpc_account_and_income.sql`~~ — applied 2026-08-21,
+  verified behaviourally.
+- ~~`202608210200_recurring_processor_restore.sql`~~ — applied 2026-08-21 (verify
+  with the `pg_proc` query if in doubt).
+- `202608220100_secure_definer_rpcs.sql` — **SECURITY.** `IF x <> auth.uid()` fails
+  open for an unauthenticated caller (NULL comparison), and Postgres grants EXECUTE
+  to PUBLIC on function creation. With only the public anon key, execution reached
+  the INSERT in `create_transaction_atomic`, `get_profile_by_email` returned a user
+  UUID for any email, and `prepare_delete_account(uuid)` had no authorisation check
+  at all. Revokes EXECUTE from anon/PUBLIC across every SECURITY DEFINER function.
