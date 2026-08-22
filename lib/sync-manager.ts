@@ -20,7 +20,7 @@ import {
 import { TransactionService } from './services/transaction-service';
 import { invalidateTransactionCaches } from './sw-cache';
 import { getOfflineReceipt, saveOfflineReceipt, deleteOfflineReceipt } from './offline-receipt-store';
-import { uploadReceipt } from './receipt-storage';
+import { uploadReceipt, deleteReceipt } from './receipt-storage';
 
 const LEGACY_QUEUE_KEY = 'novira-offline-queue';
 const QUEUE_KEY_PREFIX = 'novira-offline-queue:';
@@ -589,6 +589,14 @@ async function runSyncLoop(): Promise<void> {
                             'UPLOAD_RECEIPT_UPDATE'
                         );
                         if (error) throw error;
+                        // Replacing a receipt with a different file type changes the
+                        // extension, and the storage path is derived from it — so the
+                        // old object is not overwritten by upsert and would leak.
+                        const prevPath = item.data?.prevPath;
+                        if (prevPath && prevPath !== path) {
+                            await deleteReceipt(prevPath).catch(err =>
+                                console.warn('[sync-manager] could not remove superseded receipt', err));
+                        }
                         await deleteOfflineReceipt(item.id);
                         queue = await mutateQueue(q => markSynced(q, item.id));
                         window.dispatchEvent(new CustomEvent('novira-receipt-uploaded', {
@@ -710,6 +718,27 @@ async function runSyncLoop(): Promise<void> {
 }
 
 // 4. Manual Retry for Failed Items
+/**
+ * Attach (or replace) a receipt on a transaction that is already on the server.
+ *
+ * Goes through the queue rather than uploading inline so it inherits everything
+ * the add-expense path already has: works offline, retries with backoff, and
+ * surfaces in the failed-sync list if it never lands. `prevPath` is deleted once
+ * the new file is up, but only when the path actually changed.
+ */
+export async function queueReceiptUpload(
+    txId: string,
+    ownerId: string,
+    file: File | Blob,
+    prevPath?: string | null,
+): Promise<void> {
+    // The Blob and its queue item share one id, so the eviction and expiry sweeps
+    // (which delete Blobs by item id) stay correct.
+    const id = uuidv4();
+    await saveOfflineReceipt(id, file);
+    await enqueueMutation('UPLOAD_RECEIPT', { txId, ownerId, prevPath: prevPath ?? null }, { id });
+}
+
 export async function retryFailedItem(id: string) {
     const queue = await mutateQueue(q => q.map(item => item.id === id
         ? { ...item, status: 'pending' as const, retryCount: 0, nextRetryAt: undefined, errorReason: undefined, failedAt: undefined, errorKind: undefined }

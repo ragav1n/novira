@@ -44,6 +44,7 @@ interface TransactionRowProps {
   onEdit: (tx: Transaction) => void;
   onDelete: (tx: Transaction) => void;
   onViewReceipt?: (tx: Transaction) => void;
+  onAttachReceipt?: (tx: Transaction) => void;
   selectable?: boolean;
   selected?: boolean;
   onToggleSelect?: (tx: Transaction) => void;
@@ -171,6 +172,7 @@ export const TransactionRow = memo(function TransactionRow({
   onEdit,
   onDelete,
   onViewReceipt,
+  onAttachReceipt,
   selectable = false,
   selected = false,
   onToggleSelect,
@@ -553,7 +555,17 @@ export const TransactionRow = memo(function TransactionRow({
                     View receipt
                   </DropdownMenuItem>
                 )}
-                {/* Kept as two sibling conditionals rather than one wrapped in a
+                {canEdit && onAttachReceipt && (
+                  <DropdownMenuItem
+                    delayDuration={0}
+                    onClick={(e) => { e.stopPropagation(); onAttachReceipt(tx); }}
+                    className="rounded-lg cursor-pointer gap-2 text-body"
+                  >
+                    <Paperclip className="w-3.5 h-3.5" />
+                    {tx.receipt_path ? 'Replace receipt' : 'Attach receipt'}
+                  </DropdownMenuItem>
+                )}
+                {/* Kept as sibling conditionals rather than wrapped in a
                     fragment: DropdownMenuContent clones every child to inject a
                     `--m3-stagger` style, and cloning a Fragment with `style` logs
                     "Invalid prop `style` supplied to React.Fragment" on every open. */}

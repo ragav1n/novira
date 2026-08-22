@@ -23,6 +23,8 @@ import { AccountFilterChips } from './dashboard/account-filter-chips';
 import { AddFriendDialog } from './groups/add-friend-dialog';
 import { ReceiptViewerDialog } from './receipt-viewer-dialog';
 import { useReceiptViewer } from '@/hooks/useReceiptViewer';
+import { useReceiptAttach } from '@/hooks/useReceiptAttach';
+import { ReceiptAttachInput } from './receipt-attach-input';
 import { OnboardingModal } from './onboarding-modal';
 import { LATEST_FEATURE_ANNOUNCEMENT } from '@/lib/feature-flags';
 
@@ -118,6 +120,7 @@ export function DashboardView() {
     const [tempBudgetInput, setTempBudgetInput] = useState("");
     const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
     const receiptViewer = useReceiptViewer();
+    const receiptAttach = useReceiptAttach(userId);
 
     // First-run onboarding modal. Tracked in localStorage scoped by userId so it
     // doesn't depend on the user_preferences row being writable from the client.
@@ -506,6 +509,7 @@ export function DashboardView() {
                     selectedCategory={selectedCategory}
                     onClearCategory={() => setSelectedCategory(null)}
                     onViewReceipt={(tx) => receiptViewer.view(tx.receipt_path)}
+                    onAttachReceipt={receiptAttach.attach}
                     onBulkDelete={handleBulkDelete}
                     onBulkUpdate={handleBulkUpdate}
                 />
@@ -514,6 +518,10 @@ export function DashboardView() {
                     open={receiptViewer.open}
                     onOpenChange={receiptViewer.setOpen}
                     receiptPath={receiptViewer.path}
+                />
+                <ReceiptAttachInput
+                    inputRef={receiptAttach.inputRef}
+                    onFilePicked={receiptAttach.onFilePicked}
                 />
 
                 <OnboardingModal open={isOnboardingOpen} onComplete={closeOnboarding} />

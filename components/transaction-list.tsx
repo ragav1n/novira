@@ -32,6 +32,7 @@ interface TransactionListProps {
   loadingMore?: boolean;
   onLoadMore?: () => void;
   onViewReceipt?: (tx: Transaction) => void;
+  onAttachReceipt?: (tx: Transaction) => void;
   onBulkDelete?: (txs: Transaction[]) => Promise<{ count: number }>;
   onBulkUpdate?: (txs: Transaction[], patch: { category?: string; bucket_id?: string | null; account_id?: string | null }) => Promise<{ count: number }>;
 }
@@ -41,7 +42,7 @@ export const TransactionList = React.memo(function TransactionList({
   calculateUserShare, formatCurrency,
   convertAmount, setEditingTransaction, setIsEditOpen,
   handleDeleteTransaction, getBucketChip, loadAuditLogs,
-  canEditTransaction, loading, hasMore, loadingMore, onLoadMore, onViewReceipt,
+  canEditTransaction, loading, hasMore, loadingMore, onLoadMore, onViewReceipt, onAttachReceipt,
   onBulkDelete, onBulkUpdate,
 }: TransactionListProps) {
   const router = useRouter();
@@ -245,6 +246,7 @@ export const TransactionList = React.memo(function TransactionList({
                 onEdit={handleEdit}
                 onDelete={handleDeleteTransaction}
                 onViewReceipt={onViewReceipt}
+                onAttachReceipt={onAttachReceipt}
                 selectable={selectMode}
                 selected={selectedIds.has(tx.id)}
                 onToggleSelect={handleToggleSelect}
