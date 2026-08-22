@@ -25,6 +25,10 @@ import { uploadReceipt } from './receipt-storage';
 const LEGACY_QUEUE_KEY = 'novira-offline-queue';
 const QUEUE_KEY_PREFIX = 'novira-offline-queue:';
 const MUTATION_TIMEOUT_MS = 20_000;
+// Uploads get their own, larger budget. A receipt is orders of magnitude bigger
+// than an RPC payload, and sharing the 20s mutation timeout meant a normal phone
+// photo on a mobile uplink timed out before it finished.
+const RECEIPT_UPLOAD_TIMEOUT_MS = 60_000;
 const SYNC_LOCK_NAME = 'novira-sync-lock';
 const SYNC_BROADCAST_CHANNEL = 'novira-sync';
 
@@ -451,7 +455,7 @@ async function runSyncLoop(): Promise<void> {
                                     if (blob) {
                                         const { path } = await withTimeout(
                                             uploadReceipt(ownerId, realTxId, blob),
-                                            MUTATION_TIMEOUT_MS,
+                                            RECEIPT_UPLOAD_TIMEOUT_MS,
                                             'OFFLINE_RECEIPT_UPLOAD'
                                         );
                                         const { error: updErr } = await withTimeout(

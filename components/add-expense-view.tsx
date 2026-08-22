@@ -62,6 +62,7 @@ import { toast } from '@/utils/haptics';
 
 import { CATEGORY_COLORS, getIconForCategory, CATEGORIES as SYSTEM_CATEGORIES } from '@/lib/categories';
 import { evaluateExpression } from '@/lib/expression-eval';
+import { downscaleImage, blobToBase64 } from '@/lib/image-downscale';
 import { ExpressionKeypad } from '@/components/ui/expression-keypad';
 import { isSpeechSupported, startDictation, type DictationHandle } from '@/lib/speech-to-text';
 import { parseVoiceExpense, type ParsedVoiceExpense } from '@/lib/voice-expense-parser';
@@ -70,6 +71,9 @@ import { VoiceReviewModal } from './add-expense/voice-review-modal';
 import { Mic, MicOff, Users } from 'lucide-react';
 import { useRecentSplitPartner } from '@/hooks/useRecentSplitPartner';
 import { ViewHeader } from '@/components/ui/view-header';
+
+// Mirrors SUPPORTED_TYPES in app/api/scan-receipt/route.ts.
+const SCANNABLE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
 
 const dropdownCategories = SYSTEM_CATEGORIES.map(cat => ({
     id: cat.id,
@@ -190,8 +194,13 @@ export function AddExpenseView() {
         }, 1500);
     }, []);
 
+    // Takes the already-downscaled blob — scanFile shrinks once and shares the
+    // result, so the source image is never decoded twice.
     const stashAsReceipt = React.useCallback((file: File | Blob) => {
-        const v = validateReceiptFile(file);
+        const named = file.type === 'image/jpeg' && !(file as File).name
+            ? new File([file], 'receipt.jpg', { type: 'image/jpeg' })
+            : file;
+        const v = validateReceiptFile(named);
         if (!v.valid) {
             // Scan-source files don't need to be persisted; tell the user but
             // don't block the scan itself.
@@ -201,7 +210,7 @@ export function AddExpenseView() {
             });
             return;
         }
-        formState.setReceiptFile(file);
+        formState.setReceiptFile(named);
     }, [formState]);
 
     const receiptPreviewUrl = React.useMemo(() => {
@@ -218,45 +227,35 @@ export function AddExpenseView() {
     }, [receiptPreviewUrl]);
 
     const scanFile = React.useCallback(async (file: Blob) => {
+        // Downscale before anything else. A full-size phone photo is 3-8 MB,
+        // which is far more than a receipt needs and does not finish inside the
+        // upload timeout on a mobile uplink.
+        const shrunk = await downscaleImage(file);
+        // Attach first: scanning needs the network but attaching does not, and
+        // gating the stash behind the online check made it impossible to add a
+        // receipt while offline at all.
+        stashAsReceipt(shrunk);
         if (typeof navigator !== 'undefined' && navigator.onLine === false) {
             toast.error('Receipt scanning needs an internet connection');
             return;
         }
-        // Keep the original file as the persisted receipt — scan downsamples to
-        // JPEG for the API, but storage gets the user's source image.
-        stashAsReceipt(file);
         scanAbortRef.current?.abort();
         const controller = new AbortController();
         scanAbortRef.current = controller;
         setScanning(true);
-        let objectUrl: string | null = null;
         try {
-            const base64 = await new Promise<string>((resolve, reject) => {
-                const img = new Image();
-                objectUrl = URL.createObjectURL(file);
-                const onAbort = () => {
-                    img.src = '';
-                    reject(new DOMException('Aborted', 'AbortError'));
-                };
-                controller.signal.addEventListener('abort', onAbort, { once: true });
-                img.onload = () => {
-                    if (controller.signal.aborted) return;
-                    const MAX = 1600;
-                    const scale = Math.min(1, MAX / Math.max(img.width, img.height));
-                    const canvas = document.createElement('canvas');
-                    canvas.width = Math.round(img.width * scale);
-                    canvas.height = Math.round(img.height * scale);
-                    canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height);
-                    const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
-                    resolve(dataUrl.split(',')[1]);
-                };
-                img.onerror = reject;
-                img.src = objectUrl;
-            });
+            // downscaleImage returns the original when it can't decode the
+            // source (HEIC outside Safari), and the scan API only takes
+            // jpeg/png/gif/webp — so say what's wrong instead of sending it.
+            if (!SCANNABLE_TYPES.includes(shrunk.type)) {
+                throw new Error('unsupported image format');
+            }
+            const base64 = await blobToBase64(shrunk);
+            if (controller.signal.aborted) return;
             const res = await fetch('/api/scan-receipt', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ imageBase64: base64, mimeType: 'image/jpeg' }),
+                body: JSON.stringify({ imageBase64: base64, mimeType: shrunk.type }),
                 signal: controller.signal,
             });
             if (!res.ok) throw new Error('Scan failed');
@@ -287,7 +286,6 @@ export function AddExpenseView() {
             const msg = e instanceof Error ? e.message : 'unknown error';
             toast.error(`Couldn't scan receipt: ${msg}`);
         } finally {
-            if (objectUrl) URL.revokeObjectURL(objectUrl);
             if (scanAbortRef.current === controller) {
                 scanAbortRef.current = null;
                 setScanning(false);
