@@ -668,6 +668,13 @@ async function runSyncLoop(): Promise<void> {
                             detail: { id: item.id, type: item.type, data: item.data }
                         }));
                     }
+                } else {
+                    // No branch matched. Nothing above would have marked it synced or
+                    // thrown, so it would sit 'pending' and be retried forever. Fail it
+                    // so it surfaces and can be discarded.
+                    console.error('[sync-manager] unknown mutation type, failing it:', item.type);
+                    queue = await mutateQueue(q => markFailed(q, item.id, `Unsupported change type: ${item.type}`, 'permanent'));
+                    dispatchQueueUpdated(queue);
                 }
             } catch (e) {
                 // ADD path: some errors (RLS, validation) are permanent and won't pass on retry.
@@ -676,7 +683,15 @@ async function runSyncLoop(): Promise<void> {
                     const { permanent, reason } = classifyAddError(e);
                     if (permanent) {
                         console.error(`[sync-manager] ${item.type} permanently failed:`, reason);
-                        queue = markFailed(queue, item.id, reason, 'permanent');
+                        // Must go through mutateQueue. `markFailed` is a pure function;
+                        // assigning its result to the local `queue` persisted nothing, and
+                        // the `mutateQueue(removeSynced)` at the end of the pass re-read
+                        // fresh state and discarded it. The item stayed 'pending' forever:
+                        // it re-ran every pass, failed permanently every pass, and never
+                        // reached the failed list where it could be discarded. The pill
+                        // read "1 change pending" indefinitely and Sync now did nothing.
+                        queue = await mutateQueue(q => markFailed(q, item.id, reason, 'permanent'));
+                        dispatchQueueUpdated(queue);
                         window.dispatchEvent(new CustomEvent('novira-mutation-failed-permanent', {
                             detail: { id: item.id, type: item.type, data: item.data, reason }
                         }));
@@ -737,6 +752,22 @@ export async function queueReceiptUpload(
     const id = uuidv4();
     await saveOfflineReceipt(id, file);
     await enqueueMutation('UPLOAD_RECEIPT', { txId, ownerId, prevPath: prevPath ?? null }, { id });
+}
+
+/**
+ * User-initiated sync. `attemptSync` skips pending items whose `nextRetryAt` is in
+ * the future, so during a backoff window (up to 5 minutes) tapping "Sync now" did
+ * nothing at all and looked broken. An explicit request clears the backoff first.
+ */
+export async function syncNow(): Promise<void> {
+    const queue = await mutateQueue(q => q.map(item =>
+        item.status === 'pending' && item.nextRetryAt
+            ? { ...item, nextRetryAt: undefined }
+            : item
+    ));
+    dispatchQueueUpdated(queue);
+    clearRetryTimer();
+    await attemptSync();
 }
 
 export async function retryFailedItem(id: string) {

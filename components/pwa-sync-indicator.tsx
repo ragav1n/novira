@@ -6,7 +6,7 @@ import { RefreshCcw, AlertCircle, CloudOff, ChevronDown, X, Clock } from 'lucide
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { type SyncErrorKind } from '@/lib/offline-sync-queue';
-import { retryFailedItem, discardFailedItem, attemptSync } from '@/lib/sync-manager';
+import { retryFailedItem, discardFailedItem, syncNow } from '@/lib/sync-manager';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 import { useSyncQueueState } from '@/hooks/use-sync-queue-state';
 import { toast } from '@/utils/haptics';
@@ -15,6 +15,7 @@ const FRIENDLY_TYPE: Record<string, string> = {
     ADD_FULL_TRANSACTION: 'New transaction',
     DELETE_TRANSACTION: 'Delete transaction',
     UPDATE_TRANSACTION: 'Update transaction',
+    UPLOAD_RECEIPT: 'Receipt photo',
 };
 
 type ErrorKindMeta = {
@@ -203,7 +204,7 @@ export function SyncIndicator() {
                                 {pending} {pending === 1 ? 'change' : 'changes'} pending
                             </span>
                             <button
-                                onClick={() => attemptSync()}
+                                onClick={() => syncNow()}
                                 className="text-xs font-medium text-primary hover:bg-primary/10 rounded-full px-2 py-0.5 transition-colors"
                             >
                                 Sync now
