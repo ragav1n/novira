@@ -1,5 +1,4 @@
 import { get, set, del } from 'idb-keyval';
-import type { PostgrestError } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import {
     SyncPayload,
@@ -21,6 +20,7 @@ import { TransactionService } from './services/transaction-service';
 import { invalidateTransactionCaches } from './sw-cache';
 import { getOfflineReceipt, saveOfflineReceipt, deleteOfflineReceipt } from './offline-receipt-store';
 import { uploadReceipt, deleteReceipt } from './receipt-storage';
+import { classifyAddError, classifyPgError } from './sync-error-classify';
 
 const LEGACY_QUEUE_KEY = 'novira-offline-queue';
 const QUEUE_KEY_PREFIX = 'novira-offline-queue:';
@@ -153,42 +153,6 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
             e => { clearTimeout(timer); reject(e); }
         );
     });
-}
-
-// Supabase Postgrest error codes that should be treated as permanent (no retry).
-// 42501 = insufficient_privilege (RLS), PGRST116 = singular row not found.
-const PERMANENT_PG_CODES = new Set(['42501', 'PGRST116']);
-
-/**
- * Classify a Postgrest error into a stable retry vs. permanent decision.
- * Permanent errors are marked failed; transient errors throw to trigger backoff.
- */
-function classifyPgError(error: PostgrestError): { permanent: boolean; reason: string } {
-    const reason = error.code ? `${error.code}: ${error.message}` : error.message;
-    // Postgrest doesn't expose `status` on the type but does set it at runtime.
-    const status = (error as PostgrestError & { status?: number }).status;
-    const is4xx = typeof status === 'number' && status >= 400 && status < 500;
-    const permanent = is4xx || (typeof error.code === 'string' && PERMANENT_PG_CODES.has(error.code));
-    return { permanent, reason };
-}
-
-/**
- * Generic error classifier for ADD path — the RPC throws either a Postgrest
- * error (with `.code`/`.status`) or a plain Error from `data.error`. We treat
- * known permanent codes / 4xx as permanent; everything else is transient.
- */
-function classifyAddError(err: unknown): { permanent: boolean; reason: string } {
-    if (err && typeof err === 'object') {
-        const e = err as { code?: unknown; status?: unknown; message?: unknown };
-        const code = typeof e.code === 'string' ? e.code : undefined;
-        const status = typeof e.status === 'number' ? e.status : undefined;
-        const message = typeof e.message === 'string' ? e.message : 'Unknown error';
-        const is4xx = typeof status === 'number' && status >= 400 && status < 500;
-        const permanent = is4xx || (code !== undefined && PERMANENT_PG_CODES.has(code));
-        const reason = code ? `${code}: ${message}` : message;
-        return { permanent, reason };
-    }
-    return { permanent: false, reason: String(err) };
 }
 
 export class QueueFullError extends Error {
