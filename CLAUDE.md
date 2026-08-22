@@ -134,3 +134,8 @@ Committed as files and run by hand in the Supabase SQL editor:
   the INSERT in `create_transaction_atomic`, `get_profile_by_email` returned a user
   UUID for any email, and `prepare_delete_account(uuid)` had no authorisation check
   at all. Revokes EXECUTE from anon/PUBLIC across every SECURITY DEFINER function.
+  **Applied 2026-08-22, verified** (all three now return 42501).
+- `202608220200_restore_rls_helper_execute.sql` — fixes a regression from the above:
+  `get_transaction_user_id`, `is_group_member` and `is_group_creator` are called
+  from inside RLS policies, which are evaluated as the *querying* role, so revoking
+  anon's EXECUTE turned an empty read into a hard 401. Apply this one too.

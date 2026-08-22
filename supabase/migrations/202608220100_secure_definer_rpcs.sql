@@ -328,7 +328,17 @@ BEGIN
           AND p.prorettype <> 'pg_catalog.trigger'::regtype
     LOOP
         EXECUTE format('REVOKE EXECUTE ON FUNCTION %s FROM PUBLIC', r.sig);
-        EXECUTE format('REVOKE EXECUTE ON FUNCTION %s FROM anon', r.sig);
+
+        -- These three are called from inside RLS policies (USING / WITH CHECK).
+        -- A policy is evaluated as the *querying* role, so taking EXECUTE away
+        -- from anon turns a filtered-empty result into a hard 42501 instead —
+        -- a functional regression, not a security win, since RLS already returns
+        -- no rows to an anonymous caller either way.
+        IF r.proname NOT IN ('get_transaction_user_id', 'is_group_member', 'is_group_creator') THEN
+            EXECUTE format('REVOKE EXECUTE ON FUNCTION %s FROM anon', r.sig);
+        ELSE
+            EXECUTE format('GRANT EXECUTE ON FUNCTION %s TO anon', r.sig);
+        END IF;
 
         IF r.proname = 'prepare_delete_account' THEN
             -- Server-only, and destructive. Never reachable from a browser session.
