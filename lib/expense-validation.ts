@@ -40,3 +40,23 @@ export function getExpenseFormErrors(
 
     return Object.keys(errors).length > 0 ? errors : null;
 }
+
+/**
+ * parseFloat accepts a numeric prefix, so it reads "1,234" as 1. Anywhere a
+ * user-typed money string becomes a number, it has to go through this instead.
+ */
+export function parseAmountStrict(value: string): number | null {
+    const raw = (value ?? '').trim();
+    if (!PLAIN_NUMBER.test(raw)) return null;
+    const n = parseFloat(raw);
+    return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * Money has to be compared in integer cents. In binary floating point
+ * 1.1 + 2.2 is 3.3000000000000003, so an exactly-balanced custom split of 3.30
+ * into 1.10 and 2.20 compared as "exceeding the total" and refused to save.
+ */
+export function toCents(value: number): number {
+    return Math.round(value * 100);
+}

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getExpenseFormErrors } from '../expense-validation';
+import { getExpenseFormErrors, parseAmountStrict, toCents } from '../expense-validation';
 
 const DATE = new Date('2026-08-21T00:00:00Z');
 const amountError = (amount: string) =>
@@ -64,5 +64,39 @@ describe('getExpenseFormErrors — other fields', () => {
 
     it('returns null when everything is valid', () => {
         expect(getExpenseFormErrors('51.72', 'Groceries', DATE)).toBeNull();
+    });
+});
+
+describe('parseAmountStrict', () => {
+    it('parses plain numbers', () => {
+        expect(parseAmountStrict('51.72')).toBe(51.72);
+        expect(parseAmountStrict('  10 ')).toBe(10);
+        expect(parseAmountStrict('.5')).toBe(0.5);
+    });
+
+    it('returns null where parseFloat would have taken a prefix', () => {
+        for (const bad of ['1,234', '12+', '20-30', '5%2', 'abc', '', '  ']) {
+            expect(parseAmountStrict(bad), bad).toBeNull();
+        }
+    });
+});
+
+describe('toCents', () => {
+    it('makes an exactly-balanced split compare as balanced', () => {
+        // The bug: 1.1 + 2.2 === 3.3000000000000003, so splitting 3.30 into
+        // 1.10 and 2.20 was rejected as exceeding the total.
+        expect(1.1 + 2.2 > 3.3).toBe(true);
+        expect(toCents(1.1) + toCents(2.2) > toCents(3.3)).toBe(false);
+        expect(toCents(1.1) + toCents(2.2)).toBe(toCents(3.3));
+    });
+
+    it('still catches a genuine over-allocation', () => {
+        expect(toCents(2.0) + toCents(2.0) > toCents(3.3)).toBe(true);
+        expect(toCents(3.31) > toCents(3.3)).toBe(true);
+    });
+
+    it('rounds half-cents rather than truncating', () => {
+        expect(toCents(0.005)).toBe(1);
+        expect(toCents(10.994)).toBe(1099);
     });
 });

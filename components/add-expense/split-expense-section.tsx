@@ -1,10 +1,11 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Users, CheckCircle2, User, Home, Plane, Heart } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import type { Group, Friend } from '@/components/providers/groups-provider';
 import { evaluateExpression } from '@/lib/expression-eval';
+import { parseAmountStrict, toCents } from '@/lib/expense-validation';
 import { ExpressionKeypad } from '@/components/ui/expression-keypad';
 
 interface SplitFriendRowProps {
@@ -121,6 +122,14 @@ export function SplitExpenseSection({
     currency,
     CURRENCY_SYMBOLS
 }: SplitExpenseSectionProps) {
+    // A group has no per-member amount inputs, so group + custom is a state the
+    // user cannot fill in and cannot save. The Custom button is disabled while a
+    // group is selected; this catches the orders that button can't — picking a
+    // group after choosing Custom, or a restored draft carrying the combination.
+    useEffect(() => {
+        if (selectedGroupId && splitMode === 'custom') setSplitMode('even');
+    }, [selectedGroupId, splitMode, setSplitMode]);
+
     return (
         <div className="space-y-4 p-4 rounded-xl bg-secondary/10 border border-white/5">
             <div className="flex items-center justify-between">
@@ -139,7 +148,10 @@ export function SplitExpenseSection({
 
             {isSplitEnabled && (
                 <div className="space-y-4 pt-2 animate-in fade-in slide-in-from-top-2 duration-300">
-                    {/* Split Mode Toggle */}
+                    {/* Split Mode Toggle. Custom is friends-only: there are no
+                        per-member inputs for a group, so leaving it selected made
+                        the expense unsavable ("Please enter split amounts" with no
+                        field to fill). */}
                     <div className="grid grid-cols-2 gap-2">
                         <button
                             onClick={() => setSplitMode('even')}
@@ -154,11 +166,15 @@ export function SplitExpenseSection({
                         </button>
                         <button
                             onClick={() => setSplitMode('custom')}
+                            disabled={!!selectedGroupId}
+                            title={selectedGroupId ? 'Custom amounts are only available when splitting with friends' : undefined}
                             className={cn(
                                 "py-2.5 text-xs font-bold uppercase tracking-wider rounded-xl border transition-all",
-                                splitMode === 'custom'
-                                    ? "bg-primary text-white border-primary shadow-lg shadow-primary/20"
-                                    : "bg-background/20 border-white/5 text-muted-foreground hover:border-white/10"
+                                selectedGroupId
+                                    ? "bg-background/10 border-white/5 text-muted-foreground/40 cursor-not-allowed"
+                                    : splitMode === 'custom'
+                                        ? "bg-primary text-white border-primary shadow-lg shadow-primary/20"
+                                        : "bg-background/20 border-white/5 text-muted-foreground hover:border-white/10"
                             )}
                         >
                             Custom Amounts
@@ -253,8 +269,10 @@ export function SplitExpenseSection({
                         <div className="space-y-3 pt-2 border-t border-white/5 animate-in fade-in slide-in-from-top-2 duration-300">
                             <p className="text-meta font-semibold text-muted-foreground uppercase tracking-wider">Enter amounts each person owes you</p>
                             {selectedGroupId ? (
-                                // For groups, we show group members (fetched dynamically)
-                                <p className="text-meta text-muted-foreground italic">Custom amounts for group members will be applied after saving</p>
+                                // Unreachable now that Custom is disabled for groups, but kept
+                                // as a truthful fallback rather than the old claim that custom
+                                // amounts "will be applied after saving" — they never were.
+                                <p className="text-meta text-muted-foreground italic">Custom amounts aren&apos;t available for groups — use Even Split.</p>
                             ) : (
                                 selectedFriendIds.map((friendId) => {
                                     const friend = friends.find(f => f.id === friendId);
@@ -280,9 +298,14 @@ export function SplitExpenseSection({
                                     const n = parseFloat(raw);
                                     return Number.isFinite(n) ? n : 0;
                                 };
-                                const totalAllocated = selectedFriendIds.reduce((sum, id) => sum + resolveAmount(customAmounts[id] || ''), 0);
-                                const expenseAmount = resolveAmount(amount);
-                                const yourShare = expenseAmount - totalAllocated;
+                                // Cents, not floats: 1.1 + 2.2 is 3.3000000000000003, which
+                                // rendered a balanced split as "Your share: $-0.00" in red
+                                // with an "exceeds the total" warning.
+                                const allocatedCents = selectedFriendIds.reduce((sum, id) => sum + toCents(resolveAmount(customAmounts[id] || '')), 0);
+                                const expenseCents = toCents(resolveAmount(amount));
+                                const shareCents = expenseCents - allocatedCents;
+                                const totalAllocated = allocatedCents / 100;
+                                const yourShare = shareCents / 100;
                                 return (
                                     <div className="space-y-1.5 pt-2 border-t border-white/5">
                                         <div className="flex justify-between text-meta">
@@ -293,11 +316,11 @@ export function SplitExpenseSection({
                                         </div>
                                         <div className="flex justify-between text-meta">
                                             <span className="text-muted-foreground">Your share:</span>
-                                            <span className={cn("font-medium", yourShare < 0 ? "text-red-400" : "text-white")}>
+                                            <span className={cn("font-medium", shareCents < 0 ? "text-red-400" : "text-white")}>
                                                 {CURRENCY_SYMBOLS[currency] || '$'}{yourShare.toFixed(2)}
                                             </span>
                                         </div>
-                                        {yourShare < 0 && (
+                                        {shareCents < 0 && (
                                             <p className="text-meta text-red-400">⚠ Split amounts exceed the total expense</p>
                                         )}
                                     </div>
@@ -315,7 +338,7 @@ export function SplitExpenseSection({
                                 ) : (
                                     <>Each person pays <span className="font-medium text-primary">
                                         {CURRENCY_SYMBOLS[currency] || '$'}
-                                        {((evaluateExpression(amount) ?? parseFloat(amount) ?? 0) / (selectedFriendIds.length + 1)).toFixed(2)}
+                                        {((evaluateExpression(amount) ?? parseAmountStrict(amount) ?? 0) / (selectedFriendIds.length + 1)).toFixed(2)}
                                     </span></>
                                 )}
                             </p>

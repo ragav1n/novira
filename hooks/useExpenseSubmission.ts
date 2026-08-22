@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { format } from 'date-fns';
 import { toast } from '@/utils/haptics';
-import { getExpenseFormErrors, type ExpenseFormErrors } from '@/lib/expense-validation';
+import { getExpenseFormErrors, parseAmountStrict, toCents, type ExpenseFormErrors } from '@/lib/expense-validation';
 import { Haptics, NotificationType } from '@capacitor/haptics';
 import { TransactionService } from '@/lib/services/transaction-service';
 import { TripService } from '@/lib/services/trip-service';
@@ -89,16 +89,21 @@ async function buildSplitRecords(
     if (debtors.length === 0) return { records: undefined };
 
     if (splitMode === 'custom') {
-        const parsedSplits = debtors.map(id => ({ id, amount: parseFloat(customAmounts[id] || '0') }));
-        if (parsedSplits.some(s => Number.isNaN(s.amount) || s.amount < 0)) {
+        const parsedSplits = debtors.map(id => ({ id, amount: parseAmountStrict(customAmounts[id] || '0') }));
+        if (parsedSplits.some(s => s.amount === null || s.amount < 0)) {
             return { records: undefined, error: 'Split amounts must be non-negative numbers' };
         }
-        const totalCustom = parsedSplits.reduce((sum, s) => sum + s.amount, 0);
-        if (totalCustom <= 0) return { records: undefined, error: 'Please enter split amounts' };
-        if (totalCustom > parseFloat(amount)) return { records: undefined, error: 'Split amounts exceed the total expense' };
+        const splits = parsedSplits as { id: string; amount: number }[];
+        // Compared in cents: 1.1 + 2.2 is 3.3000000000000003, so an exactly
+        // balanced split used to be rejected as exceeding the total.
+        const totalCents = splits.reduce((sum, s) => sum + toCents(s.amount), 0);
+        if (totalCents <= 0) return { records: undefined, error: 'Please enter split amounts' };
+        if (totalCents > toCents(parseFloat(amount))) {
+            return { records: undefined, error: 'Split amounts exceed the total expense' };
+        }
 
         return {
-            records: parsedSplits
+            records: splits
                 .filter(s => s.amount > 0)
                 .map(s => ({ user_id: s.id, amount: s.amount }))
         };
