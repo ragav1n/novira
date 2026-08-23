@@ -135,6 +135,17 @@ Committed as files and run by hand in the Supabase SQL editor:
   UUID for any email, and `prepare_delete_account(uuid)` had no authorisation check
   at all. Revokes EXECUTE from anon/PUBLIC across every SECURITY DEFINER function.
   **Applied 2026-08-22, verified** (all three now return 42501).
+- `202608240100_atomic_rpc_error_code.sql` — **DIAGNOSABILITY.** `create_transaction_atomic`
+  swallows every SQL exception into `{success:false, error: SQLERRM}` at HTTP 200, so a
+  constraint violation was indistinguishable from a dropped connection: the offline queue
+  called it transient, retried 5×, then replaced the reason with 'Max retries exceeded'.
+  Adds `'code', SQLSTATE` to the catch-all and `'code', '42501'` to the unauthorised
+  early return. Function body copied forward verbatim; only those two RETURNs changed.
+  The client falls back to a synthetic `RPC_REJECTED` when the field is absent, so this
+  is an improvement rather than a prerequisite. **Applied 2026-08-23, verified** — the
+  unauthorised branch now answers `{"code":"42501",...}`, which only the new definition
+  returns (probe it with the service-role key: `auth.uid()` is NULL there, so the guard
+  returns before any INSERT).
 - `202608220200_restore_rls_helper_execute.sql` — fixes a regression from the above:
   `get_transaction_user_id`, `is_group_member` and `is_group_creator` are called
   from inside RLS policies, which are evaluated as the *querying* role, so revoking
