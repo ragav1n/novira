@@ -146,6 +146,31 @@ Committed as files and run by hand in the Supabase SQL editor:
   unauthorised branch now answers `{"code":"42501",...}`, which only the new definition
   returns (probe it with the service-role key: `auth.uid()` is NULL there, so the guard
   returns before any INSERT).
+- `202608230100_realtime_trips_accounts_rules.sql` — **REALTIME.** `trips` was never in
+  the `supabase_realtime` publication (its provider had subscribed since the feature
+  shipped and never received one event — `.subscribe()` reports SUBSCRIBED either way,
+  so a dead subscription looks identical to a live one). `accounts` and
+  `categorization_rules` were published via the dashboard toggle, which does not touch
+  replica identity, so DELETEs carried only the primary key and Realtime could not
+  evaluate the `user_id=eq.<id>` filter — deletes stayed on screen on other devices
+  until a reload. Adds `trips` to the publication and sets REPLICA IDENTITY FULL on all
+  three. **Applied 2026-08-23** (not verifiable from the agent environment — neither
+  `pg_publication_tables` nor `relreplident` is exposed through PostgREST). Check it in
+  the SQL editor with:
+  ```sql
+  select c.relname,
+         (p.tablename is not null) as in_publication,
+         case c.relreplident when 'f' then 'FULL' when 'd' then 'default'
+              when 'n' then 'nothing' when 'i' then 'index' end as replica_identity
+  from pg_class c
+  join pg_namespace n on n.oid = c.relnamespace
+  left join pg_publication_tables p
+    on p.schemaname = 'public' and p.tablename = c.relname
+   and p.pubname = 'supabase_realtime'
+  where n.nspname = 'public'
+    and c.relname in ('trips','accounts','categorization_rules','transactions')
+  order by c.relname;
+  ```
 - `202608220200_restore_rls_helper_execute.sql` — fixes a regression from the above:
   `get_transaction_user_id`, `is_group_member` and `is_group_creator` are called
   from inside RLS policies, which are evaluated as the *querying* role, so revoking
