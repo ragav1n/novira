@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
     Plus, Pencil, Archive, ArchiveRestore, Trash2, Star, StarOff, Scale, Wand2, MoreVertical,
     Wallet, Landmark, PiggyBank, CreditCard, Smartphone, CircleDollarSign,
@@ -109,6 +109,7 @@ export function AccountsSection({ defaultCurrency, formatCurrency }: Props) {
     const [balancesError, setBalancesError] = useState(false);
     const [reconciling, setReconciling] = useState<Account | null>(null);
     const [bulkAssignOpen, setBulkAssignOpen] = useState(false);
+    const balanceDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const active = accounts.filter(a => !a.archived_at);
     const archived = accounts.filter(a => !!a.archived_at);
@@ -157,6 +158,39 @@ export function AccountsSection({ defaultCurrency, formatCurrency }: Props) {
         window.addEventListener('novira:expense-added', onChange);
         return () => window.removeEventListener('novira:expense-added', onChange);
     }, [fetchBalances]);
+
+    // Every balance here is derived from `transactions` by the RPC, but the only
+    // refresh triggers were the local `novira:expense-added` event and a change to
+    // `accounts` itself. So an expense added on another device — or edited, deleted,
+    // reassigned, or imported anywhere — left every figure on this screen stale
+    // until a reload, which reads as "the account didn't save". Debounced because a
+    // CSV import fires one event per row.
+    // Held in a ref so the subscription below depends on `userId` alone. Reading
+    // `fetchBalances` directly would re-subscribe every time its identity changed,
+    // and it closes over `convertAmount` — which is rebuilt whenever exchange rates
+    // refresh. Tearing a live channel down and rebuilding it on an FX poll is how
+    // you drop the event you were subscribed for.
+    const fetchBalancesRef = useRef(fetchBalances);
+    useEffect(() => { fetchBalancesRef.current = fetchBalances; }, [fetchBalances]);
+
+    useEffect(() => {
+        if (!userId) return;
+        const channel = supabase
+            .channel(`account-balances-${userId}-${crypto.randomUUID()}`)
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'transactions', filter: `user_id=eq.${userId}` },
+                () => {
+                    if (balanceDebounceRef.current) clearTimeout(balanceDebounceRef.current);
+                    balanceDebounceRef.current = setTimeout(() => fetchBalancesRef.current(), 300);
+                },
+            )
+            .subscribe();
+        return () => {
+            if (balanceDebounceRef.current) clearTimeout(balanceDebounceRef.current);
+            supabase.removeChannel(channel);
+        };
+    }, [userId]);
 
     const openNew = () => setEditing(emptyDraft(defaultCurrency));
     const openEdit = (a: Account) => {

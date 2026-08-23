@@ -40,13 +40,13 @@ export function ReceiptsView() {
     // Bumped per load so a stale in-flight fetch can't land on top of a newer one.
     const fetchGenRef = useRef(0);
 
-    const load = useCallback(async () => {
+    const load = useCallback(async (opts?: { silent?: boolean }) => {
         if (!userId) {
             setLoading(false);
             return;
         }
         const myGen = ++fetchGenRef.current;
-        setLoading(true);
+        if (!opts?.silent) setLoading(true);
         let query = supabase
             .from('transactions')
             .select('id, description, amount, currency, date, receipt_path')
@@ -66,9 +66,15 @@ export function ReceiptsView() {
                 details: error.details,
                 hint: error.hint,
             });
-            setLoadError(true);
             setLoading(false);
-            toast.error("Couldn't load your receipts");
+            // A silent background refresh must not tear down a grid that is already
+            // rendering fine. Swapping good rows for the error state and toasting on
+            // one dropped refetch would be worse than showing slightly stale rows;
+            // the next event, or a pull-to-refresh, retries anyway.
+            if (!opts?.silent) {
+                setLoadError(true);
+                toast.error("Couldn't load your receipts");
+            }
             return;
         }
         const list = (data || []) as ReceiptRow[];
@@ -95,13 +101,31 @@ export function ReceiptsView() {
                 // The rows themselves loaded; only the previews are missing. Say so,
                 // rather than leaving every tile as an unexplained warning icon.
                 setUrlError(true);
-                toast.error("Couldn't load receipt previews");
+                if (!opts?.silent) toast.error("Couldn't load receipt previews");
             }
         }
         if (fetchGenRef.current === myGen) setLoading(false);
     }, [userId, activeWorkspaceId]);
 
     useEffect(() => { load(); }, [load]);
+
+    // This screen had no live path at all: it read `transactions` once on mount and
+    // then never again. Attaching a receipt anywhere else — including the upload
+    // this very app queues, which lands asynchronously after the sync loop runs —
+    // left the grid showing "No receipts yet" until a manual refresh. Reloads
+    // silently so an arriving receipt doesn't wipe the grid to a skeleton.
+    useEffect(() => {
+        if (!userId) return;
+        const channel = supabase
+            .channel(`receipts-${userId}-${activeWorkspaceId || 'personal'}-${crypto.randomUUID()}`)
+            .on(
+                'postgres_changes',
+                { event: '*', schema: 'public', table: 'transactions', filter: `user_id=eq.${userId}` },
+                () => { load({ silent: true }); },
+            )
+            .subscribe();
+        return () => { supabase.removeChannel(channel); };
+    }, [userId, activeWorkspaceId, load]);
 
     useRefreshRequest(() => load());
 
