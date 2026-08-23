@@ -266,6 +266,22 @@ export function useDashboardData(
                 setPendingTransactions(prev => prev.filter(t => t.id !== detail.id));
             }
         };
+        // The sync loop already announces a landed receipt, but nothing listened,
+        // so the row only picked up `receipt_path` if the Postgres realtime UPDATE
+        // happened to arrive. On a phone that is the least reliable moment there is:
+        // the socket routinely drops while the OS photo picker is foregrounded, and
+        // realtime does not replay what it missed. The file was in storage and the
+        // column was set, but the row still offered "Attach receipt" and no way to
+        // view it — indistinguishable from the upload having failed. Patching the
+        // path in from the event needs no refetch: the loop hands us the path it
+        // just wrote.
+        const onReceiptUploaded = (e: Event) => {
+            const detail = (e as CustomEvent<{ txId: string; path: string }>).detail;
+            if (!detail?.txId || !detail.path) return;
+            setServerTransactions(prev => prev.map(t =>
+                t.id === detail.txId ? { ...t, receipt_path: detail.path } : t
+            ));
+        };
         const onRefreshRequested = (e: WindowEventMap['novira-refresh-requested']) => {
             if (!userId) return;
             const p = loadTxRef.current?.(userId, activeWorkspaceId);
@@ -274,11 +290,13 @@ export function useDashboardData(
         window.addEventListener('novira-queue-updated', onQueueUpdated);
         window.addEventListener('novira-mutation-synced', onMutationSynced);
         window.addEventListener('novira-mutation-failed-permanent', onMutationFailedPermanent);
+        window.addEventListener('novira-receipt-uploaded', onReceiptUploaded);
         window.addEventListener('novira-refresh-requested', onRefreshRequested);
         return () => {
             window.removeEventListener('novira-queue-updated', onQueueUpdated);
             window.removeEventListener('novira-mutation-synced', onMutationSynced);
             window.removeEventListener('novira-mutation-failed-permanent', onMutationFailedPermanent);
+            window.removeEventListener('novira-receipt-uploaded', onReceiptUploaded);
             window.removeEventListener('novira-refresh-requested', onRefreshRequested);
         };
     }, [userId, activeWorkspaceId, loadPendingFromQueue]);
