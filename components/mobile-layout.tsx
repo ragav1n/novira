@@ -637,10 +637,15 @@ export function MobileLayout({ children, defaultIsDesktop = false }: { children:
                 </UIBoundary>
             </main>
 
+            {/* Update prompt. Deliberately a sibling of the nav rather than a child of
+                it: nested inside `showNav && !showDesktop` it never mounted on a desktop
+                viewport, so desktop sessions were never offered an update at all. It
+                renders nothing until an update is actually available. */}
+            {showNav && <PWAUpdater />}
+
             {/* Bottom Navigation (mobile only) */}
             {showNav && !showDesktop && (
                 <>
-                    <PWAUpdater />
                     <MobileBottomNavScroller scrollContainerRef={mainRef}>
                         <ExpandableTabs
                             tabs={tabs}
