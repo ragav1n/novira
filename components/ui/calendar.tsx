@@ -134,7 +134,7 @@ function Calendar({
               className={cn(className)}
               onPointerDown={(e) => e.stopPropagation()}
               onMouseDown={(e) => e.stopPropagation()}
-              onTouchStart={(e) => e.stopPropagation()}
+              // No onTouchStart — it breaks touch scrolling. See ui/dialog.tsx.
               onClick={(e) => e.stopPropagation()}
               {...props}
             />
@@ -197,7 +197,7 @@ function CalendarDayButton({
       size="icon"
       onPointerDown={(e) => e.stopPropagation()}
       onMouseDown={(e) => e.stopPropagation()}
-      onTouchStart={(e) => e.stopPropagation()}
+      // No onTouchStart — it breaks touch scrolling. See ui/dialog.tsx.
       onClick={(e) => e.stopPropagation()}
       data-day={day.date.toLocaleDateString()}
       data-selected-single={

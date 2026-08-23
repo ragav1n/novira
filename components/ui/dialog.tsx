@@ -84,12 +84,19 @@ function DialogContent({
           variant === 'fullscreen' ? DIALOG_FULLSCREEN : DIALOG_CENTERED,
           className,
         )}
-        // Sheet, Drawer and AlertDialog all carry this triple; Dialog alone did
-        // not, so a press starting inside a Dialog could reach a parent's
-        // press handler (a swipeable row, a card onClick) underneath it.
+        // Stops a press inside the dialog reaching a parent's press handler (a
+        // swipeable row, a card onClick): Radix portals the DOM out, but React
+        // events still bubble up the *component* tree to whatever rendered it.
+        //
+        // Deliberately NOT onTouchStart. Radix's scroll lock (react-remove-scroll)
+        // tracks the touch origin with a bubble-phase `touchstart` listener on
+        // `document`, and React's stopPropagation calls the native one — so the
+        // listener never fired and the origin stayed [0, 0]. Every touchmove then
+        // read as a large upward scroll, which at scrollTop 0 has nothing left to
+        // give, so it was preventDefault()ed: touch scrolling inside every modal
+        // was dead, while the wheel (real deltaY) kept working on desktop.
         onPointerDown={(e) => e.stopPropagation()}
         onMouseDown={(e) => e.stopPropagation()}
-        onTouchStart={(e) => e.stopPropagation()}
         {...props}
       >
         {children}
