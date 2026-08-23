@@ -21,10 +21,13 @@ import { invalidateTransactionCaches } from './sw-cache';
 import { getOfflineReceipt, saveOfflineReceipt, deleteOfflineReceipt } from './offline-receipt-store';
 import { uploadReceipt, deleteReceipt } from './receipt-storage';
 import { classifyAddError, classifyPgError } from './sync-error-classify';
+import { getErrorMessage } from './error-utils';
 
 const LEGACY_QUEUE_KEY = 'novira-offline-queue';
 const QUEUE_KEY_PREFIX = 'novira-offline-queue:';
 const MUTATION_TIMEOUT_MS = 20_000;
+// How long to wait before re-checking the queue when a sibling tab holds the sync lock.
+const LOCK_CONTENTION_RETRY_MS = 2_000;
 // Uploads get their own, larger budget. A receipt is orders of magnitude bigger
 // than an RPC payload, and sharing the 20s mutation timeout meant a normal phone
 // photo on a mobile uplink timed out before it finished.
@@ -270,7 +273,14 @@ async function withSyncLock(body: () => Promise<void>): Promise<void> {
     const locks = getLockManager();
     if (locks) {
         await locks.request(SYNC_LOCK_NAME, { ifAvailable: true }, async (lock) => {
-            if (!lock) return; // another tab is syncing — yield
+            if (!lock) {
+                // Another tab holds the lock. `scheduleRetry` only runs inside
+                // runSyncLoop, so yielding here used to leave the queue pending with
+                // no timer armed — if the other tab then closed mid-pass, nothing
+                // re-fired until the next enqueue or reload.
+                scheduleRetry(await readQueue(), LOCK_CONTENTION_RETRY_MS);
+                return;
+            }
             await body();
         });
     } else {
@@ -292,7 +302,7 @@ function clearRetryTimer() {
  * incidentally (next enqueue / online event / app reload), stranding items that
  * hit a transient failure while the user stays online and idle.
  */
-function scheduleRetry(queue: SyncPayload[]) {
+function scheduleRetry(queue: SyncPayload[], minDelayMs = 0) {
     if (typeof window === 'undefined') return;
     const now = Date.now();
     let soonest = Infinity;
@@ -307,7 +317,10 @@ function scheduleRetry(queue: SyncPayload[]) {
     }
     clearRetryTimer();
     if (soonest === Infinity) return;
-    const delay = Math.max(0, soonest - now);
+    // `minDelayMs` is the floor for the lock-contention path: a runnable item resolves
+    // to a 0ms delay, which against a tab that holds the lock for a while would spin
+    // attemptSync in a tight loop.
+    const delay = Math.max(minDelayMs, soonest - now);
     retryTimer = setTimeout(() => {
         retryTimer = null;
         attemptSync();
@@ -424,7 +437,12 @@ async function runSyncLoop(): Promise<void> {
                         TransactionService.createTransaction({
                             transaction: { ...transaction, idempotency_key: item.id },
                             splits: splitRecords,
-                            recurring: recurringRecord
+                            recurring: recurringRecord,
+                            // Never let the service re-queue on our behalf: its offline
+                            // fallback answers `success: true` with no row id, which
+                            // marked this item synced, orphaned its receipt Blob and
+                            // enqueued a duplicate under a new idempotency key.
+                            requireOnline: true,
                         }),
                         MUTATION_TIMEOUT_MS,
                         'ADD_FULL_TRANSACTION'
@@ -451,17 +469,26 @@ async function runSyncLoop(): Promise<void> {
                                             RECEIPT_UPLOAD_TIMEOUT_MS,
                                             'OFFLINE_RECEIPT_UPLOAD'
                                         );
-                                        const { error: updErr } = await withTimeout(
+                                        // `.select()` matters: without it an RLS-filtered
+                                        // update answers 204 with no error, so the item was
+                                        // marked synced and the Blob deleted while the file
+                                        // sat in Storage with nothing pointing at it.
+                                        const { data: updated, error: updErr } = await withTimeout(
                                             Promise.resolve(
                                                 supabase
                                                     .from('transactions')
                                                     .update({ receipt_path: path })
                                                     .eq('id', realTxId)
+                                                    .eq('user_id', ownerId)
+                                                    .select('id')
                                             ),
                                             MUTATION_TIMEOUT_MS,
                                             'OFFLINE_RECEIPT_UPDATE'
                                         );
                                         if (updErr) throw updErr;
+                                        if (!updated || updated.length === 0) {
+                                            throw new Error(`receipt_path update matched no row for transaction ${realTxId}`);
+                                        }
                                     }
                                     await deleteOfflineReceipt(item.id);
                                 } catch (uploadErr) {
@@ -532,27 +559,36 @@ async function runSyncLoop(): Promise<void> {
                     const { txId, ownerId } = item.data;
                     const blob = await getOfflineReceipt(item.id);
                     if (!blob) {
-                        // Nothing left to upload — treat as done rather than
-                        // retrying against a Blob that will never come back.
-                        console.warn('[sync-manager] UPLOAD_RECEIPT has no stored photo, dropping', item.id);
-                        queue = await mutateQueue(q => markSynced(q, item.id));
+                        // Retrying is hopeless — the Blob is gone for good. Fail it
+                        // rather than marking it synced: the photo silently vanished
+                        // with no user-visible trace, and re-attaching is the only fix.
+                        console.error('[sync-manager] UPLOAD_RECEIPT has no stored photo', item.id);
+                        queue = await mutateQueue(q => markFailed(
+                            q, item.id, 'Receipt photo is no longer available on this device', 'permanent'
+                        ));
+                        dispatchQueueUpdated(queue);
                     } else {
                         const { path } = await withTimeout(
                             uploadReceipt(ownerId, txId, blob),
                             RECEIPT_UPLOAD_TIMEOUT_MS,
                             'UPLOAD_RECEIPT'
                         );
-                        const { error } = await withTimeout(
+                        const { data: updated, error } = await withTimeout(
                             Promise.resolve(
                                 supabase
                                     .from('transactions')
                                     .update({ receipt_path: path })
                                     .eq('id', txId)
+                                    .eq('user_id', ownerId)
+                                    .select('id')
                             ),
                             MUTATION_TIMEOUT_MS,
                             'UPLOAD_RECEIPT_UPDATE'
                         );
                         if (error) throw error;
+                        if (!updated || updated.length === 0) {
+                            throw new Error(`receipt_path update matched no row for transaction ${txId}`);
+                        }
                         // Replacing a receipt with a different file type changes the
                         // extension, and the storage path is derived from it — so the
                         // old object is not overwritten by upsert and would leak.
@@ -641,10 +677,14 @@ async function runSyncLoop(): Promise<void> {
                     dispatchQueueUpdated(queue);
                 }
             } catch (e) {
-                // ADD path: some errors (RLS, validation) are permanent and won't pass on retry.
-                // Classify before backing off so the user isn't waiting on hopeless retries.
-                if (item.type === 'ADD_FULL_TRANSACTION') {
+                // ADD and receipt-upload paths: some errors (RLS, validation, a rejected
+                // storage object) are permanent and won't pass on retry. Classify before
+                // backing off so the user isn't waiting on hopeless retries — and so the
+                // real reason survives instead of being replaced by 'Max retries exceeded'.
+                let classifiedReason: string | undefined;
+                if (item.type === 'ADD_FULL_TRANSACTION' || item.type === 'UPLOAD_RECEIPT') {
                     const { permanent, reason } = classifyAddError(e);
+                    classifiedReason = reason;
                     if (permanent) {
                         console.error(`[sync-manager] ${item.type} permanently failed:`, reason);
                         // Must go through mutateQueue. `markFailed` is a pure function;
@@ -666,10 +706,11 @@ async function runSyncLoop(): Promise<void> {
                     }
                 }
                 // Temporary network/server failure — apply exponential backoff with jitter.
-                if (process.env.NODE_ENV === 'development') {
-                    console.error(`[sync-manager] ${item.type} failed, will retry:`, e);
-                }
-                queue = await mutateQueue(q => incrementRetry(q, item.id));
+                // Logged unconditionally: this branch was gated on NODE_ENV, so on the
+                // deployed build every retryable failure was swallowed with no trace
+                // anywhere, which made a phone-only failure impossible to diagnose.
+                console.warn(`[sync-manager] ${item.type} failed, will retry:`, e);
+                queue = await mutateQueue(q => incrementRetry(q, item.id, classifiedReason ?? getErrorMessage(e)));
             }
 
             done++;
@@ -761,6 +802,13 @@ if (typeof window !== 'undefined') {
                 (reg as any).sync.register('novira-sync-queue').catch(() => {});
             });
         }
+    });
+
+    // iOS suspends timers while the tab is backgrounded — which is exactly what the
+    // OS photo picker does — so a backoff schedule can lapse with nothing left to
+    // restart it until the next cold start. Re-drive the queue on foreground.
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible' && navigator.onLine) attemptSync();
     });
 
     // Handle BG_SYNC_TRIGGERED message from service worker

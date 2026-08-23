@@ -209,6 +209,31 @@ describe('offline sync queue state machine', () => {
             expect(queue[0].errorKind).toBe('transient');
         });
 
+        /**
+         * The reason used to be dropped on the floor: `incrementRetry` took no error, so
+         * the failed list could only ever say 'Max retries exceeded' with a "Network"
+         * badge — even for a rejection the server had explained in full.
+         */
+        it('keeps the last error alongside the max-retries verdict', () => {
+            queue = addToQueue(queue, { id: 'uuid-1', type: 'ADD_TX', data: {} });
+            for (let i = 0; i < 4; i++) {
+                queue = incrementRetry(queue, 'uuid-1', 'transient blip');
+            }
+            expect(queue[0].status).toBe('pending');
+            expect(queue[0].errorReason).toBe('transient blip');
+
+            queue = incrementRetry(queue, 'uuid-1', '23514: check violation');
+            expect(queue[0].status).toBe('failed');
+            expect(queue[0].errorReason).toBe('Max retries exceeded — last error: 23514: check violation');
+        });
+
+        it('leaves an earlier reason in place when a retry supplies none', () => {
+            queue = addToQueue(queue, { id: 'uuid-1', type: 'ADD_TX', data: {} });
+            queue = incrementRetry(queue, 'uuid-1', 'Load failed');
+            queue = incrementRetry(queue, 'uuid-1');
+            expect(queue[0].errorReason).toBe('Load failed');
+        });
+
         it('doubles backoff on each retry (exponential)', () => {
             queue = addToQueue(queue, { id: 'uuid-1', type: 'ADD_TX', data: {} });
             const t0 = Date.now();

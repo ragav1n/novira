@@ -349,6 +349,15 @@ export function SyncIndicator() {
                                                             <div className="text-meta text-muted-foreground mt-0.5 break-words">
                                                                 {meta.summary}
                                                             </div>
+                                                            {/* The server's own words. Without this the banner only ever
+                                                                showed the generic kind copy, and the real reason was
+                                                                buried in Settings — so a deterministic rejection and a
+                                                                dropped connection looked identical. */}
+                                                            {item.errorReason && (
+                                                                <div className="text-micro text-muted-foreground/70 mt-1 break-words font-mono">
+                                                                    {item.errorReason}
+                                                                </div>
+                                                            )}
                                                         </div>
                                                         <div className="flex items-center gap-1 shrink-0">
                                                             {meta.showRetry && (

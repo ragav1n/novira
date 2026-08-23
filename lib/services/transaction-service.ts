@@ -5,6 +5,7 @@ import { applyWorkspaceFilter } from '@/lib/workspace-filter';
 import { toast } from '@/utils/haptics';
 import { format } from 'date-fns';
 import { saveOfflineReceipt, ReceiptQuotaError } from '../offline-receipt-store';
+import { RPC_REJECTED } from '@/lib/sync-error-classify';
 
 const FRANKFURTER_SUPPORTED = [
     'AUD', 'BRL', 'CAD', 'CHF', 'CNY', 'CZK', 'DKK', 'EUR', 'GBP', 'HKD',
@@ -195,12 +196,20 @@ export const TransactionService = {
         splits?: SplitRecord[];
         recurring?: RecurringRecord | null;
         offlineReceiptFile?: File | Blob | null;
+        // Set by the sync loop. Re-queueing from inside the loop is never right:
+        // the caller already owns a queue item, and the fallback below returns
+        // `success: true` with no row id, which made the loop mark that item
+        // synced, orphan its receipt Blob, and enqueue a duplicate under a fresh
+        // idempotency key. Throwing instead keeps the original item and its
+        // backoff.
+        requireOnline?: boolean;
     }) {
-        const { transaction, splits, recurring, offlineReceiptFile } = params;
+        const { transaction, splits, recurring, offlineReceiptFile, requireOnline } = params;
 
         // OFFLINE GUARD — the sync loop calls this method while online to perform
         // the real RPC, so this branch only triggers on a direct offline call.
         if (!navigator.onLine) {
+            if (requireOnline) throw new Error('Offline — the change stays queued');
             return this.queueTransaction({ transaction, splits, recurring, offlineReceiptFile });
         }
 
@@ -213,7 +222,16 @@ export const TransactionService = {
             });
 
             if (error) throw error;
-            if (!data.success) throw new Error(data.error || 'Failed to create transaction');
+            if (!data.success) {
+                // The RPC catches every SQL exception internally and answers HTTP 200
+                // with `{ success: false, error: SQLERRM }`, so a rejection arrives
+                // with no code and used to be classified as a network blip: five
+                // pointless retries, then the reason overwritten with "Max retries
+                // exceeded". Tag it so the queue can fail it fast and keep the text.
+                const err = new Error(data.error || 'Failed to create transaction') as Error & { code?: string };
+                err.code = typeof data.code === 'string' ? data.code : RPC_REJECTED;
+                throw err;
+            }
 
             return { 
                 success: true, 

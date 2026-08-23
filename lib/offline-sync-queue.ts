@@ -58,19 +58,26 @@ const MAX_RETRIES = 5;
 export const MAX_QUEUE_SIZE = 500;
 export const MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
-export function incrementRetry(queue: SyncPayload[], id: string): SyncPayload[] {
+/**
+ * `reason` is the classified error from the attempt that just failed. Without it the
+ * final transition wrote a bare 'Max retries exceeded', which discarded the only
+ * record of what actually went wrong — the failed-sync list then had nothing to show
+ * but the word "Network".
+ */
+export function incrementRetry(queue: SyncPayload[], id: string, reason?: string): SyncPayload[] {
     return queue.map(item => {
         if (item.id !== id) return item;
         const retryCount = (item.retryCount ?? 0) + 1;
         if (retryCount >= MAX_RETRIES) {
-            return { ...item, status: 'failed', retryCount, errorReason: 'Max retries exceeded', failedAt: Date.now(), errorKind: 'transient' };
+            const errorReason = reason ? `Max retries exceeded — last error: ${reason}` : 'Max retries exceeded';
+            return { ...item, status: 'failed', retryCount, errorReason, failedAt: Date.now(), errorKind: 'transient' };
         }
         // Exponential backoff: 2s, 4s, 8s, 16s, capped at 5 min, with ±15% jitter
         // to avoid thundering herd when many clients retry after a server outage.
         const baseMs = Math.min(1000 * Math.pow(2, retryCount), 5 * 60 * 1000);
         const jitter = 0.85 + Math.random() * 0.3;
         const backoffMs = Math.round(baseMs * jitter);
-        return { ...item, status: 'pending', retryCount, nextRetryAt: Date.now() + backoffMs };
+        return { ...item, status: 'pending', retryCount, nextRetryAt: Date.now() + backoffMs, errorReason: reason ?? item.errorReason };
     });
 }
 
