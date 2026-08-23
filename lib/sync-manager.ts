@@ -463,6 +463,16 @@ async function runSyncLoop(): Promise<void> {
                             if (realTxId && ownerId) {
                                 try {
                                     const blob = await getOfflineReceipt(item.id);
+                                    if (!blob) {
+                                        // The row is on the server but the photo is
+                                        // unrecoverable. Say so — this used to fall through
+                                        // to the delete below and vanish silently.
+                                        console.error('[sync-manager] queued receipt is gone, expense saved without it', item.id);
+                                        window.dispatchEvent(new CustomEvent('novira-receipt-upload-failed', {
+                                            detail: { txId: realTxId, queueId: item.id }
+                                        }));
+                                        broadcast('novira-receipt-upload-failed', { txId: realTxId, queueId: item.id });
+                                    }
                                     if (blob) {
                                         const { path } = await withTimeout(
                                             uploadReceipt(ownerId, realTxId, blob),

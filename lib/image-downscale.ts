@@ -57,6 +57,9 @@ export async function downscaleImage(
             canvas.toBlob(resolve, 'image/jpeg', quality)
         );
         if (!blob) return file;
+        // `blob.size < file.size` alone would happily prefer a 0-byte encode, which
+        // uploads as an empty body.
+        if (blob.size === 0) return file;
         return blob.size < file.size ? blob : file;
     } catch (err) {
         console.warn('[image-downscale] falling back to the original file', err);

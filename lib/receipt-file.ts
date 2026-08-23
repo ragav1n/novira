@@ -27,6 +27,12 @@ export const RECEIPT_ACCEPT = RECEIPT_MIME_TYPES.join(',');
 export type ReceiptValidation = { valid: true } | { valid: false; reason: string };
 
 export function validateReceiptFile(file: File | Blob): ReceiptValidation {
+    // A zero-byte pick is not a receipt. Storage answers such an upload with
+    // "No content provided", which the queue then reports as a permanent failure
+    // long after the expense was saved — far too late to be useful.
+    if (file.size === 0) {
+        return { valid: false, reason: 'That file is empty — pick or retake the photo.' };
+    }
     if (file.size > MAX_BYTES) {
         return { valid: false, reason: `File is too large (max ${Math.round(MAX_BYTES / 1024 / 1024)}MB).` };
     }

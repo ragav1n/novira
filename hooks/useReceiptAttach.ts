@@ -4,6 +4,7 @@ import { useCallback, useRef, useState } from 'react';
 import { queueReceiptUpload } from '@/lib/sync-manager';
 import { validateReceiptFile } from '@/lib/receipt-storage';
 import { downscaleImage } from '@/lib/image-downscale';
+import { ReceiptUnreadableError } from '@/lib/offline-receipt-store';
 import { toast } from '@/utils/haptics';
 import type { Transaction } from '@/types/transaction';
 
@@ -66,7 +67,11 @@ export function useReceiptAttach(userId: string | null | undefined) {
             );
         } catch (err) {
             console.error('[useReceiptAttach] could not queue receipt', err);
-            toast.error("Couldn't attach that receipt — please try again");
+            // "Try again" is the wrong advice for a photo the device can't read back —
+            // retrying the same file fails identically.
+            toast.error(err instanceof ReceiptUnreadableError
+                ? err.message
+                : "Couldn't attach that receipt — please try again");
         } finally {
             setBusyId(null);
         }

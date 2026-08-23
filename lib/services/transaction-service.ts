@@ -4,7 +4,7 @@ import { enqueueMutation } from '../sync-manager';
 import { applyWorkspaceFilter } from '@/lib/workspace-filter';
 import { toast } from '@/utils/haptics';
 import { format } from 'date-fns';
-import { saveOfflineReceipt, ReceiptQuotaError } from '../offline-receipt-store';
+import { saveOfflineReceipt, ReceiptQuotaError, ReceiptUnreadableError } from '../offline-receipt-store';
 import { RPC_REJECTED } from '@/lib/sync-error-classify';
 
 const FRANKFURTER_SUPPORTED = [
@@ -166,12 +166,21 @@ export const TransactionService = {
         // discover what id was assigned — a races-with-other-tabs hazard.
         const queueId = crypto.randomUUID();
         let receiptDropped = false;
+        // The reason drives the toast: "storage is full" and "that photo couldn't be
+        // read" call for different actions, and showing the wrong one sent the user off
+        // to wait for a queue that was never the problem.
+        let receiptDropReason: string | undefined;
         if (offlineReceiptFile) {
             try {
                 await saveOfflineReceipt(queueId, offlineReceiptFile);
             } catch (e) {
                 receiptDropped = true;
-                if (!(e instanceof ReceiptQuotaError)) {
+                if (e instanceof ReceiptQuotaError) {
+                    receiptDropReason = 'Receipt storage is full — attach again once synced.';
+                } else if (e instanceof ReceiptUnreadableError) {
+                    receiptDropReason = e.message + ' The expense was saved.';
+                } else {
+                    receiptDropReason = "The receipt couldn't be saved — the expense was added without it.";
                     console.warn('[TransactionService] saveOfflineReceipt failed:', e);
                 }
             }
@@ -188,7 +197,7 @@ export const TransactionService = {
         );
         // `offline` drives the toast copy in the caller: queued-while-online reads
         // as "added", queued-while-offline as "will sync later".
-        return { success: true, offline: !navigator.onLine, receiptDropped };
+        return { success: true, offline: !navigator.onLine, receiptDropped, receiptDropReason };
     },
 
     async createTransaction(params: {

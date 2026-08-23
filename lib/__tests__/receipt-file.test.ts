@@ -15,6 +15,23 @@ const blobOf = (type: string, size = 1024) =>
  * while the validator and the viewer both supported PDFs. Nothing errored — the
  * option simply never existed, so PDF support was dead code for months.
  */
+/**
+ * An empty pick is not a receipt. Storage rejects the upload with "No content
+ * provided", and because that only happens once the queue drains, the user saw a
+ * permanent failure long after the expense was saved.
+ */
+describe('validateReceiptFile rejects an empty file', () => {
+    it('refuses zero bytes before anything is queued', () => {
+        const result = validateReceiptFile(blobOf('image/jpeg', 0));
+        expect(result.valid).toBe(false);
+        expect(result.valid === false && result.reason).toMatch(/empty/i);
+    });
+
+    it('still accepts a single byte', () => {
+        expect(validateReceiptFile(blobOf('image/jpeg', 1)).valid).toBe(true);
+    });
+});
+
 describe('RECEIPT_ACCEPT stays in step with the validator', () => {
     it('offers every type the validator accepts', () => {
         const offered = RECEIPT_ACCEPT.split(',');

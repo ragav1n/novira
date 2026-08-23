@@ -302,10 +302,11 @@ export function useExpenseSubmission() {
                     invalidateTransactionCaches();
                 }
 
-                // Receipt storage was full — the row queues but the file is dropped.
-                // Warn the user so they can re-attach later.
+                // The row queued but the file did not: storage full, or the picked
+                // photo could not be read off the device. `receiptDropReason` says
+                // which, so the advice matches the cause.
                 if (result.receiptDropped && receiptFile) {
-                    toast("Receipt storage is full — attach again once synced.", {
+                    toast(result.receiptDropReason ?? "The receipt couldn't be saved — attach it again.", {
                         icon: '⚠️',
                         style: { background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.2)', color: '#FBBF24' }
                     });
