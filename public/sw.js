@@ -197,6 +197,36 @@ function addXFromCacheHeader(response) {
     });
 }
 
+// PostgREST reads go to the network first, but a stalled connection must not hang
+// the UI. If the network hasn't answered within this budget and a cached copy
+// exists, serve the cached copy and let the real response refresh the cache behind
+// it.
+const NETWORK_FIRST_TIMEOUT_MS = 2500;
+
+async function networkFirstWithCacheFallback(request) {
+    const cache = await caches.open(CACHE_NAME);
+    const network = fetch(request).then((response) => {
+        // Only plain 200s: Cache.put rejects a 206, and a storage failure (quota)
+        // must not turn a perfectly good response into a failed request.
+        if (response.status === 200) {
+            cache.put(request, response.clone()).catch(() => {});
+        }
+        return response;
+    });
+
+    const cached = await cache.match(request);
+    if (!cached) return network;
+
+    // Whichever of (network, timeout) settles first wins. A rejected network —
+    // offline, DNS failure — resolves to null and hands over to the cached copy
+    // immediately rather than waiting out the timeout.
+    const timeout = new Promise((resolve) => setTimeout(() => resolve(null), NETWORK_FIRST_TIMEOUT_MS));
+    const winner = await Promise.race([network.catch(() => null), timeout]);
+    if (winner) return winner;
+
+    return addXFromCacheHeader(cached.clone());
+}
+
 // Web Share Target: receive a shared image from the OS share sheet, stash the
 // blob in a dedicated IndexedDB store, then redirect to /add?from-share=1.
 // The /add page reads the blob and triggers receipt scanning automatically.
@@ -242,7 +272,8 @@ async function handleShareTarget(request) {
     return Response.redirect('/add?from-share=1', 303);
 }
 
-// Fetch: network-first for auth, stale-while-revalidate for data, cache-first for static assets
+// Fetch: network-first for auth and PostgREST reads, stale-while-revalidate for
+// storage and exchange rates, cache-first for static assets
 self.addEventListener('fetch', (event) => {
     const { request } = event;
     const url = new URL(request.url);
@@ -296,7 +327,22 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
-    // --- 2. API Data Layer (Stale-While-Revalidate) ---
+    // --- 2. PostgREST reads (Network-First, cache is the offline fallback) ---
+    // These were stale-while-revalidate along with everything else on the Supabase
+    // host, and that is what made the app feel non-live. Every list query has a
+    // stable URL, so the cached body was handed back on every read while the fresh
+    // one landed in the cache and nowhere else: a realtime event fired, the handler
+    // refetched, and the service worker replied with the pre-change rows. An edit
+    // made on another device — a budget saved on the phone, a bucket renamed on the
+    // laptop — stayed invisible until some later refetch happened to miss the cache.
+    // Reads have to be fresh for a realtime subscription to mean anything. The cache
+    // is still written on every successful read, purely so the app renders offline.
+    if (url.hostname.includes('supabase.co') && url.pathname.startsWith('/rest/v1/')) {
+        event.respondWith(networkFirstWithCacheFallback(request));
+        return;
+    }
+
+    // --- 3. Storage / exchange rates (Stale-While-Revalidate) ---
     if (url.hostname.includes('supabase.co') || url.hostname.includes('frankfurter')) {
         // Exchange-rate hosts get a 6h max-age. Without it, a single bad upstream
         // response could be served from cache for days until the SW version bumps.
@@ -352,7 +398,7 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
-    // --- 3. Static Assets (Cache-First) ---
+    // --- 4. Static Assets (Cache-First) ---
     if (
         url.pathname.startsWith('/_next/static/') ||
         url.pathname.startsWith('/_next/image') ||
@@ -376,7 +422,7 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
-    // --- 4. Navigation requests (Network-first with offline fallback) ---
+    // --- 5. Navigation requests (Network-first with offline fallback) ---
     // Always try the network first for navigate requests. Pages are server-rendered
     // with live auth state, so serving a stale cached HTML immediately (cache-first)
     // risks showing outdated content or auth-redirect loops.
