@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useRealtimeRefetch } from '@/hooks/useRealtimeRefetch';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sparkles, X, Plus } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
@@ -42,47 +43,62 @@ export function RecurringDetectCard({
     const [dismissedKeys, setDismissedKeys] = useState<Set<string>>(() => loadDismissedKeys());
     const [creatingKey, setCreatingKey] = useState<string | null>(null);
 
-    useEffect(() => {
+    // Bumped per scan so a slow response can't overwrite a newer set of candidates.
+    const scanGenRef = useRef(0);
+
+    const detect = useCallback(async () => {
         if (!userId) {
             setCandidates([]);
             return;
         }
-        let cancelled = false;
-        (async () => {
-            try {
-                const ninetyDaysAgo = new Date();
-                ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
-                const since = ninetyDaysAgo.toISOString().slice(0, 10);
+        const myGen = ++scanGenRef.current;
+        try {
+            const ninetyDaysAgo = new Date();
+            ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+            const since = ninetyDaysAgo.toISOString().slice(0, 10);
 
-                let q = supabase
-                    .from('transactions')
-                    .select('id, description, amount, category, date, payment_method, currency, is_recurring, is_settlement, user_id, created_at, group_id')
-                    .eq('user_id', userId)
-                    .eq('is_recurring', false)
-                    .gte('date', since)
-                    .order('date', { ascending: false })
-                    .limit(500);
+            let q = supabase
+                .from('transactions')
+                .select('id, description, amount, category, date, payment_method, currency, is_recurring, is_settlement, user_id, created_at, group_id')
+                .eq('user_id', userId)
+                .eq('is_recurring', false)
+                .gte('date', since)
+                .order('date', { ascending: false })
+                .limit(500);
 
-                if (activeWorkspaceId) {
-                    q = q.eq('group_id', activeWorkspaceId);
-                }
-
-                const { data, error } = await q;
-                if (error) throw error;
-                if (cancelled) return;
-
-                const result = detectRecurringCandidates(
-                    (data ?? []) as Transaction[],
-                    templates,
-                    { dismissedKeys, maxResults: 5 },
-                );
-                setCandidates(result);
-            } catch (error) {
-                console.error('Recurring detection failed:', error);
+            if (activeWorkspaceId) {
+                q = q.eq('group_id', activeWorkspaceId);
             }
-        })();
-        return () => { cancelled = true; };
+
+            const { data, error } = await q;
+            if (error) throw error;
+            if (scanGenRef.current !== myGen) return;
+
+            const result = detectRecurringCandidates(
+                (data ?? []) as Transaction[],
+                templates,
+                { dismissedKeys, maxResults: 5 },
+            );
+            setCandidates(result);
+        } catch (error) {
+            console.error('Recurring detection failed:', error);
+        }
     }, [userId, activeWorkspaceId, templates, dismissedKeys]);
+
+    useEffect(() => { detect(); }, [detect]);
+
+    // Detection reads the last 90 days of spend, so a charge added on another
+    // device can be the one that completes a pattern.
+    useRealtimeRefetch(
+        `recurring-detect-${userId ?? 'anon'}-${activeWorkspaceId ?? 'personal'}`,
+        userId
+            ? [activeWorkspaceId
+                ? { table: 'transactions', filter: `group_id=eq.${activeWorkspaceId}` }
+                : { table: 'transactions', filter: `user_id=eq.${userId}` }]
+            : [],
+        detect,
+        !!userId,
+    );
 
     const visible = useMemo(
         () => candidates.filter((c) => !dismissedKeys.has(c.normalizedKey)),

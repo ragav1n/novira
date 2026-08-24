@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useCallback, useMemo, useRef, useState, useEffect } from 'react';
 import { Sparkles, ChevronDown } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import {
@@ -13,6 +13,7 @@ import {
 import { Slider } from '@/components/ui/slider';
 import { CATEGORY_COLORS, getCategoryLabel, getIconForCategory } from '@/lib/categories';
 import { supabase } from '@/lib/supabase';
+import { useRealtimeRefetch } from '@/hooks/useRealtimeRefetch';
 import type { Transaction } from '@/types/transaction';
 import type { SavingsGoal } from '@/types/goal';
 
@@ -36,23 +37,34 @@ export function WhatIfCard({
     const [open, setOpen] = useState(false);
     const [goals, setGoals] = useState<SavingsGoal[]>([]);
 
-    useEffect(() => {
+    // Bumped per fetch so a slow response for a previous user can't land on top
+    // of the current one.
+    const goalsGenRef = useRef(0);
+
+    const loadGoals = useCallback(async () => {
         if (!userId) {
             setGoals([]);
             return;
         }
-        let cancelled = false;
-        (async () => {
-            const { data } = await supabase
-                .from('savings_goals')
-                .select('id, user_id, name, target_amount, current_amount, currency, deadline, icon, color, group_id, created_at')
-                .eq('user_id', userId)
-                .order('created_at', { ascending: false })
-                .limit(20);
-            if (!cancelled && data) setGoals(data as SavingsGoal[]);
-        })();
-        return () => { cancelled = true; };
+        const myGen = ++goalsGenRef.current;
+        const { data } = await supabase
+            .from('savings_goals')
+            .select('id, user_id, name, target_amount, current_amount, currency, deadline, icon, color, group_id, created_at')
+            .eq('user_id', userId)
+            .order('created_at', { ascending: false })
+            .limit(20);
+        if (goalsGenRef.current !== myGen) return;
+        if (data) setGoals(data as SavingsGoal[]);
     }, [userId]);
+
+    useEffect(() => { loadGoals(); }, [loadGoals]);
+
+    useRealtimeRefetch(
+        `what-if-goals-${userId ?? 'anon'}`,
+        userId ? [{ table: 'savings_goals', filter: `user_id=eq.${userId}` }] : [],
+        loadGoals,
+        !!userId,
+    );
 
     const categoryTotals = useMemo(() => {
         const map = new Map<string, number>();

@@ -19,6 +19,7 @@ import {
 import { ChevronLeft, ChevronRight, Plus, RotateCw, Target, Tag, Bell, TrendingDown, Check, Trash2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useRefreshRequest } from '@/hooks/useRefreshRequest';
+import { useRealtimeRefetch } from '@/hooks/useRealtimeRefetch';
 import { useUserPreferences } from '@/components/providers/user-preferences-provider';
 import { useBucketsList } from '@/components/providers/buckets-provider';
 import { useWorkspaceTheme } from '@/hooks/useWorkspaceTheme';
@@ -216,6 +217,22 @@ export function CalendarView() {
     useEffect(() => { fetchGenRef.current++; load(); }, [load]);
 
     useRefreshRequest(() => load({ silent: true }));
+
+    // The three tables behind this view are all edited elsewhere — a bill from
+    // subscriptions, a goal from the goals view, a one-off from the sheet on
+    // another device. Without this the month stayed frozen until a remount.
+    useRealtimeRefetch(
+        `calendar-${userId ?? 'anon'}-${activeWorkspaceId ?? 'personal'}`,
+        userId
+            ? [
+                { table: 'recurring_templates', filter: `user_id=eq.${userId}` },
+                { table: 'savings_goals', filter: `user_id=eq.${userId}` },
+                { table: 'scheduled_events', filter: `user_id=eq.${userId}` },
+            ]
+            : [],
+        () => load({ silent: true }),
+        !!userId,
+    );
 
     // Build events for the visible month + a 60-day forward window so day-detail
     // works for buckets / goals whose dates fall within either range.

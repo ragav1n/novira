@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useRealtimeRefetch } from '@/hooks/useRealtimeRefetch';
 import { useRouter } from 'next/navigation';
 import { format, parseISO, differenceInCalendarDays } from 'date-fns';
 import { Calendar as CalendarIcon, MapPin, Edit2, Plane, Receipt, TrendingUp, Hash, Coins } from 'lucide-react';
@@ -32,7 +33,7 @@ type TxRow = {
 
 export function TripDetailView({ tripId }: { tripId: string }) {
     const router = useRouter();
-    const { userId, currency, formatCurrency, convertAmount } = useUserPreferences();
+    const { userId, activeWorkspaceId, currency, formatCurrency, convertAmount } = useUserPreferences();
     const { refresh: refreshActiveTrip } = useActiveTrip();
 
     const [trip, setTrip] = useState<Trip | null>(null);
@@ -53,9 +54,11 @@ export function TripDetailView({ tripId }: { tripId: string }) {
         }
     }, [router]);
 
-    const load = useCallback(async () => {
+    // `silent` keeps a realtime refetch from swapping the whole screen back to the
+    // skeleton — the data is already on screen, it just needs replacing.
+    const load = useCallback(async (opts: { silent?: boolean } = {}) => {
         if (!userId) return;
-        setLoading(true);
+        if (!opts.silent) setLoading(true);
         try {
             const t = await TripService.getTripById(tripId);
             if (!t) {
@@ -87,6 +90,22 @@ export function TripDetailView({ tripId }: { tripId: string }) {
     }, [tripId, userId]);
 
     useEffect(() => { load(); }, [load]);
+
+    useRealtimeRefetch(
+        `trip-detail-${tripId}-${activeWorkspaceId ?? 'personal'}`,
+        userId
+            ? [
+                { table: 'trips', filter: `id=eq.${tripId}` },
+                // The trip's spend is matched by tag, not by owner, so in a shared
+                // workspace a partner's expense counts toward it too.
+                activeWorkspaceId
+                    ? { table: 'transactions', filter: `group_id=eq.${activeWorkspaceId}` }
+                    : { table: 'transactions', filter: `user_id=eq.${userId}` },
+            ]
+            : [],
+        () => load({ silent: true }),
+        !!userId,
+    );
 
     const tripCurrency = (trip?.home_currency || currency).toUpperCase();
 

@@ -1,12 +1,13 @@
 'use client';
 
-import { memo, useEffect, useMemo, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { LineChart, Line, XAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { endOfMonth, format, isAfter, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { CATEGORY_COLORS, getCategoryLabel } from '@/lib/categories';
 import { supabase } from '@/lib/supabase';
+import { useRealtimeRefetch } from '@/hooks/useRealtimeRefetch';
 import { AnalyticsTooltip } from '@/components/analytics/analytics-tooltip';
 import { ChartDataTable } from '@/components/analytics/chart-data-table';
 import type { DateRange } from '@/hooks/useAnalyticsData';
@@ -59,23 +60,37 @@ function SpendingTrendCardInner({
     themeHex,
 }: Props) {
     const [recurringForecast, setRecurringForecast] = useState<RecurringLite[]>([]);
-    useEffect(() => {
-        if (!userId) return;
-        let cancelled = false;
-        (async () => {
-            try {
-                const { data } = await supabase
-                    .from('recurring_templates')
-                    .select('id, amount, currency, frequency, next_occurrence')
-                    .eq('user_id', userId)
-                    .eq('is_active', true);
-                if (!cancelled && data) setRecurringForecast(data as RecurringLite[]);
-            } catch (error) {
-                console.error('Error fetching recurring templates for forecast:', error);
-            }
-        })();
-        return () => { cancelled = true; };
+    // Bumped per fetch so a slow response for a previous user can't land on top
+    // of the current one.
+    const forecastGenRef = useRef(0);
+
+    const loadForecast = useCallback(async () => {
+        if (!userId) {
+            setRecurringForecast([]);
+            return;
+        }
+        const myGen = ++forecastGenRef.current;
+        try {
+            const { data } = await supabase
+                .from('recurring_templates')
+                .select('id, amount, currency, frequency, next_occurrence')
+                .eq('user_id', userId)
+                .eq('is_active', true);
+            if (forecastGenRef.current !== myGen) return;
+            if (data) setRecurringForecast(data as RecurringLite[]);
+        } catch (error) {
+            console.error('Error fetching recurring templates for forecast:', error);
+        }
     }, [userId]);
+
+    useEffect(() => { loadForecast(); }, [loadForecast]);
+
+    useRealtimeRefetch(
+        `trend-forecast-${userId ?? 'anon'}`,
+        userId ? [{ table: 'recurring_templates', filter: `user_id=eq.${userId}` }] : [],
+        loadForecast,
+        !!userId,
+    );
 
     const forecastChartData = useMemo(() => {
         if (dateRange !== '1M') return categoryTrendData;

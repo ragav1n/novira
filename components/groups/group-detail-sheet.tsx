@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useRealtimeRefetch } from '@/hooks/useRealtimeRefetch';
 import { useRouter } from 'next/navigation';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -51,10 +52,16 @@ export function GroupDetailSheet({
     const [loadingTx, setLoadingTx] = useState(false);
     const [txError, setTxError] = useState(false);
 
-    useEffect(() => {
-        if (!open) return;
-        let cancelled = false;
-        setLoadingTx(true);
+    // Bumped per load so a response for a previous group — or one overtaken by a
+    // realtime refetch — can't land on top of a newer one.
+    const txGenRef = useRef(0);
+
+    // `silent` keeps a realtime refetch from swapping the expense list back to
+    // skeletons — the rows are already on screen, they just need replacing.
+    const loadGroupTransactions = useCallback((opts: { silent?: boolean } = {}) => {
+        const myGen = ++txGenRef.current;
+        const isStale = () => txGenRef.current !== myGen;
+        if (!opts.silent) setLoadingTx(true);
 
         (async () => {
             const { data, error } = await supabase
@@ -64,7 +71,7 @@ export function GroupDetailSheet({
                 .order('date', { ascending: false })
                 .limit(50);
 
-            if (cancelled) return;
+            if (isStale()) return;
             if (error) {
                 // Bailing to an empty list here rendered "No expenses yet in this group"
                 // plus a confident "$0.00 total" in the header.
@@ -105,7 +112,7 @@ export function GroupDetailSheet({
                 .from('transactions')
                 .select('amount, currency, is_settlement')
                 .eq('group_id', group.id);
-            if (cancelled) return;
+            if (isStale()) return;
             type AmountRow = { amount: number; currency: string | null; is_settlement: boolean | null };
             const sum = (totals ?? [])
                 .filter((t: AmountRow) => t.is_settlement !== true)
@@ -116,9 +123,21 @@ export function GroupDetailSheet({
             setTotalSpent(sum);
             setLoadingTx(false);
         })();
+    }, [group.id, currency, currentUserId, convertAmount]);
 
-        return () => { cancelled = true; };
-    }, [open, group.id, currency, currentUserId, convertAmount]);
+    useEffect(() => {
+        if (!open) return;
+        loadGroupTransactions();
+    }, [open, loadGroupTransactions]);
+
+    // An expense added by another member — or by this user on their phone — should
+    // appear in the open sheet, not on the next open.
+    useRealtimeRefetch(
+        `group-detail-${group.id}`,
+        [{ table: 'transactions', filter: `group_id=eq.${group.id}` }],
+        () => loadGroupTransactions({ silent: true }),
+        open,
+    );
 
     const groupDebts: SimplifiedPayment[] = currentUserId
         ? simplifyDebtsForGroup(pendingSplits, currentUserId, convertAmount, currency, group.id)

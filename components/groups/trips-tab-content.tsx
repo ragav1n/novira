@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useRealtimeRefetch } from '@/hooks/useRealtimeRefetch';
 import Link from 'next/link';
 import { format, parseISO, differenceInCalendarDays } from 'date-fns';
 import { Plane, Plus, Calendar as CalendarIcon, MapPin, Edit2 } from 'lucide-react';
@@ -33,10 +34,12 @@ export function TripsTabContent() {
     const [totalsError, setTotalsError] = useState(false);
     const fetchGenRef = useRef(0);
 
-    const load = useCallback(async () => {
+    // `silent` keeps a realtime refetch from swapping the trip cards back to
+    // skeletons — the data is already on screen, it just needs replacing.
+    const load = useCallback(async (opts: { silent?: boolean } = {}) => {
         if (!userId) return;
         const myGen = ++fetchGenRef.current;
-        setLoading(true);
+        if (!opts.silent) setLoading(true);
         try {
             const list = await TripService.getTripsForUser(userId, activeWorkspaceId);
             if (fetchGenRef.current !== myGen) return;
@@ -103,6 +106,20 @@ export function TripsTabContent() {
     }, [userId, activeWorkspaceId, currency, convertAmount]);
 
     useEffect(() => { load(); }, [load]);
+
+    useRealtimeRefetch(
+        `trips-tab-${userId ?? 'anon'}-${activeWorkspaceId ?? 'personal'}`,
+        userId
+            ? [
+                { table: 'trips', filter: `user_id=eq.${userId}` },
+                activeWorkspaceId
+                    ? { table: 'transactions', filter: `group_id=eq.${activeWorkspaceId}` }
+                    : { table: 'transactions', filter: `user_id=eq.${userId}` },
+            ]
+            : [],
+        () => load({ silent: true }),
+        !!userId,
+    );
 
     const grouped = useMemo(() => {
         const out: Record<Bucket, Trip[]> = { active: [], upcoming: [], past: [] };
