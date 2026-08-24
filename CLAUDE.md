@@ -154,9 +154,10 @@ Committed as files and run by hand in the Supabase SQL editor:
   replica identity, so DELETEs carried only the primary key and Realtime could not
   evaluate the `user_id=eq.<id>` filter — deletes stayed on screen on other devices
   until a reload. Adds `trips` to the publication and sets REPLICA IDENTITY FULL on all
-  three. **Applied 2026-08-23** (not verifiable from the agent environment — neither
-  `pg_publication_tables` nor `relreplident` is exposed through PostgREST). Check it in
-  the SQL editor with:
+  three. **Applied 2026-08-23, verified by the user in the SQL editor** — all four tables
+  published, the three named above at REPLICA IDENTITY FULL. Not verifiable from the
+  agent environment (neither `pg_publication_tables` nor `relreplident` is exposed
+  through PostgREST), so re-check it there with:
   ```sql
   select c.relname,
          (p.tablename is not null) as in_publication,
