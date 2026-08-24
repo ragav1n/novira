@@ -19,7 +19,8 @@ Supabase backend (PostgreSQL + Auth + Realtime). Deployed on Vercel at novira-on
 - `hooks/` = all custom hooks
 - `lib/offline-sync-queue.ts` + `lib/sync-manager.ts` = offline mutation queue with exponential backoff
 - `types/transaction.ts` = canonical shared types (Transaction, RecurringTemplate, etc.)
-- `public/sw.js` = service worker (cache-first for static, stale-while-revalidate for Supabase data)
+- `public/sw.js` = service worker (cache-first for static, **network-first** for
+  PostgREST reads, stale-while-revalidate for Storage and exchange rates)
 - `scripts/inject-sw-version.js` = auto-bumps SW cache version on each build
 
 ## Important Rules
@@ -39,7 +40,13 @@ Supabase backend (PostgreSQL + Auth + Realtime). Deployed on Vercel at novira-on
 ## Service Worker
 - Cache name is auto-bumped by `scripts/inject-sw-version.js` on every build
 - Uses `skipWaiting()` on install (no waiting for old SW to release)
-- Stale-while-revalidate for Supabase data, cache-first for `/_next/static/`
+- `/rest/v1/` reads are **network-first** with a 2.5s fallback to cache. They were
+  stale-while-revalidate, which is what made the app feel dead: every list query has
+  a stable URL, so a realtime event fired, the handler refetched, and the SW replied
+  with the pre-change rows while the fresh copy landed in the cache and nowhere else.
+  The cache is still written on every 200 so the app renders offline — do not put
+  PostgREST back on SWR
+- Storage and exchange rates stay stale-while-revalidate; `/_next/static/` stays cache-first
 
 ---
 
@@ -99,6 +106,21 @@ Supabase backend (PostgreSQL + Auth + Realtime). Deployed on Vercel at novira-on
 - **Accessibility** — skip link added to `app/layout.tsx` (`href="#main-content"`, screen-reader only, visible on focus); `id="main-content"` added to `<main>` in `mobile-layout.tsx`; `aria-required`/`required` on amount and description fields; `aria-label` on back button and history button; `aria-hidden` on decorative icons in `transaction-row.tsx`
 - **`useDashboardStats` weighted run-rate** — projection now uses 60% last-7-day daily rate + 40% month-to-date daily rate instead of simple daily average; adapts to spending trend changes mid-month
 - **BucketsProvider deduplication** — extracted `computeBucketSpending()` helper shared by both `fetchBuckets` and `fetchSpendingOnly`; eliminated ~35 lines of duplicated logic
+
+
+### Round 5 — Realtime everywhere (v2.115.0)
+- **Root cause of "it didn't update in real time"**: the service worker
+  stale-while-revalidated *every* PostgREST GET. Realtime fired, the handler
+  refetched, and the SW handed back the pre-change body. Fixed by making
+  `/rest/v1/` network-first (see Service Worker above)
+- **`hooks/useRealtimeRefetch.ts`** — shared subscribe-and-refetch hook (per-instance
+  UUID topic, 150ms coalescing) so a view can watch N tables in one channel
+- Subscriptions added where a view fetched but never subscribed: `calendar-view`
+  (recurring_templates / savings_goals / scheduled_events), `trips-tab-content` and
+  `trip-detail-view`, `group-detail-sheet`, `useMapTransactions`, `useAppBadge`,
+  `recurring-detect-card`, and the `spending-trend` / `what-if` analytics cards
+- `categorization-rules-section` needed nothing — it is fed by `useCategorizationRules`,
+  which already subscribes
 
 ---
 
@@ -172,6 +194,15 @@ Committed as files and run by hand in the Supabase SQL editor:
     and c.relname in ('trips','accounts','categorization_rules','transactions')
   order by c.relname;
   ```
+- `202608240200_realtime_complete.sql` — **REALTIME, third pass.** Enumerates every
+  table the client subscribes to and asserts publication membership plus replica
+  identity for all of them, so the next feature can be checked against one list.
+  `scheduled_events` had never been published at all (202605061200 created the table
+  and stopped), so the calendar's one-off events had no live path; `savings_deposits`,
+  `groups`, `group_members` and `friendships` were published but left at the default
+  replica identity, which drops filtered/RLS-gated DELETEs. `profiles` and
+  `workspace_budgets` are deliberately left at the default — both key on their primary
+  key, so the default old record is already enough. **Not yet applied.**
 - `202608220200_restore_rls_helper_execute.sql` — fixes a regression from the above:
   `get_transaction_user_id`, `is_group_member` and `is_group_creator` are called
   from inside RLS policies, which are evaluated as the *querying* role, so revoking
