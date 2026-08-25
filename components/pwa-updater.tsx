@@ -2,7 +2,13 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { PWAUpdateDialog } from '@/components/pwa-update-dialog';
-import { updateAction, shouldOffer } from '@/lib/pwa-update';
+import {
+    updateAction,
+    shouldOffer,
+    initialSnoozedUntil,
+    UPDATE_APPLIED_KEY,
+    SNOOZED_UNTIL_KEY,
+} from '@/lib/pwa-update';
 
 /** How long "Later" suppresses the update prompt before it may re-offer. */
 const SNOOZE_MS = 60 * 60 * 1000;
@@ -14,6 +20,29 @@ const CHECK_INTERVAL_MS = 30 * 60 * 1000;
  * now" can never end in nothing happening.
  */
 const ACTIVATION_GRACE_MS = 1500;
+
+/**
+ * sessionStorage throws outright in Safari's private mode rather than returning
+ * null, and a failed read here must not take the whole updater down with it.
+ */
+function readStamp(key: string): number | null {
+    try {
+        const raw = sessionStorage.getItem(key);
+        if (raw === null) return null;
+        const n = Number(raw);
+        return Number.isFinite(n) ? n : null;
+    } catch {
+        return null;
+    }
+}
+
+function writeStamp(key: string, value: number) {
+    try {
+        sessionStorage.setItem(key, String(value));
+    } catch {
+        /* private mode — the in-memory ref still holds for this page life */
+    }
+}
 
 export function PWAUpdater() {
     const [open, setOpen] = useState(false);
@@ -42,6 +71,13 @@ export function PWAUpdater() {
 
         let disposed = false;
         hadControllerRef.current = !!navigator.serviceWorker.controller;
+        // Rebuild the snooze the previous page life left behind. Without this the
+        // dialog reopens right after the reload it just triggered, which reads as
+        // the prompt refusing to go away.
+        snoozedUntilRef.current = initialSnoozedUntil({
+            updateAppliedAt: readStamp(UPDATE_APPLIED_KEY),
+            snoozedUntil: readStamp(SNOOZED_UNTIL_KEY),
+        });
 
         const offer = (registration: ServiceWorkerRegistration | null) => {
             if (disposed) return;
@@ -158,6 +194,9 @@ export function PWAUpdater() {
 
     const handleUpdateNow = () => {
         updateAcceptedRef.current = true;
+        // Written before the reload, read back on the next mount: this is the only
+        // record that survives `window.location.reload()`.
+        writeStamp(UPDATE_APPLIED_KEY, Date.now());
         setOpen(false);
         const waiting = registrationRef.current?.waiting;
         if (updateAction(!!waiting) === 'activate-then-reload') {
@@ -170,7 +209,11 @@ export function PWAUpdater() {
     };
 
     const handleLater = () => {
-        snoozedUntilRef.current = Date.now() + SNOOZE_MS;
+        const until = Date.now() + SNOOZE_MS;
+        snoozedUntilRef.current = until;
+        // "Later" used to live only in a ref, so a reload — or the OS restoring the
+        // installed app — brought the prompt straight back.
+        writeStamp(SNOOZED_UNTIL_KEY, until);
         setOpen(false);
     };
 

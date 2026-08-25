@@ -122,6 +122,25 @@ Supabase backend (PostgreSQL + Auth + Realtime). Deployed on Vercel at novira-on
 - `categorization-rules-section` needed nothing — it is fed by `useCategorizationRules`,
   which already subscribes
 
+### Round 6 — Receipt dates & the update prompt (v2.115.1–2.115.2)
+- **Receipt dates landed in 2024.** `SYSTEM_PROMPT` in `app/api/scan-receipt/route.ts`
+  told the model "a receipt is never dated in the future" — a rule it cannot apply,
+  because it has no clock. An unclear year (small print, a cropped top, 1600px
+  downscale) was filled in from its training prior. The prompt is now
+  `buildSystemPrompt(today)`, the client sends its **local** date (the server runs in
+  UTC, already tomorrow for an evening purchase in the Americas), and the model is told
+  to return null rather than guess a year — null falls back to today, which is right
+  far more often than a guess.
+- **"Update now" prompt kept coming back.** Accepting an update reloads the page, and
+  the reload wiped every ref in `PWAUpdater` — including the one recording that we
+  asked for it. Anything landing on the fresh document (a `controllerchange`, a second
+  `updatefound`, another client) then read as a new release and re-opened the dialog.
+  Both decisions now persist in `sessionStorage` (`lib/pwa-update.ts`):
+  `initialSnoozedUntil()` rebuilds the snooze on mount, an accepted update buys 5
+  minutes of quiet, and "Later" survives a reload instead of dying with the ref.
+  Verified in a driven browser — accept, then install a genuinely new worker 20s
+  later: no re-prompt.
+
 ---
 
 ## Pending Suggestions (Not Yet Implemented)

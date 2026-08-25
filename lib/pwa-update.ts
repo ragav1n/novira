@@ -40,3 +40,36 @@ export function shouldOffer({ now, snoozedUntil, reloading, hadController }: Off
     if (!hadController) return false;
     return now >= snoozedUntil;
 }
+
+/**
+ * Accepting an update reloads the page, and the reload throws away every ref in
+ * the component — including the one recording that we asked for it. So anything
+ * that fires on the fresh document (a `controllerchange` from a worker still
+ * activating, a second `updatefound`, another client's registration) reads as a
+ * brand-new release and re-opens the dialog seconds after the user just accepted
+ * one. Both decisions therefore have to survive the reload, which is what these
+ * keys are for. Session-scoped on purpose: an update applies to this tab, not to
+ * the whole browser profile.
+ */
+export const UPDATE_APPLIED_KEY = 'novira:pwa-update-applied';
+export const SNOOZED_UNTIL_KEY = 'novira:pwa-update-snoozed-until';
+
+/**
+ * How long an accepted update keeps the prompt quiet. Long enough to cover the
+ * reload and the new worker settling, short enough that a genuinely failed
+ * update is re-offered rather than suppressed for the session.
+ */
+export const POST_UPDATE_QUIET_MS = 5 * 60 * 1000;
+
+/**
+ * The snooze in force when the component mounts, rebuilt from what the previous
+ * page life wrote down. Takes the later of the two so a "Later" tapped just
+ * before an update elsewhere is not shortened by it.
+ */
+export function initialSnoozedUntil(stored: {
+    updateAppliedAt: number | null;
+    snoozedUntil: number | null;
+}): number {
+    const afterUpdate = stored.updateAppliedAt === null ? 0 : stored.updateAppliedAt + POST_UPDATE_QUIET_MS;
+    return Math.max(afterUpdate, stored.snoozedUntil ?? 0);
+}

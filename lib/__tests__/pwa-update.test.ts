@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { updateAction, shouldOffer } from '../pwa-update';
+import { updateAction, shouldOffer, initialSnoozedUntil, POST_UPDATE_QUIET_MS } from '../pwa-update';
 
 describe('updateAction', () => {
     /**
@@ -37,5 +37,39 @@ describe('shouldOffer', () => {
 
     it('never prompts over a committed reload', () => {
         expect(shouldOffer({ ...base, reloading: true })).toBe(false);
+    });
+});
+
+describe('initialSnoozedUntil', () => {
+    /**
+     * The bug this pins down: "Update now" reloads the page, which wipes every ref
+     * in the component. A controllerchange or a second updatefound landing on the
+     * fresh document then looked like a new release and reopened the dialog within
+     * seconds of the user accepting one — the prompt that would not go away.
+     */
+    it('keeps the prompt quiet for a while after an accepted update', () => {
+        const at = 1_000_000;
+        expect(initialSnoozedUntil({ updateAppliedAt: at, snoozedUntil: null }))
+            .toBe(at + POST_UPDATE_QUIET_MS);
+    });
+
+    it('carries a "Later" across a reload', () => {
+        expect(initialSnoozedUntil({ updateAppliedAt: null, snoozedUntil: 5_000 })).toBe(5_000);
+    });
+
+    it('takes the later of the two so neither shortens the other', () => {
+        const at = 1_000_000;
+        expect(initialSnoozedUntil({ updateAppliedAt: at, snoozedUntil: at + POST_UPDATE_QUIET_MS + 1 }))
+            .toBe(at + POST_UPDATE_QUIET_MS + 1);
+    });
+
+    it('offers immediately when nothing was stored', () => {
+        expect(initialSnoozedUntil({ updateAppliedAt: null, snoozedUntil: null })).toBe(0);
+    });
+
+    it('lapses, so an update that failed to apply is re-offered rather than buried', () => {
+        const at = 1_000_000;
+        const until = initialSnoozedUntil({ updateAppliedAt: at, snoozedUntil: null });
+        expect(shouldOffer({ now: until, snoozedUntil: until, reloading: false, hadController: true })).toBe(true);
     });
 });
