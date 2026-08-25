@@ -279,7 +279,14 @@ function AddExpenseForm() {
             const res = await fetch('/api/scan-receipt', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ imageBase64: base64, mimeType: shrunk.type }),
+                // The scanner needs to know what day it is: the model has no
+                // clock, and the server runs in UTC, which is already tomorrow
+                // for an evening purchase here.
+                body: JSON.stringify({
+                    imageBase64: base64,
+                    mimeType: shrunk.type,
+                    today: format(new Date(), 'yyyy-MM-dd'),
+                }),
                 signal: controller.signal,
             });
             if (!res.ok) throw new Error('Scan failed');

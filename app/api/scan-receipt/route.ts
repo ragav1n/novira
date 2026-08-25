@@ -65,15 +65,20 @@ const RECEIPT_SCHEMA = {
 const RECEIPT_FORMAT = jsonSchemaOutputFormat(RECEIPT_SCHEMA, { transform: false })
 type Receipt = ReturnType<typeof RECEIPT_FORMAT.parse>
 
-// Static extraction instructions live in the system block; the user turn carries
-// the image and nothing else. (No cache_control — Haiku 4.5 needs a 4096-token
-// prefix before caching engages, and this is well under it.)
-const SYSTEM_PROMPT = `You read a photographed receipt and report its details.
+// The extraction instructions live in the system block; the user turn carries the
+// image and nothing else. Today's date is interpolated in because the model has
+// no clock: with nothing to anchor against it dates a hard-to-read receipt from
+// its training prior, which is how a purchase made today lands in 2024.
+// (No cache_control — Haiku 4.5 needs a 4096-token prefix before caching
+// engages, this is well under it, and a per-day prefix would not hit anyway.)
+const buildSystemPrompt = (today: string) => `You read a photographed receipt and report its details.
+
+Today's date is ${today}.
 
 Field rules:
 - "amount" is the final sum actually charged — after tax, tip, service charge, and discounts. It is not the subtotal, not the cash tendered, and not the change given. If the receipt shows several payment methods, use the combined total. If the image isn't a receipt, or no total is legible, return null and leave the other fields as your best effort.
 - "description" names the actual items: "Milk, eggs, bread", "Coffee & sandwich". Translate foreign item names to English ("Brot"→"Bread", "Käse"→"Cheese"), but keep brand names, proper nouns, and untranslatable words as they are. With too many items to list, pick the 2–3 most prominent or expensive ("Steak, wine, cheese"). Never write placeholder text like "Groceries x7". If no item line is legible, fall back to the merchant name.
-- "date": when the day/month order is ambiguous ("03/04/2026"), settle it from the merchant's country, address, or language — most of the world prints DD/MM, the US prints MM/DD. A receipt is never dated in the future; if your reading lands there, you misread it.
+- "date": read the year off the receipt — never assume one. A receipt is normally photographed within days of the purchase, so a reading that lands well before ${today} deserves a second look, and one dated after ${today} is impossible. A two-digit year is in the 2000s ("25" → 2025). When the day/month order is ambiguous ("03/04/2026"), settle it from the merchant's country, address, or language — most of the world prints DD/MM, the US prints MM/DD. Return null when no date is printed or the year is not legible: a null is filled in with today's date, whereas a guessed year is silently wrong.
 - "currency": read the printed symbol together with the address, language, and tax labels. "$" alone is ambiguous across USD, CAD, AUD, SGD, NZD, and MXN — use the country to decide, and return null rather than guessing.
 - "is_online" is true when the receipt shows a website, an order number, or a shipping address and no physical storefront.
 
@@ -109,6 +114,18 @@ function readReceiptDate(value: string | null): string | null {
   return value
 }
 
+/**
+ * The client sends its own local date: this server runs in UTC, so an evening
+ * purchase in the Americas would otherwise be told "today" is already tomorrow.
+ * A clock more than a day out is ignored rather than fed to the model.
+ */
+function resolveToday(value: unknown): string {
+  const serverToday = new Date().toISOString().slice(0, 10)
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return serverToday
+  const skew = Math.abs(Date.parse(`${value}T00:00:00Z`) - Date.parse(`${serverToday}T00:00:00Z`))
+  return skew <= 24 * 60 * 60 * 1000 ? value : serverToday
+}
+
 function readReceiptTime(value: string | null): string | null {
   if (value === null || !/^\d{2}:\d{2}$/.test(value)) return null
   const [h, min] = value.split(':').map(Number)
@@ -127,13 +144,13 @@ export async function POST(req: NextRequest) {
   const limit = checkRateLimit('scan-receipt', user.id, RATE_CFG)
   if (!limit.allowed) return rateLimitResponse(limit, RATE_CFG, `Daily scan limit reached (${RATE_CFG.max}/day).`)
 
-  let parsedBody: { imageBase64?: unknown; mimeType?: unknown }
+  let parsedBody: { imageBase64?: unknown; mimeType?: unknown; today?: unknown }
   try {
     parsedBody = await req.json()
   } catch {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
   }
-  const { imageBase64, mimeType } = parsedBody
+  const { imageBase64, mimeType, today } = parsedBody
 
   if (typeof imageBase64 !== 'string' || typeof mimeType !== 'string') {
     return NextResponse.json({ error: 'Missing image data' }, { status: 400 })
@@ -160,7 +177,7 @@ export async function POST(req: NextRequest) {
     const message = await client.messages.parse({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 512,
-      system: SYSTEM_PROMPT,
+      system: buildSystemPrompt(resolveToday(today)),
       output_config: { format: RECEIPT_FORMAT },
       messages: [
         {
