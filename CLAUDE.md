@@ -141,6 +141,55 @@ Supabase backend (PostgreSQL + Auth + Realtime). Deployed on Vercel at novira-on
   Verified in a driven browser — accept, then install a genuinely new worker 20s
   later: no re-prompt.
 
+### Round 7 — The recap's currency (v2.115.3–2.115.4)
+- **A rupee total wearing a dollar sign.** The August recap read
+  `$126,846.98` above four insights quoting `₹50,308`, `₹63,792`, `₹3,338`. Both
+  halves came from the same INR aggregate: the model was handed `currencySymbol: ₹`
+  and wrote it, and the card then reformatted the raw number with whatever
+  `formatCurrency` currently prefers.
+- **Root cause: the client chose the currency.** `POST /api/recap` took
+  `currency` from the request body, and `UserPreferencesProvider` starts at a
+  hardcoded `'INR'` — `setIsLoading(false)` fires inside `onAuthStateChange`,
+  before `loadPreferences` resolves, so there is a window where `userId` is set
+  and `currency` is still the default. The modal's effect runs in exactly that
+  window. It also beats the cron: `priorMonthKey()` uses the *client's* local
+  date, so a device in IST asks for the August recap at 18:30 UTC on Aug 31,
+  ~9 hours before `/api/cron/periodic` (03:30 UTC, day 1) fans out — and the
+  cron, which reads `profiles.currency`, would have got it right.
+  `POST` and the new `GET ?month=` both read `profiles.currency` now; the body
+  parameter is gone.
+- **A stored recap now carries its own currency.** `RecapShape.currency` is
+  written at generation (`recap` is jsonb — no migration), and `RecapBody`
+  formats the total with `formatCurrency(total, recap.currency)` rather than the
+  live preference, so the headline can never disagree with the prose again.
+- **Changing base currency invalidates a recap.** Its totals are in the old
+  currency and the model wrote the old symbol into every sentence, so it is
+  rebuilt, not relabelled: `GET ?month=` returns `currencyStale`, and both the
+  modal and the analytics card POST when they see it. The server-side cache
+  check treats a currency mismatch as a miss. Legacy recaps have no stamp, so
+  they read as stale and regenerate once each.
+- **The prompt's examples were all in ₹.** `SHARED_RULES` and the monthly
+  takeaway example hardcoded `₹13,202` / `₹2,500` while telling the model to use
+  the payload's `currencySymbol` — an invitation for Haiku to copy the symbol
+  next to the worked number instead. Both prompts are now
+  `monthPrompt(sym)` / `yearPrompt(sym)`.
+- **The silent 1:1 conversion is now logged.** In `aggregate`, a row with no
+  live rate and no usable stored ratio was added at face value, which turns a
+  ₹126,846 month into a $126,846 one with nothing in the logs. Counted per run
+  and reported via `console.error` (usually a missing `EXCHANGERATE_API_KEY`).
+  Numbers unchanged — only the visibility.
+- **The insights chat had the same defect** and is fixed the same way
+  (v2.115.4). `POST /api/insights/chat` required `baseCurrency` in the body and
+  converted the whole snapshot into it; the model then wrote that currency's
+  symbol into a streamed answer. Narrower window than the recap's — the user has
+  to type a question first — but the same wrong answer when it hits. The route
+  reads the profile now, `baseCurrency` is gone from the body and from
+  `InsightsChatCard`'s props, and `buildInsightsSnapshot` counts and logs its own
+  unconverted rows.
+- `profileCurrency(supabase, userId)` lives in `lib/server/currency.ts` — the one
+  place any server code should get a base currency from. Do not add another route
+  that takes one from a request body.
+
 ---
 
 ## Pending Suggestions (Not Yet Implemented)
