@@ -16,7 +16,6 @@ interface Props {
     customStart: string;
     customEnd: string;
     bucketId: string | 'all';
-    baseCurrency: string;
 }
 
 type ChatMessage = { role: 'user' | 'assistant'; content: string; pending?: boolean };
@@ -162,7 +161,7 @@ function TypingDots() {
     );
 }
 
-export function InsightsChatCard({ dateRange, customStart, customEnd, bucketId, baseCurrency }: Props) {
+export function InsightsChatCard({ dateRange, customStart, customEnd, bucketId }: Props) {
     const [open, setOpen] = useState(false);
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [input, setInput] = useState('');
@@ -210,8 +209,9 @@ export function InsightsChatCard({ dateRange, customStart, customEnd, bucketId, 
                 signal: ac.signal,
                 body: JSON.stringify({
                     messages: next.filter(m => !m.pending && m.content.length > 0),
+                    // No baseCurrency: the server reads the profile's, which is the
+                    // only value that can't still be a not-yet-loaded default.
                     range,
-                    baseCurrency,
                     bucketId: bucketId === 'all' ? null : bucketId,
                 }),
             });
@@ -266,7 +266,7 @@ export function InsightsChatCard({ dateRange, customStart, customEnd, bucketId, 
         } finally {
             setStreaming(false);
         }
-    }, [messages, streaming, dateRange, customStart, customEnd, bucketId, baseCurrency]);
+    }, [messages, streaming, dateRange, customStart, customEnd, bucketId]);
 
     return (
         <>

@@ -4,6 +4,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { createClient } from '@/utils/supabase/server';
 import { buildInsightsSnapshot, type SnapshotRange } from '@/lib/insights-snapshot';
 import { checkRateLimit } from '@/lib/server/rate-limit';
+import { profileCurrency } from '@/lib/server/currency';
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -18,7 +19,7 @@ How to answer:
 - Lead with the answer in the first sentence, then at most two or three more of supporting detail. Stop there unless the user asks for more.
 - Every figure must be derivable from the snapshot. Sort and aggregate it yourself — "biggest expense" is the highest amount in "sample", "most-visited place" is the highest count in "byMerchant". Never invent a merchant, category, date, or amount. If the snapshot can't answer the question, say so plainly and say what would.
 - Wrap every figure — amounts, percentages, counts, dates — in **double asterisks**. The client renders those bold.
-- Write amounts using the snapshot's "currencySymbol".
+- Every amount in the snapshot is already in the user's own currency. Write each one with the snapshot's "currencySymbol" in front of it, and no other currency symbol or code anywhere.
 - Plain sentences only. The client renders your reply as plain text, so bullet lists, headings, tables, and code fences arrive as literal characters on screen.
 - Second person, direct. No emojis, no opener ("Great question", "Based on the data"), no moralising about how they spend.
 
@@ -34,7 +35,6 @@ interface RequestBody {
     range:
         | { kind: 'preset'; value: '1M' | 'LM' | '3M' | '6M' | '1Y' | 'ALL' }
         | { kind: 'custom'; from: string; to: string };
-    baseCurrency: string;
     bucketId?: string | null;
 }
 
@@ -84,9 +84,6 @@ export async function POST(req: NextRequest) {
     if (!isValidRange(body.range)) {
         return NextResponse.json({ error: 'invalid range' }, { status: 400 });
     }
-    if (typeof body.baseCurrency !== 'string' || body.baseCurrency.length === 0) {
-        return NextResponse.json({ error: 'baseCurrency required' }, { status: 400 });
-    }
 
     // Cap conversation length to avoid runaway costs.
     const messages = body.messages.slice(-12).map(m => ({
@@ -102,7 +99,10 @@ export async function POST(req: NextRequest) {
     try {
         snapshot = await buildInsightsSnapshot(supabase, user.id, {
             range: body.range,
-            baseCurrency: body.baseCurrency,
+            // Not from the body: every figure in the snapshot is converted into
+            // this, and the model writes its symbol into the reply, so it has to
+            // be the profile's rather than whatever the client happened to hold.
+            baseCurrency: await profileCurrency(supabase, user.id),
             bucketId: body.bucketId || undefined,
         });
     } catch (err) {

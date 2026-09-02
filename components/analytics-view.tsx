@@ -730,7 +730,6 @@ export function AnalyticsView() {
                                         customStart={customStart}
                                         customEnd={customEnd}
                                         bucketId={selectedBucketId}
-                                        baseCurrency={currency}
                                     />
                                 </LazyMount>
 

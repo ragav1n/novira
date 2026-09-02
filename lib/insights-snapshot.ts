@@ -45,6 +45,7 @@ function convert(
     share: number,
     baseCurrency: string,
     liveRates: Map<string, number>,
+    stats: { unconverted: number },
 ): number {
     // Shared ladder handles same-currency and stored-rate rows. The fallback below
     // only runs when the stored rate is unusable or points at an old base (the user
@@ -54,7 +55,12 @@ function convert(
         const liveRate = liveRates.get(`${from.toUpperCase()}->${target}`);
         if (liveRate !== undefined) return amount * liveRate;
         // No live rate (e.g. API key missing). Fall back to the stored ratio so
-        // the snapshot still returns something rather than skipping the row.
+        // the snapshot still returns something rather than skipping the row — but
+        // that ratio converts into the base the row was written against, which the
+        // ladder has already ruled out as the target, and with nothing stored the
+        // figure goes in at face value. Either way it's the wrong magnitude, and
+        // the model will state it as fact, so count it rather than swallow it.
+        stats.unconverted += 1;
         if (tx.converted_amount && tx.amount) {
             return amount * (Number(tx.converted_amount) / Number(tx.amount));
         }
@@ -177,11 +183,12 @@ export async function buildInsightsSnapshot(
     let recurringTotal = 0;
     let discretionaryTotal = 0;
     const sample: InsightsSnapshot['sample'] = [];
+    const rateStats = { unconverted: 0 };
 
     for (const tx of txs) {
         const share = shareOf(tx, userId);
         if (share <= 0) continue;
-        const amt = convert(tx, share, baseCurrency, liveRates);
+        const amt = convert(tx, share, baseCurrency, liveRates, rateStats);
 
         totalSpent += amt;
         txCount += 1;
@@ -221,6 +228,15 @@ export async function buildInsightsSnapshot(
                 is_recurring: !!tx.is_recurring,
             });
         }
+    }
+
+    if (rateStats.unconverted > 0) {
+        console.error('[insights-snapshot] rows counted without a usable exchange rate', {
+            period: label,
+            baseCurrency,
+            rows: rateStats.unconverted,
+            currencies: [...mismatchedCurrencies],
+        });
     }
 
     const round = (n: number) => Math.round(n * 100) / 100;
