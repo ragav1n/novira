@@ -16,6 +16,12 @@ export interface RecapInsight {
 
 export interface RecapData {
     headline: string;
+    /**
+     * The currency the recap was generated in. Absent on recaps stored before
+     * it was recorded — those fall back to the user's current currency, which
+     * is the mislabelling this field exists to stop.
+     */
+    currency?: string;
     totalSpent: number;
     previousTotal: number;
     changePercent: number;
@@ -68,7 +74,7 @@ export function RecapBody({
     analyzed?: RecapAnalyzed | null;
     /** `YYYY-MM` or `YYYY-FY`. Drives the comparison label. */
     period?: string | null;
-    formatCurrency: (n: number) => string;
+    formatCurrency: (n: number, currency?: string) => string;
     onInsightClick?: (subject: string, kind?: InsightKind) => void;
 }) {
     const comparisonLabel = isYearlyPeriod(period ?? analyzed?.comparedToMonth)
@@ -85,7 +91,10 @@ export function RecapBody({
                 <div className="flex items-center gap-3 flex-wrap">
                     <div className="flex flex-col">
                         <span className="text-micro font-bold uppercase tracking-widest text-muted-foreground/80">Spent</span>
-                        <span className="text-lg font-bold text-foreground">{formatCurrency(recap.totalSpent)}</span>
+                        {/* The recap's own currency, not the live preference: the
+                            insight text below carries the symbol the model wrote at
+                            generation time and the two have to agree. */}
+                        <span className="text-lg font-bold text-foreground">{formatCurrency(recap.totalSpent, recap.currency)}</span>
                     </div>
                     <div className="h-8 w-px bg-border/60" />
                     <div className="flex flex-col">

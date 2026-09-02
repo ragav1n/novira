@@ -12,11 +12,10 @@ import { Spinner } from '@/components/ui/spinner';
 import { toast } from '@/utils/haptics';
 
 interface Props {
-    currency: string;
     formatCurrency: (amount: number, currency?: string) => string;
 }
 
-export function MonthlyRecapCard({ currency, formatCurrency }: Props) {
+export function MonthlyRecapCard({ formatCurrency }: Props) {
     const router = useRouter();
     const [recapLoading, setRecapLoading] = useState(false);
     const [recap, setRecap] = useState<RecapData | null>(null);
@@ -29,6 +28,42 @@ export function MonthlyRecapCard({ currency, formatCurrency }: Props) {
         const now = new Date();
         const target = new Date(now.getFullYear(), now.getMonth() - 1, 1);
         return `${target.getFullYear()}-${String(target.getMonth() + 1).padStart(2, '0')}`;
+    }, []);
+
+    const generateRecap = useCallback(async (target: string, force = false) => {
+        recapAbortRef.current?.abort();
+        const ac = new AbortController();
+        recapAbortRef.current = ac;
+        setRecapLoading(true);
+        if (force) {
+            setRecap(null);
+            setRecapMeta(null);
+        }
+        try {
+            const res = await fetch('/api/recap', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                // No currency: the server builds the recap against the profile's,
+                // which is the only value that can't be a not-yet-loaded default.
+                body: JSON.stringify({ month: target, force }),
+                signal: ac.signal,
+            });
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err.error || 'Recap failed');
+            }
+            const data = await res.json();
+            setRecap(data.recap || null);
+            setRecapMeta(data.analyzed || null);
+            setRecapMonth(target);
+            setAvailableMonths((prev) => prev.includes(target) ? prev : [target, ...prev]);
+        } catch (err) {
+            if ((err as { name?: string })?.name === 'AbortError') return;
+            console.error('[recap]', err);
+            toast.error('Could not generate recap');
+        } finally {
+            if (!ac.signal.aborted) setRecapLoading(false);
+        }
     }, []);
 
     const loadRecap = useCallback(async (monthKey: string) => {
@@ -49,6 +84,11 @@ export function MonthlyRecapCard({ currency, formatCurrency }: Props) {
             setRecap(data.recap || null);
             setRecapMeta(data.analyzed || null);
             setRecapMonth(monthKey);
+            // Built against a base currency the user has since left: its totals
+            // are in the old currency and the model wrote the old symbol through
+            // its prose, so reformatting can't save it. Rebuild. Shown as-is
+            // meanwhile, so a failed rebuild still leaves something on screen.
+            if (data.currencyStale && data.recap) await generateRecap(monthKey);
             return true;
         } catch (err) {
             if ((err as { name?: string })?.name === 'AbortError') return false;
@@ -57,42 +97,7 @@ export function MonthlyRecapCard({ currency, formatCurrency }: Props) {
         } finally {
             if (!ac.signal.aborted) setRecapLoading(false);
         }
-    }, []);
-
-    const generateRecap = useCallback(async (monthKey?: string, force = false) => {
-        const target = monthKey || recapMonth || priorMonthKey;
-        recapAbortRef.current?.abort();
-        const ac = new AbortController();
-        recapAbortRef.current = ac;
-        setRecapLoading(true);
-        if (force) {
-            setRecap(null);
-            setRecapMeta(null);
-        }
-        try {
-            const res = await fetch('/api/recap', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ month: target, currency, force }),
-                signal: ac.signal,
-            });
-            if (!res.ok) {
-                const err = await res.json().catch(() => ({}));
-                throw new Error(err.error || 'Recap failed');
-            }
-            const data = await res.json();
-            setRecap(data.recap || null);
-            setRecapMeta(data.analyzed || null);
-            setRecapMonth(target);
-            setAvailableMonths((prev) => prev.includes(target) ? prev : [target, ...prev]);
-        } catch (err) {
-            if ((err as { name?: string })?.name === 'AbortError') return;
-            console.error('[recap]', err);
-            toast.error('Could not generate recap');
-        } finally {
-            if (!ac.signal.aborted) setRecapLoading(false);
-        }
-    }, [currency, priorMonthKey, recapMonth]);
+    }, [generateRecap]);
 
     useEffect(() => () => recapAbortRef.current?.abort(), []);
 

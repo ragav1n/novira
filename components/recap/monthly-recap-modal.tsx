@@ -34,6 +34,12 @@ const SHOW_DELAY_MS = 4500;
 // Only auto-generate (POST) inside this window. Outside, only show if cached.
 const AUTO_GENERATE_DAY_LIMIT = 7;
 
+// The effect re-runs on every navigation, and generation takes long enough to
+// still be in flight when it does — without this a route change mid-generation
+// starts a second one, because the first hasn't written its row yet. Module
+// scope so it survives the remount, keyed per user and period.
+const generating = new Set<string>();
+
 function priorMonthKey(): string {
     const now = new Date();
     const target = new Date(now.getFullYear(), now.getMonth() - 1, 1);
@@ -41,7 +47,7 @@ function priorMonthKey(): string {
 }
 
 export function MonthlyRecapModal() {
-    const { formatCurrency, currency, userId } = useUserPreferences();
+    const { formatCurrency, userId } = useUserPreferences();
     const pathname = usePathname();
     const router = useRouter();
     const [open, setOpen] = useState(false);
@@ -99,30 +105,49 @@ export function MonthlyRecapModal() {
 
             try {
                 // Always try the cache first.
-                let res = await fetch(`/api/recap?month=${target}`);
-                if (res.status === 404) {
-                    // Only auto-generate during the first 7 days of the month so a user
-                    // installing mid-month doesn't trigger a fresh Anthropic call on open.
-                    const dayOfMonth = new Date().getDate();
-                    if (dayOfMonth > AUTO_GENERATE_DAY_LIMIT) return;
-                    setLoading(true);
-                    res = await fetch('/api/recap', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ month: target, currency })
-                    });
-                }
+                const cachedRes = await fetch(`/api/recap?month=${target}`);
                 if (cancelled) return;
-                if (!res.ok) {
-                    setLoading(false);
+                if (!cachedRes.ok && cachedRes.status !== 404) return;
+                let data = cachedRes.ok ? await cachedRes.json() : null;
+
+                // If user already viewed it on another device, don't pop again.
+                // Checked before any regeneration below, both to save the call and
+                // because a freshly generated response carries no seen_at.
+                if (data?.seen_at) {
+                    localStorage.setItem(`${SEEN_KEY}:${userId}:${target}`, '1');
                     return;
                 }
-                const data = await res.json();
-                // If user already viewed it on another device, don't pop again.
-                if (data.seen_at) {
-                    localStorage.setItem(`${SEEN_KEY}:${userId}:${target}`, '1');
-                    setLoading(false);
-                    return;
+
+                // currencyStale means the stored recap was built against a base
+                // the user has since moved away from — its totals are in the old
+                // currency and the model wrote the old symbol through its prose,
+                // so it has to be rebuilt rather than reformatted.
+                if (!data || data.currencyStale) {
+                    // Only auto-generate from scratch during the first 7 days of the
+                    // month so a user installing mid-month doesn't trigger a fresh
+                    // Anthropic call on open. A currency rebuild is exempt: that recap
+                    // already exists and is already wrong on screen.
+                    if (!data && new Date().getDate() > AUTO_GENERATE_DAY_LIMIT) return;
+                    const lock = `${userId}:${target}`;
+                    if (generating.has(lock)) return;
+                    generating.add(lock);
+                    setLoading(true);
+                    let res: Response;
+                    try {
+                        res = await fetch('/api/recap', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ month: target })
+                        });
+                    } finally {
+                        generating.delete(lock);
+                    }
+                    if (cancelled) return;
+                    if (!res.ok) {
+                        setLoading(false);
+                        return;
+                    }
+                    data = await res.json();
                 }
                 if (!data.recap) {
                     setLoading(false);
@@ -145,7 +170,7 @@ export function MonthlyRecapModal() {
             cancelled = true;
             if (timer) clearTimeout(timer);
         };
-    }, [userId, currency, pathname]);
+    }, [userId, pathname]);
 
     const monthLabel = formatRecapPeriod(month);
 

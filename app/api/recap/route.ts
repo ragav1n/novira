@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
 import { generateRecap, VALID_PERIOD_RE } from '@/lib/recap-generator';
 import { checkRateLimit, rateLimitResponse } from '@/lib/server/rate-limit';
+import { profileCurrency } from '@/lib/server/currency';
 
 const READ_CFG = { max: 120, windowMs: 60_000 };
 const GENERATE_CFG = { max: 10, windowMs: 24 * 60 * 60 * 1000 };
@@ -47,7 +48,19 @@ export async function GET(req: NextRequest) {
             return NextResponse.json({ error: 'Unable to load recap' }, { status: 500 });
         }
         if (!data) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-        return NextResponse.json(data);
+        // The client can't work this out for itself: on a cold mount its
+        // currency is still the provider's default, so it would call a perfectly
+        // good recap stale and regenerate it on every open.
+        let currencyStale = false;
+        try {
+            const stored = (data.recap as { currency?: string } | null)?.currency;
+            currencyStale = stored !== await profileCurrency(supabase, user.id);
+        } catch (err) {
+            // Reads fine without it. Left false so an unverifiable currency defers
+            // the rebuild instead of spending a generation on a guess.
+            console.error('[recap GET] currency lookup failed', err);
+        }
+        return NextResponse.json({ ...data, currencyStale });
     }
 
     const { data, error } = await supabase
@@ -62,8 +75,9 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ months: data || [] });
 }
 
-// POST /api/recap  { month, currency, force? }
-// Returns cached recap unless force=true.
+// POST /api/recap  { month, force? }
+// Returns the cached recap unless force=true or it was built in a currency the
+// user no longer uses.
 export async function POST(req: NextRequest) {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
@@ -72,11 +86,18 @@ export async function POST(req: NextRequest) {
     const genLimit = checkRateLimit('recap-generate', user.id, GENERATE_CFG);
     if (!genLimit.allowed) return rateLimitResponse(genLimit, GENERATE_CFG, `Daily recap generation limit reached (${GENERATE_CFG.max}/day).`);
 
-    const { month, currency, force } = (await req.json()) as { month?: string; currency?: string; force?: boolean };
+    const { month, force } = (await req.json()) as { month?: string; force?: boolean };
     if (!month || !isValidMonthPeriod(month)) {
         return NextResponse.json({ error: 'month must be YYYY-MM or YYYY-FY' }, { status: 400 });
     }
-    const baseCurrency = (currency || 'USD').toUpperCase();
+    let baseCurrency: string;
+    try {
+        baseCurrency = await profileCurrency(supabase, user.id);
+    } catch (err) {
+        // Generating against a guess would persist a recap in the wrong currency.
+        console.error('[recap POST] currency lookup failed', err);
+        return NextResponse.json({ error: 'Unable to read your currency preference' }, { status: 500 });
+    }
 
     if (!force) {
         const { data: existing } = await supabase
@@ -85,7 +106,10 @@ export async function POST(req: NextRequest) {
             .eq('user_id', user.id)
             .eq('month', month)
             .maybeSingle();
-        if (existing) {
+        // A recap carries its currency in its totals and in the symbol the model
+        // wrote into every sentence, so one built against a different base is
+        // stale in the same way an out-of-date one is. Rebuild it.
+        if (existing && (existing.recap as { currency?: string } | null)?.currency === baseCurrency) {
             return NextResponse.json({ ...existing, cached: true });
         }
     }

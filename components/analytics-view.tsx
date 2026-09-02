@@ -569,7 +569,7 @@ export function AnalyticsView() {
                             );
                         })()}
 
-                        <MonthlyRecapCard currency={currency} formatCurrency={formatCurrency} />
+                        <MonthlyRecapCard formatCurrency={formatCurrency} />
 
                         {transactions.length === 0 ? (
                             <Card className="bg-card/40 border-white/5 shadow-none py-0">

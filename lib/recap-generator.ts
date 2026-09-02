@@ -91,15 +91,21 @@ type RecapNarrativeRaw = ReturnType<typeof RECAP_FORMAT.parse>;
 // Shared by both prompts. The yearly prompt used to say "same rules as the
 // monthly recap" — but the model only ever sees one of the two, so those rules
 // were never actually delivered on a yearly run.
-const SHARED_RULES = `Output rules:
+//
+// Every worked example is written in the user's own symbol. They were hardcoded
+// with ₹, which is a symbol a small model will copy straight out of an example
+// in preference to the "currencySymbol" field further down its payload — and
+// the card has no way to tell prose in the wrong currency from prose in the
+// right one.
+const sharedRules = (sym: string) => `Output rules:
 - Every figure you cite must come from the payload. Never invent a merchant, category, or amount, and never round a number to a tidier one.
-- Wrap every number in "detail" and "takeaway" — amounts, percentages, counts — in **double asterisks**. The client renders those bold and nothing else. Example: "Food hit **₹13,202** across **31** orders — **36%** of everything you spent."
-- Write amounts using the "currencySymbol" given in the payload.
+- Wrap every number in "detail" and "takeaway" — amounts, percentages, counts — in **double asterisks**. The client renders those bold and nothing else. Example: "Food hit **${sym}13,202** across **31** orders — **36%** of everything you spent."
+- Every amount is already in the user's currency. Write each one with "${sym}" in front of it and no other currency symbol or code anywhere.
 - "subject" must appear verbatim in the payload — a category name, merchant name, or payment-method name, lowercased. It becomes a search filter, so it has to match. Use an empty string when "kind" is "frequency".
 - Second person, direct. No emojis, no markdown beyond the bold numbers, no moralising, no praise.
 - Every insight should tell the user something the total alone doesn't. Skip anything they can already see on the card.`;
 
-const SYSTEM_PROMPT_MONTH = `You are the analyst behind Novira's monthly recap. The user just closed out a calendar month. You get a JSON payload: this month's total and transaction count, every category total and count, top merchants with totals and visit counts, and payment-method splits. The "previous" block covers last month — its total, transaction count, category totals, and payment-method splits, but no merchant detail, so never compare merchants across months.
+const monthPrompt = (sym: string) => `You are the analyst behind Novira's monthly recap. The user just closed out a calendar month. You get a JSON payload: this month's total and transaction count, every category total and count, top merchants with totals and visit counts, and payment-method splits. The "previous" block covers last month — its total, transaction count, category totals, and payment-method splits, but no merchant detail, so never compare merchants across months.
 
 Length limits: "headline" ≤14 words, each "detail" ≤18 words, "takeaway" ≤24 words.
 
@@ -113,12 +119,12 @@ Pick the 3–4 most useful insights. Variety beats repetition — don't spend tw
 
 Rules:
 - Exactly 3 or 4 insight objects.
-- The takeaway names a number and an action. Good: "Cap delivery orders at **15** next month — that's about **₹2,500** back." Bad: "Consider watching your food spending."
+- The takeaway names a number and an action. Good: "Cap delivery orders at **15** next month — that's about **${sym}2,500** back." Bad: "Consider watching your food spending."
 - If this month's total is 0, return a single insight with kind "frequency" saying so, plus an encouraging takeaway.
 
-${SHARED_RULES}`;
+${sharedRules(sym)}`;
 
-const SYSTEM_PROMPT_YEAR = `You are the analyst behind Novira's yearly recap. The user just closed out a calendar year. You get a JSON payload covering the whole year — totals, category breakdowns, top merchants, payment-method splits, plus per-month totals in "byMonth" so you can see peaks and seasonality. The "previous" block covers last year — its total, transaction count, category totals, and payment-method splits, but no merchant detail, so never compare merchants across years.
+const yearPrompt = (sym: string) => `You are the analyst behind Novira's yearly recap. The user just closed out a calendar year. You get a JSON payload covering the whole year — totals, category breakdowns, top merchants, payment-method splits, plus per-month totals in "byMonth" so you can see peaks and seasonality. The "previous" block covers last year — its total, transaction count, category totals, and payment-method splits, but no merchant detail, so never compare merchants across years.
 
 Length limits: "headline" ≤14 words, each "detail" ≤20 words, "takeaway" ≤24 words.
 
@@ -134,7 +140,7 @@ Rules:
 - The takeaway names a number and an action, not a platitude.
 - Prefer a month name ("March") over a month key ("2025-03") in "detail".
 
-${SHARED_RULES}`;
+${sharedRules(sym)}`;
 
 const YEAR_RE = /^\d{4}-FY$/;
 export const VALID_PERIOD_RE = /^\d{4}(-\d{2}|-FY)$/;
@@ -176,6 +182,7 @@ function aggregate(txs: TxRow[], userId: string, baseCurrency: string, liveRates
     const byPayment = new Map<string, number>();
     const byMerchant = new Map<string, MerchantAgg>();
     let total = 0;
+    let unconverted = 0;
 
     for (const tx of txs) {
         let myShare = Number(tx.amount);
@@ -210,6 +217,14 @@ function aggregate(txs: TxRow[], userId: string, baseCurrency: string, liveRates
                     converted = myShare * liveRate;
                 } else if (tx.converted_amount && tx.amount) {
                     converted = myShare * (Number(tx.converted_amount) / Number(tx.amount));
+                    // A stored ratio only converts into the base that was current
+                    // when the row was written. Against any other base it is the
+                    // wrong number, and where the two currencies matched it is a
+                    // 1:1 no-op — which is how a rupee total reaches the card
+                    // looking like a plausible dollar one.
+                    if (baseCurr !== targetBase) unconverted += 1;
+                } else {
+                    unconverted += 1;
                 }
             }
         }
@@ -235,6 +250,7 @@ function aggregate(txs: TxRow[], userId: string, baseCurrency: string, liveRates
 
     return {
         total,
+        unconverted,
         categories: Array.from(byCategory.values()).sort((a, b) => b.total - a.total),
         payments: Array.from(byPayment.entries()).map(([name, total]) => ({ name, total })).sort((a, b) => b.total - a.total),
         merchants: Array.from(byMerchant.values()).sort((a, b) => b.total - a.total).slice(0, 10),
@@ -260,6 +276,13 @@ export interface RecapShape {
     transactionCount?: number;
     insights: RecapInsight[];
     takeaway: string;
+    /**
+     * The base currency every figure here was converted into. The model also
+     * writes this currency's symbol into the prose, so a stored recap can only
+     * be rendered in this currency — reformatting the total against whatever
+     * the user prefers today puts a "$" in front of a rupee figure.
+     */
+    currency: string;
 }
 
 export interface RecapAnalyzed {
@@ -346,6 +369,7 @@ export async function generateRecap(
     baseCurrencyInput: string
 ): Promise<{ recap: RecapShape; analyzed: RecapAnalyzed }> {
     const baseCurrency = baseCurrencyInput.toUpperCase();
+    const symbol = currencySymbol(baseCurrency);
     const isYear = isYearKey(period);
     const range = isYear ? yearRange(yearOf(period)) : monthRange(period);
     if (!range) throw new Error('Invalid period');
@@ -395,6 +419,19 @@ export async function generateRecap(
     const currentAgg = aggregate(current, userId, baseCurrency, liveRates);
     const prevAgg = aggregate(previous, userId, baseCurrency, liveRates);
 
+    // Silent until now: with no rate reachable, a foreign row goes into the total
+    // at face value and the result is a wrong-by-an-order-of-magnitude figure that
+    // looks entirely reasonable on the card. Usually a missing EXCHANGERATE_API_KEY.
+    if (currentAgg.unconverted > 0 || prevAgg.unconverted > 0) {
+        console.error('[recap] rows counted without a usable exchange rate', {
+            period,
+            baseCurrency,
+            currentRows: currentAgg.unconverted,
+            previousRows: prevAgg.unconverted,
+            currencies: [...mismatchedCurrencies],
+        });
+    }
+
     const analyzed: RecapAnalyzed = {
         transactions: currentAgg.count,
         categories: currentAgg.categories.length,
@@ -407,6 +444,7 @@ export async function generateRecap(
         const periodWord = isYear ? 'year' : 'month';
         const recap: RecapShape = {
             headline: `Nothing logged this ${periodWord}.`,
+            currency: baseCurrency,
             totalSpent: 0,
             previousTotal: prevAgg.total,
             changePercent: 0,
@@ -446,7 +484,7 @@ export async function generateRecap(
         baseCurrency,
         // The prompt used to name symbols for four currencies and let the model
         // guess the rest. Novira supports 26.
-        currencySymbol: currencySymbol(baseCurrency),
+        currencySymbol: symbol,
         current: {
             totalSpent: Math.round(currentAgg.total * 100) / 100,
             transactionCount: currentAgg.count,
@@ -491,7 +529,7 @@ export async function generateRecap(
             system: [
                 {
                     type: 'text',
-                    text: isYear ? SYSTEM_PROMPT_YEAR : SYSTEM_PROMPT_MONTH,
+                    text: isYear ? yearPrompt(symbol) : monthPrompt(symbol),
                     cache_control: { type: 'ephemeral' }
                 }
             ],
@@ -520,6 +558,7 @@ export async function generateRecap(
     // created a path for the most prominent number on screen to be wrong.
     const recap: RecapShape = {
         ...narrative,
+        currency: baseCurrency,
         totalSpent: Math.round(currentAgg.total * 100) / 100,
         previousTotal: Math.round(prevAgg.total * 100) / 100,
         changePercent: prevAgg.total > 0

@@ -1,4 +1,5 @@
 import 'server-only';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 export const CURRENCY_SYMBOLS: Record<string, string> = {
     USD: '$', EUR: '€', INR: '₹', GBP: '£', CHF: 'Fr', SGD: 'S$', VND: '₫',
@@ -25,4 +26,24 @@ export function fmtMoney(amount: number, ccy: string): string {
     }).format(Math.abs(amount));
     // Minus belongs before the unit ("-$100", not "$-100").
     return `${amount < 0 ? '-' : ''}${currencySymbol(code)}${formatted}`;
+}
+
+/**
+ * The base currency anything server-side must be denominated in. Read from the
+ * profile rather than taken from a request body: a client sends whatever its
+ * preferences provider currently holds, and on a cold mount that is still the
+ * hardcoded default — long enough for a whole recap or snapshot to be built,
+ * and converted, against the wrong currency.
+ */
+export async function profileCurrency(supabase: SupabaseClient, userId: string): Promise<string> {
+    const { data, error } = await supabase
+        .from('profiles')
+        .select('currency')
+        .eq('id', userId)
+        .maybeSingle();
+    // Throws rather than defaulting: a failed lookup that quietly answers "USD"
+    // is the same defect this function exists to remove, except it would also
+    // persist its answer. Callers decide what to do with the uncertainty.
+    if (error) throw new Error(`profile currency lookup failed: ${error.message}`);
+    return ((data?.currency as string | null) || 'USD').toUpperCase();
 }
