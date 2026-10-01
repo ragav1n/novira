@@ -113,6 +113,18 @@ interface RawGroupMember {
     } | null;
 }
 
+// Sent over REST rather than by joining the recipient's topic: a joined sender
+// shares the topic with that user's receiver, and two settles in quick
+// succession re-joined it while the first leave was still in flight.
+function notifySettled(userIds: string[], payload: Record<string, unknown>) {
+    for (const id of userIds) {
+        const ch = supabase.channel(`settlement-notify-${id}`);
+        ch.httpSend('settled', payload)
+            .catch(err => console.error('Settlement broadcast failed:', err))
+            .finally(() => supabase.removeChannel(ch));
+    }
+}
+
 const GroupsContext = createContext<GroupsContextType | undefined>(undefined);
 // Separate context for action-only consumers (dialogs that just need mutators)
 // so they don't re-render whenever data fields change.
@@ -126,7 +138,12 @@ export function GroupsProvider({ children }: { children: React.ReactNode }) {
     const [pendingSplits, setPendingSplits] = useState<Split[]>([]);
     const [loading, setLoading] = useState(true);
 
-    const { userId, convertAmount, currency: userCurrency, isLoading: authLoading } = useUserPreferences();
+    const { userId, convertAmount, currency: userCurrency } = useUserPreferences();
+
+    // The user whose data may be written into state. A fetch started before a
+    // sign-out (or account switch) resolves after it, and must not repopulate
+    // the previous user's groups and debts.
+    const activeUserRef = useRef(userId);
 
     const refreshData = useCallback(async () => {
         if (!userId) {
@@ -190,6 +207,8 @@ export function GroupsProvider({ children }: { children: React.ReactNode }) {
                     .eq('transaction.user_id', userId)
                     .eq('is_paid', false)
             ]);
+
+            if (activeUserRef.current !== userId) return;
 
             // Process Groups
             if (groupsResult.error) throw groupsResult.error;
@@ -312,14 +331,23 @@ export function GroupsProvider({ children }: { children: React.ReactNode }) {
         }
     }, [userId, userCurrency, convertAmount]);
 
+    // refreshData's identity changes with the currency and its converter. The
+    // realtime effect reads it through this ref so it subscribes once per user:
+    // re-running it tore down and re-joined the fixed-topic broadcast channels,
+    // and a re-join racing the previous leave left the receiver dead.
+    const refreshRef = useRef(refreshData);
+    useEffect(() => {
+        refreshRef.current = refreshData;
+    }, [refreshData]);
+
     // Debounced refresh to batch rapid realtime events
     const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const debouncedRefresh = useCallback(() => {
         if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
         debounceTimerRef.current = setTimeout(() => {
-            refreshData();
+            refreshRef.current();
         }, 300);
-    }, [refreshData]);
+    }, []);
 
     // Clean up debounce timer on unmount
     useEffect(() => {
@@ -333,8 +361,23 @@ export function GroupsProvider({ children }: { children: React.ReactNode }) {
     const realtimeGenRef = useRef(0);
 
     useEffect(() => {
-        if (!userId) return;
+        activeUserRef.current = userId;
+        if (!userId) {
+            // Signing out used to leave the previous user's groups, friends and
+            // open splits in state for whoever signs in next to see.
+            realtimeGenRef.current++;
+            if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+            setGroups([]);
+            setFriends([]);
+            setFriendRequests([]);
+            setBalances({ totalOwed: 0, totalOwedToMe: 0 });
+            setPendingSplits([]);
+            setLoading(false);
+            return;
+        }
         const myGen = ++realtimeGenRef.current;
+        setLoading(true);
+        const refreshData = () => refreshRef.current();
         const guarded = (fn: () => void) => () => {
             if (realtimeGenRef.current !== myGen) return;
             fn();
@@ -380,7 +423,7 @@ export function GroupsProvider({ children }: { children: React.ReactNode }) {
 
         const timer = setTimeout(() => {
             if (realtimeGenRef.current !== myGen) return;
-            channel = supabase.channel(`realtime-groups-${userId}-${myGen}`)
+            channel = supabase.channel(`realtime-groups-${userId}-${crypto.randomUUID()}`)
                 // splits: no filter — a split can belong to any user involved in the transaction
                 .on('postgres_changes', { event: '*', schema: 'public', table: 'splits' }, guarded(() => {
                     debouncedRefresh();
@@ -421,7 +464,14 @@ export function GroupsProvider({ children }: { children: React.ReactNode }) {
             clearTimeout(timer);
             if (channel) supabase.removeChannel(channel);
         };
-    }, [userId, userCurrency, convertAmount, refreshData, debouncedRefresh]);
+    }, [userId, debouncedRefresh]);
+
+    // Balances are converted inside refreshData, and the subscription above no
+    // longer re-runs on currency changes — so recompute when the base currency
+    // or the loaded rates change (the first refresh can predate both).
+    useEffect(() => {
+        if (userId) debouncedRefresh();
+    }, [userId, userCurrency, convertAmount, debouncedRefresh]);
 
     // ... (keep createGroup, addFriendByEmail, etc. methods, but remove getSession calls if they use userId from closure or check context, though some methods might still need separate checks or can use userId from context safely)
     // Actually, for helper methods called by UI, we can use `userId` from context.
@@ -552,6 +602,9 @@ export function GroupsProvider({ children }: { children: React.ReactNode }) {
 
     const leaveGroup = useCallback(async (groupId: string) => {
         if (!userId) throw new Error('Not authenticated');
+        if (groups.find(g => g.id === groupId)?.created_by === userId) {
+            throw new Error("You created this group — delete it from group settings instead");
+        }
 
         const { error } = await supabase
             .from('group_members')
@@ -561,7 +614,7 @@ export function GroupsProvider({ children }: { children: React.ReactNode }) {
 
         if (error) throw error;
         refreshData();
-    }, [userId, refreshData]);
+    }, [userId, groups, refreshData]);
 
     const removeFriend = useCallback(async (friendshipId: string) => {
         const { error } = await supabase
@@ -612,12 +665,34 @@ export function GroupsProvider({ children }: { children: React.ReactNode }) {
         refreshData();
     }, [userId, refreshData]);
 
+    // Whoever is on the other side of each split — the creditor when I owe, the
+    // debtor when I'm marking it received. Read from the splits themselves so a
+    // multi-person "Settle all" notifies every creditor, not none.
+    // Read through a ref so the settle actions keep a stable identity — the
+    // actions context exists so dialogs don't re-render on every data change.
+    const pendingSplitsRef = useRef(pendingSplits);
+    useEffect(() => {
+        pendingSplitsRef.current = pendingSplits;
+    }, [pendingSplits]);
+    const counterpartiesOf = useCallback((splitIds: string[], fallback?: string) => {
+        const ids = new Set<string>();
+        for (const split of pendingSplitsRef.current) {
+            if (!splitIds.includes(split.id)) continue;
+            const other = split.user_id === userId ? split.transaction?.user_id : split.user_id;
+            if (other) ids.add(other);
+        }
+        if (ids.size === 0 && fallback) ids.add(fallback);
+        return [...ids];
+    }, [userId]);
+
     const settleSplit = useCallback(async (splitId: string, creditorId?: string) => {
         if (!userId) throw new Error('Not authenticated');
 
         const { error } = await supabase.rpc('settle_split', { split_id: splitId });
 
         if (error) throw error;
+
+        const counterparties = counterpartiesOf([splitId], creditorId);
 
         // Optimistically remove settled split so UI updates instantly
         setPendingSplits(prev => prev.filter(s => s.id !== splitId));
@@ -628,30 +703,11 @@ export function GroupsProvider({ children }: { children: React.ReactNode }) {
         sessionStorage.setItem('novira_expense_added', '1');
         window.dispatchEvent(new Event('novira:expense-added'));
 
-        // Notify the creditor's screen via broadcast so they don't need to refresh
-        if (creditorId) {
-            const notifyChannel = supabase.channel(`settlement-notify-${creditorId}`);
-            let disposed = false;
-            const dispose = () => {
-                if (disposed) return;
-                disposed = true;
-                clearTimeout(safety);
-                supabase.removeChannel(notifyChannel);
-            };
-            const safety = setTimeout(dispose, 5000);
-            notifyChannel.subscribe((status) => {
-                if (status === 'SUBSCRIBED') {
-                    notifyChannel
-                        .send({ type: 'broadcast', event: 'settled', payload: { splitId } })
-                        .finally(dispose);
-                } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
-                    dispose();
-                }
-            });
-        }
+        // Notify the other party's screen via broadcast so they don't need to refresh
+        notifySettled(counterparties, { splitId });
 
         return true;
-    }, [userId, refreshData]);
+    }, [userId, refreshData, counterpartiesOf]);
 
     const settleSplitsBatch = useCallback(async (splitIds: string[], creditorId?: string) => {
         if (!userId) throw new Error('Not authenticated');
@@ -689,36 +745,22 @@ export function GroupsProvider({ children }: { children: React.ReactNode }) {
             }
         }
 
+        // The fallback stops at the first failure, so only the ones it got through
+        // are settled — the rest must stay on screen for the retry.
+        const settledIds = splitIds.slice(0, settled);
+        const counterparties = counterpartiesOf(settledIds, creditorId);
+
         // Optimistically remove all settled splits
-        setPendingSplits(prev => prev.filter(s => !splitIds.includes(s.id)));
+        setPendingSplits(prev => prev.filter(s => !settledIds.includes(s.id)));
         refreshData();
 
         sessionStorage.setItem('novira_expense_added', '1');
         window.dispatchEvent(new Event('novira:expense-added'));
 
-        if (creditorId) {
-            const notifyChannel = supabase.channel(`settlement-notify-${creditorId}`);
-            let disposed = false;
-            const dispose = () => {
-                if (disposed) return;
-                disposed = true;
-                clearTimeout(safety);
-                supabase.removeChannel(notifyChannel);
-            };
-            const safety = setTimeout(dispose, 5000);
-            notifyChannel.subscribe((status) => {
-                if (status === 'SUBSCRIBED') {
-                    notifyChannel
-                        .send({ type: 'broadcast', event: 'settled', payload: { splitIds } })
-                        .finally(dispose);
-                } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
-                    dispose();
-                }
-            });
-        }
+        notifySettled(counterparties, { splitIds: settledIds });
 
         return { settled, total: splitIds.length };
-    }, [userId, refreshData]);
+    }, [userId, refreshData, counterpartiesOf]);
 
     const computedSimplifiedDebts = useMemo(() => {
         if (!userId || pendingSplits.length === 0) return [];

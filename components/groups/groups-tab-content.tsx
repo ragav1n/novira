@@ -159,6 +159,18 @@ export function GroupsTabContent({
                         onOpenDetail={() => setDetailGroupId(group.id)}
                         onOpenSettings={() => setSettingsGroupId(group.id)}
                         onLeave={() => {
+                            // Only the creator can manage members or delete the group,
+                            // so leaving would strand everyone else in it.
+                            if (group.created_by === currentUserId) {
+                                confirm({
+                                    title: `You created ${group.name}`,
+                                    description: "A group can't be left by its creator — no one else could manage its members or delete it. Delete it from group settings instead.",
+                                    confirmLabel: 'Open settings',
+                                    destructive: false,
+                                    onConfirm: () => setSettingsGroupId(group.id),
+                                });
+                                return;
+                            }
                             confirm({
                                 title: `Leave ${group.name}?`,
                                 description: "You'll lose access to this group's expenses and balances. Any unsettled debts stay recorded — rejoining requires a new invite.",

@@ -37,9 +37,9 @@ describe('simplifyDebts', () => {
         expect(payments[0].toName).toBe('Friend');
     });
 
-    it('simplifies transitive debts (A→B→C becomes A→C)', () => {
-        // A owes B 500, B owes C 500
-        // Net: A = -500, B = 0, C = +500 → A pays C directly
+    it('does not chain debts across people who never split together', () => {
+        // A owes B 500, B owes C 500. A and C share no split, so A→C would be
+        // unsettleable — each pair keeps its own payment.
         const splits = [
             {
                 id: 'split-1',
@@ -55,13 +55,36 @@ describe('simplifyDebts', () => {
             },
         ];
 
-        const payments = simplifyDebts(splits, 'user-a', noConvert, 'INR');
+        const payments = simplifyDebts(splits, 'user-b', noConvert, 'INR');
+        expect(payments).toHaveLength(2);
+        expect(payments.find(p => p.from === 'user-a')).toMatchObject({ to: 'user-b', amount: 500, splitIds: ['split-1'] });
+        expect(payments.find(p => p.from === 'user-b')).toMatchObject({ to: 'user-c', amount: 500, splitIds: ['split-2'] });
+    });
+
+    it('nets mutual debts within a pair and covers both directions', () => {
+        const splits = [
+            { id: 'split-1', user_id: 'me', amount: 100, transaction: { user_id: 'friend', currency: 'INR' } },
+            { id: 'split-2', user_id: 'friend', amount: 30, transaction: { user_id: 'me', currency: 'INR' } },
+        ];
+
+        const payments = simplifyDebts(splits, 'me', noConvert, 'INR');
         expect(payments).toHaveLength(1);
-        expect(payments[0].from).toBe('user-a');
-        expect(payments[0].to).toBe('user-c');
-        expect(payments[0].amount).toBe(500);
-        // transitive case — no direct edge, splitIds should be empty
-        expect(payments[0].splitIds).toEqual([]);
+        expect(payments[0]).toMatchObject({ from: 'me', to: 'friend', amount: 70 });
+        expect(payments[0].splitIds.sort()).toEqual(['split-1', 'split-2']);
+    });
+
+    it('never shows a payment smaller than the splits it would settle', () => {
+        // friend owes me 100, I owe other 60. Global netting showed
+        // "friend → me 40" while settling friend's whole 100 split.
+        const splits = [
+            { id: 'split-1', user_id: 'friend', amount: 100, transaction: { user_id: 'me', currency: 'INR' } },
+            { id: 'split-2', user_id: 'me', amount: 60, transaction: { user_id: 'other', currency: 'INR' } },
+        ];
+
+        const payments = simplifyDebts(splits, 'me', noConvert, 'INR');
+        expect(payments).toHaveLength(2);
+        expect(payments.find(p => p.splitIds.includes('split-1'))).toMatchObject({ from: 'friend', to: 'me', amount: 100 });
+        expect(payments.find(p => p.splitIds.includes('split-2'))).toMatchObject({ from: 'me', to: 'other', amount: 60 });
     });
 
     it('handles multiple debtors to one creditor', () => {

@@ -135,6 +135,8 @@ function buildRecurringRecord(
     placeLng: number | null,
     tags: string[],
     isIncome: boolean,
+    accountId: string | null,
+    customSplits: SplitRecord[] | undefined,
 ): RecurringRecord {
     const intendedDay = date.getDate();
     const nextDate = nextOccurrence(date, frequency);
@@ -146,6 +148,7 @@ function buildRecurringRecord(
         category: selectedCategory,
         currency: txCurrency,
         group_id: selectedGroupId,
+        account_id: accountId,
         payment_method: paymentMethod,
         frequency,
         next_occurrence: format(nextDate, 'yyyy-MM-dd'),
@@ -155,6 +158,9 @@ function buildRecurringRecord(
         metadata: {
             is_split: isSplitEnabled && !isIncome,
             friend_ids: isIncome ? [] : selectedFriendIds,
+            // Without these the processor re-split every occurrence evenly,
+            // whatever amounts the user typed in.
+            ...(customSplits?.length ? { split_amounts: customSplits.map(s => ({ user_id: s.user_id, amount: s.amount })) } : {}),
             notes,
             bucket_id: selectedBucketId,
             ...(tags.length ? { tags } : {}),
@@ -209,18 +215,26 @@ export function useExpenseSubmission() {
                 return;
             }
 
+            // The split section writes its group choice into selectedGroupId, so
+            // it is the split target as well as the workspace. Once splitting is
+            // off (or the row is income, which never splits, or nobody is picked),
+            // a group picked there is a leftover, not where the user meant to file
+            // the row.
+            const splitting = isSplitEnabled && !isIncome && (!!selectedGroupId || selectedFriendIds.length > 0);
+            const groupId = splitting ? selectedGroupId : (activeWorkspaceId ?? null);
+
             // Auto-append active-trip tag when the transaction date falls within
             // an active trip. The cached `activeTrip` is scoped to the current
             // workspace, so only trust it when this transaction is being filed
             // there AND the date is today; otherwise re-fetch with the right scope.
             const isToday = date && format(date, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
-            const sameWorkspace = (selectedGroupId ?? null) === (activeWorkspaceId ?? null);
+            const sameWorkspace = (groupId ?? null) === (activeWorkspaceId ?? null);
             // Trip resolution and exchange-rate lookup are independent — run them
             // in parallel. Both are instant in the common case (same-currency rate
             // is 1, cached rates hit localStorage, today's trip is already cached).
             const tripPromise = isToday && sameWorkspace
                 ? Promise.resolve(activeTrip?.auto_tag_enabled ? activeTrip : null)
-                : TripService.getActiveTripForDate(userId, date!, selectedGroupId);
+                : TripService.getActiveTripForDate(userId, date!, groupId);
             const [exchangeRate, tripForDate] = await Promise.all([
                 TransactionService.getExchangeRate(txCurrency, currency, date!),
                 tripPromise,
@@ -245,7 +259,7 @@ export function useExpenseSubmission() {
                 payment_method: paymentMethod,
                 notes,
                 currency: txCurrency,
-                group_id: selectedGroupId,
+                group_id: groupId,
                 bucket_id: selectedBucketId,
                 account_id: selectedAccountId ?? null,
                 exchange_rate: exchangeRate,
@@ -260,9 +274,9 @@ export function useExpenseSubmission() {
             };
 
             // Income can't be split — they're personal earnings, not shared expenses.
-            const splitResult: { records?: SplitRecord[]; error?: string } = isIncome
+            const splitResult: { records?: SplitRecord[]; error?: string } = !splitting
                 ? { records: undefined }
-                : await buildSplitRecords(amount, userId, isSplitEnabled, selectedGroupId, selectedFriendIds, splitMode, customAmounts);
+                : await buildSplitRecords(amount, userId, isSplitEnabled, groupId, selectedFriendIds, splitMode, customAmounts);
             if (splitResult.error) {
                 toast.error(splitResult.error);
                 inFlightRef.current = false;
@@ -271,7 +285,7 @@ export function useExpenseSubmission() {
             }
 
             const recurringRecordToInsert = isRecurring
-                ? buildRecurringRecord(userId, description, amount, selectedCategory, txCurrency, selectedGroupId, paymentMethod, frequency, date!, excludeFromAllowance, isSplitEnabled, selectedFriendIds, notes, selectedBucketId, placeName, placeAddress, placeLat, placeLng, cleanTags, isIncome)
+                ? buildRecurringRecord(userId, description, amount, selectedCategory, txCurrency, groupId, paymentMethod, frequency, date!, excludeFromAllowance, splitting, groupId ? [] : selectedFriendIds, notes, selectedBucketId, placeName, placeAddress, placeLat, placeLng, cleanTags, isIncome, selectedAccountId ?? null, splitMode === 'custom' && !groupId ? splitResult.records : undefined)
                 : null;
 
             // Queue the write and navigate immediately. The atomic RPC, receipt

@@ -92,6 +92,7 @@ export type RecurringRecord = {
     category?: string;
     currency?: string;
     group_id?: string | null;
+    account_id?: string | null;
     payment_method?: string;
     intended_day?: number;
     exclude_from_allowance?: boolean;

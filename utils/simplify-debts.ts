@@ -1,10 +1,13 @@
 /**
  * Smart Settlement / Simplify Debts Algorithm
- * 
- * Given a list of pending splits, computes the minimum set of payments
- * needed to settle all debts between users.
- * 
- * Example: A owes B ₹500, B owes C ₹500 → A pays C ₹500 directly (1 payment instead of 2)
+ *
+ * Given a list of pending splits, nets the debts within each pair of people into
+ * one payment: A owes B ₹500 and B owes A ₹200 → A pays B ₹300.
+ *
+ * Netting stops at the pair. Chaining A→B→C into A→C would ask A to pay someone
+ * they may never have split with, and no split exists between them for the
+ * settle button to mark — while the A→B split it *would* touch is worth more
+ * than the payment shown.
  */
 
 export interface SimplifiedPayment {
@@ -18,7 +21,7 @@ export interface SimplifiedPayment {
     toName: string;
     /** Amount in the user's currency */
     amount: number;
-    /** IDs of the underlying splits that this payment covers */
+    /** IDs of the underlying splits (both directions) that this payment settles */
     splitIds: string[];
 }
 
@@ -35,13 +38,13 @@ interface SplitInput {
 }
 
 /**
- * Computes simplified debts from pending splits.
- * 
+ * Computes one net payment per pair of people from pending splits.
+ *
  * @param pendingSplits - All pending (unpaid) splits visible to the current user
  * @param currentUserId - The current user's ID
  * @param convertAmount - Currency conversion function (amount, fromCurrency, toCurrency?) => number
  * @param userCurrency - The user's preferred currency code
- * @returns Array of SimplifiedPayment representing the minimum payments needed
+ * @returns Array of SimplifiedPayment, one per pair with a non-zero net balance
  */
 export function simplifyDebts(
     pendingSplits: SplitInput[],
@@ -51,12 +54,9 @@ export function simplifyDebts(
 ): SimplifiedPayment[] {
     if (pendingSplits.length === 0) return [];
 
-    // Step 1: Build net balances between each pair of (debtor, creditor)
-    // netBalance[personId] = positive means they are OWED money, negative means they OWE money
-    const netBalance: Record<string, number> = {};
     const nameMap: Record<string, string> = {};
-    // Track which splits contribute to each debtor→creditor edge
-    const edgeSplits: Record<string, string[]> = {}; // "debtorId→creditorId" => splitIds
+    // Keyed by the pair sorted lexically; `net` > 0 means `a` owes `b`.
+    const pairs = new Map<string, { a: string; b: string; net: number; splitIds: string[] }>();
 
     for (const split of pendingSplits) {
         const debtorId = split.user_id;
@@ -69,17 +69,8 @@ export function simplifyDebts(
             ? convertAmount(split.amount, splitCurrency, userCurrency)
             : split.amount;
 
-        // Debtor owes → negative balance, Creditor is owed → positive balance
-        netBalance[debtorId] = (netBalance[debtorId] || 0) - amountInUserCurrency;
-        netBalance[creditorId] = (netBalance[creditorId] || 0) + amountInUserCurrency;
-
-        // Track names
-        if (debtorId === currentUserId) {
-            nameMap[debtorId] = 'You';
-        }
-        if (creditorId === currentUserId) {
-            nameMap[creditorId] = 'You';
-        }
+        if (debtorId === currentUserId) nameMap[debtorId] = 'You';
+        if (creditorId === currentUserId) nameMap[creditorId] = 'You';
         if (split.transaction?.payer_name) {
             // payer_name in pendingSplits context:
             // - If I'm the creditor (transaction owner), payer_name = debtor's name
@@ -91,73 +82,32 @@ export function simplifyDebts(
             }
         }
 
-        // Track split IDs per edge
-        const edgeKey = `${debtorId}→${creditorId}`;
-        if (!edgeSplits[edgeKey]) edgeSplits[edgeKey] = [];
-        edgeSplits[edgeKey].push(split.id);
-    }
-
-    // Step 2: Greedy algorithm — pair biggest creditor with biggest debtor
-    const people = Object.keys(netBalance).filter(id => Math.abs(netBalance[id]) > 0.01);
-
-    // Separate into creditors (positive balance) and debtors (negative balance)
-    const creditors: { id: string; amount: number }[] = [];
-    const debtors: { id: string; amount: number }[] = [];
-
-    for (const id of people) {
-        const bal = netBalance[id];
-        if (bal > 0.01) {
-            creditors.push({ id, amount: bal });
-        } else if (bal < -0.01) {
-            debtors.push({ id, amount: -bal }); // store as positive for easier math
+        const [a, b] = debtorId < creditorId ? [debtorId, creditorId] : [creditorId, debtorId];
+        const key = `${a}|${b}`;
+        let pair = pairs.get(key);
+        if (!pair) {
+            pair = { a, b, net: 0, splitIds: [] };
+            pairs.set(key, pair);
         }
+        pair.net += debtorId === a ? amountInUserCurrency : -amountInUserCurrency;
+        pair.splitIds.push(split.id);
     }
-
-    // Sort descending by amount
-    creditors.sort((a, b) => b.amount - a.amount);
-    debtors.sort((a, b) => b.amount - a.amount);
 
     const payments: SimplifiedPayment[] = [];
-    let ci = 0;
-    let di = 0;
-
-    while (ci < creditors.length && di < debtors.length) {
-        const creditor = creditors[ci];
-        const debtor = debtors[di];
-        const settleAmount = Math.min(creditor.amount, debtor.amount);
-
-        if (settleAmount > 0.01) {
-            // Include splits from both directions between this pair.
-            // - Direct edge (debtor→creditor): splits the debtor owes the creditor
-            // - Reverse edge (creditor→debtor): splits the creditor owes the debtor (mutual debts)
-            // Both must be settled when the net payment is made, otherwise the reverse debt lingers.
-            // In transitive cases (A→B→C with no direct A→C edge) both edges will be empty,
-            // which is correct: the payment is informational and not directly settleable.
-            const directEdge = `${debtor.id}→${creditor.id}`;
-            const reverseEdge = `${creditor.id}→${debtor.id}`;
-            const relatedSplitIds = [
-                ...(edgeSplits[directEdge] || []),
-                ...(edgeSplits[reverseEdge] || []),
-            ];
-
-            payments.push({
-                from: debtor.id,
-                fromName: nameMap[debtor.id] || 'Unknown',
-                to: creditor.id,
-                toName: nameMap[creditor.id] || 'Unknown',
-                amount: Math.round(settleAmount * 100) / 100,
-                splitIds: relatedSplitIds,
-            });
-        }
-
-        creditor.amount -= settleAmount;
-        debtor.amount -= settleAmount;
-
-        if (creditor.amount < 0.01) ci++;
-        if (debtor.amount < 0.01) di++;
+    for (const { a, b, net, splitIds } of pairs.values()) {
+        if (Math.abs(net) <= 0.01) continue;
+        const [from, to] = net > 0 ? [a, b] : [b, a];
+        payments.push({
+            from,
+            fromName: nameMap[from] || 'Unknown',
+            to,
+            toName: nameMap[to] || 'Unknown',
+            amount: Math.round(Math.abs(net) * 100) / 100,
+            splitIds,
+        });
     }
 
-    return payments;
+    return payments.sort((x, y) => y.amount - x.amount);
 }
 
 /**

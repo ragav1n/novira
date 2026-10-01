@@ -86,7 +86,7 @@ export function SettlementsTabContent({
 
     return (
         <div className="space-y-5">
-            {simplifiedDebts.length > 0 && pendingSplits.length >= 2 && (
+            {simplifiedDebts.length > 0 && simplifiedDebts.length < pendingSplits.length && (
                 <section>
                     <div className="flex items-baseline justify-between mb-2 px-1">
                         <h3 className="text-eyebrow uppercase text-amber-400 inline-flex items-center gap-1.5">
@@ -98,7 +98,7 @@ export function SettlementsTabContent({
                         </span>
                     </div>
                     <p className="text-meta text-muted-foreground px-1 mb-3 leading-relaxed">
-                        Fewer transfers, same outcome. We combined splits across this network.
+                        One payment per person. Splits you owe each other cancel out.
                     </p>
                     <ul className="space-y-1.5">
                         {simplifiedDebts.map((payment, index) => {
