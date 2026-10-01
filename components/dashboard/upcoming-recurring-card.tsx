@@ -44,8 +44,9 @@ export const UpcomingRecurringCard = React.memo(function UpcomingRecurringCard({
 
     const totalThisMonth = items.reduce((sum, it) => {
         const txCurr = (it.currency || 'USD').toUpperCase();
-        if (txCurr === displayCurrency) return sum + it.amount;
-        return sum + convertAmount(it.amount, txCurr, displayCurrency);
+        const due = it.amount * it.occurrences;
+        if (txCurr === displayCurrency) return sum + due;
+        return sum + convertAmount(due, txCurr, displayCurrency);
     }, 0);
 
     // Budget context: hidden in bucket focus (different semantics) and when
@@ -127,6 +128,7 @@ export const UpcomingRecurringCard = React.memo(function UpcomingRecurringCard({
                                 <p className="text-sm font-bold truncate">{it.description}</p>
                                 <p className="text-meta text-muted-foreground font-medium">
                                     {dueLabel(it.daysUntil)}
+                                    {it.occurrences > 1 && ` · ×${it.occurrences} this month`}
                                 </p>
                             </div>
                             <div className="text-right shrink-0">

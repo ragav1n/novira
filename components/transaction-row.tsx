@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils';
 import { motion, useMotionValue, animate, useReducedMotion } from 'framer-motion';
 import { ROW, rowVariants } from '@/lib/motion';
 import { getCategoryLabel, getIconForCategory } from '@/lib/categories';
+import { toast } from '@/utils/haptics';
 
 interface TransactionRowProps {
   tx: Transaction;
@@ -70,6 +71,19 @@ const OFFSCREEN_STYLE: React.CSSProperties = {
   contentVisibility: 'auto',
   containIntrinsicSize: '0 64px',
 };
+
+/**
+ * Whether a row can be edited, deleted or bulk-selected, given `canEdit`.
+ *
+ * Shared with the list's "Select all" so the two can't disagree. A split row is
+ * locked by RLS once shared; a settlement is a record of money moving; a pending
+ * row only exists in the offline queue, so an update by its id matches nothing on
+ * the server. Transfers are deletable (both legs go together) but never editable —
+ * changing one leg's amount would leave the pair disagreeing.
+ */
+export function isRowMutable(tx: Transaction, canEdit: boolean): boolean {
+  return canEdit && !tx.is_settlement && !(tx.splits && tx.splits.length > 0) && !tx._pending && !tx._failed;
+}
 
 function CategoryIcon({ icon, color }: { icon: React.ReactNode; color: string }) {
   if (!React.isValidElement(icon)) return <>{icon}</>;
@@ -199,7 +213,9 @@ export const TransactionRow = memo(function TransactionRow({
   // off-screen rows in long lists don't pay the drag/overlay cost.
   // The `!isSettlement && !hasSplits` terms mirror the dropdown's Edit/Delete gate —
   // otherwise swiping such a row reveals a Delete the menu deliberately hides.
-  const swipeEnabled = canEdit && !isSettlement && !hasSplits && !isPending && !isFailed && isNear && !selectable;
+  const mutable = isRowMutable(tx, canEdit);
+  const isTransfer = !!tx.is_transfer;
+  const swipeEnabled = mutable && !isTransfer && isNear && !selectable;
 
   useEffect(() => {
     const el = rowRef.current;
@@ -301,7 +317,9 @@ export const TransactionRow = memo(function TransactionRow({
   const bucketChip = renderBucketChip ? renderBucketChip(tx) : null;
 
   const paidByLabel = tx.user_id === userId ? 'You' : (tx.profile?.full_name?.split(' ')[0] ?? 'Other');
-  const canBulkSelect = selectable && !isPending && !isFailed;
+  // Transfers stay out of bulk actions: recategorising or moving one leg would split
+  // the pair, and bulk delete removes rows by id, not by pair.
+  const canBulkSelect = selectable && mutable && !isTransfer;
 
   return (
     <motion.div
@@ -561,7 +579,9 @@ export const TransactionRow = memo(function TransactionRow({
                     it, and the one you forgot is usually last month's. Ownership
                     still matters — storage RLS writes into auth.uid()'s folder, so
                     a receipt can only go on your own row. */}
-                {onAttachReceipt && tx.user_id === userId && (
+                {/* Not on a pending row: its id is the queue id, which no server row
+                    has, so the upload would land with nothing to point at it. */}
+                {onAttachReceipt && tx.user_id === userId && !isPending && !isFailed && (
                   <DropdownMenuItem
                     delayDuration={0}
                     onClick={(e) => { e.stopPropagation(); onAttachReceipt(tx); }}
@@ -575,7 +595,7 @@ export const TransactionRow = memo(function TransactionRow({
                     fragment: DropdownMenuContent clones every child to inject a
                     `--m3-stagger` style, and cloning a Fragment with `style` logs
                     "Invalid prop `style` supplied to React.Fragment" on every open. */}
-                {canEdit && !isSettlement && !hasSplits && (
+                {mutable && !isTransfer && (
                   <DropdownMenuItem
                     delayDuration={0}
                     onClick={(e) => { e.stopPropagation(); onEdit(tx); }}
@@ -585,14 +605,33 @@ export const TransactionRow = memo(function TransactionRow({
                     Edit
                   </DropdownMenuItem>
                 )}
-                {canEdit && !isSettlement && !hasSplits && (
+                {/* A pending row can still be deleted — that discards the queue entry,
+                    and nothing has been shared yet even if it carries splits. */}
+                {(mutable || (canEdit && !isSettlement && (isPending || isFailed))) && (
                   <DropdownMenuItem
                     delayDuration={0}
                     onClick={(e) => { e.stopPropagation(); onDelete(tx); }}
                     className="rounded-lg cursor-pointer text-destructive focus:text-destructive gap-2 text-body"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
-                    Delete
+                    {isTransfer ? 'Delete transfer' : 'Delete'}
+                  </DropdownMenuItem>
+                )}
+                {/* The payer used to find Edit and Delete simply missing, with no
+                    reason given. */}
+                {hasSplits && !isSettlement && !isPending && !isFailed && tx.user_id === userId && (
+                  <DropdownMenuItem
+                    delayDuration={0}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toast.info("Split expenses can't be edited or deleted", {
+                        description: "Other people's balances depend on it. Settle up in Groups instead.",
+                      });
+                    }}
+                    className="rounded-lg cursor-pointer gap-2 text-body text-white/50"
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                    Why can&apos;t I edit?
                   </DropdownMenuItem>
                 )}
               </DropdownMenuContent>

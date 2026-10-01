@@ -2,6 +2,8 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { applyWorkspaceFilter } from '@/lib/workspace-filter';
 import { format, parseISO, differenceInCalendarDays, endOfMonth } from 'date-fns';
+import { nextOccurrence, type RecurrenceFrequency } from '@/lib/recurrence';
+
 type UpcomingRow = {
     id: string;
     description: string;
@@ -9,6 +11,8 @@ type UpcomingRow = {
     currency: string;
     category: string;
     next_occurrence: string;
+    frequency: RecurrenceFrequency;
+    intended_day?: number | null;
     is_income?: boolean;
 };
 
@@ -20,7 +24,29 @@ export type UpcomingCharge = {
     category: string;
     nextOccurrence: string;
     daysUntil: number;
+    /** How many times this template posts between today and the horizon. One row
+     *  per template, but a weekly bill hits four times — `amount` is per posting. */
+    occurrences: number;
 };
+
+/** Postings from `first` through `horizon` inclusive. Monthly steps from the
+ *  anchor's intended day so a 31st bill isn't clamped once and stuck on the 28th. */
+function countOccurrences(first: Date, horizon: Date, frequency: RecurrenceFrequency, intendedDay?: number | null): number {
+    let count = 0;
+    let cursor = first;
+    while (cursor <= horizon && count < 400) {
+        count++;
+        if (frequency === 'monthly' && intendedDay) {
+            const y = cursor.getFullYear();
+            const m = cursor.getMonth() + 1;
+            const last = new Date(y, m + 1, 0).getDate();
+            cursor = new Date(y, m, Math.min(intendedDay, last));
+        } else {
+            cursor = nextOccurrence(cursor, frequency);
+        }
+    }
+    return Math.max(1, count);
+}
 
 export function useUpcomingRecurring(
     userId: string | null,
@@ -51,7 +77,7 @@ export function useUpcomingRecurring(
             // the rows we actually keep. Rows predating the column are NULL.
             const baseQuery = supabase
                 .from('recurring_templates')
-                .select('id, description, amount, currency, category, next_occurrence, is_active, is_income, group_id, user_id')
+                .select('id, description, amount, currency, category, next_occurrence, frequency, intended_day, is_active, is_income, group_id, user_id')
                 .eq('is_active', true)
                 .or('is_income.is.null,is_income.eq.false')
                 .gte('next_occurrence', todayStr)
@@ -64,6 +90,7 @@ export function useUpcomingRecurring(
             if (fetchGenRef.current !== myGen) return;
             if (error) throw error;
 
+            const horizon = parseISO(horizonStr);
             const mapped: UpcomingCharge[] = ((data ?? []) as UpcomingRow[])
                 .filter(t => !t.is_income)
                 .map(t => ({
@@ -74,6 +101,7 @@ export function useUpcomingRecurring(
                     category: t.category,
                     nextOccurrence: t.next_occurrence,
                     daysUntil: Math.max(0, differenceInCalendarDays(parseISO(t.next_occurrence), today)),
+                    occurrences: countOccurrences(parseISO(t.next_occurrence), horizon, t.frequency, t.intended_day),
                 }));
             setItems(mapped);
         } catch (e) {

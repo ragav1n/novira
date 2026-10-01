@@ -3,7 +3,7 @@ import { useRouter } from 'next/navigation';
 import { Receipt, CheckSquare } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ROW } from '@/lib/motion';
-import { TransactionRow } from '@/components/transaction-row';
+import { TransactionRow, isRowMutable } from '@/components/transaction-row';
 import { BulkActionBar } from '@/components/bulk-action-bar';
 import { CATEGORY_COLORS } from '@/lib/categories';
 import type { Transaction } from '@/types/transaction';
@@ -53,7 +53,7 @@ export const TransactionList = React.memo(function TransactionList({
   const bulkAvailable = !!onBulkDelete && !!onBulkUpdate;
 
   const eligibleForSelect = useMemo(
-    () => transactions.filter(t => canEditTransaction(t) && !t._pending && !t._failed),
+    () => transactions.filter(t => isRowMutable(t, canEditTransaction(t)) && !t.is_transfer),
     [transactions, canEditTransaction],
   );
 

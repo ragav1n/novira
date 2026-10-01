@@ -99,7 +99,7 @@ export function DashboardView() {
         [userName, avatarUrl]
     );
     const {
-        transactions, loading, hasMore, loadingMore, loadMore,
+        transactions, statsTransactions, loading, hasMore, loadingMore, loadMore,
         editingTransaction, setEditingTransaction,
         isEditOpen, setIsEditOpen, selectedAuditTx, setSelectedAuditTx,
         auditLogs, loadingAudit, handleDeleteTransaction, handleUpdateTransaction,
@@ -267,7 +267,8 @@ export function DashboardView() {
         remaining, progress, spendingData, displayTransactions, recentFeed, runRateData, cashflowForecast,
         todaySpent, lastMonthComparison, lastMonthCarryover, incomeThisMonth, topCategoryMover, weekdaySpending
     } = useDashboardStats({
-        transactions, 
+        transactions,
+        statsTransactions,
         userId: activeWorkspaceId ? null : userId, // if workspace, null so we get all workspace txs
         isBucketFocused, effectiveFocus: dashboardFocus,
         bucketCurrency, currency, convertAmount, monthlyBudget: currentWorkspaceBudget, buckets
@@ -280,8 +281,9 @@ export function DashboardView() {
         if (isBucketFocused || !runRateData || displayBudget <= 0) return null;
         const committedUpcoming = upcomingRecurring.reduce((sum, it) => {
             const txCurr = (it.currency || 'USD').toUpperCase();
-            if (txCurr === bucketCurrency) return sum + it.amount;
-            return sum + convertAmount(it.amount, txCurr, bucketCurrency);
+            const due = it.amount * it.occurrences;
+            if (txCurr === bucketCurrency) return sum + due;
+            return sum + convertAmount(due, txCurr, bucketCurrency);
         }, 0);
         return computeSafeToSpend({
             remaining,

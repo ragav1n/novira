@@ -20,7 +20,7 @@ import { TransactionService } from './services/transaction-service';
 import { invalidateTransactionCaches } from './sw-cache';
 import { getOfflineReceipt, saveOfflineReceipt, deleteOfflineReceipt } from './offline-receipt-store';
 import { uploadReceipt, deleteReceipt } from './receipt-storage';
-import { classifyAddError, classifyPgError } from './sync-error-classify';
+import { classifyAddError, classifyPgError, RPC_REJECTED } from './sync-error-classify';
 import { getErrorMessage } from './error-utils';
 
 const LEGACY_QUEUE_KEY = 'novira-offline-queue';
@@ -370,6 +370,19 @@ async function handOffReceiptForRetry(queueId: string, txId: string, ownerId: st
     }
 }
 
+/**
+ * A receipt_path update that matched no row. Retrying can't help — the row is gone,
+ * or RLS no longer lets the owner update it — so it is tagged permanent and reaches
+ * the failed list with a reason instead of burning five retries.
+ */
+function receiptNotAttachable(txId: string): Error {
+    console.error('[sync-manager] receipt_path update matched no row', txId);
+    return Object.assign(
+        new Error("Couldn't attach the receipt — the expense was deleted or can no longer be changed"),
+        { code: RPC_REJECTED },
+    );
+}
+
 async function runSyncLoop(): Promise<void> {
     let queue = await readQueue();
     const now = Date.now();
@@ -424,9 +437,24 @@ async function runSyncLoop(): Promise<void> {
     const total = pendingItems.length;
 
     try {
-        for (const item of pendingItems) {
-            // Transition to Syncing
-            queue = await mutateQueue(q => startSyncing(q, item.id));
+        for (const snapshot of pendingItems) {
+            // Claim the item against fresh state, not the snapshot taken at the top of
+            // the pass. The user can discard a pending add while an earlier item is in
+            // flight; `startSyncing` on the missing id was a no-op, and the loop then
+            // posted the discarded expense from its stale copy — the row came back.
+            // A newer UPDATE patch can also have been merged into the item since.
+            let claimed: SyncPayload | undefined;
+            queue = await mutateQueue(q => {
+                const live = q.find(i => i.id === snapshot.id);
+                if (!live || live.status !== 'pending') return q;
+                claimed = live;
+                return startSyncing(q, snapshot.id);
+            });
+            if (!claimed) {
+                done++;
+                continue;
+            }
+            const item: SyncPayload = claimed;
             dispatchQueueUpdated(queue);
 
             try {
@@ -497,7 +525,7 @@ async function runSyncLoop(): Promise<void> {
                                         );
                                         if (updErr) throw updErr;
                                         if (!updated || updated.length === 0) {
-                                            throw new Error(`receipt_path update matched no row for transaction ${realTxId}`);
+                                            throw receiptNotAttachable(realTxId);
                                         }
                                     }
                                     await deleteOfflineReceipt(item.id);
@@ -526,29 +554,13 @@ async function runSyncLoop(): Promise<void> {
                         if (!idempotent && ownerId && splitRecords && splitRecords.length > 0) {
                             for (const split of splitRecords) {
                                 if (!split.user_id || split.user_id === ownerId) continue;
+                                // httpSend, not subscribe-then-send: joining the recipient's
+                                // fixed topic from this client and then removing it tore down
+                                // the recipient's own listener when both ran in one session.
                                 const ch = supabase.channel(`split-notify-${split.user_id}`);
-                                // SUBSCRIBED fires the broadcast and disposes after `.send`
-                                // settles; terminal states dispose immediately. A 5s safety
-                                // timer frees the channel even if no status callback fires.
-                                let disposed = false;
-                                const dispose = () => {
-                                    if (disposed) return;
-                                    disposed = true;
-                                    clearTimeout(safety);
-                                    supabase.removeChannel(ch);
-                                };
-                                const safety = setTimeout(dispose, 5000);
-                                ch.subscribe((status) => {
-                                    if (status === 'SUBSCRIBED') {
-                                        ch.send({
-                                            type: 'broadcast',
-                                            event: 'split-added',
-                                            payload: { fromUserId: ownerId },
-                                        }).finally(dispose);
-                                    } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
-                                        dispose();
-                                    }
-                                });
+                                ch.httpSend('split-added', { fromUserId: ownerId })
+                                    .catch(err => console.error('[sync-manager] split broadcast failed:', err))
+                                    .finally(() => supabase.removeChannel(ch));
                             }
 
                             if (realTxId) {
@@ -597,7 +609,13 @@ async function runSyncLoop(): Promise<void> {
                         );
                         if (error) throw error;
                         if (!updated || updated.length === 0) {
-                            throw new Error(`receipt_path update matched no row for transaction ${txId}`);
+                            // The file is up but nothing points at it — remove it rather
+                            // than leak it, unless it overwrote the receipt already there.
+                            if (path !== item.data?.prevPath) {
+                                await deleteReceipt(path).catch(err =>
+                                    console.warn('[sync-manager] could not remove unattached receipt', err));
+                            }
+                            throw receiptNotAttachable(txId);
                         }
                         // Replacing a receipt with a different file type changes the
                         // extension, and the storage path is derived from it — so the
@@ -650,18 +668,30 @@ async function runSyncLoop(): Promise<void> {
                     }
                 } else if (item.type === 'UPDATE_TRANSACTION') {
                     const { id, patch } = item.data;
-                    const { error } = await withTimeout(
+                    // `.select()` so a row RLS hides (or that is gone) answers with zero
+                    // rows instead of a bare 204 — that used to be marked synced, and the
+                    // edit vanished with nothing to say it never landed.
+                    const { data: updated, error } = await withTimeout(
                         Promise.resolve(
                             supabase
                                 .from('transactions')
                                 .update(patch)
                                 .eq('id', id)
+                                .select('id')
                         ),
                         MUTATION_TIMEOUT_MS,
                         'UPDATE_TRANSACTION'
                     );
 
-                    if (error) {
+                    if (!error && (!updated || updated.length === 0)) {
+                        const reason = 'This transaction no longer exists or can no longer be edited';
+                        console.error(`[sync-manager] ${item.type} matched no row:`, id);
+                        queue = await mutateQueue(q => markFailed(q, item.id, reason, 'permanent'));
+                        dispatchQueueUpdated(queue);
+                        window.dispatchEvent(new CustomEvent('novira-mutation-failed-permanent', {
+                            detail: { id: item.id, type: item.type, data: item.data, reason }
+                        }));
+                    } else if (error) {
                         const { permanent, reason } = classifyPgError(error);
                         if (permanent) {
                             console.error(`[sync-manager] ${item.type} permanently failed:`, reason);
@@ -792,6 +822,28 @@ export async function retryFailedItem(id: string) {
     ));
     dispatchQueueUpdated(queue);
     attemptSync();
+}
+
+/**
+ * Discard a queued add the user deleted before it synced. Refuses while the item
+ * is mid-flight: the RPC may already have created the row, so dropping the queue
+ * entry then would leave the expense on the server with the list claiming it was
+ * deleted. Returns what happened so the caller can say so.
+ */
+export async function discardQueuedAdd(id: string): Promise<'discarded' | 'syncing'> {
+    let outcome: 'discarded' | 'syncing' = 'discarded';
+    const queue = await mutateQueue(q => {
+        if (q.some(item => item.id === id && item.status === 'syncing')) {
+            outcome = 'syncing';
+            return q;
+        }
+        return q.filter(item => item.id !== id);
+    });
+    if (outcome === 'discarded') {
+        dispatchQueueUpdated(queue);
+        deleteOfflineReceipt(id);
+    }
+    return outcome;
 }
 
 export async function discardFailedItem(id: string) {

@@ -16,6 +16,7 @@ type SpendingCategory = {
 
 export function useDashboardStats({
     transactions,
+    statsTransactions,
     userId,
     isBucketFocused,
     effectiveFocus,
@@ -25,7 +26,12 @@ export function useDashboardStats({
     monthlyBudget,
     buckets
 }: {
+    /** The paginated list (newest 100+). Drives the feed and bucket focus. */
     transactions: Transaction[];
+    /** Every row from the start of last month (or 30 days back), unpaginated.
+     *  Month totals, last-month comparison, carryover and the weekday pattern
+     *  read this — computed from the list they only saw the newest 100 rows. */
+    statsTransactions: Transaction[];
     userId: string | null;
     isBucketFocused: boolean;
     effectiveFocus: string;
@@ -112,8 +118,10 @@ export function useDashboardStats({
 
     // Single pre-filtered pass — all downstream computations derive from this
     const filteredTransactions = useMemo(() => {
-        if (!Array.isArray(transactions)) return [];
-        return transactions.filter(tx => {
+        // Bucket focus isn't month-bounded, so it can't come from the stats window.
+        const source = isBucketFocused ? transactions : statsTransactions;
+        if (!Array.isArray(source)) return [];
+        return source.filter(tx => {
             if (tx.is_income) return false;
             if (tx.is_transfer) return false;
             if (tx.is_settlement) return false;
@@ -129,16 +137,16 @@ export function useDashboardStats({
             if (tx.splits && tx.splits.some(s => s.user_id === userId)) return true;
             return false;
         });
-    }, [transactions, userId, isBucketFocused, effectiveFocus, currentMonthPrefix]);
+    }, [transactions, statsTransactions, userId, isBucketFocused, effectiveFocus, currentMonthPrefix]);
 
     // Last month MTD slice — same day-of-month cutoff so comparison is apples-to-apples.
     // Skipped during bucket focus (no monthly comparison concept there).
     const lastMonthMTD = useMemo(() => {
         if (isBucketFocused) return 0;
-        if (!Array.isArray(transactions)) return 0;
+        if (!Array.isArray(statsTransactions)) return 0;
         let total = 0;
-        for (const tx of transactions) {
-            if (!tx || tx.exclude_from_allowance || tx.is_income || tx.is_settlement) continue;
+        for (const tx of statsTransactions) {
+            if (!tx || tx.exclude_from_allowance || tx.is_income || tx.is_settlement || tx.is_transfer) continue;
             if (!tx.date.startsWith(lastMonthPrefix)) continue;
             const day = parseInt(tx.date.slice(8, 10), 10);
             if (isNaN(day) || day > currentDayOfMonth) continue;
@@ -151,16 +159,16 @@ export function useDashboardStats({
             total += resolveAmountIn(tx, myShare, bucketCurrency, convertAmount).amount;
         }
         return total;
-    }, [transactions, isBucketFocused, lastMonthPrefix, currentDayOfMonth, userId, bucketCurrency, convertAmount, calculateUserShare]);
+    }, [statsTransactions, isBucketFocused, lastMonthPrefix, currentDayOfMonth, userId, bucketCurrency, convertAmount, calculateUserShare]);
 
     // Per-category last-month MTD totals (target currency = user's display `currency`,
     // matching how `aggregates.byCategory` is computed for non-bucket views).
     const lastMonthByCategory = useMemo(() => {
         if (isBucketFocused) return null;
-        if (!Array.isArray(transactions)) return null;
+        if (!Array.isArray(statsTransactions)) return null;
         const byCat: Record<string, number> = {};
-        for (const tx of transactions) {
-            if (!tx || tx.exclude_from_allowance || tx.is_income || tx.is_settlement) continue;
+        for (const tx of statsTransactions) {
+            if (!tx || tx.exclude_from_allowance || tx.is_income || tx.is_settlement || tx.is_transfer) continue;
             if (!tx.date.startsWith(lastMonthPrefix)) continue;
             const day = parseInt(tx.date.slice(8, 10), 10);
             if (isNaN(day) || day > currentDayOfMonth) continue;
@@ -175,7 +183,7 @@ export function useDashboardStats({
             byCat[cat] = (byCat[cat] ?? 0) + amt;
         }
         return byCat;
-    }, [transactions, isBucketFocused, lastMonthPrefix, currentDayOfMonth, userId, currency, convertAmount, calculateUserShare]);
+    }, [statsTransactions, isBucketFocused, lastMonthPrefix, currentDayOfMonth, userId, currency, convertAmount, calculateUserShare]);
 
     // Single pass over filteredTransactions producing totalSpent + spendingByCategory + recentSpent
     // (the run-rate window). Avoids three independent O(n) walks with redundant conversions.
@@ -238,12 +246,12 @@ export function useDashboardStats({
     // focus and when there's no spend.
     const weekdaySpending = useMemo(() => {
         if (isBucketFocused) return null;
-        if (!Array.isArray(transactions)) return null;
+        if (!Array.isArray(statsTransactions)) return null;
         const today = new Date();
         const startStr = format(subDays(today, 29), 'yyyy-MM-dd'); // 30 days inclusive of today
         const totals = [0, 0, 0, 0, 0, 0, 0]; // index 0 = Mon, 6 = Sun
-        for (const tx of transactions) {
-            if (!tx || tx.exclude_from_allowance || tx.is_income || tx.is_settlement) continue;
+        for (const tx of statsTransactions) {
+            if (!tx || tx.exclude_from_allowance || tx.is_income || tx.is_settlement || tx.is_transfer) continue;
             const txDate = tx.date.slice(0, 10);
             if (txDate < startStr) continue;
             if (userId) {
@@ -264,7 +272,7 @@ export function useDashboardStats({
         const todayDow = today.getDay();
         const todayIndex = (todayDow + 6) % 7;
         return { totals, maxValue, todayIndex };
-    }, [isBucketFocused, transactions, userId, calculateUserShare, bucketCurrency, convertAmount]);
+    }, [isBucketFocused, statsTransactions, userId, calculateUserShare, bucketCurrency, convertAmount]);
 
     // displayTransactions is now just the pre-filtered set
     const displayTransactions = filteredTransactions;
@@ -410,10 +418,10 @@ export function useDashboardStats({
     // doesn't dock the next month's headroom.
     const lastMonthFullSpend = useMemo(() => {
         if (isBucketFocused) return 0;
-        if (!Array.isArray(transactions)) return 0;
+        if (!Array.isArray(statsTransactions)) return 0;
         let total = 0;
-        for (const tx of transactions) {
-            if (!tx || tx.exclude_from_allowance || tx.is_income || tx.is_settlement) continue;
+        for (const tx of statsTransactions) {
+            if (!tx || tx.exclude_from_allowance || tx.is_income || tx.is_settlement || tx.is_transfer) continue;
             if (!tx.date.startsWith(lastMonthPrefix)) continue;
             if (userId) {
                 const involved = tx.user_id === userId || (tx.splits && tx.splits.some(s => s.user_id === userId));
@@ -424,7 +432,7 @@ export function useDashboardStats({
             total += resolveAmountIn(tx, myShare, bucketCurrency, convertAmount).amount;
         }
         return total;
-    }, [transactions, isBucketFocused, lastMonthPrefix, userId, bucketCurrency, convertAmount, calculateUserShare]);
+    }, [statsTransactions, isBucketFocused, lastMonthPrefix, userId, bucketCurrency, convertAmount, calculateUserShare]);
 
     const lastMonthCarryover = useMemo(() => {
         if (isBucketFocused) return 0;
@@ -434,16 +442,16 @@ export function useDashboardStats({
     }, [isBucketFocused, displayBudget, lastMonthFullSpend]);
 
     const incomeThisMonth = useMemo(() => {
-        if (!Array.isArray(transactions)) return 0;
+        if (!Array.isArray(statsTransactions)) return 0;
         let total = 0;
-        for (const tx of transactions) {
+        for (const tx of statsTransactions) {
             if (!tx || !tx.is_income) continue;
             if (!tx.date.startsWith(currentMonthPrefix)) continue;
             if (userId && tx.user_id !== userId) continue;
             total += resolveAmountIn(tx, Number(tx.amount), bucketCurrency, convertAmount).amount;
         }
         return total;
-    }, [transactions, currentMonthPrefix, userId, bucketCurrency, convertAmount]);
+    }, [statsTransactions, currentMonthPrefix, userId, bucketCurrency, convertAmount]);
 
     return {
         focusedBucket,
