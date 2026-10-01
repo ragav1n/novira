@@ -53,8 +53,10 @@ interface RecurringRow {
     currency: string;
     frequency: 'daily' | 'weekly' | 'monthly' | 'yearly';
     next_occurrence: string;
+    intended_day: number | null;
     category: string;
     is_active: boolean;
+    is_income: boolean | null;
 }
 
 interface GoalRow {
@@ -76,45 +78,53 @@ interface OneOffRow {
     is_completed: boolean;
 }
 
+// Every occurrence is computed from the anchor, never from the previous one —
+// chaining addMonths clamps Jan 31 to Feb 28 and then keeps the 28th forever.
+function occurrenceAt(anchor: Date, frequency: RecurringRow['frequency'], intendedDay: number, k: number): Date {
+    // The stored next_occurrence is when the processor will actually post it.
+    if (k === 0) return anchor;
+    switch (frequency) {
+        case 'daily': return addDays(anchor, k);
+        case 'weekly': return addDays(anchor, k * 7);
+        case 'monthly':
+        case 'yearly': {
+            const monthStart = addMonths(startOfMonth(anchor), frequency === 'monthly' ? k : k * 12);
+            const lastDay = endOfMonth(monthStart).getDate();
+            return new Date(monthStart.getFullYear(), monthStart.getMonth(), Math.min(intendedDay, lastDay));
+        }
+    }
+}
+
 function expandRecurring(row: RecurringRow, fromStr: string, untilStr: string): Date[] {
     const out: Date[] = [];
     const from = parseISO(fromStr);
     const until = parseISO(untilStr);
-    let cursor = parseISO(row.next_occurrence);
+    const anchor = parseISO(row.next_occurrence);
+    const intendedDay = row.intended_day ?? anchor.getDate();
     // Fast-forward past stale next_occurrence values so the safety cap can't
     // exhaust before reaching the visible window.
-    if (cursor < from) {
+    let k = 0;
+    if (anchor < from) {
         const stepDays = row.frequency === 'daily' ? 1
             : row.frequency === 'weekly' ? 7
-            : row.frequency === 'monthly' ? 30
-            : 365;
-        const diffDays = Math.floor((from.getTime() - cursor.getTime()) / (24 * 60 * 60 * 1000));
-        const skipSteps = Math.floor(diffDays / stepDays);
-        if (skipSteps > 0) {
-            switch (row.frequency) {
-                case 'daily': cursor = addDays(cursor, skipSteps); break;
-                case 'weekly': cursor = addDays(cursor, skipSteps * 7); break;
-                case 'monthly': cursor = addMonths(cursor, skipSteps); break;
-                case 'yearly': cursor = addMonths(cursor, skipSteps * 12); break;
-            }
-        }
+            : row.frequency === 'monthly' ? 31
+            : 366;
+        const diffDays = Math.floor((from.getTime() - anchor.getTime()) / (24 * 60 * 60 * 1000));
+        k = Math.max(Math.floor(diffDays / stepDays) - 1, 0);
     }
     let safety = 0;
+    let cursor = occurrenceAt(anchor, row.frequency, intendedDay, k);
     while (cursor <= until && safety < 200) {
         if (cursor >= from) out.push(cursor);
-        switch (row.frequency) {
-            case 'daily': cursor = addDays(cursor, 1); break;
-            case 'weekly': cursor = addDays(cursor, 7); break;
-            case 'monthly': cursor = addMonths(cursor, 1); break;
-            case 'yearly': cursor = addMonths(cursor, 12); break;
-        }
+        k++;
+        cursor = occurrenceAt(anchor, row.frequency, intendedDay, k);
         safety++;
     }
     return out;
 }
 
 export function CalendarView() {
-    const { userId, formatCurrency, convertAmount, currency, activeWorkspaceId } = useUserPreferences();
+    const { userId, formatCurrency, convertAmount, currency, activeWorkspaceId, firstDayOfWeek } = useUserPreferences();
     const { theme: themeConfig } = useWorkspaceTheme();
     const { buckets } = useBucketsList();
 
@@ -144,7 +154,7 @@ export function CalendarView() {
         try {
             let recurringQuery = supabase
                 .from('recurring_templates')
-                .select('id, description, amount, currency, frequency, next_occurrence, category, is_active')
+                .select('id, description, amount, currency, frequency, next_occurrence, intended_day, category, is_active, is_income')
                 .eq('user_id', userId)
                 .eq('is_active', true);
             if (activeWorkspaceId) {
@@ -237,8 +247,8 @@ export function CalendarView() {
     // Build events for the visible month + a 60-day forward window so day-detail
     // works for buckets / goals whose dates fall within either range.
     const events = useMemo<CalendarEvent[]>(() => {
-        const horizonStart = startOfWeek(viewMonth);
-        const horizonEnd = endOfWeek(endOfMonth(viewMonth));
+        const horizonStart = startOfWeek(viewMonth, { weekStartsOn: firstDayOfWeek });
+        const horizonEnd = endOfWeek(endOfMonth(viewMonth), { weekStartsOn: firstDayOfWeek });
         const horizonStartStr = format(horizonStart, 'yyyy-MM-dd');
         const horizonEndStr = format(horizonEnd, 'yyyy-MM-dd');
         const out: CalendarEvent[] = [];
@@ -252,8 +262,8 @@ export function CalendarView() {
                     date: d,
                     kind: 'recurring',
                     label: r.description,
-                    detail: getCategoryLabel(r.category),
-                    amount: -Math.abs(Number(r.amount)),
+                    detail: r.is_income ? 'Income' : getCategoryLabel(r.category),
+                    amount: r.is_income ? Math.abs(Number(r.amount)) : -Math.abs(Number(r.amount)),
                     currency: r.currency,
                     color: CATEGORY_COLORS[r.category] || CATEGORY_COLORS.others,
                 });
@@ -313,7 +323,7 @@ export function CalendarView() {
         }
 
         return out;
-    }, [recurring, goals, buckets, oneOffs, viewMonth, currency]);
+    }, [recurring, goals, buckets, oneOffs, viewMonth, currency, firstDayOfWeek]);
 
     const eventsByDay = useMemo(() => {
         const map = new Map<string, CalendarEvent[]>();
@@ -344,10 +354,10 @@ export function CalendarView() {
     }, [events, convertAmount, currency]);
 
     const days = useMemo(() => {
-        const start = startOfWeek(viewMonth);
-        const end = endOfWeek(endOfMonth(viewMonth));
+        const start = startOfWeek(viewMonth, { weekStartsOn: firstDayOfWeek });
+        const end = endOfWeek(endOfMonth(viewMonth), { weekStartsOn: firstDayOfWeek });
         return eachDayOfInterval({ start, end });
-    }, [viewMonth]);
+    }, [viewMonth, firstDayOfWeek]);
 
     const monthlyTotal = useMemo(() => {
         let sum = 0;
@@ -564,7 +574,8 @@ export function CalendarView() {
                         {[
                             ['S', 'Sunday'], ['M', 'Monday'], ['T', 'Tuesday'], ['W', 'Wednesday'],
                             ['T', 'Thursday'], ['F', 'Friday'], ['S', 'Saturday'],
-                        ].map(([short, full], i) => (
+                            ['S', 'Sunday'],
+                        ].slice(firstDayOfWeek, firstDayOfWeek + 7).map(([short, full], i) => (
                             <div key={i}>
                                 <abbr title={full} className="no-underline">{short}</abbr>
                             </div>

@@ -20,6 +20,7 @@ import { CATEGORIES as SYSTEM_CATEGORIES, CATEGORY_COLORS, getIconForCategory } 
 import { cn } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
 import { toast } from '@/utils/haptics';
+import { parseAmountStrict } from '@/lib/expense-validation';
 import { getMeta, type Frequency, type Tpl } from '@/lib/subscriptions-utils';
 import type { SubscriptionMetadata } from '@/types/transaction';
 
@@ -98,8 +99,8 @@ export function EditSubscriptionDialog({ template, onClose }: Props) {
             toast.error('Description is required');
             return;
         }
-        const parsedAmount = parseFloat(amount);
-        if (!isFinite(parsedAmount) || parsedAmount <= 0) {
+        const parsedAmount = parseAmountStrict(amount);
+        if (parsedAmount === null || parsedAmount <= 0) {
             toast.error('Enter a valid amount');
             return;
         }
@@ -127,6 +128,13 @@ export function EditSubscriptionDialog({ template, onClose }: Props) {
                     currency: currency.toUpperCase(),
                     frequency,
                     next_occurrence: nextOccurrence,
+                    // A moved date moves the day the schedule clamps back to;
+                    // otherwise a bill moved from the 5th to the 20th snapped back
+                    // to the 5th after its next run. Untouched, a 31st that is
+                    // currently showing Feb 28 must keep its 31.
+                    ...(nextOccurrence !== (template.next_occurrence || '').slice(0, 10)
+                        ? { intended_day: parseISO(nextOccurrence).getDate() }
+                        : {}),
                     category,
                     payment_method: paymentMethod,
                     is_income: isIncome,

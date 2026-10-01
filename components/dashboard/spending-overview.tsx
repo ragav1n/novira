@@ -4,7 +4,7 @@ import React, { startTransition } from 'react';
 import dynamic from 'next/dynamic';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronRight, Check, Wallet, Tag, Pencil, ArrowUpRight, ArrowDownLeft, Clock, LayoutGrid, Plus, TrendingUp, TrendingDown, Info } from 'lucide-react';
-import { format, differenceInDays } from 'date-fns';
+import { format, differenceInDays, endOfDay, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { Progress } from '@/components/ui/progress';
 import { Card, CardContent } from '@/components/ui/card';
@@ -382,8 +382,11 @@ export const SpendingOverview = React.memo(function SpendingOverview({
                                         {focusedBucket?.start_date && focusedBucket?.end_date ? (
                                             (() => {
                                                 const today = new Date();
-                                                const start = new Date(focusedBucket.start_date!);
-                                                const end = new Date(focusedBucket.end_date!);
+                                                // new Date('YYYY-MM-DD') is UTC midnight — the previous
+                                                // evening in the Americas, so a bucket read "Completed"
+                                                // on its last day. The end date is inclusive.
+                                                const start = parseISO(focusedBucket.start_date!.slice(0, 10));
+                                                const end = endOfDay(parseISO(focusedBucket.end_date!.slice(0, 10)));
                                                 if (today > end) return <span className="text-white/80 font-medium whitespace-nowrap">Completed</span>;
                                                 const effectiveStart = today > start ? today : start;
                                                 const daysLeft = Math.max(1, differenceInDays(end, effectiveStart));

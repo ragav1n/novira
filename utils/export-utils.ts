@@ -227,6 +227,10 @@ function computeStats(
             return;
         }
 
+        // Settlements repay a split that is already counted on the original
+        // expense; adding them again doubled spending (or read as income).
+        if (tx.is_settlement) return;
+
         // Currency split — group by source currency before conversion.
         const srcCurr = (tx.currency || currency).toUpperCase();
         if (!currencyTotals[srcCurr]) currencyTotals[srcCurr] = { count: 0, nativeTotal: 0, convertedTotal: 0 };
@@ -861,7 +865,7 @@ export const generateCSV = (
         const unassigned = transactions.filter(tx => !tx.account_id);
         if (unassigned.length > 0) {
             const u = unassigned.reduce((acc, tx) => {
-                if (tx.is_transfer) return acc;
+                if (tx.is_transfer || tx.is_settlement) return acc;
                 const a = Math.abs(resolveAmount(tx, currency, convertAmount));
                 const isIncome = tx.is_income === true || tx.category === 'income';
                 if (isIncome) acc.income += a; else acc.spent += a;
@@ -1178,7 +1182,7 @@ export const generatePDF = async (
     } = stats;
 
     const topExpenses = [...transactions]
-        .filter(tx => resolveAmount(tx, currency, convertAmount) > 0 && tx.category !== 'income')
+        .filter(tx => !tx.is_settlement && !tx.is_transfer && !tx.is_income && resolveAmount(tx, currency, convertAmount) > 0 && tx.category !== 'income')
         .map(tx => ({ ...tx, converted: resolveAmount(tx, currency, convertAmount) }))
         .sort((a, b) => b.converted - a.converted)
         .slice(0, 5);
@@ -1659,7 +1663,7 @@ export const generatePDF = async (
             });
             if (hasUnassigned) {
                 const u = transactions.reduce((acc, tx) => {
-                    if (tx.account_id || tx.is_transfer) return acc;
+                    if (tx.account_id || tx.is_transfer || tx.is_settlement) return acc;
                     const amt = Math.abs(resolveAmount(tx, currency, convertAmount));
                     const isIncome = tx.is_income === true || tx.category === 'income';
                     if (isIncome) acc.income += amt; else acc.spent += amt;

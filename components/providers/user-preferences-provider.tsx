@@ -391,10 +391,19 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
         setWorkspaceBudgets({});
     }, []);
 
+    // undefined = no session handled yet, so the first null still resets.
+    const handledUserIdRef = useRef<string | null | undefined>(undefined);
     const handleSession = useCallback(async (session: Session | null) => {
         const currentUser = session?.user ?? null;
         setUser(currentUser);
-        setUserId(currentUser?.id ?? null);
+        // getSession() and INITIAL_SESSION both deliver the same user at startup,
+        // and TOKEN_REFRESHED delivers them again every hour. Re-running the setup
+        // for each one reloaded preferences, re-ran the recurring processor and
+        // re-flushed the queue. Only a change of user needs any of that.
+        const nextId = currentUser?.id ?? null;
+        if (handledUserIdRef.current === nextId) return;
+        handledUserIdRef.current = nextId;
+        setUserId(nextId);
 
         // Friendlier greeting fallback than the literal "User" for accounts
         // without a profile name — a loaded profile full_name overrides this.

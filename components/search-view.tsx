@@ -134,14 +134,18 @@ export function SearchView() {
     const [showPresetInput, setShowPresetInput] = useState(false);
 
     // Search history (localStorage, max 5, dedupe, most-recent first).
-    const HISTORY_KEY = 'novira:search-history';
+    // Keyed per user: the unkeyed key showed the previous account's searches
+    // to whoever signed in next on the same device.
+    const HISTORY_KEY = userId ? `novira:search-history:${userId}` : null;
     const HISTORY_MAX = 5;
     const [history, setHistory] = useState<string[]>([]);
     const [inputFocused, setInputFocused] = useState(false);
 
     useEffect(() => {
-        if (typeof window === 'undefined') return;
+        setHistory([]);
+        if (typeof window === 'undefined' || !HISTORY_KEY) return;
         try {
+            localStorage.removeItem('novira:search-history');
             const raw = localStorage.getItem(HISTORY_KEY);
             if (!raw) return;
             const parsed: unknown = JSON.parse(raw);
@@ -154,23 +158,27 @@ export function SearchView() {
             console.error('Failed to load search history:', err);
             try { localStorage.removeItem(HISTORY_KEY); } catch { /* storage unavailable */ }
         }
-    }, []);
+    }, [HISTORY_KEY]);
 
     const pushHistory = useCallback((q: string) => {
         const trimmed = q.trim();
         if (!trimmed) return;
         setHistory(prev => {
             const next = [trimmed, ...prev.filter(h => h.toLowerCase() !== trimmed.toLowerCase())].slice(0, HISTORY_MAX);
-            try { localStorage.setItem(HISTORY_KEY, JSON.stringify(next)); } catch (err) { console.error(err); }
+            if (HISTORY_KEY) {
+                try { localStorage.setItem(HISTORY_KEY, JSON.stringify(next)); } catch (err) { console.error(err); }
+            }
             return next;
         });
-    }, []);
+    }, [HISTORY_KEY]);
 
     const clearHistory = useCallback(() => {
         setHistory([]);
-        try { localStorage.removeItem(HISTORY_KEY); } catch (err) { console.error(err); }
+        if (HISTORY_KEY) {
+            try { localStorage.removeItem(HISTORY_KEY); } catch (err) { console.error(err); }
+        }
         toast.success('Search history cleared');
-    }, []);
+    }, [HISTORY_KEY]);
 
     // Record successful searches (debounced query that actually ran). Skip the
     // first run so a shared link like /search?q=foo doesn't auto-pollute history

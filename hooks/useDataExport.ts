@@ -18,7 +18,7 @@ import { useAccounts } from '@/components/providers/accounts-provider';
 type ExportType = 'csv' | 'pdf' | null;
 
 export function useDataExport() {
-    const { userId, user, currency, convertAmount, formatCurrency, monthlyBudget, avatarUrl, activeWorkspaceId } = useUserPreferences();
+    const { userId, user, currency, convertAmount, formatCurrency, monthlyBudget, avatarUrl } = useUserPreferences();
     const { buckets } = useBucketsList();
     const { groups } = useGroups();
     const { accounts } = useAccounts();
@@ -91,19 +91,35 @@ export function useDataExport() {
         if (!userId) return;
         setLoadingExport(true);
         try {
-            let query = supabase
-                .from('transactions')
-                .select('id, user_id, description, amount, category, date, payment_method, created_at, currency, bucket_id, group_id, notes, is_recurring, is_settlement, place_name, place_address, place_lat, place_lng, exclude_from_allowance, exchange_rate, base_currency, converted_amount, tags, receipt_path, account_id, is_transfer, transfer_pair_id, is_income, profile:profiles(full_name), splits(user_id, amount, is_paid, profile:profiles(full_name))')
-                .order('date', { ascending: false });
-
-            if (dateRange?.from) query = query.gte('date', format(dateRange.from, 'yyyy-MM-dd'));
-            if (dateRange?.to) query = query.lte('date', format(dateRange.to, 'yyyy-MM-dd'));
-            if (bucketId) query = query.eq('bucket_id', bucketId);
-            if (groupId === 'personal') {
-                query = query.is('group_id', null);
-            } else if (groupId) {
-                query = query.eq('group_id', groupId);
-            }
+            // PostgREST caps a response at 1,000 rows, so a long range used to
+            // export a silently truncated year. Page until a short page comes back.
+            const buildTxQuery = () => {
+                let query = supabase
+                    .from('transactions')
+                    .select('id, user_id, description, amount, category, date, payment_method, created_at, currency, bucket_id, group_id, notes, is_recurring, is_settlement, place_name, place_address, place_lat, place_lng, exclude_from_allowance, exchange_rate, base_currency, converted_amount, tags, receipt_path, account_id, is_transfer, transfer_pair_id, is_income, profile:profiles(full_name), splits(user_id, amount, is_paid, profile:profiles(full_name))')
+                    .order('date', { ascending: false })
+                    .order('id', { ascending: true });
+                if (dateRange?.from) query = query.gte('date', format(dateRange.from, 'yyyy-MM-dd'));
+                if (dateRange?.to) query = query.lte('date', format(dateRange.to, 'yyyy-MM-dd'));
+                if (bucketId) query = query.eq('bucket_id', bucketId);
+                if (groupId === 'personal') {
+                    query = query.is('group_id', null);
+                } else if (groupId) {
+                    query = query.eq('group_id', groupId);
+                }
+                return query;
+            };
+            const fetchAllTransactions = async () => {
+                const PAGE = 1000;
+                const rows: NonNullable<Awaited<ReturnType<typeof buildTxQuery>>['data']> = [];
+                for (let from = 0; ; from += PAGE) {
+                    const { data, error } = await buildTxQuery().range(from, from + PAGE - 1);
+                    if (error) return { data: null, error };
+                    rows.push(...(data ?? []));
+                    if (!data || data.length < PAGE) break;
+                }
+                return { data: rows, error: null };
+            };
 
             // Recurring templates scoped to the same workspace as the transactions —
             // exported as their own section so backups can recreate the schedule.
@@ -132,7 +148,7 @@ export function useDataExport() {
             }
 
             const [txRes, templatesRes, goalsRes] = await Promise.all([
-                query,
+                fetchAllTransactions(),
                 templatesQuery,
                 goalsQuery,
             ]);
@@ -163,9 +179,13 @@ export function useDataExport() {
                 deposits = (depositRows ?? []) as SavingsDeposit[];
             }
 
-            const workspaceName = activeWorkspaceId
-                ? groups.find((g) => g.id === activeWorkspaceId)?.name
-                : 'Personal';
+            // Name the scope the user picked in the modal, not whichever workspace
+            // happens to be active behind it.
+            const workspaceName = groupId === 'personal'
+                ? 'Personal'
+                : groupId
+                    ? groups.find((g) => g.id === groupId)?.name
+                    : 'All workspaces';
 
             const exportContext = {
                 email: user?.email,
@@ -201,7 +221,7 @@ export function useDataExport() {
         } finally {
             setLoadingExport(false);
         }
-    }, [userId, user, currency, convertAmount, formatCurrency, monthlyBudget, avatarUrl, activeWorkspaceId, buckets, groups, accounts, exportType]);
+    }, [userId, user, currency, convertAmount, formatCurrency, monthlyBudget, avatarUrl, buckets, groups, accounts, exportType]);
 
     return {
         loadingExport,

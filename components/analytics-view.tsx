@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
 import { TransactionService } from '@/lib/services/transaction-service';
 import { getIconForCategory } from '@/lib/categories';
-import { format, startOfMonth, endOfMonth, startOfWeek, startOfYear, subMonths, subYears, subDays, parseISO } from 'date-fns';
+import { format, startOfMonth, endOfMonth, startOfWeek, startOfYear, subMonths, subDays, parseISO } from 'date-fns';
 import { useUserPreferences } from '@/components/providers/user-preferences-provider';
 import { useBucketsList, useBucketSpending } from '@/components/providers/buckets-provider';
 import { useAccounts } from '@/components/providers/accounts-provider';
@@ -130,9 +130,9 @@ export function AnalyticsView() {
                 priorStart = startOfMonth(subMonths(now, 11));
                 priorEnd = startOfMonth(subMonths(now, 5));
             } else if (dateRange === '1Y') {
-                startDate = startOfMonth(subYears(now, 1));
-                priorStart = startOfMonth(subYears(now, 2));
-                priorEnd = startOfMonth(subYears(now, 1));
+                startDate = startOfMonth(subMonths(now, 11));
+                priorStart = startOfMonth(subMonths(now, 23));
+                priorEnd = startOfMonth(subMonths(now, 11));
             } else if (dateRange === 'CUSTOM') {
                 if (customStart) startDate = parseISO(customStart);
                 if (customEnd) {
@@ -339,7 +339,7 @@ export function AnalyticsView() {
         if (dateRange === 'LM') return { from: fmt(startOfMonth(subMonths(now, 1))), to: fmt(endOfMonth(subMonths(now, 1))) };
         if (dateRange === '3M') return { from: fmt(startOfMonth(subMonths(now, 2))), to: fmt(now) };
         if (dateRange === '6M') return { from: fmt(startOfMonth(subMonths(now, 5))), to: fmt(now) };
-        if (dateRange === '1Y') return { from: fmt(startOfMonth(subYears(now, 1))), to: fmt(now) };
+        if (dateRange === '1Y') return { from: fmt(startOfMonth(subMonths(now, 11))), to: fmt(now) };
         if (dateRange === 'CUSTOM' && customStart && customEnd) return { from: customStart, to: customEnd };
         return null;
     }, [dateRange, customStart, customEnd]);
@@ -589,6 +589,7 @@ export function AnalyticsView() {
 
                                 <SpendingTrendCard
                                     userId={userId}
+                                    workspaceId={activeWorkspaceId}
                                     dateRange={dateRange}
                                     selectedBucketId={selectedBucketId}
                                     categoryTrendData={categoryTrendData}

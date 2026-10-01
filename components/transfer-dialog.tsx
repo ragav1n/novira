@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/select';
 import { supabase } from '@/lib/supabase';
 import { toast } from '@/utils/haptics';
+import { parseAmountStrict } from '@/lib/expense-validation';
 import { invalidateTransactionCaches } from '@/lib/sw-cache';
 import { useAccounts } from '@/components/providers/accounts-provider';
 import { useUserPreferences } from '@/components/providers/user-preferences-provider';
@@ -68,9 +69,10 @@ export function TransferDialog({ open, onOpenChange }: TransferDialogProps) {
     const toAccount = active.find(a => a.id === toId);
     const sameAccount = fromId === toId && fromId !== '';
     const crossCurrency = !!fromAccount && !!toAccount && fromAccount.currency !== toAccount.currency;
-    const parsedAmount = parseFloat(amount);
+    // parseFloat reads "1,299" as 1 — the strict parser rejects it instead.
+    const parsedAmount = parseAmountStrict(amount) ?? NaN;
     const amountValid = Number.isFinite(parsedAmount) && parsedAmount > 0;
-    const parsedToAmount = parseFloat(toAmount);
+    const parsedToAmount = parseAmountStrict(toAmount) ?? NaN;
     const toAmountValid = Number.isFinite(parsedToAmount) && parsedToAmount > 0;
 
     // Auto-suggest the destination amount using the app's exchange-rate cache

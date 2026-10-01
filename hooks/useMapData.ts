@@ -20,10 +20,16 @@ export function getGridOffsetCoords(lng: number, lat: number, offsetX: number, o
 }
 
 export function useMapData(
-    filteredTransactions: Transaction[],
+    inputTransactions: Transaction[],
     convertAmount: (amount: number, fromCurrency: string, toCurrency: string) => number,
     baseCurrency: string
 ) {
+    // The map is a spending map: income, settlements and transfers aren't money
+    // spent at a place, and counted toward a pin's total they inflated it.
+    const filteredTransactions = useMemo(
+        () => inputTransactions.filter(tx => !tx.is_income && !tx.is_settlement && !tx.is_transfer),
+        [inputTransactions],
+    );
     // Group transactions by snapped location.
     const locationGroups = useMemo(() => {
         const groups = new Map<string, {

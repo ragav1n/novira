@@ -1,4 +1,6 @@
+import { format, parseISO, startOfDay } from 'date-fns';
 import type { Transaction, RecurringTemplate } from '@/types/transaction';
+import { nextOccurrence } from '@/lib/recurrence';
 
 export interface RecurringCandidate {
     normalizedKey: string;
@@ -11,15 +13,9 @@ export interface RecurringCandidate {
     totalSpend: number;
     frequency: 'daily' | 'weekly' | 'monthly' | 'yearly';
     nextEstimatedDate: string;
+    intendedDay: number;
     sampleTransactionIds: string[];
 }
-
-const FREQ_DAYS = {
-    daily: 1,
-    weekly: 7,
-    monthly: 30,
-    yearly: 365,
-} as const;
 
 function normalize(desc: string): string {
     return desc
@@ -82,7 +78,7 @@ export function detectRecurringCandidates(
 
         const sorted = [...txs].sort((a, b) => a.date.localeCompare(b.date));
         const amounts = sorted.map((t) => Math.abs(Number(t.amount) || 0));
-        const meanAmount = amounts.reduce((a, b) => a + b, 0) / amounts.length;
+        const meanAmount = Math.round(amounts.reduce((a, b) => a + b, 0) / amounts.length * 100) / 100;
         if (meanAmount === 0) continue;
         const amountStd = stddev(amounts, meanAmount);
         if (amountStd / meanAmount > 0.05) continue;
@@ -100,10 +96,21 @@ export function detectRecurringCandidates(
         const frequency = classifyInterval(meanDays, stdDays);
         if (!frequency) continue;
 
-        const lastDate = sorted[sorted.length - 1].date.slice(0, 10);
-        const nextEstimated = new Date(lastDate);
-        nextEstimated.setUTCDate(nextEstimated.getUTCDate() + FREQ_DAYS[frequency]);
-        const nextEstimatedDate = nextEstimated.toISOString().slice(0, 10);
+        // Step on the calendar from the last charge (last + 30 days drifts a 1st-of-
+        // the-month bill to the 31st), and never propose a date already behind
+        // us — the recurring processor would backfill every missed occurrence.
+        const lastDate = parseISO(sorted[sorted.length - 1].date.slice(0, 10));
+        const intendedDay = lastDate.getDate();
+        const today = startOfDay(new Date());
+        let nextEstimated = nextOccurrence(lastDate, frequency);
+        for (let i = 0; nextEstimated < today && i < 1000; i++) {
+            nextEstimated = nextOccurrence(nextEstimated, frequency);
+            if (frequency === 'monthly') {
+                const lastOfMonth = new Date(nextEstimated.getFullYear(), nextEstimated.getMonth() + 1, 0).getDate();
+                nextEstimated.setDate(Math.min(intendedDay, lastOfMonth));
+            }
+        }
+        const nextEstimatedDate = format(nextEstimated, 'yyyy-MM-dd');
 
         const last = sorted[sorted.length - 1];
         candidates.push({
@@ -117,6 +124,7 @@ export function detectRecurringCandidates(
             totalSpend: amounts.reduce((a, b) => a + b, 0),
             frequency,
             nextEstimatedDate,
+            intendedDay,
             sampleTransactionIds: sorted.slice(-3).map((t) => t.id),
         });
     }

@@ -2,6 +2,7 @@
 
 import React, { useCallback, useMemo, useRef, useState, useEffect } from 'react';
 import { Sparkles, ChevronDown } from 'lucide-react';
+import { endOfMonth, format, startOfMonth, subDays } from 'date-fns';
 import { Card, CardContent } from '@/components/ui/card';
 import {
     Select,
@@ -69,28 +70,33 @@ export function WhatIfCard({
     const categoryTotals = useMemo(() => {
         const map = new Map<string, number>();
         if (!transactions.length) return map;
+        // Local calendar dates: toISOString() on a local midnight is the previous
+        // day anywhere east of UTC, which shifted the whole window by one.
         const now = new Date();
-        const startMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
-        const endMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10);
+        const startMonth = format(startOfMonth(now), 'yyyy-MM-dd');
+        const endMonth = format(endOfMonth(now), 'yyyy-MM-dd');
 
-        let monthlyTxs = transactions.filter((t) => t.date >= startMonth && t.date <= endMonth);
+        let monthlyTxs = transactions.filter((t) => t.date.slice(0, 10) >= startMonth && t.date.slice(0, 10) <= endMonth);
+        // Fallback window is 60 days — scale it to one month, or every figure
+        // below (and the annual projection) is double what it should be.
+        let toMonthly = 1;
         if (monthlyTxs.length === 0) {
-            const sixtyAgo = new Date();
-            sixtyAgo.setDate(sixtyAgo.getDate() - 60);
-            const sixtyAgoStr = sixtyAgo.toISOString().slice(0, 10);
-            monthlyTxs = transactions.filter((t) => t.date >= sixtyAgoStr);
+            const sixtyAgoStr = format(subDays(now, 60), 'yyyy-MM-dd');
+            monthlyTxs = transactions.filter((t) => t.date.slice(0, 10) >= sixtyAgoStr);
+            toMonthly = 30.44 / 60;
         }
 
         for (const tx of monthlyTxs) {
             if (tx.exclude_from_allowance) continue;
             if (tx.is_income) continue;
             if (tx.is_settlement) continue;
+            if (tx.is_transfer) continue;
             const txCurr = (tx.currency || 'USD').toUpperCase();
             const amt = txCurr === currency.toUpperCase()
                 ? Number(tx.amount)
                 : convertAmount(Number(tx.amount), txCurr, currency);
             const cat = (tx.category || 'others').toLowerCase();
-            map.set(cat, (map.get(cat) ?? 0) + amt);
+            map.set(cat, (map.get(cat) ?? 0) + amt * toMonthly);
         }
 
         return map;

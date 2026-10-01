@@ -70,6 +70,9 @@ export interface Transaction {
     place_lat?: number;
     place_lng?: number;
     currency?: string;
+    is_income?: boolean;
+    is_settlement?: boolean;
+    is_transfer?: boolean;
     profile?: {
         full_name: string;
         avatar_url?: string;

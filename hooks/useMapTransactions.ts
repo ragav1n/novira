@@ -11,7 +11,7 @@ const MAP_TX_LIMIT = 5000;
 
 // Only the fields the map actually reads — far lighter than the dashboard's full select.
 const MAP_TX_SELECT =
-    'id, description, amount, category, date, created_at, user_id, currency, place_name, place_address, place_lat, place_lng, profile:profiles(full_name, avatar_url)';
+    'id, description, amount, category, date, created_at, user_id, currency, place_name, place_address, place_lat, place_lng, is_income, is_settlement, is_transfer, profile:profiles(full_name, avatar_url)';
 
 /**
  * Fetches *all* geo-tagged transactions for the active workspace when the map opens,

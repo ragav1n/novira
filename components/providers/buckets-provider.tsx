@@ -214,7 +214,11 @@ export function BucketsProvider({ children }: { children: React.ReactNode }) {
                 supabase.removeChannel(channel);
             };
         } else {
+            // Invalidate any fetch still in flight for the previous user, or it
+            // lands their buckets back on the signed-out screen.
+            fetchGenRef.current++;
             setBuckets([]);
+            setBucketSpending({});
             setLoading(false);
         }
     }, [userId, activeWorkspaceId, fetchBuckets, fetchSpendingOnly, debouncedFetchBuckets, debouncedFetchSpending]);

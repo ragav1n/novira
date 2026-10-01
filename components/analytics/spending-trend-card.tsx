@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import { CATEGORY_COLORS, getCategoryLabel } from '@/lib/categories';
 import { supabase } from '@/lib/supabase';
 import { useRealtimeRefetch } from '@/hooks/useRealtimeRefetch';
+import { applyWorkspaceFilter } from '@/lib/workspace-filter';
 import { AnalyticsTooltip } from '@/components/analytics/analytics-tooltip';
 import { ChartDataTable } from '@/components/analytics/chart-data-table';
 import type { DateRange } from '@/hooks/useAnalyticsData';
@@ -32,6 +33,7 @@ interface CategoryTrendBucket {
 
 interface Props {
     userId: string | null;
+    workspaceId: string | null;
     dateRange: DateRange;
     selectedBucketId: string | 'all';
     categoryTrendData: CategoryTrendBucket[];
@@ -47,6 +49,7 @@ interface Props {
 
 function SpendingTrendCardInner({
     userId,
+    workspaceId,
     dateRange,
     selectedBucketId,
     categoryTrendData,
@@ -71,23 +74,31 @@ function SpendingTrendCardInner({
         }
         const myGen = ++forecastGenRef.current;
         try {
-            const { data } = await supabase
-                .from('recurring_templates')
-                .select('id, amount, currency, frequency, next_occurrence')
-                .eq('user_id', userId)
-                .eq('is_active', true);
+            // Same scope as the spending it is projected onto: the active workspace,
+            // and bills only — a recurring salary is not a spending spike.
+            const { data } = await applyWorkspaceFilter(
+                supabase
+                    .from('recurring_templates')
+                    .select('id, amount, currency, frequency, next_occurrence')
+                    .eq('is_active', true)
+                    .or('is_income.is.null,is_income.eq.false'),
+                userId,
+                workspaceId,
+            );
             if (forecastGenRef.current !== myGen) return;
             if (data) setRecurringForecast(data as RecurringLite[]);
         } catch (error) {
             console.error('Error fetching recurring templates for forecast:', error);
         }
-    }, [userId]);
+    }, [userId, workspaceId]);
 
     useEffect(() => { loadForecast(); }, [loadForecast]);
 
     useRealtimeRefetch(
-        `trend-forecast-${userId ?? 'anon'}`,
-        userId ? [{ table: 'recurring_templates', filter: `user_id=eq.${userId}` }] : [],
+        `trend-forecast-${userId ?? 'anon'}-${workspaceId ?? 'personal'}`,
+        userId
+            ? [{ table: 'recurring_templates', filter: workspaceId ? `group_id=eq.${workspaceId}` : `user_id=eq.${userId}` }]
+            : [],
         loadForecast,
         !!userId,
     );

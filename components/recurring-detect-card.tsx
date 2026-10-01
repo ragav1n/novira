@@ -123,6 +123,7 @@ export function RecurringDetectCard({
                 category: c.category,
                 payment_method: c.payment_method,
                 next_occurrence: c.nextEstimatedDate,
+                intended_day: c.intendedDay,
                 is_active: true,
             };
             if (activeWorkspaceId) {

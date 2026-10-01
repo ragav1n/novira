@@ -11,6 +11,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import { toast } from '@/utils/haptics';
+import { useUserPreferences } from '@/components/providers/user-preferences-provider';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ImpactStyle } from '@capacitor/haptics';
 
@@ -384,14 +385,21 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
 
     // ── Recent locations ────────────────────────────────────────────────────
 
+    // Keyed per user — the shared key carried one account's places into the next.
+    const { userId } = useUserPreferences();
+    const recentKey = userId ? `novira_recent_locations_v2:${userId}` : null;
+
     useEffect(() => {
+        setRecentLocations([]);
+        if (!recentKey) return;
         try {
-            const cached = localStorage.getItem('novira_recent_locations_v2');
+            localStorage.removeItem('novira_recent_locations_v2');
+            const cached = localStorage.getItem(recentKey);
             if (cached) setRecentLocations(JSON.parse(cached));
         } catch (e) {
             console.warn('[LocationPicker] Failed to load recent locations:', e);
         }
-    }, []);
+    }, [recentKey]);
 
     const saveToRecent = useCallback((loc: LocationData) => {
         // Identity = coords (rounded to 4dp ≈ 11m) when available, else name+address.
@@ -413,10 +421,12 @@ export function LocationPicker({ placeName, placeAddress, placeLat, placeLng, on
             const next = [updated, ...filtered]
                 .sort((a, b) => b.visitCount - a.visitCount || b.lastVisited - a.lastVisited)
                 .slice(0, 10);
-            localStorage.setItem('novira_recent_locations_v2', JSON.stringify(next));
+            if (recentKey) {
+                try { localStorage.setItem(recentKey, JSON.stringify(next)); } catch (e) { console.warn('[LocationPicker] Failed to save recent locations:', e); }
+            }
             return next;
         });
-    }, []);
+    }, [recentKey]);
 
     // ── Position acquisition ────────────────────────────────────────────────
 

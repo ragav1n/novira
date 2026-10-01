@@ -13,6 +13,7 @@ import { UIBoundary } from '@/components/boundaries/ui-boundary';
 import { AnimatePresence, motion, useScroll, useMotionValueEvent } from 'framer-motion';
 import { useIsNative } from '@/hooks/use-native';
 import { useGroups } from '@/components/providers/groups-provider';
+import { supabase } from '@/lib/supabase';
 import { PWAUpdater } from '@/components/pwa-updater';
 import { toast, ImpactStyle } from '@/utils/haptics';
 import { RefreshCcw } from 'lucide-react';
@@ -394,11 +395,26 @@ export function MobileLayout({ children, defaultIsDesktop = false }: { children:
         () => groups.filter(g => g.type === 'couple' || g.type === 'home'),
         [groups],
     );
+    // `groups` is also empty when the fetch failed (the provider clears loading in
+    // `finally`), and that used to wipe the saved workspace on every flaky start.
+    // Ask the server before resetting: only a successful answer that the group is
+    // gone (or no longer a shared workspace) clears it.
     useEffect(() => {
         if (groupsLoading || !activeWorkspaceId) return;
-        if (!eligibleGroups.some(g => g.id === activeWorkspaceId)) {
-            setActiveWorkspaceId(null);
-        }
+        if (eligibleGroups.some(g => g.id === activeWorkspaceId)) return;
+        let cancelled = false;
+        supabase
+            .from('groups')
+            .select('id, type')
+            .eq('id', activeWorkspaceId)
+            .maybeSingle()
+            .then(({ data, error }) => {
+                if (cancelled || error) return;
+                if (!data || (data.type !== 'couple' && data.type !== 'home')) {
+                    setActiveWorkspaceId(null);
+                }
+            });
+        return () => { cancelled = true; };
     }, [activeWorkspaceId, eligibleGroups, groupsLoading, setActiveWorkspaceId]);
 
     useEffect(() => {
