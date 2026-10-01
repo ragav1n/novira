@@ -13,6 +13,7 @@ import { cn } from '@/lib/utils';
 import { CATEGORIES as SYSTEM_CATEGORIES, CATEGORY_COLORS, getIconForCategory } from '@/lib/categories';
 import { supabase } from '@/lib/supabase';
 import { subMonths, subYears, format, startOfMonth, endOfMonth } from 'date-fns';
+import { resolveAmountIn } from '@/lib/utils/resolve-amount';
 
 interface BucketDialogProps {
     isOpen: boolean;
@@ -37,7 +38,7 @@ const ICONS = [
 
 export function BucketDialog({ isOpen, onClose, editingBucket }: BucketDialogProps) {
     const { createBucket, updateBucket } = useBucketsList();
-    const { currency, formatCurrency, userId } = useUserPreferences();
+    const { currency, formatCurrency, convertAmount, userId } = useUserPreferences();
 
     const [isProcessing, setIsProcessing] = useState(false);
     const [newBucketName, setNewBucketName] = useState('');
@@ -88,31 +89,42 @@ export function BucketDialog({ isOpen, onClose, editingBucket }: BucketDialogPro
                 const [recent, lastYear] = await Promise.all([
                     supabase
                         .from('transactions')
-                        .select('amount, date')
+                        .select('amount, currency, exchange_rate, base_currency, converted_amount')
                         .eq('user_id', userId)
                         .eq('bucket_id', editingBucket.id)
+                        .eq('is_income', false)
+                        .eq('is_settlement', false)
+                        .eq('is_transfer', false)
                         .gte('date', format(threeMonthsAgo, 'yyyy-MM-dd'))
                         .lt('date', format(startOfMonth(now), 'yyyy-MM-dd')),
                     supabase
                         .from('transactions')
-                        .select('amount, date')
+                        .select('amount, currency, exchange_rate, base_currency, converted_amount')
                         .eq('user_id', userId)
                         .eq('bucket_id', editingBucket.id)
+                        .eq('is_income', false)
+                        .eq('is_settlement', false)
+                        .eq('is_transfer', false)
                         .gte('date', format(sameMonthLastYearStart, 'yyyy-MM-dd'))
                         .lte('date', format(sameMonthLastYearEnd, 'yyyy-MM-dd')),
                 ]);
 
                 if (cancelled) return;
 
+                // The suggestion is typed straight into the bucket's budget, so it has
+                // to be in the bucket's currency — not a raw sum of mixed currencies.
+                const bucketCcy = String(newBucketCurrency || 'USD').toUpperCase();
+                const inBucketCcy = (row: { amount: number; currency: string | null }) =>
+                    resolveAmountIn(row, Number(row.amount), bucketCcy, convertAmount).amount;
                 let recentSum = 0;
                 for (const row of recent.data || []) {
-                    recentSum += Number(row.amount);
+                    recentSum += inBucketCcy(row);
                 }
                 // Divide by the full window length (3 months). Using the count of
                 // months that *had* spending inflates sparse buckets — 1 active
                 // month with $300 would render as "Avg 3mo · $300" instead of $100.
                 const avg3mo = recentSum / 3;
-                const sameMonthLastYear = (lastYear.data || []).reduce((s, r) => s + Number(r.amount), 0);
+                const sameMonthLastYear = (lastYear.data || []).reduce((s, r) => s + inBucketCcy(r), 0);
 
                 if (avg3mo > 0 || sameMonthLastYear > 0) {
                     setBudgetSuggestions({ avg3mo, sameMonthLastYear });
@@ -124,7 +136,7 @@ export function BucketDialog({ isOpen, onClose, editingBucket }: BucketDialogPro
             }
         })();
         return () => { cancelled = true; };
-    }, [isOpen, editingBucket, userId]);
+    }, [isOpen, editingBucket, userId, newBucketCurrency, convertAmount]);
 
     const handleAction = async () => {
         if (!newBucketName.trim()) {
@@ -292,7 +304,7 @@ export function BucketDialog({ isOpen, onClose, editingBucket }: BucketDialogPro
                                         onClick={() => setNewBucketTarget(Math.round(budgetSuggestions.avg3mo).toString())}
                                         className="text-meta font-semibold px-2 py-0.5 rounded-full bg-cyan-400/10 border border-cyan-400/25 text-cyan-300 hover:bg-cyan-400/15 transition-colors tabular-nums"
                                     >
-                                        Avg 3mo · {formatCurrency(budgetSuggestions.avg3mo)}
+                                        Avg 3mo · {formatCurrency(budgetSuggestions.avg3mo, String(newBucketCurrency))}
                                     </button>
                                 )}
                                 {budgetSuggestions.sameMonthLastYear > 0 && (
@@ -301,7 +313,7 @@ export function BucketDialog({ isOpen, onClose, editingBucket }: BucketDialogPro
                                         onClick={() => setNewBucketTarget(Math.round(budgetSuggestions.sameMonthLastYear).toString())}
                                         className="text-meta font-semibold px-2 py-0.5 rounded-full bg-cyan-400/10 border border-cyan-400/25 text-cyan-300 hover:bg-cyan-400/15 transition-colors tabular-nums"
                                     >
-                                        Last year · {formatCurrency(budgetSuggestions.sameMonthLastYear)}
+                                        Last year · {formatCurrency(budgetSuggestions.sameMonthLastYear, String(newBucketCurrency))}
                                     </button>
                                 )}
                             </div>

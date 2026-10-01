@@ -18,6 +18,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Input } from '@/components/ui/input';
 import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils';
+import { resolveAmountIn } from '@/lib/utils/resolve-amount';
 import { supabase } from '@/lib/supabase';
 import { toast, ImpactStyle } from '@/utils/haptics';
 import { format } from 'date-fns';
@@ -74,7 +75,7 @@ export function SearchView() {
     // True when the query matched more rows than SEARCH_RESULT_LIMIT, so the
     // list is showing a prefix rather than the whole result set.
     const [truncated, setTruncated] = useState(false);
-    const { formatCurrency, convertAmount, activeWorkspaceId, userId } = useUserPreferences();
+    const { currency, formatCurrency, convertAmount, activeWorkspaceId, userId } = useUserPreferences();
     const { buckets } = useBucketsList();
     const { theme: themeConfig } = useWorkspaceTheme();
     const receiptViewer = useReceiptViewer();
@@ -274,7 +275,7 @@ export function SearchView() {
         try {
             let query = supabase
                 .from('transactions')
-                .select('id, description, amount, category, date, payment_method, created_at, user_id, group_id, currency, exchange_rate, base_currency, is_recurring, is_settlement, exclude_from_allowance, bucket_id, place_name, place_address, place_lat, place_lng, tags, notes, receipt_path, profile:profiles(full_name, avatar_url), splits(user_id, amount, is_paid)');
+                .select('id, description, amount, category, date, payment_method, created_at, user_id, group_id, currency, exchange_rate, base_currency, converted_amount, is_recurring, is_settlement, is_income, is_transfer, exclude_from_allowance, bucket_id, place_name, place_address, place_lat, place_lng, tags, notes, receipt_path, profile:profiles(full_name, avatar_url), splits(user_id, amount, is_paid)');
 
             // Workspace filter — when null, RLS limits results to rows the user can see.
             if (activeWorkspaceId) {
@@ -642,11 +643,16 @@ export function SearchView() {
     // Stats derived from the current filtered set
     const filterStats = useMemo(() => {
         if (filteredTransactions.length === 0) return null;
+        // The hero total is spending: income, settle-ups and transfers would net
+        // against it (a settlement's negative leg subtracts).
         let total = 0;
+        let spendCount = 0;
         const byCategory = new Map<string, number>();
         for (const tx of filteredTransactions) {
-            const amt = convertAmount(Number(tx.amount), tx.currency || 'USD');
+            if (tx.is_income || tx.is_settlement || tx.is_transfer || Number(tx.amount) <= 0) continue;
+            const amt = resolveAmountIn(tx, Number(tx.amount), currency, convertAmount).amount;
             total += amt;
+            spendCount += 1;
             const cat = (tx.category || 'uncategorized').toLowerCase();
             byCategory.set(cat, (byCategory.get(cat) || 0) + amt);
         }
@@ -658,10 +664,10 @@ export function SearchView() {
         return {
             total,
             count: filteredTransactions.length,
-            avg: total / filteredTransactions.length,
+            avg: spendCount ? total / spendCount : 0,
             topCategory,
         };
-    }, [filteredTransactions, convertAmount]);
+    }, [filteredTransactions, currency, convertAmount]);
 
     const toggleSelectAll = useCallback(() => {
         if (selectedIds.size === filteredTransactions.length && filteredTransactions.length > 0) {

@@ -12,6 +12,7 @@ import { TripService } from '@/lib/services/trip-service';
 import { TripForm } from '@/components/trips/trip-form';
 import { EmptyState, EMPTY_ACCENTS } from '@/components/ui/empty-state';
 import { supabase } from '@/lib/supabase';
+import { resolveAmountIn } from '@/lib/utils/resolve-amount';
 import type { Trip } from '@/types/trip';
 
 type Bucket = 'active' | 'upcoming' | 'past';
@@ -60,7 +61,11 @@ export function TripsTabContent() {
             );
             const query = supabase
                 .from('transactions')
-                .select('amount, currency, exchange_rate, base_currency, converted_amount, tags');
+                .select('amount, currency, exchange_rate, base_currency, converted_amount, tags')
+                // Trip spend only: income, settle-ups and transfers aren't money spent on the trip.
+                .eq('is_income', false)
+                .eq('is_settlement', false)
+                .eq('is_transfer', false);
             const q = activeWorkspaceId
                 ? query.eq('group_id', activeWorkspaceId)
                 : query.eq('user_id', userId).is('group_id', null);
@@ -81,19 +86,10 @@ export function TripsTabContent() {
                 amount: number; currency: string; exchange_rate?: number;
                 base_currency?: string; converted_amount?: number; tags?: string[];
             }>) {
-                const txCurr = (tx.currency || 'USD').toUpperCase();
-                const baseCurr = (tx.base_currency || '').toUpperCase();
                 for (const tag of tx.tags ?? []) {
                     if (!slugs.includes(tag)) continue;
                     const target = tripCurrencyBySlug.get(tag) ?? currency.toUpperCase();
-                    let amountInTarget: number;
-                    if (txCurr === target) {
-                        amountInTarget = Number(tx.amount);
-                    } else if (tx.exchange_rate && baseCurr === target) {
-                        amountInTarget = Number(tx.amount) * Number(tx.exchange_rate);
-                    } else {
-                        amountInTarget = convertAmount(Number(tx.amount), txCurr, target);
-                    }
+                    const amountInTarget = resolveAmountIn(tx, Number(tx.amount), target, convertAmount).amount;
                     totals[tag] = (totals[tag] ?? 0) + amountInTarget;
                 }
             }

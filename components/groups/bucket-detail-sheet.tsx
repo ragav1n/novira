@@ -11,6 +11,7 @@ import { useUserPreferences } from '@/components/providers/user-preferences-prov
 import { Trophy, Flag, MapPin, Layers } from 'lucide-react';
 import { toast } from '@/utils/haptics';
 import { cn } from '@/lib/utils';
+import { resolveAmountIn } from '@/lib/utils/resolve-amount';
 
 type ProfileLite = { full_name: string; avatar_url?: string };
 type DetailTx = {
@@ -23,6 +24,7 @@ type DetailTx = {
     currency: string | null;
     exchange_rate: number | null;
     base_currency: string | null;
+    converted_amount?: number | null;
     place_name?: string | null;
     profile?: ProfileLite | ProfileLite[] | null;
     splits?: {
@@ -107,14 +109,8 @@ export function BucketDetailSheet({ bucket, spent, open, onOpenChange }: Props) 
                 contributors.push({ user_id: tx.user_id, native: Number(tx.amount), profile: payerProfile });
             }
 
-            let toBucket: (n: number) => number;
-            if (txCurr === bucketCurrency) {
-                toBucket = (n) => n;
-            } else if (tx.exchange_rate && (tx.base_currency || '').toUpperCase() === bucketCurrency) {
-                toBucket = (n) => n * Number(tx.exchange_rate);
-            } else {
-                toBucket = (n) => convertAmount(n, txCurr, bucketCurrency);
-            }
+            // Same ladder as the bucket card (BucketsProvider), so the two can't disagree.
+            const toBucket = (n: number) => resolveAmountIn(tx, n, bucketCurrency, convertAmount).amount;
 
             for (const c of contributors) {
                 const conv = toBucket(c.native);

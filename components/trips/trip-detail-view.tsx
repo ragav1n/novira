@@ -13,6 +13,7 @@ import { TripService } from '@/lib/services/trip-service';
 import { toast } from '@/utils/haptics';
 import { TripForm } from '@/components/trips/trip-form';
 import { supabase } from '@/lib/supabase';
+import { resolveAmountIn } from '@/lib/utils/resolve-amount';
 import { CATEGORIES, CATEGORY_COLORS, getCategoryLabel } from '@/lib/categories';
 import type { Trip } from '@/types/trip';
 import { cn } from '@/lib/utils';
@@ -72,6 +73,10 @@ export function TripDetailView({ tripId }: { tripId: string }) {
                 .from('transactions')
                 .select('id, amount, description, category, date, currency, base_currency, exchange_rate, converted_amount')
                 .contains('tags', [t.slug])
+                // Trip spend only: income, settle-ups and transfers aren't money spent on the trip.
+                .eq('is_income', false)
+                .eq('is_settlement', false)
+                .eq('is_transfer', false)
                 .order('date', { ascending: false })
                 .limit(500);
             if (error) {
@@ -109,15 +114,10 @@ export function TripDetailView({ tripId }: { tripId: string }) {
 
     const tripCurrency = (trip?.home_currency || currency).toUpperCase();
 
-    const toDisplay = useCallback((tx: TxRow): number => {
-        const txCurr = (tx.currency || 'USD').toUpperCase();
-        const baseCurr = (tx.base_currency || '').toUpperCase();
-        if (txCurr === tripCurrency) return Number(tx.amount);
-        if (tx.exchange_rate && baseCurr === tripCurrency) {
-            return Number(tx.amount) * Number(tx.exchange_rate);
-        }
-        return convertAmount(Number(tx.amount), txCurr, tripCurrency);
-    }, [tripCurrency, convertAmount]);
+    const toDisplay = useCallback(
+        (tx: TxRow): number => resolveAmountIn(tx, Number(tx.amount), tripCurrency, convertAmount).amount,
+        [tripCurrency, convertAmount],
+    );
 
     const summary = useMemo(() => {
         if (!trip) return null;
