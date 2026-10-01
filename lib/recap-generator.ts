@@ -204,7 +204,9 @@ function aggregate(txs: TxRow[], userId: string, baseCurrency: string, liveRates
         const targetBase = baseCurrency.toUpperCase();
         let converted = myShare;
         if (txCurr !== targetBase) {
-            if (tx.exchange_rate && baseCurr === targetBase) {
+            // A stored rate of exactly 1 on a cross-currency row is the failed-lookup
+            // fallback, not parity (see storedRateIsUsable in resolve-amount.ts).
+            if (tx.exchange_rate && Number(tx.exchange_rate) !== 1 && baseCurr === targetBase) {
                 // Stored rate is already to the user's CURRENT base. Trust it.
                 converted = myShare * Number(tx.exchange_rate);
             } else {
@@ -216,13 +218,14 @@ function aggregate(txs: TxRow[], userId: string, baseCurrency: string, liveRates
                 if (liveRate !== undefined) {
                     converted = myShare * liveRate;
                 } else if (tx.converted_amount && tx.amount) {
-                    converted = myShare * (Number(tx.converted_amount) / Number(tx.amount));
+                    const ratio = Number(tx.converted_amount) / Number(tx.amount);
+                    converted = myShare * ratio;
                     // A stored ratio only converts into the base that was current
                     // when the row was written. Against any other base it is the
                     // wrong number, and where the two currencies matched it is a
                     // 1:1 no-op — which is how a rupee total reaches the card
                     // looking like a plausible dollar one.
-                    if (baseCurr !== targetBase) unconverted += 1;
+                    if (baseCurr !== targetBase || ratio === 1) unconverted += 1;
                 } else {
                     unconverted += 1;
                 }
