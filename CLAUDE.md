@@ -204,6 +204,41 @@ Supabase backend (PostgreSQL + Auth + Realtime). Deployed on Vercel at novira-on
 - Single-item pushes (bill reminders, transaction anomaly, subscription price change)
   were already right — they format in the item's own currency.
 
+### Round 9 — Totals that disagreed with the dashboard (v2.115.6)
+- **Income counted as spending on the dashboard.** `TX_SELECT` in `useDashboardData`
+  never selected `is_income`, so every `tx.is_income` check in `useDashboardStats`
+  saw undefined: a salary landed in "Spent this month", the run rate and
+  Safe-to-Spend, and the Income line never rendered. Analytics was right all along
+  (it loads through `TransactionService`).
+- **Push totals now follow the dashboard's rules**:
+  - **Rows counted:** rows the user paid, group rows included at their share
+    (`payerShare` in `lib/server/spend.ts`).
+  - **Budget:** `monthly_budget`, not `budgets[ccy]`, which `setCurrency` never
+    writes for the new currency.
+  - **Slot window:** the slots fetch the whole month, because a 14-day window
+    dropped the 1st–10th from month-to-date by the 25th.
+  - **Streak:** the slot streak is the live count, not the last milestone.
+- **"Yesterday" is the user's day** (`lib/server/local-date.ts`). Every daily cron
+  runs at 02:30 UTC, which is still the previous evening in the Americas, so
+  "yesterday's spending" described an unfinished today.
+  - **Affected crons:** digest, unusual spending, transaction anomaly, no-spend
+    streak, bucket deadline and bucket completion. They now resolve dates from
+    `profiles.timezone`.
+  - **Allowance reset:** now runs on the 1st *and* 2nd and sends once each user's
+    calendar reaches the new month.
+  - **Bucket archiving:** a bucket is archived the day *after* its end date, not on it.
+- **Smaller fixes:**
+  - **Recap:** stops trusting `exchange_rate === 1`.
+  - **Shared conversion:** trip totals, the bucket detail sheet, bucket budget
+    suggestions and the search total use `resolveAmountIn`, and leave out income,
+    settlements and transfers.
+  - **Bucket threshold alerts:** count the same rows as the bucket card.
+  - **Group activity:** converts a mixed-currency total.
+  - **Unusual-spending floor:** $20 converted into the user's currency.
+- **Goals:** a goal's currency is locked once money is saved toward it. Deposits are
+  stored in the goal's currency and `remove_savings_deposit_atomic` subtracts them
+  verbatim, so converting `current_amount` alone would break later removals.
+
 ---
 
 ## Pending Suggestions (Not Yet Implemented)
