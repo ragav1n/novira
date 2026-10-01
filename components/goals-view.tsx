@@ -89,6 +89,10 @@ export function GoalsView() {
     const [isGoalModalOpen, setIsGoalModalOpen] = useState(false);
     const [goalModalMode, setGoalModalMode] = useState<'add'|'edit'>('add');
     const [editingGoalId, setEditingGoalId] = useState<string | null>(null);
+    // Saved money is a sum of deposits recorded in the goal's currency, so the
+    // currency is fixed once anything is saved — switching it would relabel ₹500 as €500.
+    const [editingGoalSaved, setEditingGoalSaved] = useState(0);
+    const goalCurrencyLocked = goalModalMode === 'edit' && editingGoalSaved > 0;
     const [goalName, setGoalName] = useState('');
     const [goalTarget, setGoalTarget] = useState('');
     const [goalCurrency, setGoalCurrency] = useState<Currency>(currency);
@@ -265,6 +269,7 @@ export function GoalsView() {
     const openEditModal = (goal: SavingsGoal) => {
         setGoalModalMode('edit');
         setEditingGoalId(goal.id);
+        setEditingGoalSaved(Number(goal.current_amount) || 0);
         setGoalName(goal.name);
         setGoalTarget(goal.target_amount.toString());
         setGoalCurrency(goal.currency as Currency);
@@ -813,9 +818,12 @@ export function GoalsView() {
                                     className={cn('bg-secondary/20 border-white/10 h-10 flex-1 text-base font-bold', themeConfig.ring)}
                                 />
                                 <div className="w-[120px]">
-                                    <CurrencyDropdown value={goalCurrency} onValueChange={(val) => setGoalCurrency(val as Currency)} compact={true} />
+                                    <CurrencyDropdown value={goalCurrency} onValueChange={(val) => setGoalCurrency(val as Currency)} compact={true} disabled={goalCurrencyLocked} />
                                 </div>
                             </div>
+                            {goalCurrencyLocked && (
+                                <p className="text-xs text-muted-foreground">Currency can&apos;t change once money is saved toward this goal.</p>
+                            )}
                         </div>
                         <div className="space-y-1.5">
                             <Label className="text-eyebrow uppercase text-muted-foreground">Appearance</Label>

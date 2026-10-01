@@ -16,21 +16,23 @@ interface CurrencyDropdownProps {
     onValueChange: (value: string) => void;
     className?: string;
     compact?: boolean;
+    disabled?: boolean;
 }
 
 // Currency picker rebuilt on the Material dropdown — ripple rows + cinematic
 // sweep, while keeping the same controlled value/onValueChange/compact API so
 // every call site is untouched. The field button uses the raw Radix trigger so
 // its justify-between layout (value left, chevron right) is preserved.
-export function CurrencyDropdown({ value, onValueChange, className, compact = false }: CurrencyDropdownProps) {
+export function CurrencyDropdown({ value, onValueChange, className, compact = false, disabled = false }: CurrencyDropdownProps) {
     const { CURRENCY_DETAILS } = useUserPreferences()
     const currentDetail = CURRENCY_DETAILS[value as keyof typeof CURRENCY_DETAILS] || { symbol: '$', name: value };
 
     return (
         <DropdownMenu>
-            <DropdownMenuPrimitive.Trigger asChild>
+            <DropdownMenuPrimitive.Trigger asChild disabled={disabled}>
                 <button
                     type="button"
+                    disabled={disabled}
                     aria-label="Select currency"
                     className={cn(
                         "group w-full flex items-center justify-between bg-secondary/10 text-foreground",
@@ -39,6 +41,7 @@ export function CurrencyDropdown({ value, onValueChange, className, compact = fa
                         "transition-all duration-200 ease-in-out",
                         "border border-white/10 data-[state=open]:border-primary/50",
                         "h-11 px-3 rounded-xl",
+                        "disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:bg-secondary/10",
                         className,
                     )}
                 >
