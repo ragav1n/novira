@@ -190,6 +190,20 @@ Supabase backend (PostgreSQL + Auth + Realtime). Deployed on Vercel at novira-on
   place any server code should get a base currency from. Do not add another route
   that takes one from a request body.
 
+### Round 8 — Push notifications in the wrong currency (v2.115.5)
+- **₹479 went out as "$479".** Every cron that totals spend (daily digest, the
+  morning/midday/evening slots, spending pace, unusual spending, mid-month comparison,
+  allowance reset, cash-flow shortfall, bucket thresholds) converted a foreign row only
+  when its stored rate pointed at the user's *current* base; otherwise it added the raw
+  amount and printed the base symbol. Rows entered before a base-currency change, or
+  whose FX lookup failed at write time (`exchange_rate === 1`), all took that path.
+- They now go through `loadConverter` (`lib/server/fx.ts`): the client's
+  `resolveAmountIn` ladder backed by server-fetched live rates. A row with no rate at
+  all is dropped from the total and logged, never added at face value. Cash-flow
+  shortfall also used to ignore bills in a foreign currency entirely; it converts them now.
+- Single-item pushes (bill reminders, transaction anomaly, subscription price change)
+  were already right — they format in the item's own currency.
+
 ---
 
 ## Pending Suggestions (Not Yet Implemented)
