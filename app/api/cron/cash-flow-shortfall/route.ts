@@ -8,6 +8,7 @@ import {
     cleanupExpired,
     fmtMoney,
 } from '@/lib/server/push';
+import { loadConverter } from '@/lib/server/fx';
 
 interface ProfileRow {
     id: string;
@@ -30,6 +31,7 @@ interface TxRow {
     currency: string | null;
     exchange_rate: number | null;
     base_currency: string | null;
+    converted_amount: number | null;
     exclude_from_allowance: boolean;
 }
 
@@ -65,7 +67,7 @@ export async function GET(request: NextRequest) {
 
     const { data: txs } = await supabase
         .from('transactions')
-        .select('user_id, amount, currency, exchange_rate, base_currency, exclude_from_allowance')
+        .select('user_id, amount, currency, exchange_rate, base_currency, converted_amount, exclude_from_allowance')
         .in('user_id', userIds)
         .gte('date', ymd(monthStart))
         .lte('date', ymd(today))
@@ -83,7 +85,13 @@ export async function GET(request: NextRequest) {
         .lte('next_occurrence', ymd(horizonClamped))
         .returns<BillRow[]>();
 
-    interface Hit { profile: ProfileRow; remaining: number; upcoming: number; gap: number; nextBill: BillRow | null; }
+    const baseOf = (userId: string) => eligible.find(p => p.id === userId)?.currency;
+    const toCurrency = await loadConverter([
+        ...(txs || []).map(tx => ({ tx, target: baseOf(tx.user_id) })),
+        ...(bills || []).map(b => ({ tx: b, target: baseOf(b.user_id) })),
+    ]);
+
+    interface Hit { profile: ProfileRow; remaining: number; upcoming: number; gap: number; nextBill: BillRow | null; billCount: number; }
     const hits: Hit[] = [];
 
     for (const p of eligible) {
@@ -95,30 +103,27 @@ export async function GET(request: NextRequest) {
         for (const tx of txs || []) {
             if (tx.user_id !== p.id) continue;
             if (tx.exclude_from_allowance) continue;
-            const txCcy = (tx.currency || 'USD').toUpperCase();
-            let amt = Number(tx.amount);
-            if (txCcy !== baseCcy) {
-                if (tx.exchange_rate && (tx.base_currency || '').toUpperCase() === baseCcy) {
-                    amt = amt * Number(tx.exchange_rate);
-                } else continue;
-            }
+            const amt = toCurrency(tx, baseCcy);
+            if (amt === null) continue;
             spent += amt;
         }
         const remaining = budget - spent;
 
         let upcoming = 0;
+        let billCount = 0;
         let nextBill: BillRow | null = null;
         for (const b of bills || []) {
             if (b.user_id !== p.id) continue;
-            const bCcy = (b.currency || 'USD').toUpperCase();
-            if (bCcy !== baseCcy) continue;
-            upcoming += Number(b.amount);
+            const amt = toCurrency(b, baseCcy);
+            if (amt === null) continue;
+            upcoming += amt;
+            billCount += 1;
             if (!nextBill || b.next_occurrence < nextBill.next_occurrence) nextBill = b;
         }
         if (upcoming <= 0) continue;
 
         const gap = upcoming - remaining;
-        if (gap > 0) hits.push({ profile: p, remaining, upcoming, gap, nextBill });
+        if (gap > 0) hits.push({ profile: p, remaining, upcoming, gap, nextBill, billCount });
     }
 
     if (!hits.length) return NextResponse.json({ scanned: profiles.length, notified: 0 });
@@ -129,7 +134,7 @@ export async function GET(request: NextRequest) {
 
     for (const h of hits) {
         const ccy = (h.profile.currency || 'USD').toUpperCase();
-        const billCount = (bills || []).filter(b => b.user_id === h.profile.id && (b.currency || 'USD').toUpperCase() === ccy).length;
+        const billCount = h.billCount;
         const sent = await sendToUser(supabase, subsByUser, h.profile.id, {
             title: 'Tight week ahead',
             body: `Projected short by ${fmtMoney(h.gap, ccy)} after ${billCount} upcoming bill${billCount === 1 ? '' : 's'}.`,

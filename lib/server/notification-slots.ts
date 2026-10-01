@@ -1,6 +1,7 @@
 import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { fmtMoney, type PushPayload } from '@/lib/server/push';
+import { loadConverter } from '@/lib/server/fx';
 import { loadSettlementBalance, type SettlementBalance } from '@/lib/server/settlement-balance';
 import { computeWeightedRunRate } from '@/lib/utils/run-rate';
 
@@ -53,6 +54,7 @@ interface TxRow {
     currency: string | null;
     exchange_rate: number | null;
     base_currency: string | null;
+    converted_amount: number | null;
     date: string;
     exclude_from_allowance: boolean | null;
 }
@@ -92,15 +94,6 @@ function shiftDays(yyyymmdd: string, n: number): string {
     return d.toISOString().slice(0, 10);
 }
 
-function toBaseAmount(tx: TxRow, baseCcy: string): number {
-    const txCcy = (tx.currency || 'USD').toUpperCase();
-    let amt = Number(tx.amount);
-    if (txCcy !== baseCcy && tx.exchange_rate && (tx.base_currency || '').toUpperCase() === baseCcy) {
-        amt = amt * Number(tx.exchange_rate);
-    }
-    return amt;
-}
-
 /**
  * Single fetch reused across all 3 composers for a given user. Pulls a 14-day
  * transaction window (covers yesterday/today + activity check), upcoming
@@ -122,7 +115,7 @@ export async function loadSlotContext(
 
     const { data: txs } = await supabase
         .from('transactions')
-        .select('user_id, amount, currency, exchange_rate, base_currency, date, exclude_from_allowance')
+        .select('user_id, amount, currency, exchange_rate, base_currency, converted_amount, date, exclude_from_allowance')
         .eq('user_id', profile.id)
         .gte('date', fourteenAgo)
         .is('group_id', null)
@@ -130,6 +123,7 @@ export async function loadSlotContext(
         .eq('is_income', false)
         .eq('is_transfer', false)
         .returns<TxRow[]>();
+    const toCurrency = await loadConverter((txs || []).map(tx => ({ tx, target: baseCcy })));
 
     let todaySpend = 0, todayCount = 0;
     let yesterdaySpend = 0, yesterdayCount = 0;
@@ -139,8 +133,8 @@ export async function loadSlotContext(
     const sevenAgo = shiftDays(localToday, -6); // inclusive 7-day window
     for (const tx of txs || []) {
         if (tx.exclude_from_allowance) continue;
-        const amt = toBaseAmount(tx, baseCcy);
-        if (amt <= 0) continue;
+        const amt = toCurrency(tx, baseCcy);
+        if (amt === null || amt <= 0) continue;
         const d = tx.date.slice(0, 10);
         txCount14d += 1;
         if (d === localToday) { todaySpend += amt; todayCount += 1; }

@@ -3,10 +3,8 @@
 // Five call sites used to reimplement this ladder inline and disagreed with each
 // other, so the same transaction could total differently on the dashboard, in
 // analytics, inside a bucket, and in an export. Everything client-side now routes
-// through resolveAmountIn.
-//
-// The `app/api/cron/*` routes deliberately keep their own inline handling: they run
-// server-side with no live-rate access and simply skip rows they can't convert.
+// through resolveAmountIn. Push/cron copy uses it too, via `loadConverter` in
+// lib/server/fx.ts, which supplies server-fetched live rates.
 
 export interface AmountResolvable {
     amount: number | string;

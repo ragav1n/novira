@@ -2,6 +2,7 @@ import 'server-only';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient as createServiceClient } from '@supabase/supabase-js';
 import { authorizeCron } from '@/lib/server/push';
+import { loadConverter } from '@/lib/server/fx';
 import { logSend } from '@/lib/server/send-log';
 const webpush = require('web-push') as typeof import('web-push');
 
@@ -36,6 +37,7 @@ interface TxRow {
     currency: string | null;
     exchange_rate: number | null;
     base_currency: string | null;
+    converted_amount: number | null;
     splits?: { user_id: string; amount: number }[];
 }
 
@@ -82,7 +84,7 @@ export async function GET(request: NextRequest) {
     const bucketIds = buckets.map(b => b.id);
     const { data: txs } = await supabase
         .from('transactions')
-        .select('bucket_id, user_id, amount, category, currency, exchange_rate, base_currency, splits(user_id, amount)')
+        .select('bucket_id, user_id, amount, category, currency, exchange_rate, base_currency, converted_amount, splits(user_id, amount)')
         .in('bucket_id', bucketIds)
         .eq('is_settlement', false)
         .eq('is_income', false)
@@ -90,10 +92,9 @@ export async function GET(request: NextRequest) {
         .eq('exclude_from_allowance', false)
         .returns<TxRow[]>();
 
-    // Compute per-bucket spend in the bucket's currency. Currency conversion is
-    // approximated: same-currency or via stored exchange_rate; mismatched
-    // currencies without a stored rate fall back to raw amount (rare for
-    // bucket-tagged transactions).
+    // Compute per-bucket spend in the bucket's currency.
+    const bucketCcyOf = (bucketId: string | null) => buckets.find(b => b.id === bucketId)?.currency;
+    const toCurrency = await loadConverter((txs || []).map(tx => ({ tx, target: bucketCcyOf(tx.bucket_id) })));
     const spendByBucket = new Map<string, number>();
     for (const tx of txs || []) {
         const bId = tx.bucket_id;
@@ -118,14 +119,8 @@ export async function GET(request: NextRequest) {
         }
         if (share <= 0) continue;
 
-        const bucketCcy = (bucket.currency || 'USD').toUpperCase();
-        const txCcy = (tx.currency || 'USD').toUpperCase();
-        let inBucketCcy = share;
-        if (txCcy !== bucketCcy) {
-            if (tx.exchange_rate && (tx.base_currency || '').toUpperCase() === bucketCcy) {
-                inBucketCcy = share * Number(tx.exchange_rate);
-            } else continue;
-        }
+        const inBucketCcy = toCurrency(tx, (bucket.currency || 'USD').toUpperCase(), share);
+        if (inBucketCcy === null) continue;
         spendByBucket.set(bId, (spendByBucket.get(bId) || 0) + inBucketCcy);
     }
 

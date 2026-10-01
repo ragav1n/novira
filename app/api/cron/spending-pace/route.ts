@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient as createServiceClient } from '@supabase/supabase-js';
 import { isInQuietHours } from '@/lib/push-quiet-hours';
 import { authorizeCron, fmtMoney } from '@/lib/server/push';
+import { loadConverter } from '@/lib/server/fx';
 import { logSend } from '@/lib/server/send-log';
 const webpush = require('web-push') as typeof import('web-push');
 
@@ -38,6 +39,7 @@ interface TxRow {
     currency: string | null;
     exchange_rate: number | null;
     base_currency: string | null;
+    converted_amount: number | null;
     exclude_from_allowance: boolean | null;
 }
 
@@ -97,7 +99,7 @@ export async function GET(request: NextRequest) {
 
     const { data: txs } = await supabase
         .from('transactions')
-        .select('user_id, amount, currency, exchange_rate, base_currency, exclude_from_allowance')
+        .select('user_id, amount, currency, exchange_rate, base_currency, converted_amount, exclude_from_allowance')
         .in('user_id', userIds)
         .gte('date', monthStartStr)
         .is('group_id', null)
@@ -106,18 +108,15 @@ export async function GET(request: NextRequest) {
         .eq('is_transfer', false)
         .returns<TxRow[]>();
 
+    const baseOf = (userId: string) => profiles.find(p => p.id === userId)?.currency;
+    const toCurrency = await loadConverter((txs || []).map(tx => ({ tx, target: baseOf(tx.user_id) })));
     const totalsByUser = new Map<string, number>();
     for (const tx of txs || []) {
         if (tx.exclude_from_allowance) continue;
         const profile = profiles.find(p => p.id === tx.user_id);
         if (!profile) continue;
-        const baseCcy = (profile.currency || 'USD').toUpperCase();
-        const txCcy = (tx.currency || 'USD').toUpperCase();
-        let amt = Number(tx.amount);
-        if (txCcy !== baseCcy && tx.exchange_rate && (tx.base_currency || '').toUpperCase() === baseCcy) {
-            amt = amt * Number(tx.exchange_rate);
-        }
-        if (amt <= 0) continue;
+        const amt = toCurrency(tx, (profile.currency || 'USD').toUpperCase());
+        if (amt === null || amt <= 0) continue;
         totalsByUser.set(tx.user_id, (totalsByUser.get(tx.user_id) || 0) + amt);
     }
 

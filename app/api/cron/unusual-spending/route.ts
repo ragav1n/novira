@@ -8,6 +8,7 @@ import {
     cleanupExpired,
     fmtMoney,
 } from '@/lib/server/push';
+import { loadConverter } from '@/lib/server/fx';
 import { isInQuietHours } from '@/lib/push-quiet-hours';
 
 interface ProfileRow {
@@ -25,6 +26,7 @@ interface TxRow {
     currency: string | null;
     exchange_rate: number | null;
     base_currency: string | null;
+    converted_amount: number | null;
     date: string;
 }
 
@@ -57,7 +59,7 @@ export async function GET(request: NextRequest) {
 
     const { data: yesterdayTxs } = await supabase
         .from('transactions')
-        .select('user_id, amount, currency, exchange_rate, base_currency, date')
+        .select('user_id, amount, currency, exchange_rate, base_currency, converted_amount, date')
         .eq('date', yesterdayStr)
         .is('group_id', null)
         .eq('exclude_from_allowance', false)
@@ -80,7 +82,7 @@ export async function GET(request: NextRequest) {
     // Pull the 30-day history ending the day before yesterday.
     const { data: history } = await supabase
         .from('transactions')
-        .select('user_id, amount, currency, exchange_rate, base_currency, date')
+        .select('user_id, amount, currency, exchange_rate, base_currency, converted_amount, date')
         .in('user_id', userIds)
         .gte('date', thirtyAgoStr)
         .lt('date', yesterdayStr)
@@ -100,17 +102,11 @@ export async function GET(request: NextRequest) {
         .eq('local_date', today);
     const sentToday = new Set((alreadySent || []).map(r => r.user_id));
 
-    // Convert an amount into the user's display currency. Falls back to the
-    // raw amount when no rate is available — matches the spending-pace cron's
-    // pragmatic approach.
-    const convertToBase = (tx: TxRow, baseCcy: string): number => {
-        const txCcy = (tx.currency || 'USD').toUpperCase();
-        let amt = Number(tx.amount);
-        if (txCcy !== baseCcy && tx.exchange_rate && (tx.base_currency || '').toUpperCase() === baseCcy) {
-            amt = amt * Number(tx.exchange_rate);
-        }
-        return amt;
-    };
+    // Convert into the user's display currency; rows with no known rate count as 0.
+    const toCurrency = await loadConverter(
+        [...yesterdayTxs, ...(history || [])].map(tx => ({ tx, target: profileById.get(tx.user_id)?.currency })),
+    );
+    const convertToBase = (tx: TxRow, baseCcy: string): number => toCurrency(tx, baseCcy) ?? 0;
 
     const yesterdayByUser = new Map<string, number>();
     for (const tx of yesterdayTxs) {

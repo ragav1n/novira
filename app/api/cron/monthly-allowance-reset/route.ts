@@ -8,6 +8,7 @@ import {
     cleanupExpired,
     fmtMoney,
 } from '@/lib/server/push';
+import { loadConverter } from '@/lib/server/fx';
 
 interface ProfileRow {
     id: string;
@@ -22,6 +23,7 @@ interface TxRow {
     currency: string | null;
     exchange_rate: number | null;
     base_currency: string | null;
+    converted_amount: number | null;
     exclude_from_allowance: boolean;
 }
 
@@ -55,7 +57,7 @@ export async function GET(request: NextRequest) {
 
     const { data: txs } = await supabase
         .from('transactions')
-        .select('user_id, amount, currency, exchange_rate, base_currency, exclude_from_allowance')
+        .select('user_id, amount, currency, exchange_rate, base_currency, converted_amount, exclude_from_allowance')
         .in('user_id', eligible.map(p => p.id))
         .gte('date', ymd(lastMonthStart))
         .lte('date', ymd(lastMonthEnd))
@@ -63,6 +65,9 @@ export async function GET(request: NextRequest) {
         .eq('is_income', false)
         .eq('is_transfer', false)
         .returns<TxRow[]>();
+
+    const baseOf = (userId: string) => eligible.find(p => p.id === userId)?.currency;
+    const toCurrency = await loadConverter((txs || []).map(tx => ({ tx, target: baseOf(tx.user_id) })));
 
     const subsByUser = await loadSubsByUser(supabase, eligible.map(p => p.id));
     const expired: string[] = [];
@@ -75,13 +80,8 @@ export async function GET(request: NextRequest) {
         for (const tx of txs || []) {
             if (tx.user_id !== p.id) continue;
             if (tx.exclude_from_allowance) continue;
-            const txCcy = (tx.currency || 'USD').toUpperCase();
-            let amt = Number(tx.amount);
-            if (txCcy !== ccy) {
-                if (tx.exchange_rate && (tx.base_currency || '').toUpperCase() === ccy) {
-                    amt = amt * Number(tx.exchange_rate);
-                } else continue;
-            }
+            const amt = toCurrency(tx, ccy);
+            if (amt === null) continue;
             lastSpent += amt;
         }
 

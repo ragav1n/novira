@@ -2,7 +2,8 @@ import 'server-only';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient as createServiceClient } from '@supabase/supabase-js';
 import { isInQuietHours } from '@/lib/push-quiet-hours';
-import { authorizeCron, processInBatches } from '@/lib/server/push';
+import { authorizeCron, fmtMoney, processInBatches } from '@/lib/server/push';
+import { loadConverter } from '@/lib/server/fx';
 import { logSend } from '@/lib/server/send-log';
 const webpush = require('web-push') as typeof import('web-push');
 
@@ -30,6 +31,7 @@ interface TxRow {
     currency: string | null;
     exchange_rate: number | null;
     base_currency: string | null;
+    converted_amount: number | null;
     date: string;
     exclude_from_allowance: boolean | null;
 }
@@ -39,17 +41,6 @@ interface PushSubRow {
     endpoint: string;
     p256dh: string;
     auth: string;
-}
-
-const CURRENCY_SYMBOLS: Record<string, string> = {
-    USD: '$', EUR: '€', INR: '₹', GBP: '£', CHF: 'Fr', SGD: 'S$', VND: '₫',
-    TWD: 'NT$', JPY: '¥', KRW: '₩', HKD: 'HK$', MYR: 'RM',
-    PHP: '₱', THB: '฿', CAD: 'C$', AUD: 'A$', MXN: 'Mex$', BRL: 'R$', IDR: 'Rp', AED: 'AED',
-};
-
-function fmt(amount: number, ccy: string): string {
-    const sym = CURRENCY_SYMBOLS[ccy.toUpperCase()] || '';
-    return `${sym}${amount.toFixed(2)}`;
 }
 
 export async function GET(request: NextRequest) {
@@ -106,7 +97,7 @@ export async function GET(request: NextRequest) {
 
     const { data: txs } = await supabase
         .from('transactions')
-        .select('user_id, amount, currency, exchange_rate, base_currency, date, exclude_from_allowance')
+        .select('user_id, amount, currency, exchange_rate, base_currency, converted_amount, date, exclude_from_allowance')
         .in('user_id', allUserIds)
         .gte('date', eightDaysAgo.toISOString().slice(0, 10))
         .is('group_id', null)
@@ -122,9 +113,9 @@ export async function GET(request: NextRequest) {
     sevenDaysAgo.setUTCDate(sevenDaysAgo.getUTCDate() - 7);
     const sevenDaysAgoStr = sevenDaysAgo.toISOString().slice(0, 10);
 
-    // Per-user totals in their preferred currency. Currency conversion is
-    // approximated using stored exchange_rate when available; otherwise we
-    // use the raw amount (most users have one base currency).
+    // Per-user totals in their preferred currency.
+    const baseOf = (userId: string) => profiles.find(p => p.id === userId)?.currency;
+    const toCurrency = await loadConverter((txs || []).map(tx => ({ tx, target: baseOf(tx.user_id) })));
     interface Totals { yesterday: number; yesterdayCount: number; week: number; weekCount: number; }
     const totalsByUser = new Map<string, Totals>();
     for (const p of profiles) {
@@ -139,13 +130,8 @@ export async function GET(request: NextRequest) {
         if (tx.exclude_from_allowance) continue;
         const profile = profiles.find(p => p.id === tx.user_id);
         if (!profile) continue;
-        const baseCcy = (profile.currency || 'USD').toUpperCase();
-        const txCcy = (tx.currency || 'USD').toUpperCase();
-        let amt = Number(tx.amount);
-        if (txCcy !== baseCcy && tx.exchange_rate && (tx.base_currency || '').toUpperCase() === baseCcy) {
-            amt = amt * Number(tx.exchange_rate);
-        }
-        if (amt <= 0) continue;
+        const amt = toCurrency(tx, (profile.currency || 'USD').toUpperCase());
+        if (amt === null || amt <= 0) continue;
 
         const totals = totalsByUser.get(tx.user_id);
         if (!totals) continue;
@@ -197,11 +183,11 @@ export async function GET(request: NextRequest) {
             if (profile.digest_frequency === 'daily') {
                 if (totals.yesterdayCount === 0) return;
                 title = 'Yesterday\'s spending';
-                body = `${fmt(totals.yesterday, baseCcy)} across ${totals.yesterdayCount} transaction${totals.yesterdayCount === 1 ? '' : 's'}.`;
+                body = `${fmtMoney(totals.yesterday, baseCcy)} across ${totals.yesterdayCount} transaction${totals.yesterdayCount === 1 ? '' : 's'}.`;
             } else {
                 if (totals.weekCount === 0) return;
                 title = 'Your weekly recap';
-                body = `${fmt(totals.week, baseCcy)} across ${totals.weekCount} transaction${totals.weekCount === 1 ? '' : 's'} this week.`;
+                body = `${fmtMoney(totals.week, baseCcy)} across ${totals.weekCount} transaction${totals.weekCount === 1 ? '' : 's'} this week.`;
             }
 
             const payload = JSON.stringify({ title, body, url: '/dashboard', icon: '/Novira.png' });
