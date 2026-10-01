@@ -8,6 +8,7 @@ import {
     cleanupExpired,
     fmtMoney,
 } from '@/lib/server/push';
+import { localDate, shiftDays } from '@/lib/server/local-date';
 
 interface TxRow {
     id: string;
@@ -21,6 +22,7 @@ interface TxRow {
 
 interface ProfileRow {
     id: string;
+    timezone: string | null;
     last_anomaly_notified_at: string | null;
 }
 
@@ -44,24 +46,29 @@ export async function GET(request: NextRequest) {
     const yesterday = new Date(today); yesterday.setUTCDate(today.getUTCDate() - 1);
     const ninetyAgo = new Date(today); ninetyAgo.setUTCDate(today.getUTCDate() - 90);
 
-    const { data: yesterdayTxs } = await supabase
+    // "Yesterday" is each user's own calendar day: at 02:30 UTC it is the UTC day
+    // before yesterday for anyone west of UTC. Fetch both candidates, filter per user.
+    const { data: recentTxs } = await supabase
         .from('transactions')
         .select('id, user_id, amount, currency, category, description, date')
-        .eq('date', ymd(yesterday))
+        .gte('date', shiftDays(ymd(yesterday), -1))
+        .lte('date', ymd(yesterday))
         .eq('exclude_from_allowance', false)
         .eq('is_settlement', false)
         .eq('is_income', false)
         .eq('is_transfer', false)
         .returns<TxRow[]>();
-    if (!yesterdayTxs?.length) return NextResponse.json({ scanned: 0, notified: 0 });
+    if (!recentTxs?.length) return NextResponse.json({ scanned: 0, notified: 0 });
 
-    const userIds = Array.from(new Set(yesterdayTxs.map(t => t.user_id)));
+    const userIds = Array.from(new Set(recentTxs.map(t => t.user_id)));
     const { data: profiles } = await supabase
         .from('profiles')
-        .select('id, last_anomaly_notified_at')
+        .select('id, timezone, last_anomaly_notified_at')
         .in('id', userIds)
         .returns<ProfileRow[]>();
     const profileById = new Map((profiles || []).map(p => [p.id, p]));
+    const yesterdayOf = new Map((profiles || []).map(p => [p.id, shiftDays(localDate(p.timezone, now), -1)]));
+    const yesterdayTxs = recentTxs.filter(tx => tx.date.slice(0, 10) === yesterdayOf.get(tx.user_id));
 
     const eligibleUsers = userIds.filter(uid => profileById.get(uid)?.last_anomaly_notified_at !== ymd(today));
     if (!eligibleUsers.length) return NextResponse.json({ scanned: yesterdayTxs.length, notified: 0 });
@@ -80,6 +87,8 @@ export async function GET(request: NextRequest) {
 
     const histByKey = new Map<string, number[]>();
     for (const h of history || []) {
+        const y = yesterdayOf.get(h.user_id);
+        if (!y || h.date.slice(0, 10) >= y) continue;
         const key = `${h.user_id}|${(h.category || '').toLowerCase()}|${(h.currency || 'USD').toUpperCase()}`;
         const arr = histByKey.get(key) || [];
         arr.push(Number(h.amount));

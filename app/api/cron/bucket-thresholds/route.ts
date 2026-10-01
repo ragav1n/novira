@@ -86,10 +86,11 @@ export async function GET(request: NextRequest) {
         .from('transactions')
         .select('bucket_id, user_id, amount, category, currency, exchange_rate, base_currency, converted_amount, splits(user_id, amount)')
         .in('bucket_id', bucketIds)
-        .eq('is_settlement', false)
+        // Same rows the bucket card counts (bucket spending RPC): everything tagged
+        // to the bucket except income and transfers. A trip bucket's expenses are
+        // often excluded from the monthly allowance, and still count toward the trip.
         .eq('is_income', false)
         .eq('is_transfer', false)
-        .eq('exclude_from_allowance', false)
         .returns<TxRow[]>();
 
     // Compute per-bucket spend in the bucket's currency.

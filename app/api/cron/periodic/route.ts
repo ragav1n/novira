@@ -41,6 +41,10 @@ export async function GET(request: NextRequest) {
 
     if (day === 1) {
         await trigger('/api/cron/monthly-recap');
+    }
+    // Twice, so every timezone has reached the 1st by one of the runs; the
+    // route sends each user once per month.
+    if (day === 1 || day === 2) {
         await trigger('/api/cron/monthly-allowance-reset');
     }
     if (day === 15) {

@@ -4,6 +4,8 @@ import { createClient as createServiceClient } from '@supabase/supabase-js';
 import { isInQuietHours } from '@/lib/push-quiet-hours';
 import { authorizeCron, fmtMoney, processInBatches } from '@/lib/server/push';
 import { loadConverter } from '@/lib/server/fx';
+import { localDate, shiftDays } from '@/lib/server/local-date';
+import { payerShare } from '@/lib/server/spend';
 import { logSend } from '@/lib/server/send-log';
 const webpush = require('web-push') as typeof import('web-push');
 
@@ -34,6 +36,7 @@ interface TxRow {
     converted_amount: number | null;
     date: string;
     exclude_from_allowance: boolean | null;
+    splits: { amount: number }[] | null;
 }
 
 interface PushSubRow {
@@ -89,29 +92,25 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ recipients: 0, pushSent: 0 });
     }
 
-    // Pull last 8 days of transactions — covers both single-day (yesterday)
-    // and 7-day (last week) windows in one round-trip.
-    const eightDaysAgo = new Date(now);
-    eightDaysAgo.setUTCDate(eightDaysAgo.getUTCDate() - 8);
+    // "Yesterday" and "this week" are the user's own calendar days. At 02:30 UTC
+    // the Americas are still on the previous evening, so a UTC yesterday would
+    // report their unfinished today. One fetch wide enough for every timezone.
     const allUserIds = profiles.map(p => p.id);
+    const windowByUser = new Map(profiles.map(p => {
+        const yesterday = shiftDays(localDate(p.timezone, now), -1);
+        return [p.id, { yesterday, weekStart: shiftDays(yesterday, -6) }];
+    }));
 
+    // Rows the user paid, group ones included at their share — the dashboard's rule.
     const { data: txs } = await supabase
         .from('transactions')
-        .select('user_id, amount, currency, exchange_rate, base_currency, converted_amount, date, exclude_from_allowance')
+        .select('user_id, amount, currency, exchange_rate, base_currency, converted_amount, date, exclude_from_allowance, splits(amount)')
         .in('user_id', allUserIds)
-        .gte('date', eightDaysAgo.toISOString().slice(0, 10))
-        .is('group_id', null)
+        .gte('date', shiftDays(now.toISOString().slice(0, 10), -9))
         .eq('is_settlement', false)
         .eq('is_income', false)
         .eq('is_transfer', false)
         .returns<TxRow[]>();
-
-    const yesterday = new Date(now);
-    yesterday.setUTCDate(yesterday.getUTCDate() - 1);
-    const yesterdayStr = yesterday.toISOString().slice(0, 10);
-    const sevenDaysAgo = new Date(now);
-    sevenDaysAgo.setUTCDate(sevenDaysAgo.getUTCDate() - 7);
-    const sevenDaysAgoStr = sevenDaysAgo.toISOString().slice(0, 10);
 
     // Per-user totals in their preferred currency.
     const baseOf = (userId: string) => profiles.find(p => p.id === userId)?.currency;
@@ -130,18 +129,22 @@ export async function GET(request: NextRequest) {
         if (tx.exclude_from_allowance) continue;
         const profile = profiles.find(p => p.id === tx.user_id);
         if (!profile) continue;
-        const amt = toCurrency(tx, (profile.currency || 'USD').toUpperCase());
+        const share = payerShare(tx);
+        if (share <= 0) continue;
+        const amt = toCurrency(tx, (profile.currency || 'USD').toUpperCase(), share);
         if (amt === null || amt <= 0) continue;
 
         const totals = totalsByUser.get(tx.user_id);
-        if (!totals) continue;
+        const window = windowByUser.get(tx.user_id);
+        if (!totals || !window) continue;
 
         const dateOnly = tx.date.slice(0, 10);
-        if (dateOnly === yesterdayStr) {
+        if (dateOnly > window.yesterday) continue;
+        if (dateOnly === window.yesterday) {
             totals.yesterday += amt;
             totals.yesterdayCount += 1;
         }
-        if (dateOnly >= sevenDaysAgoStr) {
+        if (dateOnly >= window.weekStart) {
             totals.week += amt;
             totals.weekCount += 1;
         }

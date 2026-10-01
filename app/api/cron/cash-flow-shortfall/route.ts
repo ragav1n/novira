@@ -9,11 +9,12 @@ import {
     fmtMoney,
 } from '@/lib/server/push';
 import { loadConverter } from '@/lib/server/fx';
+import { payerShare } from '@/lib/server/spend';
 
 interface ProfileRow {
     id: string;
     currency: string | null;
-    budgets: Record<string, number> | null;
+    monthly_budget: number | null;
     last_cashflow_shortfall_at: string | null;
 }
 
@@ -33,6 +34,7 @@ interface TxRow {
     base_currency: string | null;
     converted_amount: number | null;
     exclude_from_allowance: boolean;
+    splits: { amount: number }[] | null;
 }
 
 function ymd(d: Date): string { return d.toISOString().slice(0, 10); }
@@ -52,7 +54,7 @@ export async function GET(request: NextRequest) {
 
     const { data: profiles } = await supabase
         .from('profiles')
-        .select('id, currency, budgets, last_cashflow_shortfall_at')
+        .select('id, currency, monthly_budget, last_cashflow_shortfall_at')
         .returns<ProfileRow[]>();
     if (!profiles?.length) return NextResponse.json({ scanned: 0, notified: 0 });
 
@@ -67,7 +69,7 @@ export async function GET(request: NextRequest) {
 
     const { data: txs } = await supabase
         .from('transactions')
-        .select('user_id, amount, currency, exchange_rate, base_currency, converted_amount, exclude_from_allowance')
+        .select('user_id, amount, currency, exchange_rate, base_currency, converted_amount, exclude_from_allowance, splits(amount)')
         .in('user_id', userIds)
         .gte('date', ymd(monthStart))
         .lte('date', ymd(today))
@@ -96,14 +98,17 @@ export async function GET(request: NextRequest) {
 
     for (const p of eligible) {
         const baseCcy = (p.currency || 'USD').toUpperCase();
-        const budget = Number(p.budgets?.[baseCcy] || 0);
+        const budget = Number(p.monthly_budget) || 0;
         if (budget <= 0) continue;
 
         let spent = 0;
         for (const tx of txs || []) {
             if (tx.user_id !== p.id) continue;
             if (tx.exclude_from_allowance) continue;
-            const amt = toCurrency(tx, baseCcy);
+            // Group rows count at the payer's share, as on the dashboard.
+            const share = payerShare(tx);
+            if (share <= 0) continue;
+            const amt = toCurrency(tx, baseCcy, share);
             if (amt === null) continue;
             spent += amt;
         }

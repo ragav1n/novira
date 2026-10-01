@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient as createServiceClient } from '@supabase/supabase-js';
 import { authorizeCron } from '@/lib/server/push';
 import { logSend } from '@/lib/server/send-log';
+import { localDate } from '@/lib/server/local-date';
 const webpush = require('web-push') as typeof import('web-push');
 
 const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
@@ -44,27 +45,42 @@ export async function GET(request: NextRequest) {
         auth: { persistSession: false, autoRefreshToken: false }
     });
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const todayStr = today.toISOString().slice(0, 10);
+    const now = new Date();
+    const todayStr = now.toISOString().slice(0, 10);
 
-    // 1. Find buckets whose end_date is on/before today, not archived, not yet completed.
+    // 1. Find buckets whose end_date has passed, not archived, not yet completed.
+    //    The end date is the last day to log, so a bucket ending today stays open —
+    //    bucket-deadline told the user yesterday that today is that last day.
     //    Index `buckets_end_date_idx` covers the (is_archived = FALSE AND completed_at IS NULL) shape.
-    const { data: candidates, error: candidatesErr } = await supabase
+    const { data: dueBuckets, error: candidatesErr } = await supabase
         .from('buckets')
         .select('id, user_id, name, end_date, is_archived, completed_at, completion_notified')
         .eq('is_archived', false)
         .is('completed_at', null)
         .not('end_date', 'is', null)
-        .lte('end_date', todayStr)
+        .lt('end_date', todayStr)
         .returns<BucketRow[]>();
 
     if (candidatesErr) {
         console.error('[bucket-completion] candidate fetch failed', candidatesErr);
         return NextResponse.json({ error: candidatesErr.message }, { status: 500 });
     }
-    if (!candidates?.length) {
+    if (!dueBuckets?.length) {
         return NextResponse.json({ archived: 0, scanned: 0 });
+    }
+
+    // "Passed" in the owner's calendar: at 02:30 UTC the Americas are still on
+    // the UTC day before, which may be the bucket's last day for them.
+    const ownerIds = Array.from(new Set(dueBuckets.map(b => b.user_id)));
+    const { data: owners } = await supabase
+        .from('profiles')
+        .select('id, timezone')
+        .in('id', ownerIds)
+        .returns<{ id: string; timezone: string | null }[]>();
+    const ownerToday = new Map((owners || []).map(o => [o.id, localDate(o.timezone, now)]));
+    const candidates = dueBuckets.filter(b => b.end_date! < (ownerToday.get(b.user_id) ?? todayStr));
+    if (!candidates.length) {
+        return NextResponse.json({ archived: 0, scanned: dueBuckets.length });
     }
 
     // 2. Archive + stamp completed_at in one update per bucket. We don't batch

@@ -4,6 +4,7 @@ import { createClient as createServiceClient } from '@supabase/supabase-js';
 import { isInQuietHours } from '@/lib/push-quiet-hours';
 import { authorizeCron } from '@/lib/server/push';
 import { logSend } from '@/lib/server/send-log';
+import { localDate, shiftDays } from '@/lib/server/local-date';
 const webpush = require('web-push') as typeof import('web-push');
 
 /**
@@ -56,18 +57,19 @@ export async function GET(request: NextRequest) {
         auth: { persistSession: false, autoRefreshToken: false }
     });
 
-    const today = new Date();
-    today.setUTCHours(0, 0, 0, 0);
-    const inThree = new Date(today); inThree.setUTCDate(inThree.getUTCDate() + 3);
-    const inOne = new Date(today); inOne.setUTCDate(inOne.getUTCDate() + 1);
-    const targets = new Set([ymd(inThree), ymd(inOne)]);
+    // "Tomorrow" is the owner's tomorrow: at 02:30 UTC the Americas are still on
+    // the UTC day before. Fetch every end date that is 1 or 3 days out in some
+    // timezone, then keep the ones that are in the owner's.
+    const now = new Date();
+    const utcToday = ymd(now);
+    const targets = [0, 1, 2, 3].map(n => shiftDays(utcToday, n));
 
     const { data: candidates, error } = await supabase
         .from('buckets')
         .select('id, user_id, name, end_date')
         .eq('is_archived', false)
         .is('completed_at', null)
-        .in('end_date', Array.from(targets))
+        .in('end_date', targets)
         .returns<BucketRow[]>();
 
     if (error) {
@@ -117,8 +119,14 @@ export async function GET(request: NextRequest) {
         }
 
         const expiredEndpoints: string[] = [];
+        const daysOut = (b: BucketRow) => {
+            const ownerToday = localDate(prefsByUser.get(b.user_id)?.timezone, now);
+            return Math.round((Date.parse(b.end_date) - Date.parse(ownerToday)) / 86400000);
+        };
 
         for (const b of candidates) {
+            const days = daysOut(b);
+            if (days !== 1 && days !== 3) continue;
             const userSubs = subsByUser.get(b.user_id);
             if (!userSubs?.length) continue;
 
@@ -132,7 +140,7 @@ export async function GET(request: NextRequest) {
                 continue;
             }
 
-            const isOneDay = b.end_date === ymd(inOne);
+            const isOneDay = days === 1;
             const title = isOneDay ? `${b.name} ends tomorrow` : `${b.name} ends in 3 days`;
             const body = isOneDay
                 ? 'Last day to log expenses and review.'

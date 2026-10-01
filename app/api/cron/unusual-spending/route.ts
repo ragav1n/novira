@@ -9,6 +9,8 @@ import {
     fmtMoney,
 } from '@/lib/server/push';
 import { loadConverter } from '@/lib/server/fx';
+import { localDate, shiftDays } from '@/lib/server/local-date';
+import { payerShare } from '@/lib/server/spend';
 import { isInQuietHours } from '@/lib/push-quiet-hours';
 
 interface ProfileRow {
@@ -28,14 +30,14 @@ interface TxRow {
     base_currency: string | null;
     converted_amount: number | null;
     date: string;
+    splits: { amount: number }[] | null;
 }
 
 function ymd(d: Date): string { return d.toISOString().slice(0, 10); }
 
 // Notify when yesterday's spending exceeded 1.5× the user's prior 30-day daily
-// average AND the absolute amount is meaningful ($20 floor). Comparing
-// "yesterday" not "today" keeps the cron timezone-consistent: yesterday is
-// already-complete spend regardless of when in their local day the cron fires.
+// average AND the absolute amount is meaningful ($20 floor, converted). Comparing
+// the user's local "yesterday" means the day being judged is already complete.
 // One fire per user per day, dedup via notification_send_log.
 export async function GET(request: NextRequest) {
     const denied = authorizeCron(request);
@@ -44,33 +46,30 @@ export async function GET(request: NextRequest) {
     if (supabase instanceof NextResponse) return supabase;
 
     const MULT_THRESHOLD = 1.5;
-    const ABSOLUTE_FLOOR_BASE = 20; // in the user's display currency
+    const ABSOLUTE_FLOOR_USD = 20;
 
     const now = new Date();
     const today = ymd(now);
-    const yesterday = new Date(now);
-    yesterday.setUTCDate(yesterday.getUTCDate() - 1);
-    const yesterdayStr = ymd(yesterday);
-    // History window: the 30 days ending the day before yesterday — i.e. excludes
-    // the day we're evaluating so it doesn't pollute its own baseline.
-    const thirtyAgo = new Date(yesterday);
-    thirtyAgo.setUTCDate(thirtyAgo.getUTCDate() - 30);
-    const thirtyAgoStr = ymd(thirtyAgo);
+    // "Yesterday" is each user's own calendar day. At 02:30 UTC that is the UTC
+    // day before yesterday for anyone west of UTC, and UTC yesterday for anyone east.
+    const earliestYesterday = shiftDays(today, -2);
+    const latestYesterday = shiftDays(today, -1);
 
-    const { data: yesterdayTxs } = await supabase
+    // Rows the user paid, group ones included at their share — the dashboard's rule.
+    const { data: recentTxs } = await supabase
         .from('transactions')
-        .select('user_id, amount, currency, exchange_rate, base_currency, converted_amount, date')
-        .eq('date', yesterdayStr)
-        .is('group_id', null)
+        .select('user_id, amount, currency, exchange_rate, base_currency, converted_amount, date, splits(amount)')
+        .gte('date', earliestYesterday)
+        .lte('date', latestYesterday)
         .eq('exclude_from_allowance', false)
         .eq('is_settlement', false)
         .eq('is_income', false)
         .eq('is_transfer', false)
         .returns<TxRow[]>();
 
-    if (!yesterdayTxs?.length) return NextResponse.json({ scanned: 0, notified: 0 });
+    if (!recentTxs?.length) return NextResponse.json({ scanned: 0, notified: 0 });
 
-    const userIds = Array.from(new Set(yesterdayTxs.map(t => t.user_id)));
+    const userIds = Array.from(new Set(recentTxs.map(t => t.user_id)));
 
     const { data: profiles } = await supabase
         .from('profiles')
@@ -78,20 +77,27 @@ export async function GET(request: NextRequest) {
         .in('id', userIds)
         .returns<ProfileRow[]>();
     const profileById = new Map((profiles || []).map(p => [p.id, p]));
+    const yesterdayOf = new Map((profiles || []).map(p => [p.id, shiftDays(localDate(p.timezone, now), -1)]));
+    const yesterdayTxs = recentTxs.filter(tx => tx.date.slice(0, 10) === yesterdayOf.get(tx.user_id));
 
-    // Pull the 30-day history ending the day before yesterday.
-    const { data: history } = await supabase
+    // The 30 days before each user's yesterday — excludes the day being evaluated
+    // so it doesn't pollute its own baseline.
+    const { data: rawHistory } = await supabase
         .from('transactions')
-        .select('user_id, amount, currency, exchange_rate, base_currency, converted_amount, date')
+        .select('user_id, amount, currency, exchange_rate, base_currency, converted_amount, date, splits(amount)')
         .in('user_id', userIds)
-        .gte('date', thirtyAgoStr)
-        .lt('date', yesterdayStr)
-        .is('group_id', null)
+        .gte('date', shiftDays(earliestYesterday, -30))
+        .lt('date', latestYesterday)
         .eq('exclude_from_allowance', false)
         .eq('is_settlement', false)
         .eq('is_income', false)
         .eq('is_transfer', false)
         .returns<TxRow[]>();
+    const history = (rawHistory || []).filter(tx => {
+        const y = yesterdayOf.get(tx.user_id);
+        const d = tx.date.slice(0, 10);
+        return !!y && d < y && d >= shiftDays(y, -30);
+    });
 
     // Already-sent today — dedup so the cron can run multiple times per day safely.
     const { data: alreadySent } = await supabase
@@ -103,10 +109,13 @@ export async function GET(request: NextRequest) {
     const sentToday = new Set((alreadySent || []).map(r => r.user_id));
 
     // Convert into the user's display currency; rows with no known rate count as 0.
-    const toCurrency = await loadConverter(
-        [...yesterdayTxs, ...(history || [])].map(tx => ({ tx, target: profileById.get(tx.user_id)?.currency })),
-    );
-    const convertToBase = (tx: TxRow, baseCcy: string): number => toCurrency(tx, baseCcy) ?? 0;
+    // The floor is $20 expressed in that currency, so it means the same for ₹ and ¥.
+    const floorTx = { amount: ABSOLUTE_FLOOR_USD, currency: 'USD' };
+    const toCurrency = await loadConverter([
+        ...[...yesterdayTxs, ...history].map(tx => ({ tx, target: profileById.get(tx.user_id)?.currency })),
+        ...(profiles || []).map(p => ({ tx: floorTx, target: p.currency })),
+    ]);
+    const convertToBase = (tx: TxRow, baseCcy: string): number => toCurrency(tx, baseCcy, payerShare(tx)) ?? 0;
 
     const yesterdayByUser = new Map<string, number>();
     for (const tx of yesterdayTxs) {
@@ -117,7 +126,7 @@ export async function GET(request: NextRequest) {
     }
 
     const historyByUser = new Map<string, number>();
-    for (const tx of history || []) {
+    for (const tx of history) {
         const profile = profileById.get(tx.user_id);
         if (!profile) continue;
         const base = (profile.currency || 'USD').toUpperCase();
@@ -140,12 +149,12 @@ export async function GET(request: NextRequest) {
         const histTotal = historyByUser.get(userId) || 0;
         const dailyAvg = histTotal / 30;
         if (dailyAvg <= 0) continue;
-        if (yesterdaySpend < ABSOLUTE_FLOOR_BASE) continue;
+        const baseCcy = (profile.currency || 'USD').toUpperCase();
+        if (yesterdaySpend < (toCurrency(floorTx, baseCcy) ?? ABSOLUTE_FLOOR_USD)) continue;
         evaluated++;
         const multiple = yesterdaySpend / dailyAvg;
         if (multiple < MULT_THRESHOLD) continue;
 
-        const baseCcy = (profile.currency || 'USD').toUpperCase();
         const sent = await sendToUser(
             supabase,
             subsByUser,

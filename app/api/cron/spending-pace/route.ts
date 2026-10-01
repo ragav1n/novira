@@ -4,6 +4,7 @@ import { createClient as createServiceClient } from '@supabase/supabase-js';
 import { isInQuietHours } from '@/lib/push-quiet-hours';
 import { authorizeCron, fmtMoney } from '@/lib/server/push';
 import { loadConverter } from '@/lib/server/fx';
+import { payerShare } from '@/lib/server/spend';
 import { logSend } from '@/lib/server/send-log';
 const webpush = require('web-push') as typeof import('web-push');
 
@@ -41,6 +42,7 @@ interface TxRow {
     base_currency: string | null;
     converted_amount: number | null;
     exclude_from_allowance: boolean | null;
+    splits: { amount: number }[] | null;
 }
 
 interface PushSubRow {
@@ -99,10 +101,9 @@ export async function GET(request: NextRequest) {
 
     const { data: txs } = await supabase
         .from('transactions')
-        .select('user_id, amount, currency, exchange_rate, base_currency, converted_amount, exclude_from_allowance')
+        .select('user_id, amount, currency, exchange_rate, base_currency, converted_amount, exclude_from_allowance, splits(amount)')
         .in('user_id', userIds)
         .gte('date', monthStartStr)
-        .is('group_id', null)
         .eq('is_settlement', false)
         .eq('is_income', false)
         .eq('is_transfer', false)
@@ -115,7 +116,10 @@ export async function GET(request: NextRequest) {
         if (tx.exclude_from_allowance) continue;
         const profile = profiles.find(p => p.id === tx.user_id);
         if (!profile) continue;
-        const amt = toCurrency(tx, (profile.currency || 'USD').toUpperCase());
+        // Group rows count at the payer's share, as on the dashboard.
+        const share = payerShare(tx);
+        if (share <= 0) continue;
+        const amt = toCurrency(tx, (profile.currency || 'USD').toUpperCase(), share);
         if (amt === null || amt <= 0) continue;
         totalsByUser.set(tx.user_id, (totalsByUser.get(tx.user_id) || 0) + amt);
     }

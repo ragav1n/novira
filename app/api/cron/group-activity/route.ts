@@ -8,6 +8,7 @@ import {
     cleanupExpired,
     fmtMoney,
 } from '@/lib/server/push';
+import { loadConverter } from '@/lib/server/fx';
 
 interface TxRow {
     id: string;
@@ -15,6 +16,9 @@ interface TxRow {
     group_id: string | null;
     amount: number;
     currency: string | null;
+    exchange_rate: number | null;
+    base_currency: string | null;
+    converted_amount: number | null;
     description: string;
     created_at: string;
 }
@@ -31,6 +35,7 @@ interface GroupRow {
 
 interface ProfileRow {
     id: string;
+    currency: string | null;
     last_group_activity_at: string | null;
 }
 
@@ -44,7 +49,7 @@ export async function GET(request: NextRequest) {
 
     const { data: txs } = await supabase
         .from('transactions')
-        .select('id, user_id, group_id, amount, currency, description, created_at')
+        .select('id, user_id, group_id, amount, currency, exchange_rate, base_currency, converted_amount, description, created_at')
         .not('group_id', 'is', null)
         .gte('created_at', cutoff.toISOString())
         .returns<TxRow[]>();
@@ -64,7 +69,20 @@ export async function GET(request: NextRequest) {
         membersByGroup.set(m.group_id, arr);
     }
 
-    interface PerUserSummary { groupId: string; groupName: string; count: number; total: number; ccy: string; lastDesc: string; lastActor: string; }
+    // Profiles up front: a mixed-currency total is converted into each member's base.
+    const memberIds = Array.from(new Set((members || []).map(m => m.user_id)));
+    const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, currency, last_group_activity_at')
+        .in('id', memberIds)
+        .returns<ProfileRow[]>();
+    const profileById = new Map((profiles || []).map(p => [p.id, p]));
+    const toCurrency = await loadConverter((members || []).flatMap(m =>
+        txs.filter(t => t.group_id === m.group_id).map(tx => ({ tx, target: profileById.get(m.user_id)?.currency })),
+    ));
+
+    // total is null when a mixed-currency sum couldn't be converted; the copy then omits it.
+    interface PerUserSummary { groupId: string; groupName: string; count: number; total: number | null; ccy: string; lastDesc: string; lastActor: string; }
     const summariesByUser = new Map<string, PerUserSummary[]>();
 
     for (const groupId of groupIds) {
@@ -76,13 +94,22 @@ export async function GET(request: NextRequest) {
         for (const memberId of groupMembers) {
             const others = groupTxs.filter(t => t.user_id !== memberId);
             if (!others.length) continue;
-            const totalsByCcy = new Map<string, number>();
-            for (const t of others) {
-                const c = (t.currency || 'USD').toUpperCase();
-                totalsByCcy.set(c, (totalsByCcy.get(c) || 0) + Number(t.amount));
+            // One currency: report it as entered. Mixed: convert everything into the
+            // member's base, so the total covers the same expenses the count does.
+            const ccys = new Set(others.map(t => (t.currency || 'USD').toUpperCase()));
+            let topCcy: string;
+            let topTotal: number | null = 0;
+            if (ccys.size === 1) {
+                topCcy = [...ccys][0];
+                topTotal = others.reduce((sum, t) => sum + Number(t.amount), 0);
+            } else {
+                topCcy = (profileById.get(memberId)?.currency || 'USD').toUpperCase();
+                for (const t of others) {
+                    const amt = toCurrency(t, topCcy);
+                    if (amt === null) { topTotal = null; break; }
+                    topTotal += amt;
+                }
             }
-            // Pick the dominant-currency total.
-            const [topCcy, topTotal] = Array.from(totalsByCcy.entries()).sort((a, b) => b[1] - a[1])[0];
             const last = others[others.length - 1];
             const arr = summariesByUser.get(memberId) || [];
             arr.push({
@@ -101,12 +128,6 @@ export async function GET(request: NextRequest) {
     if (!summariesByUser.size) return NextResponse.json({ scanned: txs.length, notified: 0 });
 
     const userIds = Array.from(summariesByUser.keys());
-    const { data: profiles } = await supabase
-        .from('profiles')
-        .select('id, last_group_activity_at')
-        .in('id', userIds)
-        .returns<ProfileRow[]>();
-    const profileById = new Map((profiles || []).map(p => [p.id, p]));
     const eligibleUsers = userIds.filter(uid => {
         const last = profileById.get(uid)?.last_group_activity_at;
         if (!last) return true;
@@ -126,9 +147,11 @@ export async function GET(request: NextRequest) {
         if (summaries.length === 1) {
             const s = summaries[0];
             title = `New activity in ${s.groupName}`;
-            body = s.count === 1
-                ? `${fmtMoney(s.total, s.ccy)} added — "${s.lastDesc}".`
-                : `${s.count} expenses by others — ${fmtMoney(s.total, s.ccy)} total.`;
+            body = s.total === null
+                ? `${s.count} ${s.count === 1 ? 'expense' : 'expenses'} by others.`
+                : s.count === 1
+                    ? `${fmtMoney(s.total, s.ccy)} added — "${s.lastDesc}".`
+                    : `${s.count} expenses by others — ${fmtMoney(s.total, s.ccy)} total.`;
             url = '/groups';
         } else {
             const totalCount = summaries.reduce((sum, s) => sum + s.count, 0);

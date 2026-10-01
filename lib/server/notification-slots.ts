@@ -2,6 +2,8 @@ import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { fmtMoney, type PushPayload } from '@/lib/server/push';
 import { loadConverter } from '@/lib/server/fx';
+import { localDate, shiftDays } from '@/lib/server/local-date';
+import { payerShare } from '@/lib/server/spend';
 import { loadSettlementBalance, type SettlementBalance } from '@/lib/server/settlement-balance';
 import { computeWeightedRunRate } from '@/lib/utils/run-rate';
 
@@ -10,12 +12,6 @@ export interface SlotProfile {
     currency: string | null;
     monthly_budget: number | null;
     timezone: string | null;
-    /**
-     * Optional. When present, slot composers can surface streak milestones
-     * inside the existing morning/evening copy without firing a separate push.
-     * Maintained by the `no-spend-streak` cron.
-     */
-    last_no_spend_streak?: number | null;
 }
 
 export interface SlotContext {
@@ -44,7 +40,7 @@ export interface SlotContext {
     nearestBucket: { name: string; end_date: string; daysOut: number } | null;
     /** Net unpaid-split balance across all the user's groups. */
     settlement: SettlementBalance;
-    /** Current no-spend streak (days). Sourced from profile; 0 when unknown. */
+    /** Complete days since the last allowance-affecting expense, ending yesterday. */
     currentStreak: number;
 }
 
@@ -57,6 +53,7 @@ interface TxRow {
     converted_amount: number | null;
     date: string;
     exclude_from_allowance: boolean | null;
+    splits: { amount: number }[] | null;
 }
 
 interface RecurringRow {
@@ -76,27 +73,9 @@ interface BucketRow {
     completed_at: string | null;
 }
 
-function localDate(timezone: string | null, d: Date): string {
-    const tz = timezone || 'UTC';
-    try {
-        return new Intl.DateTimeFormat('en-CA', {
-            timeZone: tz,
-            year: 'numeric', month: '2-digit', day: '2-digit',
-        }).format(d);
-    } catch {
-        return d.toISOString().slice(0, 10);
-    }
-}
-
-function shiftDays(yyyymmdd: string, n: number): string {
-    const d = new Date(yyyymmdd + 'T00:00:00Z');
-    d.setUTCDate(d.getUTCDate() + n);
-    return d.toISOString().slice(0, 10);
-}
-
 /**
- * Single fetch reused across all 3 composers for a given user. Pulls a 14-day
- * transaction window (covers yesterday/today + activity check), upcoming
+ * Single fetch reused across all 3 composers for a given user. Pulls the month
+ * to date or the last 14 days, whichever reaches further back, plus upcoming
  * recurring bills, and the nearest non-archived bucket.
  */
 export async function loadSlotContext(
@@ -112,13 +91,15 @@ export async function loadSlotContext(
     const monthStart = localToday.slice(0, 8) + '01';
     const horizon = shiftDays(localToday, 2);
     const baseCcy = (profile.currency || 'USD').toUpperCase();
+    // mtdSpend needs the whole month: a 14-day window alone loses the 1st–10th by the 25th.
+    const since = monthStart < fourteenAgo ? monthStart : fourteenAgo;
 
+    // Rows the user paid, group ones included at their share — the dashboard's rule.
     const { data: txs } = await supabase
         .from('transactions')
-        .select('user_id, amount, currency, exchange_rate, base_currency, converted_amount, date, exclude_from_allowance')
+        .select('user_id, amount, currency, exchange_rate, base_currency, converted_amount, date, exclude_from_allowance, splits(amount)')
         .eq('user_id', profile.id)
-        .gte('date', fourteenAgo)
-        .is('group_id', null)
+        .gte('date', since)
         .eq('is_settlement', false)
         .eq('is_income', false)
         .eq('is_transfer', false)
@@ -130,13 +111,17 @@ export async function loadSlotContext(
     let mtdSpend = 0;
     let last7Spend = 0;
     let txCount14d = 0;
+    const spendDays = new Set<string>();
     const sevenAgo = shiftDays(localToday, -6); // inclusive 7-day window
     for (const tx of txs || []) {
         if (tx.exclude_from_allowance) continue;
-        const amt = toCurrency(tx, baseCcy);
+        const share = payerShare(tx);
+        if (share <= 0) continue;
+        const amt = toCurrency(tx, baseCcy, share);
         if (amt === null || amt <= 0) continue;
         const d = tx.date.slice(0, 10);
-        txCount14d += 1;
+        spendDays.add(d);
+        if (d >= fourteenAgo) txCount14d += 1;
         if (d === localToday) { todaySpend += amt; todayCount += 1; }
         if (d === localYesterday) { yesterdaySpend += amt; yesterdayCount += 1; }
         if (d >= monthStart && d <= localToday) mtdSpend += amt;
@@ -183,7 +168,10 @@ export async function loadSlotContext(
     }
 
     const settlement = await loadSettlementBalance(supabase, profile.id, baseCcy, 3, now);
-    const currentStreak = Math.max(0, Number(profile.last_no_spend_streak) || 0);
+    // Slots only fire for users with spend in the last 14 days, so the streak
+    // always ends inside the fetched window.
+    let currentStreak = 0;
+    for (let d = localYesterday; d >= fourteenAgo && !spendDays.has(d); d = shiftDays(d, -1)) currentStreak += 1;
 
     return {
         profile, localToday, localYesterday, localTomorrow,

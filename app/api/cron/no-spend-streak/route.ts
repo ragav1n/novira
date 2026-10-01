@@ -7,11 +7,13 @@ import {
     sendToUser,
     cleanupExpired,
 } from '@/lib/server/push';
+import { localDate, shiftDays } from '@/lib/server/local-date';
 
 const CELEBRATE_AT = [3, 7, 14, 30] as const;
 
 interface ProfileRow {
     id: string;
+    timezone: string | null;
     last_no_spend_streak: number | null;
 }
 
@@ -42,7 +44,7 @@ export async function GET(request: NextRequest) {
 
     const { data: profiles } = await supabase
         .from('profiles')
-        .select('id, last_no_spend_streak')
+        .select('id, timezone, last_no_spend_streak')
         .in('id', candidateIds)
         .returns<ProfileRow[]>();
 
@@ -73,14 +75,13 @@ export async function GET(request: NextRequest) {
         // Only count if they've ever logged a transaction in the lookback window
         // (otherwise a brand-new user gets falsely celebrated).
         if (dates.size === 0) continue;
+        // Count complete days in the user's own calendar, starting at their yesterday.
         let streak = 0;
-        const cursor = new Date(today);
-        // Skip today itself — only count complete prior days.
-        cursor.setUTCDate(cursor.getUTCDate() - 1);
+        let cursor = shiftDays(localDate(p.timezone, now), -1);
         while (streak < 31) {
-            if (dates.has(ymd(cursor))) break;
+            if (dates.has(cursor)) break;
             streak++;
-            cursor.setUTCDate(cursor.getUTCDate() - 1);
+            cursor = shiftDays(cursor, -1);
         }
         // Did we just cross a celebration milestone?
         const milestone = [...CELEBRATE_AT].reverse().find(m => streak >= m && (p.last_no_spend_streak || 0) < m);
@@ -108,8 +109,9 @@ export async function GET(request: NextRequest) {
     }
 
     // Reset streak counter for anyone who logged a tx yesterday so the next milestone fires fresh.
+    const yesterdayOf = new Map((profiles || []).map(p => [p.id, shiftDays(localDate(p.timezone, now), -1)]));
     const userIdsWithRecent = (txDates || [])
-        .filter(t => t.date === ymd(new Date(today.getTime() - 86400000)))
+        .filter(t => t.date === yesterdayOf.get(t.user_id))
         .map(t => t.user_id);
     if (userIdsWithRecent.length) {
         await supabase.from('profiles')

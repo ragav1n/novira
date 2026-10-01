@@ -9,6 +9,7 @@ import {
     fmtMoney,
 } from '@/lib/server/push';
 import { loadConverter } from '@/lib/server/fx';
+import { payerShare } from '@/lib/server/spend';
 
 interface ProfileRow {
     id: string;
@@ -24,6 +25,7 @@ interface TxRow {
     base_currency: string | null;
     converted_amount: number | null;
     date: string;
+    splits: { amount: number }[] | null;
 }
 
 function ymd(d: Date): string { return d.toISOString().slice(0, 10); }
@@ -54,7 +56,7 @@ export async function GET(request: NextRequest) {
 
     const { data: txs } = await supabase
         .from('transactions')
-        .select('user_id, amount, currency, exchange_rate, base_currency, converted_amount, date')
+        .select('user_id, amount, currency, exchange_rate, base_currency, converted_amount, date, splits(amount)')
         .in('user_id', eligible.map(p => p.id))
         .gte('date', ymd(lastMonthStart))
         .lte('date', ymd(thisMonthCutoff))
@@ -75,7 +77,10 @@ export async function GET(request: NextRequest) {
         let thisMtd = 0; let lastMtd = 0;
         for (const tx of txs || []) {
             if (tx.user_id !== p.id) continue;
-            const amt = toCurrency(tx, ccy);
+            // Group rows count at the payer's share, as on the dashboard.
+            const share = payerShare(tx);
+            if (share <= 0) continue;
+            const amt = toCurrency(tx, ccy, share);
             if (amt === null) continue;
             const d = tx.date;
             if (d >= ymd(thisMonthStart) && d <= ymd(thisMonthCutoff)) thisMtd += amt;
