@@ -324,3 +324,22 @@ Committed as files and run by hand in the Supabase SQL editor:
   `get_transaction_user_id`, `is_group_member` and `is_group_creator` are called
   from inside RLS policies, which are evaluated as the *querying* role, so revoking
   anon's EXECUTE turned an empty read into a hard 401. Apply this one too.
+- **Bug audit round (v2.116.0) — apply in this order, none applied yet:**
+  - `202610010100_transaction_write_guards.sql` — **SECURITY.** `create_transaction_atomic`
+    checked only the transaction's owner: the recurring template's `user_id`, split debtors,
+    amounts and `is_paid`, and group/bucket/account refs were trusted (a forged backdated daily
+    template for another user, charging strangers). Adds `can_split_on(tx, debtor)` (accepted
+    friend or group member), a refs trigger on `transactions`/`recurring_templates`, scopes the
+    idempotency lookup to the caller, narrows the splits UPDATE policy to the creditor's
+    `is_paid`, adds `recurring_templates.account_id`, and lets the owner change only
+    `receipt_path`/`account_id` on a split expense. Errors: 42501 (refs), 22023 (split amounts).
+  - `202610010200_recurring_processor_local_date_and_splits.sql` — processor uses the user's
+    `profiles.timezone` date, copies `account_id`, honours `metadata.split_amounts`, skips
+    unfriended debtors, and posts a group bill as personal if the payer left. Depends on 0100.
+  - `202610010300_friendships_groups_profile_lookup.sql` — only the recipient can accept a
+    request (and INSERT is pending-only); the group creator can't leave while others remain
+    (`GROUP_CREATOR_CANNOT_LEAVE`); `get_profile_by_email` rate-limited to 20/hour.
+  - `202610010400_settle_splits_skip_settled.sql` — `settle_splits_batch` skips settled splits
+    instead of rolling back; `settle_split` locks the row.
+  - `202610010900_rate_limit.sql` — durable `rate_limit_hit` counter for the AI routes. The
+    client falls back to the in-memory limiter until it is applied.
