@@ -9,7 +9,7 @@ import { supabase } from '@/lib/supabase';
 import { useBucketsList } from '@/components/providers/buckets-provider';
 import { useGroups } from '@/components/providers/groups-provider';
 import { useSyncQueueState } from '@/hooks/use-sync-queue-state';
-import { usePushNotifications } from '@/hooks/usePushNotifications';
+import { usePushNotifications, detachPushSubscription } from '@/hooks/usePushNotifications';
 import { useCategorizationRules } from '@/hooks/useCategorizationRules';
 import { useRecurringTemplates } from '@/hooks/useRecurringTemplates';
 import { useDataExport } from '@/hooks/useDataExport';
@@ -106,6 +106,7 @@ export function SettingsView() {
         if (signingOut) return;
         setSigningOut(true);
         try {
+            await detachPushSubscription();
             await supabase.auth.signOut();
             router.push('/signin');
         } catch (error) {

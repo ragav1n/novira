@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { Dialog, DialogContent, DialogTrigger, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import * as VisuallyHidden from '@radix-ui/react-visually-hidden';
 import { supabase } from '@/lib/supabase';
+import { detachPushSubscription } from '@/hooks/usePushNotifications';
 import { useUserPreferences } from '@/components/providers/user-preferences-provider';
 
 function Input({ className, type, ...props }: React.ComponentProps<"input">) {
@@ -82,6 +83,7 @@ export function DeleteAccountDialog({ trigger }: DeleteAccountDialogProps) {
                 }
 
                 // Success
+                await detachPushSubscription();
                 await supabase.auth.signOut();
                 window.location.href = '/signin?message=Account+deleted';
             }

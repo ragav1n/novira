@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { detachPushSubscription } from '@/hooks/usePushNotifications'
 import { deleteAccount } from '@/app/actions/delete-account'
 import { toast } from '@/utils/haptics'
 import { getErrorMessage } from '@/lib/error-utils'
@@ -55,6 +56,7 @@ export default function ConfirmDeletePage() {
 
                 // 4. Finalize
                 setStatus('Cleaning up...')
+                await detachPushSubscription()
                 await supabase.auth.signOut()
                 
                 router.push('/signin?message=Account+deleted')

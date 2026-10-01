@@ -15,6 +15,38 @@ function urlBase64ToUint8Array(base64String: string): ArrayBuffer {
     return outputArray.buffer;
 }
 
+// Detach this browser's push channel from the signed-in user. Called before
+// sign-out: the subscription and its server row otherwise outlive the session,
+// so the previous user's bills and split requests keep arriving on a device
+// someone else is now signed into. Must run while the session is still valid
+// (the DELETE is authenticated). The browser subscription is dropped even if
+// the request fails — the next send to it then 410s and the server prunes the row.
+export async function detachPushSubscription(): Promise<void> {
+    if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return;
+    try {
+        const reg = await navigator.serviceWorker.getRegistration();
+        const sub = await reg?.pushManager?.getSubscription();
+        if (!sub) return;
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 3000);
+        try {
+            await fetch('/api/push/subscribe', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ endpoint: sub.endpoint }),
+                signal: controller.signal,
+            });
+        } catch (err) {
+            console.error('[Push] Detach request failed:', err);
+        } finally {
+            clearTimeout(timer);
+        }
+        await sub.unsubscribe();
+    } catch (err) {
+        console.error('[Push] Detach failed:', err);
+    }
+}
+
 export type PushPermission = 'default' | 'granted' | 'denied' | 'unsupported';
 
 export function usePushNotifications() {

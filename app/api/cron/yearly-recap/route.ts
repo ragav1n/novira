@@ -2,6 +2,7 @@ import 'server-only';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient as createServiceClient } from '@supabase/supabase-js';
 import { authorizeCron } from '@/lib/server/push';
+import { activeUserIdsInRange } from '@/lib/server/active-users';
 
 export const maxDuration = 60;
 
@@ -47,25 +48,14 @@ export async function GET(request: NextRequest) {
 
     const { year, key, startStr, endStr } = priorYearRange();
 
-    const { data: txs, error: txErr } = await supabase
-        .from('transactions')
-        .select('user_id')
-        .gte('date', startStr)
-        .lte('date', endStr);
-    if (txErr) {
+    let activeUserIds: string[];
+    try {
+        activeUserIds = await activeUserIdsInRange(supabase, startStr, endStr);
+    } catch (txErr) {
         console.error('[yearly-recap-cron] tx fetch failed', txErr);
-        return NextResponse.json({ error: txErr.message }, { status: 500 });
+        return NextResponse.json({ error: 'Unable to list active users' }, { status: 500 });
     }
-    const activeUserIds = Array.from(new Set((txs || []).map(t => t.user_id as string)));
     if (!activeUserIds.length) return NextResponse.json({ dispatched: 0, year: key });
-
-    const { data: profiles } = await supabase
-        .from('profiles')
-        .select('id, currency')
-        .in('id', activeUserIds);
-    const currencyByUser = new Map<string, string>(
-        (profiles || []).map(p => [p.id as string, ((p.currency as string) || 'USD').toUpperCase()])
-    );
 
     const baseUrl = workerBaseUrl(request);
     const workerUrl = `${baseUrl}/api/cron/_recap-worker`;
@@ -94,7 +84,6 @@ export async function GET(request: NextRequest) {
                     body: JSON.stringify({
                         userId: uid,
                         period: key,
-                        currency: currencyByUser.get(uid) || 'USD',
                         push: pushPayload
                     }),
                     keepalive: true

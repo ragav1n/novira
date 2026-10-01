@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient as createServiceClient } from '@supabase/supabase-js';
 import { authorizeCron } from '@/lib/server/push';
 import { generateRecap, VALID_PERIOD_RE } from '@/lib/recap-generator';
+import { profileCurrency } from '@/lib/server/currency';
 const webpush = require('web-push') as typeof import('web-push');
 
 export const maxDuration = 60;
@@ -24,7 +25,6 @@ interface PushSubRow {
 interface WorkerPayload {
     userId?: string;
     period?: string;
-    currency?: string;
     push?: { title: string; body: string; url: string; icon?: string };
 }
 
@@ -32,8 +32,14 @@ export async function POST(request: NextRequest) {
     const denied = authorizeCron(request);
     if (denied) return denied;
 
-    const { userId, period, currency, push } = (await request.json()) as WorkerPayload;
-    if (!userId || !period || !VALID_PERIOD_RE.test(period)) {
+    let payload: WorkerPayload | null;
+    try {
+        payload = (await request.json()) as WorkerPayload | null;
+    } catch {
+        return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
+    }
+    const { userId, period, push } = payload ?? {};
+    if (typeof userId !== 'string' || typeof period !== 'string' || !userId || !period || !VALID_PERIOD_RE.test(period)) {
         return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
     }
 
@@ -56,8 +62,11 @@ export async function POST(request: NextRequest) {
     if (!existing) {
         const GENERATION_TIMEOUT_MS = 50_000; // keep headroom under maxDuration=60
         try {
+            // Read here rather than trusting the dispatcher's copy, so every path
+            // into a stored recap gets its currency from the same place.
+            const currency = await profileCurrency(supabase, userId);
             await Promise.race([
-                generateRecap(supabase, userId, period, (currency || 'USD').toUpperCase()),
+                generateRecap(supabase, userId, period, currency),
                 new Promise<never>((_, reject) =>
                     setTimeout(() => reject(new Error('generateRecap timeout')), GENERATION_TIMEOUT_MS)
                 )

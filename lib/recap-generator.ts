@@ -380,20 +380,55 @@ export async function generateRecap(
     const prevRange = isYear ? yearRange(yearOf(period) - 1) : monthRange(prev);
     if (!prevRange) throw new Error('Invalid previous period');
 
+    // The cron worker calls this with the service role, which bypasses RLS, so
+    // every query has to be scoped to the user explicitly — unscoped, it read
+    // every user's rows (capped at PostgREST's 1,000) into one recap. Two
+    // queries: rows the user paid (with all their splits, to subtract what
+    // others owe) and rows someone else paid where the user owes a split (with
+    // only that split embedded, which is all `aggregate` reads for them).
+    // Each is paged, since a year of transactions can pass the 1,000-row cap.
+    const PAGE = 1000;
+    const TX_COLS = 'id, amount, category, payment_method, date, place_name, description, user_id, currency, exchange_rate, base_currency, converted_amount';
+    const fetchPaged = async (build: (from: number, to: number) => PromiseLike<{ data: TxRow[] | null; error: unknown }>) => {
+        const rows: TxRow[] = [];
+        for (let from = 0; ; from += PAGE) {
+            const { data, error } = await build(from, from + PAGE - 1);
+            if (error) throw error;
+            rows.push(...(data || []));
+            if (!data || data.length < PAGE) return rows;
+        }
+    };
     const fetchRange = async (start: string, end: string) => {
-        const { data, error } = await supabase
-            .from('transactions')
-            .select('amount, category, payment_method, date, place_name, description, user_id, currency, exchange_rate, base_currency, converted_amount, splits(user_id, amount)')
-            .gte('date', start)
-            .lte('date', end)
-            .eq('is_settlement', false)
-            // Income posts a positive amount and a transfer's outflow leg is
-            // positive too — without these the recap counts both as spending.
-            .eq('is_income', false)
-            .eq('is_transfer', false)
-            .returns<TxRow[]>();
-        if (error) throw error;
-        return data || [];
+        const [own, owed] = await Promise.all([
+            fetchPaged((from, to) => supabase
+                .from('transactions')
+                .select(`${TX_COLS}, splits(user_id, amount)`)
+                .eq('user_id', userId)
+                .gte('date', start)
+                .lte('date', end)
+                .eq('is_settlement', false)
+                // Income posts a positive amount and a transfer's outflow leg is
+                // positive too — without these the recap counts both as spending.
+                .eq('is_income', false)
+                .eq('is_transfer', false)
+                .order('id')
+                .range(from, to)
+                .returns<TxRow[]>()),
+            fetchPaged((from, to) => supabase
+                .from('transactions')
+                .select(`${TX_COLS}, splits!inner(user_id, amount)`)
+                .eq('splits.user_id', userId)
+                .neq('user_id', userId)
+                .gte('date', start)
+                .lte('date', end)
+                .eq('is_settlement', false)
+                .eq('is_income', false)
+                .eq('is_transfer', false)
+                .order('id')
+                .range(from, to)
+                .returns<TxRow[]>()),
+        ]);
+        return [...own, ...owed];
     };
 
     const [current, previous] = await Promise.all([

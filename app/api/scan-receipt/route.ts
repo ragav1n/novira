@@ -5,7 +5,7 @@ import Anthropic from '@anthropic-ai/sdk'
 // converts through zod/v4, and this project is still on zod 3's v3 surface.
 import { jsonSchemaOutputFormat } from '@anthropic-ai/sdk/helpers/json-schema'
 import { createClient } from '@/utils/supabase/server'
-import { checkRateLimit, rateLimitResponse } from '@/lib/server/rate-limit'
+import { checkDurableRateLimit, rateLimitResponse } from '@/lib/server/rate-limit'
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
 
@@ -141,16 +141,13 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const limit = checkRateLimit('scan-receipt', user.id, RATE_CFG)
-  if (!limit.allowed) return rateLimitResponse(limit, RATE_CFG, `Daily scan limit reached (${RATE_CFG.max}/day).`)
-
-  let parsedBody: { imageBase64?: unknown; mimeType?: unknown; today?: unknown }
+  let parsedBody: { imageBase64?: unknown; mimeType?: unknown; today?: unknown } | null
   try {
     parsedBody = await req.json()
   } catch {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
   }
-  const { imageBase64, mimeType, today } = parsedBody
+  const { imageBase64, mimeType, today } = parsedBody ?? {}
 
   if (typeof imageBase64 !== 'string' || typeof mimeType !== 'string') {
     return NextResponse.json({ error: 'Missing image data' }, { status: 400 })
@@ -171,6 +168,10 @@ export async function POST(req: NextRequest) {
       { status: 413 }
     )
   }
+
+  // Counted after validation so a rejected upload doesn't spend a scan.
+  const limit = await checkDurableRateLimit('scan-receipt', user.id, RATE_CFG)
+  if (!limit.allowed) return rateLimitResponse(limit, RATE_CFG, `Daily scan limit reached (${RATE_CFG.max}/day).`)
 
   let receipt: Receipt | null
   try {
@@ -197,7 +198,15 @@ export async function POST(req: NextRequest) {
     // A schema-shaped response can still fail to parse — a `max_tokens` cutoff
     // truncates the JSON mid-object. Transport and rate-limit failures are a
     // different problem and keep their own status.
-    if (err instanceof Anthropic.APIError) throw err
+    if (err instanceof Anthropic.APIError) {
+      console.error('[scan-receipt] model request failed', { status: err.status, message: err.message })
+      // Our request was rejected (bad image) vs. the upstream being busy or down.
+      if (err.status === 400) return NextResponse.json({ error: 'Could not read this image' }, { status: 422 })
+      if (err.status === 429 || err.status === 529) {
+        return NextResponse.json({ error: 'Receipt scanning is busy, try again shortly' }, { status: 503 })
+      }
+      return NextResponse.json({ error: 'Receipt scanning is unavailable' }, { status: 502 })
+    }
     console.error('[scan-receipt] structured output parse failed', { err })
     return NextResponse.json({ error: 'Could not parse receipt' }, { status: 422 })
   }

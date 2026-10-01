@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { createClient } from '@/utils/supabase/server';
 import { buildInsightsSnapshot, type SnapshotRange } from '@/lib/insights-snapshot';
-import { checkRateLimit } from '@/lib/server/rate-limit';
+import { checkDurableRateLimit } from '@/lib/server/rate-limit';
 import { profileCurrency } from '@/lib/server/currency';
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -60,7 +60,32 @@ export async function POST(req: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const limit = checkRateLimit('insights-chat', user.id, RATE_CFG);
+    let body: RequestBody;
+    try {
+        body = await req.json();
+    } catch {
+        return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+    }
+
+    if (!body || typeof body !== 'object' || !Array.isArray(body.messages) || body.messages.length === 0) {
+        return NextResponse.json({ error: 'messages required' }, { status: 400 });
+    }
+    if (!isValidRange(body.range)) {
+        return NextResponse.json({ error: 'invalid range' }, { status: 400 });
+    }
+
+    // Cap conversation length to avoid runaway costs.
+    const messages = body.messages.slice(-12).filter(m => m && typeof m === 'object').map(m => ({
+        role: m.role,
+        content: typeof m.content === 'string' ? m.content.slice(0, 2000) : '',
+    })).filter(m => m.content.length > 0 && (m.role === 'user' || m.role === 'assistant'));
+
+    if (messages.length === 0 || messages[messages.length - 1].role !== 'user') {
+        return NextResponse.json({ error: 'last message must be from user' }, { status: 400 });
+    }
+
+    // Counted after validation so a malformed request doesn't spend a slot.
+    const limit = await checkDurableRateLimit('insights-chat', user.id, RATE_CFG);
     if (!limit.allowed) {
         const minutes = Math.max(1, Math.ceil((limit.resetAt - Date.now()) / 60000));
         const hours = Math.floor(minutes / 60);
@@ -69,30 +94,6 @@ export async function POST(req: NextRequest) {
             { error: `Daily limit reached (${DAILY_LIMIT}/day). Try again in ${wait}.`, resetAt: limit.resetAt },
             { status: 429, headers: { 'X-RateLimit-Reset': String(limit.resetAt) } }
         );
-    }
-
-    let body: RequestBody;
-    try {
-        body = await req.json();
-    } catch {
-        return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
-    }
-
-    if (!Array.isArray(body.messages) || body.messages.length === 0) {
-        return NextResponse.json({ error: 'messages required' }, { status: 400 });
-    }
-    if (!isValidRange(body.range)) {
-        return NextResponse.json({ error: 'invalid range' }, { status: 400 });
-    }
-
-    // Cap conversation length to avoid runaway costs.
-    const messages = body.messages.slice(-12).map(m => ({
-        role: m.role,
-        content: typeof m.content === 'string' ? m.content.slice(0, 2000) : '',
-    })).filter(m => m.content.length > 0 && (m.role === 'user' || m.role === 'assistant'));
-
-    if (messages.length === 0 || messages[messages.length - 1].role !== 'user') {
-        return NextResponse.json({ error: 'last message must be from user' }, { status: 400 });
     }
 
     let snapshot;

@@ -1,5 +1,6 @@
 import 'server-only';
 import { NextResponse } from 'next/server';
+import { createClient as createServiceClient, type SupabaseClient } from '@supabase/supabase-js';
 
 export interface RateLimitConfig {
     max: number;
@@ -45,6 +46,49 @@ export function checkRateLimit(bucket: string, key: string, cfg: RateLimitConfig
         resetAt: now + cfg.windowMs,
         retryAfterSec: 0,
     };
+}
+
+let serviceClient: SupabaseClient | null | undefined;
+function getServiceClient(): SupabaseClient | null {
+    if (serviceClient !== undefined) return serviceClient;
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    serviceClient = url && key
+        ? createServiceClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } })
+        : null;
+    return serviceClient;
+}
+
+// Database-backed fixed-window limiter for the routes that spend money (AI calls).
+// The in-memory one above is per serverless instance, so a cold start or a second
+// instance hands out a fresh quota. Falls back to the in-memory limiter when the
+// database can't answer (migration not applied, no service key, outage): a
+// per-instance cap is still a cap, and failing closed would take recap, chat and
+// scan down together with the counter.
+export async function checkDurableRateLimit(bucket: string, key: string, cfg: RateLimitConfig): Promise<RateLimitResult> {
+    const supabase = getServiceClient();
+    if (supabase) {
+        const { data, error } = await supabase.rpc('rate_limit_hit', {
+            p_bucket: bucket,
+            p_key: key,
+            p_window_ms: cfg.windowMs,
+            p_max: cfg.max,
+        });
+        const row = Array.isArray(data) ? data[0] as { hit_count: number; window_started: string } | undefined : undefined;
+        if (!error && row) {
+            const now = Date.now();
+            const resetAt = new Date(row.window_started).getTime() + cfg.windowMs;
+            const allowed = row.hit_count <= cfg.max;
+            return {
+                allowed,
+                remaining: Math.max(0, cfg.max - row.hit_count),
+                resetAt,
+                retryAfterSec: allowed ? 0 : Math.max(1, Math.ceil((resetAt - now) / 1000)),
+            };
+        }
+        console.error('[rate-limit] durable counter unavailable, using in-memory', error ?? 'no row');
+    }
+    return checkRateLimit(bucket, key, cfg);
 }
 
 export function rateLimitResponse(result: RateLimitResult, cfg: RateLimitConfig, message?: string): NextResponse {

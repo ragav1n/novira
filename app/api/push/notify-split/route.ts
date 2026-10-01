@@ -58,13 +58,13 @@ export async function POST(request: NextRequest) {
     const limit = checkRateLimit('notify-split', user.id, RATE_CFG);
     if (!limit.allowed) return rateLimitResponse(limit, RATE_CFG);
 
-    let body: { transaction_id?: unknown };
+    let body: { transaction_id?: unknown } | null;
     try {
         body = await request.json();
     } catch {
         return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
     }
-    const transactionId = typeof body.transaction_id === 'string' ? body.transaction_id : '';
+    const transactionId = typeof body?.transaction_id === 'string' ? body.transaction_id : '';
     if (!transactionId) {
         return NextResponse.json({ error: 'transaction_id required' }, { status: 400 });
     }
@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
         .returns<SplitRow[]>();
     if (splitsErr) {
         console.error('[notify-split] splits fetch failed', splitsErr.message);
-        return NextResponse.json({ error: splitsErr.message }, { status: 500 });
+        return NextResponse.json({ error: 'Unable to load splits' }, { status: 500 });
     }
 
     // Only the transaction owner may notify on its splits — anything else

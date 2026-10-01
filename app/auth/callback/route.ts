@@ -6,7 +6,12 @@ export async function GET(request: NextRequest) {
     const { searchParams, origin } = new URL(request.url)
     const code = searchParams.get('code')
     let next = searchParams.get('next') ?? '/'
-    if (!next.startsWith('/') || next.startsWith('//')) next = '/'
+    // Same-origin paths only. `//evil.com` and `/\evil.com` both parse as a
+    // protocol-relative URL (browsers treat `\` as `/`), so the second
+    // character must not be a slash of either kind.
+    if (!next.startsWith('/') || next[1] === '/' || next[1] === '\\') next = '/'
+    // Belt and braces: whatever survived must still resolve to our origin.
+    if (new URL(next, origin).origin !== origin) next = '/'
 
     if (code) {
         const cookieStore = await cookies()

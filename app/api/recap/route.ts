@@ -2,7 +2,7 @@ import 'server-only';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
 import { generateRecap, VALID_PERIOD_RE } from '@/lib/recap-generator';
-import { checkRateLimit, rateLimitResponse } from '@/lib/server/rate-limit';
+import { checkRateLimit, checkDurableRateLimit, rateLimitResponse } from '@/lib/server/rate-limit';
 import { profileCurrency } from '@/lib/server/currency';
 
 const READ_CFG = { max: 120, windowMs: 60_000 };
@@ -83,10 +83,14 @@ export async function POST(req: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const genLimit = checkRateLimit('recap-generate', user.id, GENERATE_CFG);
-    if (!genLimit.allowed) return rateLimitResponse(genLimit, GENERATE_CFG, `Daily recap generation limit reached (${GENERATE_CFG.max}/day).`);
-
-    const { month, force } = (await req.json()) as { month?: string; force?: boolean };
+    let body: { month?: unknown; force?: unknown } | null;
+    try {
+        body = await req.json();
+    } catch {
+        return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+    }
+    const month = typeof body?.month === 'string' ? body.month : undefined;
+    const force = body?.force === true;
     if (!month || !isValidMonthPeriod(month)) {
         return NextResponse.json({ error: 'month must be YYYY-MM or YYYY-FY' }, { status: 400 });
     }
@@ -114,6 +118,11 @@ export async function POST(req: NextRequest) {
         }
     }
 
+    // Counted only once we know a generation will actually run — a cache hit
+    // costs nothing and used to burn one of the day's slots.
+    const genLimit = await checkDurableRateLimit('recap-generate', user.id, GENERATE_CFG);
+    if (!genLimit.allowed) return rateLimitResponse(genLimit, GENERATE_CFG, `Daily recap generation limit reached (${GENERATE_CFG.max}/day).`);
+
     try {
         const { recap, analyzed } = await generateRecap(supabase, user.id, month, baseCurrency);
         return NextResponse.json({ month, recap, analyzed, cached: false });
@@ -132,8 +141,13 @@ export async function PATCH(req: NextRequest) {
     const readLimit = checkRateLimit('recap-read', user.id, READ_CFG);
     if (!readLimit.allowed) return rateLimitResponse(readLimit, READ_CFG);
 
-    const { month } = (await req.json()) as { month?: string };
-    if (!month || !isValidMonthPeriod(month)) {
+    let month: unknown;
+    try {
+        month = ((await req.json()) as { month?: unknown } | null)?.month;
+    } catch {
+        return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+    }
+    if (typeof month !== 'string' || !isValidMonthPeriod(month)) {
         return NextResponse.json({ error: 'month must be YYYY-MM or YYYY-FY' }, { status: 400 });
     }
     const { error } = await supabase

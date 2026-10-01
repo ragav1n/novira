@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/utils/supabase/server';
 import { checkRateLimit, rateLimitResponse } from '@/lib/server/rate-limit';
+import { getServiceSupabase } from '@/lib/server/push';
 
 const RATE_CFG = { max: 20, windowMs: 60_000 };
 
@@ -13,7 +14,12 @@ export async function POST(request: NextRequest) {
         const limit = checkRateLimit('push-subscribe', user.id, RATE_CFG);
         if (!limit.allowed) return rateLimitResponse(limit, RATE_CFG);
 
-        const subscription = await request.json();
+        let subscription;
+        try {
+            subscription = await request.json();
+        } catch {
+            return NextResponse.json({ error: 'Invalid subscription' }, { status: 400 });
+        }
         if (!subscription?.endpoint || typeof subscription.endpoint !== 'string') {
             return NextResponse.json({ error: 'Invalid subscription' }, { status: 400 });
         }
@@ -38,11 +44,20 @@ export async function POST(request: NextRequest) {
         // `endpoint` alone, so without this a caller who knows someone else's
         // endpoint could reassign its user_id to themselves — silently stealing
         // the victim's push channel. Drop any foreign claim on it first.
-        await supabase
+        // This has to run as the service role: RLS scopes the caller's deletes
+        // to their own rows, so as the user it matched nothing and the upsert
+        // then failed on the foreign row. The common case is benign — the same
+        // browser, signed into a different account — and the endpoint (a
+        // capability URL issued to this browser) is proof enough of that.
+        // Without a service key this falls back to the caller's client, where RLS
+        // turns the delete into a no-op — the pre-fix behaviour, not an outage.
+        const admin = getServiceSupabase();
+        const { error: claimErr } = await (admin instanceof NextResponse ? supabase : admin)
             .from('push_subscriptions')
             .delete()
             .eq('endpoint', subscription.endpoint)
             .neq('user_id', user.id);
+        if (claimErr) throw claimErr;
 
         // Upsert so re-subscriptions update the keys without duplicating
         const { error } = await supabase
@@ -71,7 +86,15 @@ export async function DELETE(request: NextRequest) {
         const limit = checkRateLimit('push-subscribe', user.id, RATE_CFG);
         if (!limit.allowed) return rateLimitResponse(limit, RATE_CFG);
 
-        const { endpoint } = await request.json();
+        let endpoint: unknown;
+        try {
+            endpoint = ((await request.json()) as { endpoint?: unknown } | null)?.endpoint;
+        } catch {
+            return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+        }
+        if (typeof endpoint !== 'string' || !endpoint) {
+            return NextResponse.json({ error: 'endpoint required' }, { status: 400 });
+        }
         await supabase.from('push_subscriptions').delete().eq('endpoint', endpoint).eq('user_id', user.id);
         return NextResponse.json({ success: true });
     } catch (err: unknown) {
